@@ -5,7 +5,7 @@ from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO, emit
 
 from orca_core.hardware.sensor_client import SensorClient
-from orca_core.hardware.sensing.taxel_coordinates import get_all_coordinates
+from orca_ui.taxel_coordinates import get_all_coordinates
 from orca_core.utils.utils import read_yaml, update_yaml
 import argparse
 import os
