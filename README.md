@@ -44,6 +44,19 @@ finger→sensor-id wiring map and the directory where `calibration.yaml` (zeroin
 offsets) is read/written; the `--side` defaults load the matching config bundled
 with `orca_core`.
 
+### Mock mode (no hardware)
+
+To try the UI without a touch hand connected, run with `--mock`. It simulates
+all five fingers with sine-wave signals on both the resultant force vectors and
+every taxel:
+
+```bash
+uv run python -m orca_ui.app --mock
+```
+
+Open the UI and click **Connect** as usual — the port selector is ignored in
+mock mode. Useful for UI development, demos, or verifying the install.
+
 ## Features
 
 - **Connection Management**: Connect/disconnect to sensor devices

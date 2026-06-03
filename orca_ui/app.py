@@ -27,6 +27,21 @@ stream_thread_running = False
 current_mode = 'resultant'  # 'resultant', 'taxels', or 'combined'
 finger_to_sensor_id_config = None  # Loaded from --config if provided
 config_dir = None  # Set from --config arg directory, for calibration.yaml access
+use_mock = False  # --mock: simulate a touch hand with sine signals, no hardware
+
+def build_client(requested_port=None):
+    """Construct the sensor client: a sine-driven mock if --mock, else real hardware."""
+    if use_mock:
+        from orca_core.hardware.mock_tactile_client import MockTactileClient
+        from orca_ui.mock_signals import make_sine_providers
+        resultant_provider, taxel_provider = make_sine_providers()
+        return MockTactileClient(
+            finger_to_sensor_id=finger_to_sensor_id_config,
+            resultant_provider=resultant_provider,
+            taxel_provider=taxel_provider,
+        )
+    return TactileClient(port=resolve_port(requested_port),
+                         finger_to_sensor_id=finger_to_sensor_id_config)
 
 def resolve_port(requested):
     """Resolve the serial port to use.
@@ -48,7 +63,7 @@ def resolve_port(requested):
 def get_sensor_client():
     global sensor_client
     if sensor_client is None:
-        sensor_client = TactileClient(port=resolve_port(request.args.get('port')))
+        sensor_client = build_client(request.args.get('port'))
     return sensor_client
 
 def stream_update_loop():
@@ -138,7 +153,6 @@ def list_ports():
 def connect():
     try:
         data = request.json
-        port = resolve_port(data.get('port'))
         mode = data.get('mode', 'resultant')
         global sensor_client, current_mode
 
@@ -146,8 +160,9 @@ def connect():
             stop_stream()
             sensor_client.disconnect()
 
-        sensor_client = TactileClient(port=port, finger_to_sensor_id=finger_to_sensor_id_config)
+        sensor_client = build_client(data.get('port'))
         sensor_client.connect()
+        port = 'mock sensor (sine signals)' if use_mock else sensor_client.port
 
         # Load saved sensor offsets if config was provided
         if config_dir:
@@ -345,9 +360,14 @@ def main():
                         help='Path to a hand config.yaml (or the folder containing it), '
                              'overriding --side. Used for the finger->sensor wiring map '
                              'and calibration.yaml location.')
+    parser.add_argument('--mock', action='store_true',
+                        help='Simulate a touch hand (sine signals on all fingers and '
+                             'taxels) instead of connecting to real hardware. No device '
+                             'needed; just open the UI and click Connect.')
     args = parser.parse_args()
 
-    global config_dir, finger_to_sensor_id_config
+    global config_dir, finger_to_sensor_id_config, use_mock
+    use_mock = args.mock
 
     if args.config:
         # Accept either a config.yaml file or the directory containing it.
@@ -374,6 +394,10 @@ def main():
     else:
         print(f"Warning: no 'sensors.finger_to_sensor_id' in {config_path}; "
               f"using TactileClient defaults.")
+
+    if use_mock:
+        print("Running in --mock mode: streaming simulated sine signals "
+              "(no hardware). Open the UI and click Connect.")
 
     socketio.run(app, host='0.0.0.0', port=5001, debug=True, allow_unsafe_werkzeug=True)
 

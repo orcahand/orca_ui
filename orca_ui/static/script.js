@@ -2,17 +2,17 @@ const MAX_FORCE_SCALE = 10;
 const MIN_CIRCLE_RADIUS = 2;
 const MAX_CIRCLE_RADIUS = 40;
 const VISUALIZATION_RADIUS = 70;
-const MAX_TAXEL_FORCE = 5;
+const MAX_TAXEL_FORCE = 25; // N; matches the sensor's max (fz is an unsigned byte * 0.1 N = 25.5 N)
 
 const socket = io();
 
 // State
 let currentMode = 'taxels';
-let taxelDisplayMode = 'direction'; // 'magnitude', 'direction', or 'arrows'
+let taxelDisplayMode = 'magnitude'; // 'magnitude', 'direction', or 'arrows'
 let arrowColorScheme = 'heat'; // 'heat', 'intensity', or 'orca'
-let forceThreshold = 0.5; // default threshold in N
-let arrowLengthMult = 1.0;
-let arrowThicknessMult = 1.0;
+let forceThreshold = 0; // default: threshold disabled (show all). Toggle in UI enables it.
+let arrowLengthMult = 0.5;
+let arrowThicknessMult = 0.5;
 let taxelCounts = { thumb: 127, index: 52, middle: 31, ring: 31, pinky: 31 };
 let taxelGridsInitialized = false;
 let activeSensors = {};

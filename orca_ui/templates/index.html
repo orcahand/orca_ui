@@ -163,11 +163,11 @@
                 <h2>Taxel Visualization</h2>
                 <div class="taxel-controls">
                     <label class="toggle-label">
-                        <input type="radio" name="taxel-mode" id="magnitude-mode-toggle">
+                        <input type="radio" name="taxel-mode" id="magnitude-mode-toggle" checked>
                         <span>Magnitude</span>
                     </label>
                     <label class="toggle-label">
-                        <input type="radio" name="taxel-mode" id="direction-mode-toggle" checked>
+                        <input type="radio" name="taxel-mode" id="direction-mode-toggle">
                         <span>Direction</span>
                     </label>
                     <label class="toggle-label">
@@ -186,19 +186,19 @@
                     <span class="view-separator">|</span>
                     <label class="toggle-label slider-control" title="Arrow length multiplier">
                         <span>Length:</span>
-                        <input type="range" id="arrow-length-slider" min="0.2" max="3" step="0.1" value="1">
-                        <span id="arrow-length-value">1.0x</span>
+                        <input type="range" id="arrow-length-slider" min="0.2" max="3" step="0.1" value="0.5">
+                        <span id="arrow-length-value">0.5x</span>
                     </label>
                     <label class="toggle-label slider-control" title="Arrow thickness multiplier">
                         <span>Thickness:</span>
-                        <input type="range" id="arrow-thickness-slider" min="0.2" max="3" step="0.1" value="1">
-                        <span id="arrow-thickness-value">1.0x</span>
+                        <input type="range" id="arrow-thickness-slider" min="0.2" max="3" step="0.1" value="0.5">
+                        <span id="arrow-thickness-value">0.5x</span>
                     </label>
                     <span class="view-separator">|</span>
                     <label class="toggle-label" title="Hide arrows below this force (N). 0 = show all.">
-                        <input type="checkbox" id="threshold-toggle" checked>
+                        <input type="checkbox" id="threshold-toggle">
                         <span>Threshold:</span>
-                        <input type="number" id="threshold-input" min="0" max="5" step="0.1" value="0.5">
+                        <input type="number" id="threshold-input" min="0" max="5" step="0.1" value="0.5" disabled>
                         <span>N</span>
                     </label>
                     <div class="color-legend" id="color-legend">
