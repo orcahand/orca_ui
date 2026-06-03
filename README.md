@@ -4,22 +4,45 @@ Web-based visualization interface for the ORCA Hand tactile sensors. Uses [orca_
 
 ## Installation
 
-```bash
-# Install orca_core first (from local checkout or PyPI)
-pip install -e /path/to/orca_core
+This project uses [uv](https://docs.astral.sh/uv/). `orca_core` is installed automatically from the public GitHub repo —
 
-# Then install orca_ui
-pip install -e .
+```bash
+# Creates the virtualenv and installs orca_ui + orca_core (from GitHub)
+uv sync
 ```
+
+> Using a local orca_core dev checkout instead? Edit the `[tool.uv.sources]`
+> entry in `pyproject.toml` (instructions are in the comment there), then re-run
+> `uv sync`.
 
 ## Usage
 
+By default, the UI runs for the **right** touch hand:
+
 ```bash
-python -m orca_ui.app
-python -m orca_ui.app --config /path/to/orcahand-touch/config.yaml
+uv run python -m orca_ui.app
 ```
 
-Then open your browser to `http://localhost:5001`
+For the **left** touch hand:
+
+```bash
+uv run python -m orca_ui.app --side left
+```
+
+To use your own **specific config** (e.g. a per-hand calibrated copy), point at it
+with `--config`. This overrides `--side`:
+
+```bash
+uv run python -m orca_ui.app --config /path/to/orcahand-touch/config.yaml
+```
+
+Then open your browser to `http://localhost:5001`.
+
+Right and left have different sensor wiring, so the `--side` you choose (or the
+config you pass) must match your hardware. The config supplies the
+finger→sensor-id wiring map and the directory where `calibration.yaml` (zeroing
+offsets) is read/written; the `--side` defaults load the matching config bundled
+with `orca_core`.
 
 ## Features
 

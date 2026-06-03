@@ -4,7 +4,7 @@
 from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO, emit
 
-from orca_core.hardware.sensor_client import SensorClient
+from orca_core.hardware.tactile_client import TactileClient
 from orca_ui.taxel_coordinates import get_all_coordinates
 from orca_core.utils.utils import read_yaml, update_yaml
 import argparse
@@ -32,7 +32,7 @@ def get_sensor_client():
     global sensor_client
     if sensor_client is None:
         port = request.args.get('port', '/dev/ttyACM0')
-        sensor_client = SensorClient(port=port)
+        sensor_client = TactileClient(port=port)
     return sensor_client
 
 def stream_update_loop():
@@ -130,7 +130,7 @@ def connect():
             stop_stream()
             sensor_client.disconnect()
 
-        sensor_client = SensorClient(port=port, finger_to_sensor_id=finger_to_sensor_id_config)
+        sensor_client = TactileClient(port=port, finger_to_sensor_id=finger_to_sensor_id_config)
         sensor_client.connect()
 
         # Load saved sensor offsets if config was provided
@@ -144,7 +144,7 @@ def connect():
         start_stream(mode)
 
         # Get configuration for response
-        config = sensor_client.get_sensor_configuration()
+        config = sensor_client.get_tactile_configuration()
 
         socketio.emit('connection_status', {'connected': True, 'mode': mode})
         return jsonify({
@@ -313,23 +313,51 @@ def handle_connect():
 def handle_disconnect():
     pass
 
+def default_config_path(side):
+    """Path to the orca_core-bundled touch-hand config for the given side."""
+    import orca_core
+    return os.path.join(os.path.dirname(orca_core.__file__),
+                        'models', 'v2', f'orcahand_touch_{side}', 'config.yaml')
+
+
 def main():
-    parser = argparse.ArgumentParser(description='ORCA Sensor Testing UI')
+    parser = argparse.ArgumentParser(description='ORCA Tactile Sensor UI')
+    parser.add_argument('--side', choices=['right', 'left'], default='right',
+                        help="Which touch hand to use (default: right). Selects the "
+                             "matching sensor wiring from the orca_core bundled config.")
     parser.add_argument('--config', type=str, default=None,
-                        help='Path to hand config YAML (for sensor wiring mapping)')
+                        help='Path to a hand config.yaml (or the folder containing it), '
+                             'overriding --side. Used for the finger->sensor wiring map '
+                             'and calibration.yaml location.')
     args = parser.parse_args()
 
     global config_dir, finger_to_sensor_id_config
 
     if args.config:
-        config_dir = os.path.dirname(os.path.abspath(args.config))
-        with open(args.config) as f:
-            config_data = yaml.safe_load(f)
-        sensors_cfg = config_data.get('sensors', {})
-        mapping = sensors_cfg.get('finger_to_sensor_id')
-        if mapping:
-            finger_to_sensor_id_config = mapping
-            print(f"Loaded sensor mapping from {args.config}: {finger_to_sensor_id_config}")
+        # Accept either a config.yaml file or the directory containing it.
+        config_path = args.config
+        if os.path.isdir(config_path):
+            config_path = os.path.join(config_path, 'config.yaml')
+    else:
+        config_path = default_config_path(args.side)
+
+    if not os.path.isfile(config_path):
+        parser.error(f"Config not found: {config_path}\n"
+                     f"Pass --config <file-or-folder> explicitly, or check your "
+                     f"orca_core install.")
+
+    config_dir = os.path.dirname(os.path.abspath(config_path))
+    with open(config_path) as f:
+        config_data = yaml.safe_load(f)
+    sensors_cfg = config_data.get('sensors', {})
+    mapping = sensors_cfg.get('finger_to_sensor_id')
+    if mapping:
+        finger_to_sensor_id_config = mapping
+        source = args.config and config_path or f"{args.side} hand"
+        print(f"Loaded sensor mapping ({source}): {finger_to_sensor_id_config}")
+    else:
+        print(f"Warning: no 'sensors.finger_to_sensor_id' in {config_path}; "
+              f"using TactileClient defaults.")
 
     socketio.run(app, host='0.0.0.0', port=5001, debug=True, allow_unsafe_werkzeug=True)
 

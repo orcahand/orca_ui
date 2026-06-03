@@ -3,7 +3,8 @@ name = "orca_ui"
 version = "0.1.0"
 description = "Web-based visualization UI for the ORCA Hand tactile sensors. Depends on orca_core for hardware communication."
 authors = [
-    {name = "clemens-chr", email = "cchristoph@student.ethz.ch"}
+    {name = "clemens-chr", email = "cchristoph@student.ethz.ch"},
+    {name = "Fabrice Bourquin", email = "fabrice@orcahand.com"}
 ]
 license = {text = "MIT"}
 readme = "README.md"
@@ -19,6 +20,15 @@ dependencies = [
 dev = [
     "pytest>=8.3.5,<9.0.0",
 ]
+
+# orca_core's tactile sensing support lives on the public repo (the PyPI
+# `orca_core` 1.0.0 release does NOT yet include the tactile client). Install it
+# straight from GitHub so `uv sync` works out of the box.
+#
+# To use a local orca_core dev checkout instead, replace the entry below with:
+#   orca_core = { path = "/absolute/path/to/orca_core", editable = true }
+[tool.uv.sources]
+orca_core = { git = "https://github.com/orcahand/orca_core.git", branch = "main" }
 
 [build-system]
 requires = ["hatchling>=1.27.0"]
