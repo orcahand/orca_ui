@@ -147,8 +147,8 @@ async function scanPorts() {
         select.innerHTML = '';
         if (ports.length === 0) {
             const opt = document.createElement('option');
-            opt.value = '/dev/ttyACM0';
-            opt.textContent = 'No ports found — /dev/ttyACM0';
+            opt.value = 'auto';
+            opt.textContent = 'No adapter found — auto-detect on connect';
             select.appendChild(opt);
         } else {
             ports.forEach(p => {

@@ -6,7 +6,7 @@ from flask_socketio import SocketIO, emit
 
 from orca_core.hardware.tactile_client import TactileClient
 from orca_ui.taxel_coordinates import get_all_coordinates
-from orca_core.utils.utils import read_yaml, update_yaml
+from orca_core.utils.utils import read_yaml, update_yaml, auto_detect_port
 import argparse
 import os
 import yaml
@@ -28,11 +28,27 @@ current_mode = 'resultant'  # 'resultant', 'taxels', or 'combined'
 finger_to_sensor_id_config = None  # Loaded from --config if provided
 config_dir = None  # Set from --config arg directory, for calibration.yaml access
 
+def resolve_port(requested):
+    """Resolve the serial port to use.
+
+    If an explicit port is given, use it. Otherwise auto-detect the tactile
+    sensor adapter by USB VID (same logic as orca_core's auto_detect_port),
+    which is cross-platform (macOS /dev/cu.usbmodem*, Linux /dev/ttyACM*).
+    """
+    if requested and requested not in ('auto', ''):
+        return requested
+    detected = auto_detect_port("tactile_sensor")
+    if detected:
+        return detected
+    raise RuntimeError(
+        "No tactile sensor adapter found (USB VID 0x28E9). Check that the "
+        "sensor is connected with a data cable, or select a port manually."
+    )
+
 def get_sensor_client():
     global sensor_client
     if sensor_client is None:
-        port = request.args.get('port', '/dev/ttyACM0')
-        sensor_client = TactileClient(port=port)
+        sensor_client = TactileClient(port=resolve_port(request.args.get('port')))
     return sensor_client
 
 def stream_update_loop():
@@ -122,7 +138,7 @@ def list_ports():
 def connect():
     try:
         data = request.json
-        port = data.get('port', '/dev/ttyACM0')
+        port = resolve_port(data.get('port'))
         mode = data.get('mode', 'resultant')
         global sensor_client, current_mode
 
