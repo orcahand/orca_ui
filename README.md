@@ -36,7 +36,11 @@ with `--config`. This overrides `--side`:
 uv run python -m orca_ui.app --config /path/to/orcahand-touch/config.yaml
 ```
 
-Then open your browser to `http://localhost:5001`.
+A browser window opens automatically on startup and closes again when you stop
+the program (Ctrl-C). If a Chromium-based browser (Chrome/Brave/Edge/Chromium)
+is available it opens a dedicated app window; otherwise your default browser is
+used (and won't auto-close). Pass `--no-browser` to disable this and open
+`http://localhost:5001` yourself.
 
 Right and left have different sensor wiring, so the `--side` you choose (or the
 config you pass) must match your hardware. The config supplies the

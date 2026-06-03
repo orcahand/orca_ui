@@ -8,8 +8,15 @@ from orca_core.hardware.tactile_client import TactileClient
 from orca_ui.taxel_coordinates import get_all_coordinates
 from orca_core.utils.utils import read_yaml, update_yaml, auto_detect_port
 import argparse
+import atexit
 import os
 import secrets
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+import webbrowser
 import yaml
 import serial.tools.list_ports
 import threading
@@ -354,6 +361,72 @@ def default_config_path(side):
                         'models', 'v2', f'orcahand_touch_{side}', 'config.yaml')
 
 
+_browser_proc = None
+_browser_profile_dir = None
+
+def _find_chromium():
+    """Return a path to a Chromium-based browser, or None."""
+    mac_apps = [
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+        "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    ]
+    for path in mac_apps:
+        if os.path.exists(path):
+            return path
+    for name in ("google-chrome", "chromium", "chromium-browser",
+                 "brave-browser", "microsoft-edge"):
+        path = shutil.which(name)
+        if path:
+            return path
+    return None
+
+def open_browser(url):
+    """Open the UI in a browser.
+
+    If a Chromium-based browser is found, launch a dedicated app window as a
+    subprocess we can close when the program exits. Otherwise fall back to the
+    default browser (which opens but cannot be closed automatically).
+    """
+    global _browser_proc, _browser_profile_dir
+    chromium = _find_chromium()
+    if chromium:
+        # A throwaway profile forces a fresh, separately-controllable instance.
+        _browser_profile_dir = tempfile.mkdtemp(prefix="orca_ui_browser_")
+        try:
+            # start_new_session: put Chrome (and its helper processes) in their
+            # own process group so we can signal the whole group on exit.
+            _browser_proc = subprocess.Popen([
+                chromium, f"--app={url}",
+                f"--user-data-dir={_browser_profile_dir}",
+                "--no-first-run", "--no-default-browser-check",
+            ], start_new_session=True)
+            atexit.register(close_browser)
+            return
+        except Exception:
+            _browser_proc = None
+    webbrowser.open(url)
+
+def close_browser():
+    """Close the app-window browser (and its helper processes) on exit."""
+    global _browser_proc, _browser_profile_dir
+    proc, _browser_proc = _browser_proc, None
+    if proc and proc.poll() is None:
+        try:
+            pgid = os.getpgid(proc.pid)
+            os.killpg(pgid, signal.SIGTERM)  # graceful: whole Chrome process group
+            try:
+                proc.wait(timeout=3)
+            except Exception:
+                os.killpg(pgid, signal.SIGKILL)  # force if it ignores SIGTERM
+        except ProcessLookupError:
+            pass
+    if _browser_profile_dir:
+        shutil.rmtree(_browser_profile_dir, ignore_errors=True)
+        _browser_profile_dir = None
+
+
 def main():
     parser = argparse.ArgumentParser(description='ORCA Tactile Sensor UI')
     parser.add_argument('--side', choices=['right', 'left'], default='right',
@@ -367,6 +440,8 @@ def main():
                         help='Simulate a touch hand (sine signals on all fingers and '
                              'taxels) instead of connecting to real hardware. No device '
                              'needed; just open the UI and click Connect.')
+    parser.add_argument('--no-browser', action='store_true',
+                        help="Don't automatically open a browser window on startup.")
     args = parser.parse_args()
 
     global config_dir, finger_to_sensor_id_config, use_mock
@@ -402,7 +477,23 @@ def main():
         print("Running in --mock mode: streaming simulated sine signals "
               "(no hardware). Open the UI and click Connect.")
 
-    socketio.run(app, host='0.0.0.0', port=5001, debug=True, allow_unsafe_werkzeug=True)
+    url = "http://localhost:5001"
+    if not args.no_browser:
+        # Deterministically close the app window when the program is stopped.
+        # Handle SIGINT (Ctrl-C) and SIGTERM (kill) ourselves rather than relying
+        # on KeyboardInterrupt -> atexit, which the socketio server swallows.
+        def _on_stop(signum, frame):
+            close_browser()
+            sys.exit(0)
+        signal.signal(signal.SIGINT, _on_stop)
+        signal.signal(signal.SIGTERM, _on_stop)
+        # Open once the server is listening.
+        threading.Timer(1.5, open_browser, args=(url,)).start()
+
+    # use_reloader=False: run single-process so browser open/close and signal
+    # handling are deterministic (the reloader would re-run main() in a child).
+    socketio.run(app, host='0.0.0.0', port=5001, debug=True,
+                 use_reloader=False, allow_unsafe_werkzeug=True)
 
 if __name__ == '__main__':
     main()
