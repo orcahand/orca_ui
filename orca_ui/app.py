@@ -9,6 +9,7 @@ from orca_ui.taxel_coordinates import get_all_coordinates
 from orca_core.utils.utils import read_yaml, update_yaml, auto_detect_port
 import argparse
 import os
+import secrets
 import yaml
 import serial.tools.list_ports
 import threading
@@ -18,7 +19,9 @@ SENSOR_ADAPTER_VID = 0x28E9
 SENSOR_ADAPTER_PID = 0x018A
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'orca_sensor_secret'
+# Local debug UI with no auth/sessions, so an ephemeral per-run key is fine
+# (and keeps no secret in source). Flask-SocketIO just needs one present.
+app.config['SECRET_KEY'] = secrets.token_hex(32)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 sensor_client = None
