@@ -69,6 +69,7 @@ class HandSession:
     # Sensor-only extras (owned only when the hand object isn't connected):
     _owned_links: list = field(default_factory=list)
     _encoder_client: JointEncoderClient | None = None
+    _estimate_ok: bool | None = None  # lazily: is the motor calibration usable?
 
     # ----- tactile ---------------------------------------------------------
 
@@ -117,6 +118,19 @@ class HandSession:
     def estimate_joints(self) -> dict | None:
         """Naive motor-derived joint angles in degrees (the 'ghost' pose)."""
         if not self.caps.motors:
+            return None
+        if self._estimate_ok is None:
+            # _motor_to_joint_pos prints per-joint warnings on uncalibrated
+            # hands; check once instead of spamming at the sampler rate.
+            try:
+                self._estimate_ok = bool(self.hand.is_calibrated())
+            except Exception:
+                self._estimate_ok = False
+            if not self._estimate_ok:
+                logger.warning(
+                    "motor calibration incomplete — joint estimate disabled "
+                    "(run orca_core's calibration first)")
+        if not self._estimate_ok:
             return None
         pos = self.hand._motor_to_joint_pos(self.hand.get_motor_pos())
         return {j: v for j, v in pos.items() if v is not None}

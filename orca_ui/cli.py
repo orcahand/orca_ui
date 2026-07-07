@@ -47,6 +47,16 @@ def parse_args(argv=None) -> argparse.Namespace:
                         help="HTTP port (default: 5001).")
     parser.add_argument("--no-browser", action="store_true",
                         help="Don't automatically open a browser window on startup.")
+    parser.add_argument("--fast-hz", type=float, default=60.0,
+                        help="Sampling rate for encoder/tactile telemetry "
+                             "(in-memory reads; default 60).")
+    parser.add_argument("--mid-hz", type=float, default=10.0,
+                        help="Sampling rate for the motor-based joint estimate "
+                             "(one motor-bus read per tick; lower this if the "
+                             "bus complains; default 10).")
+    parser.add_argument("--slow-hz", type=float, default=1.0,
+                        help="Sampling rate for temps/currents/stats "
+                             "(motor-bus reads; default 1).")
     return parser.parse_args(argv)
 
 
@@ -87,6 +97,9 @@ def build_settings(argv=None) -> UiSettings:
         host=args.host,
         port=args.port,
         open_browser=not args.no_browser,
+        fast_hz=args.fast_hz,
+        mid_hz=args.mid_hz,
+        slow_hz=args.slow_hz,
     )
 
 
