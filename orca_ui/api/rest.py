@@ -119,4 +119,19 @@ def build_router(service: HandService) -> APIRouter:
     def tactile_geometry():
         return get_taxel_geometry(service.session)
 
+    # ----- dev helpers (mock mode only) ------------------------------------------
+
+    if service.settings.mock:
+        from orca_ui.hand.sweep import JointSweeper
+
+        sweeper = JointSweeper(service)
+
+        @router.post("/mock/joint_sweep")
+        def mock_joint_sweep(body: schemas.SweepRequest):
+            if body.joint is None:
+                sweeper.stop()
+            else:
+                guard(sweeper.start, body.joint, body.period_s)
+            return {"ok": True, "sweeping": sweeper.active_joint}
+
     return router

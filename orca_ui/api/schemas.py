@@ -35,3 +35,10 @@ class TactileModeRequest(BaseModel):
 
 class ZeroRequest(BaseModel):
     num_samples: int = Field(default=100, ge=1, le=2000)
+
+
+class SweepRequest(BaseModel):
+    """Dev-only (mock): sweep one joint through its ROM; null joint stops."""
+
+    joint: Optional[str] = None
+    period_s: float = Field(default=4.0, gt=0.1, le=60)

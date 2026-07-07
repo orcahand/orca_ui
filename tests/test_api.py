@@ -133,3 +133,19 @@ def test_model_metadata_hints_when_bundle_missing(client):
         assert "build_hand_bundle" in response.json()["detail"]
     else:
         assert response.json()["urdf_url"].endswith("hand.urdf")
+
+
+def test_mock_joint_sweep_endpoint(client):
+    response = client.post("/api/mock/joint_sweep",
+                           json={"joint": "index_mcp", "period_s": 0.5})
+    assert response.status_code == 200
+    assert response.json()["sweeping"] == "index_mcp"
+    time.sleep(0.4)
+
+    def moved():
+        measured = client.app.state.service.session.measured_joints() or {}
+        return abs(measured.get("index_mcp", 0.0)) > 5.0
+
+    assert _wait_for(moved, timeout=3.0)
+    response = client.post("/api/mock/joint_sweep", json={"joint": None})
+    assert response.json()["sweeping"] is None
