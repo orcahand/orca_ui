@@ -1,4 +1,4 @@
-"""Sine-wave signal generators for driving the UI with a MockTactileClient.
+"""Sine-wave signal generators for the mock tactile pump.
 
 Lets you exercise the full UI (resultant force vectors + per-taxel views) with
 no hardware attached.
@@ -7,7 +7,8 @@ no hardware attached.
 import math
 import time
 
-from orca_core.hardware.sensing.constants import FINGER_NAMES, DEFAULT_TAXEL_COUNTS
+from orca_core.constants import FINGER_NAMES
+from orca_core.hardware.sensing.constants import DEFAULT_TAXEL_COUNTS
 
 # Per-axis amplitude/offset (Newtons). fz is unsigned on the wire (0..25.5 N),
 # so it is always kept non-negative.
