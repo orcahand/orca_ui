@@ -56,11 +56,14 @@ def open_browser(url):
         try:
             # start_new_session: put Chrome (and its helper processes) in their
             # own process group so we can signal the whole group on exit.
+            # DEVNULL: Chrome inherits the terminal otherwise and floods it
+            # with updater/GCM/crashpad logs.
             _browser_proc = subprocess.Popen([
                 chromium, f"--app={url}",
                 f"--user-data-dir={_browser_profile_dir}",
                 "--no-first-run", "--no-default-browser-check",
-            ], start_new_session=True)
+            ], start_new_session=True,
+               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             atexit.register(close_browser)
             return
         except Exception:

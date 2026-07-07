@@ -111,11 +111,25 @@ def build_settings(argv=None) -> UiSettings:
 
 def main(argv=None) -> None:
     import uvicorn
+    from orca_ui.console import install_stdout_dedupe
     from orca_ui.server import create_app
 
     settings = build_settings(argv)
-    print(f"ORCA UI · config: {settings.config_path}"
-          f"{' · MOCK MODE (no hardware)' if settings.mock else ''}")
+
+    mode = "MOCK — no hardware" if settings.mock else "hardware"
+    if settings.mock is False and not settings.motors_enabled:
+        mode += ", sensors only (--no-motors)"
+    rule = "─" * 62
+    print(f"\n{rule}\n"
+          f"  ORCA UI   http://localhost:{settings.port}\n"
+          f"  config    {settings.config_path}\n"
+          f"  mode      {mode}\n"
+          f"{rule}\n")
+
+    # orca_core prints hardware diagnostics; the connect ladder would repeat
+    # them for every tier and retry. First occurrence passes, repeats don't.
+    # (Installed after the banner — its rules are identical lines.)
+    install_stdout_dedupe()
 
     app = create_app(settings)
 
@@ -124,7 +138,10 @@ def main(argv=None) -> None:
         # Browser targets localhost even when bound wider.
         launch_after_startup(f"http://localhost:{settings.port}")
 
-    uvicorn.run(app, host=settings.host, port=settings.port, log_level="info")
+    # access_log=False: per-request lines (assets, 60 Hz websocket chatter's
+    # HTTP siblings) drown the hardware diagnostics that actually matter.
+    uvicorn.run(app, host=settings.host, port=settings.port,
+                log_level="info", access_log=False)
 
 
 if __name__ == "__main__":
