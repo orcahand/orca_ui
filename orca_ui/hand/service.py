@@ -121,12 +121,26 @@ class HandService:
     def hand_info(self) -> dict:
         config = self.supervisor.config
         encoder_backed = set(_encoder_sensed_joints(config))
+        session = self.session
+        # Which sensed joints can actually be decoded: raw counts become joint
+        # angles only with a per-joint anchor from the calibration sweep.
+        encoder_calibrated = None
+        if session is not None:
+            try:
+                encoder_calibrated = set(
+                    session.hand.calibration.joint_encoder_calibration_dict or {})
+            except Exception:
+                encoder_calibrated = None
         joints = [
             {
                 "id": joint,
                 "rom": [float(v) for v in config.joint_roms_dict[joint]],
                 "neutral": float(config.neutral_position.get(joint, 0.0)),
                 "encoder_backed": joint in encoder_backed,
+                "encoder_calibrated": (
+                    None if encoder_calibrated is None or joint not in encoder_backed
+                    else joint in encoder_calibrated
+                ),
             }
             for joint in config.joint_ids
         ]
@@ -140,7 +154,6 @@ class HandService:
         mapping = getattr(config, "finger_to_sensor_id", None)
         if mapping:
             info["finger_to_sensor_id"] = dict(mapping)
-        session = self.session
         tactile_config = session.tactile_configuration() if session else None
         if tactile_config is not None:
             info["tactile"] = {

@@ -131,3 +131,12 @@ def test_wrist_is_measured_and_follows_commands(service):
                 and abs(angles.get("wrist", 0.0) - 20.0) < 2.0)
 
     assert _wait_for(wrist_tracks), service.session.measured_joints()
+
+
+def test_hand_info_reports_encoder_calibration_state(service):
+    info = service.hand_info()
+    for joint in info["joints"]:
+        if joint["encoder_backed"]:
+            assert joint["encoder_calibrated"] is True  # mock model is complete
+        else:
+            assert joint["encoder_calibrated"] is None

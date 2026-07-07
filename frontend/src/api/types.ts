@@ -37,6 +37,9 @@ export interface JointInfo {
   rom: [number, number] // degrees
   neutral: number
   encoder_backed: boolean
+  // null: unknown (no session yet) or not an encoder joint. false: the joint
+  // has an encoder but no calibration anchor — raw counts can't be decoded.
+  encoder_calibrated: boolean | null
 }
 
 export interface ControlState {

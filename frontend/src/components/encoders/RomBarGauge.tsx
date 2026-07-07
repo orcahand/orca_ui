@@ -136,12 +136,29 @@ export function RomBarGauge({ joint }: { joint: JointInfo }) {
       <span style={{ width: 30, color: 'var(--dimmer)', fontSize: 9 }}>
         {max > 0 ? `+${max.toFixed(0)}` : max.toFixed(0)}
       </span>
-      <span
-        ref={valueRef}
-        style={{ width: 52, color: 'var(--text)', fontWeight: 600, textAlign: 'right' }}
-      >
-        --
-      </span>
+      {joint.encoder_calibrated === false ? (
+        <span
+          title="This joint's encoder streams raw counts, but no calibration
+anchor exists to convert them into an angle. Run orca_core's calibration
+with joint feedback to record the anchors."
+          style={{
+            width: 52,
+            color: 'var(--warn)',
+            fontSize: 9,
+            textAlign: 'right',
+            cursor: 'help',
+          }}
+        >
+          no cal
+        </span>
+      ) : (
+        <span
+          ref={valueRef}
+          style={{ width: 52, color: 'var(--text)', fontWeight: 600, textAlign: 'right' }}
+        >
+          --
+        </span>
+      )}
     </div>
   )
 }
