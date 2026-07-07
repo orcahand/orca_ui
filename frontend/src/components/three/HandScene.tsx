@@ -93,27 +93,42 @@ function HandRig({
     invalidate()
   }, [assets.calibration, rig, invalidate])
 
-  // Frame the camera on the hand once it exists.
+  // Frame the camera on the hand once it exists: fit the whole model with a
+  // margin, looking down from a 3/4 angle.
+  const camera = useThree((s) => s.camera)
   useEffect(() => {
     if (!rig || !controls) return
-    const box = new THREE.Box3().setFromObject(rig.robot)
-    const center = box.getCenter(new THREE.Vector3())
-    controls.target.copy(center)
+    rig.robot.updateMatrixWorld(true)
+    const sphere = new THREE.Box3()
+      .setFromObject(rig.robot)
+      .getBoundingSphere(new THREE.Sphere())
+    const persp = camera as THREE.PerspectiveCamera
+    const fovRad = (persp.fov * Math.PI) / 180
+    const distance = (sphere.radius / Math.tan(fovRad / 2)) * 1.15
+    const direction = new THREE.Vector3(1, 0.85, 1.05).normalize()
+    persp.position.copy(sphere.center).addScaledVector(direction, distance)
+    persp.near = distance / 100
+    persp.far = distance * 50
+    persp.updateProjectionMatrix()
+    controls.target.copy(sphere.center)
     controls.update()
     invalidate()
-  }, [rig, controls, invalidate])
+  }, [rig, controls, camera, invalidate])
 
   // Pose + overlay updates from the stream (outside React).
   useEffect(() => {
     if (!rig) return
     return subscribeFrames((frames) => {
       const scene = useAppStore.getState().scene
-      const solidSource = caps.encoders
-        ? frames.joints.measured
-        : Object.keys(frames.joints.target).length
-          ? frames.joints.target
-          : frames.joints.estimate
-      rig.adapter.apply(solidSource)
+      // Layered per-joint knowledge: the motor estimate covers every joint
+      // (including the encoder-less wrist), encoder measurements override
+      // where they exist. Non-encoder hands: commanded targets win instead.
+      rig.adapter.apply(frames.joints.estimate)
+      if (caps.encoders) {
+        rig.adapter.apply(frames.joints.measured)
+      } else {
+        rig.adapter.apply(frames.joints.target)
+      }
 
       if (rig.ghost) {
         const showGhost = scene.ghost && caps.motors

@@ -112,3 +112,17 @@ def test_stats_shape(service):
     stats = service.stats()
     assert stats["loop"]["cycles_ok"] > 0
     assert stats["encoder"]["frames_ok"] > 0
+
+
+def test_wrist_commands_flow_to_the_motor_estimate(service):
+    """The wrist has no encoder; the 3D view poses it from the estimate."""
+    service.enable_torque()
+    service.set_targets({"wrist": 20.0})
+
+    def wrist_moved():
+        estimate = service.session.estimate_joints() or {}
+        return abs(estimate.get("wrist", 0.0) - 20.0) < 1.0
+
+    assert _wait_for(wrist_moved), service.session.estimate_joints()
+    measured = service.session.measured_joints() or {}
+    assert "wrist" not in measured  # encoder stream never carries the wrist
