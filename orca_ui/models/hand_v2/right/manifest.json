@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "source": {
+    "description_path": "/Users/fbourquin/Documents/orca/orcahand_description",
+    "git_sha": "ec4f6ae9e75692357c37e572e5018bfc13c808c5",
+    "dirty": true
+  },
+  "side": "right",
+  "joints": [
+    "wrist",
+    "pinky_abd",
+    "pinky_mcp",
+    "pinky_pip",
+    "ring_abd",
+    "ring_mcp",
+    "ring_pip",
+    "middle_abd",
+    "middle_mcp",
+    "middle_pip",
+    "index_abd",
+    "index_mcp",
+    "index_pip",
+    "thumb_cmc",
+    "thumb_abd",
+    "thumb_mcp",
+    "thumb_dip"
+  ],
+  "links": [
+    "forearm",
+    "tower",
+    "carpals",
+    "pinky_ap",
+    "pinky_pp",
+    "pinky_fingertip_assembly",
+    "ring_ap",
+    "ring_pp",
+    "ring_fingertip_assembly",
+    "middle_ap",
+    "middle_pp",
+    "middle_fingertip_assembly",
+    "index_ap",
+    "index_pp",
+    "index_fingertip_assembly",
+    "thumb_tp",
+    "thumb_ap",
+    "thumb_pp",
+    "thumb_dp",
+    "thumb_fingertip",
+    "index_fingertip",
+    "middle_fingertip",
+    "ring_fingertip",
+    "pinky_fingertip"
+  ],
+  "meshes": {
+    "link_forearm.glb": {
+      "tris": 3000,
+      "bytes": 55948
+    },
+    "link_tower.glb": {
+      "tris": 2068,
+      "bytes": 38236
+    },
+    "link_carpals.glb": {
+      "tris": 8000,
+      "bytes": 142580
+    },
+    "link_thumb_tp.glb": {
+      "tris": 1776,
+      "bytes": 33148
+    },
+    "link_thumb_ap.glb": {
+      "tris": 2900,
+      "bytes": 53296
+    },
+    "link_thumb_pp.glb": {
+      "tris": 3000,
+      "bytes": 55672
+    },
+    "link_thumb_dp.glb": {
+      "tris": 3000,
+      "bytes": 55764
+    },
+    "link_index_ap.glb": {
+      "tris": 3036,
+      "bytes": 55816
+    },
+    "link_index_pp.glb": {
+      "tris": 3000,
+      "bytes": 55644
+    },
+    "link_index_fingertip_assembly.glb": {
+      "tris": 3226,
+      "bytes": 59880
+    },
+    "link_middle_ap.glb": {
+      "tris": 2966,
+      "bytes": 54632
+    },
+    "link_middle_pp.glb": {
+      "tris": 3000,
+      "bytes": 55648
+    },
+    "link_middle_fingertip_assembly.glb": {
+      "tris": 3226,
+      "bytes": 59880
+    },
+    "link_pinky_ap.glb": {
+      "tris": 3110,
+      "bytes": 57120
+    },
+    "link_pinky_pp.glb": {
+      "tris": 3000,
+      "bytes": 55640
+    },
+    "link_pinky_fingertip_assembly.glb": {
+      "tris": 4142,
+      "bytes": 76368
+    }
+  },
+  "total_tris": 52450,
+  "rest_pose_offsets_deg": {
+    "wrist": -35.0
+  },
+  "built_with": "build_hand_bundle.py"
+}

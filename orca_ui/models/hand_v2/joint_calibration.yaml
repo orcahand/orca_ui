@@ -1,0 +1,85 @@
+index_abd:
+  evidence: rom_mirrored
+  offset_deg: 0.0
+  sign: -1
+  verified: false
+index_mcp:
+  evidence: rom_mismatch
+  offset_deg: 0.0
+  sign: 1
+  verified: false
+index_pip:
+  evidence: rom_match
+  offset_deg: 0.0
+  sign: 1
+  verified: false
+middle_abd:
+  evidence: ambiguous
+  offset_deg: 0.0
+  sign: 1
+  verified: false
+middle_mcp:
+  evidence: rom_mismatch
+  offset_deg: 0.0
+  sign: 1
+  verified: false
+middle_pip:
+  evidence: rom_match
+  offset_deg: 0.0
+  sign: 1
+  verified: false
+pinky_abd:
+  evidence: ambiguous
+  offset_deg: 0.0
+  sign: 1
+  verified: false
+pinky_mcp:
+  evidence: rom_mismatch
+  offset_deg: 0.0
+  sign: 1
+  verified: false
+pinky_pip:
+  evidence: rom_match
+  offset_deg: 0.0
+  sign: 1
+  verified: false
+ring_abd:
+  evidence: ambiguous
+  offset_deg: 0.0
+  sign: 1
+  verified: false
+ring_mcp:
+  evidence: rom_mismatch
+  offset_deg: 0.0
+  sign: 1
+  verified: false
+ring_pip:
+  evidence: rom_match
+  offset_deg: 0.0
+  sign: 1
+  verified: false
+thumb_abd:
+  evidence: rom_match
+  offset_deg: 0.0
+  sign: 1
+  verified: false
+thumb_cmc:
+  evidence: rom_match
+  offset_deg: 0.0
+  sign: 1
+  verified: false
+thumb_dip:
+  evidence: rom_mismatch
+  offset_deg: 0.0
+  sign: 1
+  verified: false
+thumb_mcp:
+  evidence: rom_mismatch
+  offset_deg: 0.0
+  sign: 1
+  verified: false
+wrist:
+  evidence: rom_match
+  offset_deg: 0.0
+  sign: 1
+  verified: false
