@@ -105,7 +105,30 @@ function HandRig({
     const persp = camera as THREE.PerspectiveCamera
     const fovRad = (persp.fov * Math.PI) / 180
     const distance = (sphere.radius / Math.tan(fovRad / 2)) * 1.15
-    const direction = new THREE.Vector3(1, 0.85, 1.05).normalize()
+    // View from the thumb's side of the hand (so the thumb is never hidden
+    // behind the palm), nudged toward the fingertips for a 3/4 look, from
+    // ~40° above. Derived from the model, so left hands frame correctly too.
+    const worldPos = new THREE.Vector3()
+    const direction = new THREE.Vector3(1, 0, 1)
+    const thumbLink = rig.robot.links['thumb_fingertip']
+    if (thumbLink) {
+      thumbLink.getWorldPosition(worldPos)
+      direction.copy(worldPos).sub(sphere.center)
+      direction.y = 0
+      if (direction.lengthSq() > 1e-8) direction.normalize()
+      else direction.set(1, 0, 1).normalize()
+    }
+    const middleLink = rig.robot.links['middle_fingertip']
+    if (middleLink) {
+      middleLink.getWorldPosition(worldPos)
+      const toward = worldPos.sub(sphere.center)
+      toward.y = 0
+      if (toward.lengthSq() > 1e-8) {
+        direction.addScaledVector(toward.normalize(), 0.45)
+      }
+    }
+    direction.normalize().y = 0.8
+    direction.normalize()
     persp.position.copy(sphere.center).addScaledVector(direction, distance)
     persp.near = distance / 100
     persp.far = distance * 50
