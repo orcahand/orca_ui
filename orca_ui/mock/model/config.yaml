@@ -211,9 +211,9 @@ calibration_sequence:
 sensors:
   port: /dev/orca-mock
   finger_to_sensor_id:
-    thumb: 1
-    index: 3
-    middle: 0
-    ring: 2
+    thumb: 0
+    index: 1
+    middle: 2
+    ring: 3
     pinky: 4
   baudrate: 2000000
