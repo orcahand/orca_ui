@@ -21,3 +21,8 @@ env/
 
 # OS
 .DS_Store
+
+# Frontend
+node_modules/
+# Vite build output (shipped in the wheel via hatch artifacts, not in git)
+orca_ui/webui/
