@@ -1,0 +1,37 @@
+"""Pydantic request bodies. Responses are plain dicts assembled by the
+service layer (they double as WS payloads); these models exist to validate
+what clients send."""
+
+from __future__ import annotations
+
+from typing import Literal, Optional
+
+from pydantic import BaseModel, Field
+
+
+class JointTargets(BaseModel):
+    angles: dict[str, float]
+
+
+class TorqueRequest(BaseModel):
+    # Reserved for future per-motor control; today torque toggles hand-wide.
+    motor_ids: Optional[list[int]] = None
+
+
+class GainsRequest(BaseModel):
+    kp: float = Field(ge=0)
+    ki: float = Field(ge=0)
+    correction_max_deg: float = Field(gt=0)
+    i_clamp_deg: Optional[float] = Field(default=None, gt=0)
+
+
+class MaxCurrentRequest(BaseModel):
+    ma: int = Field(gt=0, le=2000)
+
+
+class TactileModeRequest(BaseModel):
+    mode: Literal["resultant", "taxels", "combined"]
+
+
+class ZeroRequest(BaseModel):
+    num_samples: int = Field(default=100, ge=1, le=2000)

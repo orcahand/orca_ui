@@ -66,12 +66,15 @@ class HandService:
         settings: UiSettings,
         publish_status: Callable[[dict], None] | None = None,
         publish_error: Callable[[str], None] | None = None,
+        publish_topic: Callable[[str, dict], None] | None = None,
     ):
         self.settings = settings
         self._publish_status = publish_status or (lambda snapshot: None)
         self._publish_error = publish_error or (lambda message: None)
+        self._publish_topic = publish_topic or (lambda topic, payload: None)
 
         self._state_lock = threading.Lock()
+        self._targets: dict[str, float] = {}
         self._tactile_mode = "combined"
         self._gains = {
             "kp": DEFAULT_KP,
@@ -179,6 +182,9 @@ class HandService:
     # ----- session bootstrap ---------------------------------------------------
 
     def _session_ready(self, session: HandSession) -> None:
+        with self._state_lock:
+            self._targets = {}
+        self._publish_control_state()
         if session.caps.tactile:
             try:
                 zeroing.apply_saved_offsets(session)
@@ -222,6 +228,10 @@ class HandService:
 
     # ----- motor control ---------------------------------------------------------
 
+    def _publish_control_state(self) -> None:
+        from orca_ui.streaming import topics as T
+        self._publish_topic(T.CONTROL_STATE, self.control_state())
+
     def enable_torque(self) -> dict:
         session = self._require_motors()
         if session.caps.feedback_loop:
@@ -230,12 +240,18 @@ class HandService:
             session.hand.rebase_loop()
         session.hand.enable_torque()
         self.supervisor.set_torque_flag(True)
-        return {"seed": self._current_pose(session)}
+        seed = self._current_pose(session)
+        with self._state_lock:
+            self._targets = dict(seed)
+        self._publish_control_state()
+        self._publish_targets()
+        return {"seed": seed}
 
     def disable_torque(self) -> None:
         session = self._require_motors()
         session.hand.disable_torque()
         self.supervisor.set_torque_flag(False)
+        self._publish_control_state()
 
     def _current_pose(self, session: HandSession) -> dict:
         measured = session.measured_joints()
@@ -250,11 +266,28 @@ class HandService:
         unknown = set(angles) - known
         if unknown:
             raise ServiceError(f"unknown joints: {sorted(unknown)}")
-        self.worker.submit_targets({j: float(v) for j, v in angles.items()})
+        clean = {j: float(v) for j, v in angles.items()}
+        self.worker.submit_targets(clean)
+        with self._state_lock:
+            self._targets.update(clean)
+        self._publish_targets()
+
+    def _publish_targets(self) -> None:
+        from orca_ui.streaming import topics as T
+        with self._state_lock:
+            targets = dict(self._targets)
+        if targets:
+            self._publish_topic(T.JOINTS_TARGET, {"angles": targets})
 
     def go_neutral(self) -> None:
         session = self._require_torque()
         self.worker.submit_op(session.hand.set_neutral_position)
+        with self._state_lock:
+            self._targets.update({
+                j: float(v)
+                for j, v in session.hand.config.neutral_position.items()
+            })
+        self._publish_targets()
 
     def set_gains(self, kp: float, ki: float, correction_max_deg: float,
                   i_clamp_deg: float | None = None) -> None:
@@ -267,6 +300,7 @@ class HandService:
         with self._state_lock:
             self._gains = {"kp": kp, "ki": ki,
                            "correction_max_deg": correction_max_deg}
+        self._publish_control_state()
 
     def set_max_current(self, ma: int) -> None:
         import dataclasses
@@ -277,6 +311,7 @@ class HandService:
                                                   max_current=ma)
         with self._state_lock:
             self._max_current = int(ma)
+        self._publish_control_state()
 
     def rebase(self) -> None:
         session = self._require_feedback()
@@ -294,6 +329,7 @@ class HandService:
         session.start_tactile_stream(resultant=resultant, taxels=taxels)
         with self._state_lock:
             self._tactile_mode = mode
+        self._publish_control_state()
 
     @property
     def tactile_mode(self) -> str:
