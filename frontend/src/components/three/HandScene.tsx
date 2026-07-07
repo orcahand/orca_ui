@@ -38,6 +38,10 @@ interface Rig {
   ghostAdapter: JointPoseAdapter | null
   glow: JointGlowLayer
   arrows: ForceArrowLayer
+  // Measured from the bare robot BEFORE overlay layers attach: the arrow
+  // layer's unit-height instanced geometry would otherwise inflate the box
+  // (Box3.setFromObject ignores per-instance matrices).
+  bounds: THREE.Sphere
 }
 
 function HandRig({
@@ -61,6 +65,10 @@ function HandRig({
         if (disposed) {
           return
         }
+        robot.updateMatrixWorld(true)
+        const bounds = new THREE.Box3()
+          .setFromObject(robot)
+          .getBoundingSphere(new THREE.Sphere())
         const ghost = makeGhost(robot)
         built = {
           robot,
@@ -72,6 +80,7 @@ function HandRig({
           glow: new JointGlowLayer(robot),
           arrows: new ForceArrowLayer(
             robot, assets.fingertips, assets.sensorMounts, assets.taxelGeometry),
+          bounds,
         }
         setRig(built)
       })
@@ -102,10 +111,7 @@ function HandRig({
   const camera = useThree((s) => s.camera)
   useEffect(() => {
     if (!rig || !controls) return
-    rig.robot.updateMatrixWorld(true)
-    const sphere = new THREE.Box3()
-      .setFromObject(rig.robot)
-      .getBoundingSphere(new THREE.Sphere())
+    const sphere = rig.bounds
     const persp = camera as THREE.PerspectiveCamera
     const fovRad = (persp.fov * Math.PI) / 180
     const distance = (sphere.radius / Math.tan(fovRad / 2)) * 1.15

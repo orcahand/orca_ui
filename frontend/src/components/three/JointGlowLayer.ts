@@ -1,15 +1,18 @@
-// Emissive rings at the revolute joint frames, encoding tracking error
-// (|measured − target|): invisible below a 1° dead-band, ramping dim-blue →
-// amber → red toward 15°. Falls back to encoding measured joint speed when
-// no target stream exists.
+// X-ray rings at the revolute joint frames, encoding tracking error
+// (|measured − target|). At rest they sit as faint markers on the joint
+// axes; error ramps them dim-blue → amber → red toward saturation. Rendered
+// without depth testing so they read through the hand meshes (the joints sit
+// inside the fingers). Falls back to encoding measured joint speed when no
+// target stream exists (torque off).
 
 import * as THREE from 'three'
 import type { URDFRobot } from 'urdf-loader'
 
-const DEAD_BAND_DEG = 1
-const SATURATE_DEG = 15
-const RING_RADIUS = 0.007
-const RING_TUBE = 0.0011
+const DEAD_BAND_DEG = 0.5
+const SATURATE_DEG = 10
+const RING_RADIUS = 0.0095
+const RING_TUBE = 0.0012
+const IDLE_OPACITY = 0.14
 
 const COLOR_LOW = new THREE.Color('#7f8ea2')
 const COLOR_MID = new THREE.Color('#f59e0b')
@@ -34,9 +37,10 @@ export class JointGlowLayer {
       }
       const material = new THREE.MeshBasicMaterial({
         transparent: true,
-        opacity: 0,
+        opacity: IDLE_OPACITY,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
+        depthTest: false, // joints sit inside the meshes; render through
         color: COLOR_LOW,
       })
       const mesh = new THREE.Mesh(this.geometry, material)
@@ -57,7 +61,8 @@ export class JointGlowLayer {
     for (const [joint, entry] of this.entries) {
       const measuredDeg = measured[joint]
       if (measuredDeg === undefined) {
-        entry.material.opacity = 0
+        entry.material.opacity = IDLE_OPACITY
+        entry.material.color.copy(COLOR_LOW)
         continue
       }
       let errorDeg: number
@@ -74,11 +79,12 @@ export class JointGlowLayer {
         entry.lastT = nowMs
       }
       if (errorDeg < DEAD_BAND_DEG) {
-        entry.material.opacity = 0
+        entry.material.opacity = IDLE_OPACITY
+        entry.material.color.copy(COLOR_LOW)
         continue
       }
       const t = Math.min((errorDeg - DEAD_BAND_DEG) / (SATURATE_DEG - DEAD_BAND_DEG), 1)
-      entry.material.opacity = 0.25 + 0.75 * t
+      entry.material.opacity = 0.35 + 0.65 * t
       if (t < 0.5) {
         entry.material.color.lerpColors(COLOR_LOW, COLOR_MID, t * 2)
       } else {
