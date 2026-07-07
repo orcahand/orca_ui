@@ -17,6 +17,7 @@ class UiSettings:
     config_path: str
     mock: bool = False
     engage_feedback: bool = True
+    motors_enabled: bool = True
     host: str = "127.0.0.1"
     port: int = 5001
     open_browser: bool = True

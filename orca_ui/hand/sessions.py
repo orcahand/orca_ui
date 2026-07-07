@@ -47,12 +47,14 @@ class SessionConnectError(RuntimeError):
         self.attempts = attempts or []
 
 
-def declared_capabilities(config, engage_feedback: bool) -> dict:
+def declared_capabilities(config, engage_feedback: bool,
+                          motors_enabled: bool = True) -> dict:
     return {
-        "motors": True,
+        "motors": motors_enabled,
         "tactile": isinstance(config, OrcaHandTouchConfig),
         "encoders": bool(config.has_joint_encoders),
-        "feedback_loop": bool(engage_feedback and config.joint_feedback_enabled),
+        "feedback_loop": bool(motors_enabled and engage_feedback
+                              and config.joint_feedback_enabled),
     }
 
 
@@ -175,15 +177,33 @@ class HandSession:
 
 def connect_session(settings: UiSettings, config) -> HandSession:
     """Probe hardware and connect at the best achievable tier."""
-    declared = declared_capabilities(config, settings.engage_feedback)
+    declared = declared_capabilities(config, settings.engage_feedback,
+                                     motors_enabled=settings.motors_enabled)
 
     if settings.mock:
         return _connect_mock(settings, declared)
 
     presence = probe_hardware(config)
-    if presence.motor_port:
-        return _connect_with_motors(settings, config, declared, presence)
-    if presence.sensing.tactile or presence.sensing.encoder:
+    sensing_present = bool(presence.sensing.tactile or presence.sensing.encoder)
+
+    if settings.motors_enabled and presence.motor_port:
+        try:
+            return _connect_with_motors(settings, config, declared, presence)
+        except SessionConnectError as motor_error:
+            # A motor port that answers but won't connect (unpowered motors,
+            # broken motor stack) must not block sensor viewing.
+            if not sensing_present:
+                raise
+            logger.warning("all motor tiers failed — trying sensors-only")
+            try:
+                return _connect_sensors_only(settings, config, declared, presence)
+            except SessionConnectError as sensor_error:
+                raise SessionConnectError(
+                    "motor tiers and sensors-only both failed",
+                    attempts=motor_error.attempts + sensor_error.attempts
+                    + [str(sensor_error)],
+                )
+    if sensing_present:
         return _connect_sensors_only(settings, config, declared, presence)
     raise SessionConnectError(
         "No ORCA hardware found (no motor bus, tactile, or encoder port)."

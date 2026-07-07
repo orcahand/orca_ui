@@ -59,7 +59,9 @@ class HandSupervisor(threading.Thread):
         self._on_error = on_error or (lambda message: None)
 
         self.config = load_config(settings.config_path)
-        self._declared = declared_capabilities(self.config, settings.engage_feedback)
+        self._declared = declared_capabilities(
+            self.config, settings.engage_feedback,
+            motors_enabled=settings.motors_enabled)
 
         self._lock = threading.Lock()
         self._session: Optional[HandSession] = None

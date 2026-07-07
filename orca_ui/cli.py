@@ -39,6 +39,11 @@ def parse_args(argv=None) -> argparse.Namespace:
                         help="Do not engage the closed-loop joint-feedback "
                              "controller even if the config enables it (sliders "
                              "drive motors open-loop).")
+    parser.add_argument("--no-motors", action="store_true",
+                        help="Skip the motor bus entirely and connect sensors "
+                             "only (tactile / joint-encoder viewing, no control). "
+                             "Useful when motors are unpowered or the motor "
+                             "stack is being worked on.")
     parser.add_argument("--host", type=str, default="127.0.0.1",
                         help="Bind address (default: 127.0.0.1). This UI can move "
                              "motors, so exposing it on the LAN is opt-in via "
@@ -94,6 +99,7 @@ def build_settings(argv=None) -> UiSettings:
         config_path=resolve_config_path(args),
         mock=args.mock,
         engage_feedback=not args.no_feedback,
+        motors_enabled=not args.no_motors,
         host=args.host,
         port=args.port,
         open_browser=not args.no_browser,
