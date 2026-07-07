@@ -46,14 +46,23 @@ export function SceneControls({
           />
           ghost (motor estimate)
         </label>
-        <label className="toggle-label" title="fingertip resultant-force arrows">
+        <label className="toggle-label" title="one resultant-force arrow per finger, at the sensor">
           <input
             type="checkbox"
-            checked={scene.forceArrows}
-            onChange={(e) => setScene({ forceArrows: e.target.checked })}
+            checked={scene.forceResultant}
+            onChange={(e) => setScene({ forceResultant: e.target.checked })}
             disabled={!caps?.tactile}
           />
-          force arrows
+          resultant force
+        </label>
+        <label className="toggle-label" title="one arrow per taxel (needs the taxel or combined stream mode)">
+          <input
+            type="checkbox"
+            checked={scene.forceTaxels}
+            onChange={(e) => setScene({ forceTaxels: e.target.checked })}
+            disabled={!caps?.tactile}
+          />
+          taxel forces
         </label>
         <label className="toggle-label" title="joint rings colored by tracking error">
           <input

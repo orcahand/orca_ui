@@ -68,4 +68,22 @@ def build_router(service: HandService) -> APIRouter:
         with open(path) as f:
             return yaml.safe_load(f)
 
+    @router.get("/model/sensor_mounts")
+    def model_sensor_mounts():
+        """Per-finger ``T_fingertip_sensor`` as a row-major 4x4 (meters):
+        the tactile sensor's fixed pose in its distal link frame, from
+        orca_core's mesh-registered kinematics data."""
+        try:
+            from orca_core.kinematics import HandKinematics
+            side = service.supervisor.config.type
+            mounts = HandKinematics.load(side).sensor_mounts
+        except Exception as e:
+            raise HTTPException(
+                status_code=404,
+                detail=f"sensor mounts unavailable from orca_core: {e}")
+        return {
+            finger: {"matrix": [[float(v) for v in row] for row in t.matrix]}
+            for finger, t in mounts.items()
+        }
+
     return router

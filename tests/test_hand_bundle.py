@@ -84,5 +84,7 @@ def test_joint_calibration_covers_all_joints():
         entry = cal[jid]
         assert entry["sign"] in (1, -1)
         assert isinstance(entry["offset_deg"], (int, float))
-        assert entry["evidence"] in {"rom_match", "rom_mirrored",
-                                     "rom_mismatch", "ambiguous"}
+        # Evidence is provenance text: the build script's ROM classification,
+        # optionally extended with later verification sources.
+        assert entry["evidence"].split(" + ")[0] in {
+            "rom_match", "rom_mirrored", "rom_mismatch", "ambiguous"}

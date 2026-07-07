@@ -24,7 +24,8 @@ export interface TactileSettings {
 
 export interface SceneSettings {
   ghost: boolean
-  forceArrows: boolean
+  forceResultant: boolean
+  forceTaxels: boolean
   jointGlow: boolean
 }
 
@@ -51,16 +52,21 @@ interface AppState {
   setTactileMode(mode: TactileMode): void
 }
 
+const SCENE_DEFAULTS: SceneSettings = {
+  ghost: false,
+  forceResultant: false,
+  forceTaxels: false,
+  jointGlow: false,
+}
+
 const storedScene = ((): SceneSettings => {
   try {
     return {
-      ghost: false,
-      forceArrows: false,
-      jointGlow: false,
+      ...SCENE_DEFAULTS,
       ...JSON.parse(localStorage.getItem('orca-ui.scene') ?? '{}'),
     }
   } catch {
-    return { ghost: false, forceArrows: false, jointGlow: false }
+    return { ...SCENE_DEFAULTS }
   }
 })()
 

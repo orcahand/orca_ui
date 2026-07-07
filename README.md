@@ -60,9 +60,9 @@ exposure is opt-in), `--model-version`, `--side`.
   (torque, neutral, per-joint sliders, PI tuning + rebase on feedback hands).
 - **3D View** — the v2 hand posed live from the joint encoders, an optional
   translucent ghost showing the naive motor-based estimate, joint rings that
-  glow with tracking error, and fingertip force arrows (resultant mode; the
-  per-taxel mode activates once sensor→fingertip transforms land in
-  orca_core).
+  glow with tracking error, and tactile force arrows rendered in the real
+  sensor frames (orca_core's mesh-registered sensor mounts): toggle the
+  per-finger resultant vector, all per-taxel vectors, or both.
 
 ### Mock mode
 

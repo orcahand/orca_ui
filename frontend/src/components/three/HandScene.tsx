@@ -8,12 +8,13 @@ import { OrbitControls, Grid } from '@react-three/drei'
 import { useEffect, useState } from 'react'
 import * as THREE from 'three'
 import type { URDFRobot } from 'urdf-loader'
-import type { FingertipEntry } from '../../api/rest'
+import type { FingertipEntry, SensorMounts } from '../../api/rest'
 import type {
   Capabilities,
   JointCalibrationEntry,
   JointInfo,
   ModelMetadata,
+  TaxelGeometry,
 } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
 import { subscribeFrames } from '../../state/streamStore'
@@ -26,6 +27,8 @@ export interface HandAssets {
   metadata: ModelMetadata
   calibration: Record<string, JointCalibrationEntry>
   fingertips: Record<string, FingertipEntry>
+  sensorMounts: SensorMounts | null // null: no tactile kinematics available
+  taxelGeometry: TaxelGeometry | null
 }
 
 interface Rig {
@@ -67,7 +70,8 @@ function HandRig({
             ? new JointPoseAdapter(ghost, assets.calibration, joints)
             : null,
           glow: new JointGlowLayer(robot),
-          arrows: new ForceArrowLayer(robot, assets.fingertips),
+          arrows: new ForceArrowLayer(
+            robot, assets.fingertips, assets.sensorMounts, assets.taxelGeometry),
         }
         setRig(built)
       })
@@ -169,12 +173,15 @@ function HandRig({
         )
       }
 
-      rig.arrows.setVisible(scene.forceArrows && caps.tactile)
-      if (scene.forceArrows && caps.tactile) {
-        rig.arrows.update(
-          frames.tactile.forces,
-          useAppStore.getState().tactile.colorScheme,
-        )
+      const tactileOk = caps.tactile && rig.arrows.available
+      const scheme = useAppStore.getState().tactile.colorScheme
+      rig.arrows.setResultantVisible(scene.forceResultant && tactileOk)
+      rig.arrows.setTaxelsVisible(scene.forceTaxels && tactileOk)
+      if (scene.forceResultant && tactileOk) {
+        rig.arrows.updateResultants(frames.tactile.forces, scheme)
+      }
+      if (scene.forceTaxels && tactileOk) {
+        rig.arrows.updateTaxels(frames.tactile.taxels, scheme)
       }
       invalidate()
     })

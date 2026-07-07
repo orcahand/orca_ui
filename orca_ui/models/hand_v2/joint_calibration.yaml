@@ -1,83 +1,87 @@
+# Per-joint corrections mapping orca_core angles onto the URDF:
+#   urdf_rad = deg2rad(sign * angle_deg + offset_deg)
+# verified entries survive bundle rebuilds. Signs cross-checked
+# against orca_core's audited kinematics/data/v2_kinematics.yaml.
 index_abd:
-  evidence: rom_mirrored
+  evidence: rom_mirrored + orca_core_kinematics_audit
   offset_deg: 0.0
   sign: -1
-  verified: false
+  verified: true
 index_mcp:
-  evidence: rom_mismatch
+  evidence: rom_mismatch + orca_core_kinematics_audit
   offset_deg: 0.0
   sign: 1
-  verified: false
+  verified: true
 index_pip:
-  evidence: rom_match
+  evidence: rom_match + orca_core_kinematics_audit
   offset_deg: 0.0
   sign: 1
-  verified: false
+  verified: true
 middle_abd:
   evidence: ambiguous
   offset_deg: 0.0
   sign: 1
   verified: false
 middle_mcp:
-  evidence: rom_mismatch
+  evidence: rom_mismatch + orca_core_kinematics_audit
   offset_deg: 0.0
   sign: 1
-  verified: false
+  verified: true
 middle_pip:
-  evidence: rom_match
+  evidence: rom_match + orca_core_kinematics_audit
   offset_deg: 0.0
   sign: 1
-  verified: false
+  verified: true
 pinky_abd:
   evidence: ambiguous
   offset_deg: 0.0
   sign: 1
   verified: false
 pinky_mcp:
-  evidence: rom_mismatch
+  evidence: rom_mismatch + orca_core_kinematics_audit
   offset_deg: 0.0
   sign: 1
-  verified: false
+  verified: true
 pinky_pip:
-  evidence: rom_match
+  evidence: rom_match + orca_core_kinematics_audit
   offset_deg: 0.0
   sign: 1
-  verified: false
+  verified: true
 ring_abd:
   evidence: ambiguous
   offset_deg: 0.0
   sign: 1
   verified: false
 ring_mcp:
-  evidence: rom_mismatch
+  evidence: rom_mismatch + orca_core_kinematics_audit
   offset_deg: 0.0
   sign: 1
-  verified: false
+  verified: true
 ring_pip:
-  evidence: rom_match
+  evidence: rom_match + orca_core_kinematics_audit
   offset_deg: 0.0
   sign: 1
-  verified: false
+  verified: true
 thumb_abd:
-  evidence: rom_match
+  evidence: rom_match + orca_core_kinematics_audit
   offset_deg: 0.0
   sign: 1
-  verified: false
+  verified: true
 thumb_cmc:
-  evidence: rom_match
+  evidence: rom_match + orca_core_kinematics_audit
   offset_deg: 0.0
   sign: 1
-  verified: false
+  verified: true
 thumb_dip:
-  evidence: rom_mismatch
+  evidence: rom_mismatch + orca_core_kinematics_audit
   offset_deg: 0.0
   sign: 1
-  verified: false
+  verified: true
 thumb_mcp:
-  evidence: rom_mismatch
+  evidence: rom_mismatch + orca_core_kinematics_audit
   offset_deg: 0.0
   sign: 1
-  verified: false
+  verified: true
 wrist:
   evidence: rom_match
   offset_deg: -35.0

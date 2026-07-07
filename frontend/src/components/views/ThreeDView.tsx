@@ -20,9 +20,12 @@ export function ThreeDView() {
       api.modelMetadata(),
       api.modelCalibration(),
       api.modelFingertips(),
+      // Tactile extras are optional — non-touch hands have neither.
+      api.modelSensorMounts().catch(() => null),
+      api.taxelGeometry().catch(() => null),
     ])
-      .then(([metadata, calibration, fingertips]) => {
-        setAssets({ metadata, calibration, fingertips })
+      .then(([metadata, calibration, fingertips, sensorMounts, taxelGeometry]) => {
+        setAssets({ metadata, calibration, fingertips, sensorMounts, taxelGeometry })
         setAssetError(null)
       })
       .catch((error) => setAssetError(String(error.message ?? error)))

@@ -74,6 +74,9 @@ export const api = {
     request<Record<string, JointCalibrationEntry>>('/api/model/calibration'),
   modelFingertips: () =>
     request<Record<string, FingertipEntry>>('/api/model/fingertips'),
+  // Per-finger T_fingertip_sensor as row-major 4x4 (meters), from orca_core's
+  // mesh-registered kinematics data.
+  modelSensorMounts: () => request<SensorMounts>('/api/model/sensor_mounts'),
   mockJointSweep: (joint: string | null, periodS = 4.0) =>
     post<{ ok: boolean; sweeping: string | null }>('/api/mock/joint_sweep', {
       joint,
@@ -87,3 +90,5 @@ export interface FingertipEntry {
   anchor: [number, number, number]
   distal_axis: string
 }
+
+export type SensorMounts = Record<string, { matrix: number[][] }>

@@ -46,9 +46,15 @@ def test_hand_info_and_geometry(client):
     assert len(info["joints"]) == 17
     geometry = client.get("/api/tactile/geometry").json()
     assert set(geometry) == {"thumb", "index", "middle", "ring", "pinky"}
-    assert geometry["index"]["frame"] == "fingertip_local"
+    assert geometry["index"]["frame"] == "sensor"
     assert len(geometry["index"]["positions"]) == 87
-    assert geometry["index"]["source"] == "orca_ui_fallback"
+    # Tactile session -> geometry comes from orca_core, normalized to mm.
+    assert geometry["index"]["source"] == "orca_core"
+    assert 1.0 < abs(geometry["index"]["positions"][0][1]) < 100.0
+
+    mounts = client.get("/api/model/sensor_mounts").json()
+    assert set(mounts) == {"thumb", "index", "middle", "ring", "pinky"}
+    assert len(mounts["thumb"]["matrix"]) == 4
 
 
 def test_target_without_torque_is_409(client):
