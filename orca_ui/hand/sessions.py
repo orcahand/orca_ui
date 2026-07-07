@@ -204,21 +204,31 @@ def _caps_from_hand(hand, declared: dict) -> Capabilities:
 def _connect_mock(settings: UiSettings, declared: dict) -> HandSession:
     from orca_ui.mock import build_mock_hand
 
-    hand = build_mock_hand(settings.config_path,
-                           engage_feedback=settings.engage_feedback)
-    try:
-        ok, msg = hand.connect()
-    except (JointFeedbackConnectError, RuntimeError) as e:
-        raise SessionConnectError(f"mock connect failed: {e}")
-    if not ok:
-        raise SessionConnectError(f"mock connect failed: {msg}")
-    return HandSession(
-        hand=hand,
-        caps=_caps_from_hand(hand, declared),
-        tier="mock",
-        message=msg,
-        ports={"motor": "mock", "tactile": "mock", "encoder": "mock"},
-    )
+    # Mirror the real ladder's key degradation: a config whose encoder
+    # calibration is incomplete (JointFeedbackConnectError) still connects
+    # open-loop, so real configs can be previewed in --mock as they would
+    # behave on hardware.
+    attempts: list[str] = []
+    for engage_feedback, tier in ((settings.engage_feedback, "mock"),
+                                  (False, "mock-open-loop")):
+        hand = build_mock_hand(settings.config_path,
+                               engage_feedback=engage_feedback)
+        try:
+            ok, msg = hand.connect()
+        except (JointFeedbackConnectError, RuntimeError) as e:
+            attempts.append(f"{tier}: {e}")
+            continue
+        if not ok:
+            attempts.append(f"{tier}: {msg}")
+            continue
+        return HandSession(
+            hand=hand,
+            caps=_caps_from_hand(hand, declared),
+            tier=tier,
+            message=msg,
+            ports={"motor": "mock", "tactile": "mock", "encoder": "mock"},
+        )
+    raise SessionConnectError("mock connect failed", attempts=attempts)
 
 
 def _build_hand(settings: UiSettings, config, feedback: bool, tactile: bool):

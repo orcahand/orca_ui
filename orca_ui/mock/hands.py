@@ -98,10 +98,24 @@ _UI_MOCK_MATRIX = {
 
 
 def build_mock_hand(config_path: str, engage_feedback: bool = True):
-    """Construct the instrumented mock hand matching the config's capabilities."""
+    """Construct the instrumented mock hand matching the config's capabilities.
+
+    Ports are always forced to fixed mock values, whatever the config says:
+    a real config typically declares ``auto``, and mock mode must never probe
+    (or open) real hardware that happens to be plugged in.
+    """
+    import dataclasses
+
     raw = read_yaml(config_path) or {}
     tactile = "sensors" in raw
     config_cls = OrcaHandTouchConfig if tactile else OrcaHandConfig
     config = config_cls.from_config_path(config_path=config_path)
+
+    overrides: dict = {"port": "mock", "encoder_serial_port": "/dev/orca-mock"}
+    if tactile:
+        overrides["sensor_port"] = "/dev/orca-mock"  # == encoder -> shared link
+        overrides["sensor_baudrate"] = 2_000_000     # explicit -> no baud probe
+    config = dataclasses.replace(config, **overrides)
+
     feedback = engage_feedback and config.joint_feedback_enabled
     return _UI_MOCK_MATRIX[(bool(feedback), tactile)](config=config)
