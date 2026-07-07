@@ -57,7 +57,7 @@ def test_hand_info_shape(service):
     assert index_mcp["rom"] == [-60.0, 100.0]
     assert index_mcp["encoder_backed"] is True
     wrist = next(j for j in info["joints"] if j["id"] == "wrist")
-    assert wrist["encoder_backed"] is False
+    assert wrist["encoder_backed"] is True  # slot 16 is sensed (loop-excluded only)
     assert info["control"]["tactile_mode"] == "combined"
 
 
@@ -114,15 +114,20 @@ def test_stats_shape(service):
     assert stats["encoder"]["frames_ok"] > 0
 
 
-def test_wrist_commands_flow_to_the_motor_estimate(service):
-    """The wrist has no encoder; the 3D view poses it from the estimate."""
+def test_wrist_is_measured_and_follows_commands(service):
+    """The wrist encoder (slot 16) is sensed even though it stays outside
+    orca_core's closed loop — measured must include it and track commands."""
+    measured = _wait_for(service.session.measured_joints) or {}
+    assert "wrist" in measured
+    assert len(measured) == 17
+
     service.enable_torque()
     service.set_targets({"wrist": 20.0})
 
-    def wrist_moved():
+    def wrist_tracks():
         estimate = service.session.estimate_joints() or {}
-        return abs(estimate.get("wrist", 0.0) - 20.0) < 1.0
+        angles = service.session.measured_joints() or {}
+        return (abs(estimate.get("wrist", 0.0) - 20.0) < 1.0
+                and abs(angles.get("wrist", 0.0) - 20.0) < 2.0)
 
-    assert _wait_for(wrist_moved), service.session.estimate_joints()
-    measured = service.session.measured_joints() or {}
-    assert "wrist" not in measured  # encoder stream never carries the wrist
+    assert _wait_for(wrist_tracks), service.session.measured_joints()

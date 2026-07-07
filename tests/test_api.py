@@ -76,7 +76,8 @@ def test_ws_streams_measured_and_taxels(client):
             seen.setdefault(message["type"], message)
 
         measured = seen["joints.measured"]["data"]["angles"]
-        assert len(measured) == 16
+        assert len(measured) == 17  # all encoder slots, wrist included
+        assert "wrist" in measured
         taxels = seen["tactile.taxels"]["data"]["taxels"]
         assert len(taxels["index"]) == 87
 
@@ -106,6 +107,9 @@ def test_ws_command_moves_the_hand(client):
 
 
 def test_tactile_zero_persists_offsets(client):
+    # Zeroing needs live frames; wait for the auto-started stream to produce.
+    assert _wait_for(
+        lambda: client.app.state.service.session.tactile_data() is not None)
     response = client.post("/api/tactile/zero", json={"num_samples": 5})
     assert response.status_code == 200
     calib_path = os.path.join(os.path.dirname(client.config_path),

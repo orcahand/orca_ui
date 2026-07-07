@@ -39,9 +39,14 @@ class ServiceError(RuntimeError):
         self.status_code = status_code
 
 
-def _encoder_backed_joints(config) -> list[str]:
-    """Config-level mirror of ``OrcaHand._encoder_backed_joints`` (usable
-    before any hand instance exists)."""
+def _encoder_sensed_joints(config) -> list[str]:
+    """Joints with an encoder measurement, wrist included.
+
+    Production hands wire encoders on all 17 slots. orca_core's
+    ``_encoder_backed_joints`` excludes the wrist because it stays outside
+    the closed loop — a control policy, not a sensing limitation — so the
+    UI keeps its own list for what can be *displayed* as measured.
+    """
     from orca_core.hardware.sensing.constants import (
         ENCODER_JOINTS_ALL,
         JOINT_TO_ENCODER_SLOT,
@@ -52,7 +57,7 @@ def _encoder_backed_joints(config) -> list[str]:
         return []
     available = [
         joint for joint in JOINT_TO_ENCODER_SLOT
-        if joint != "wrist" and joint in config.joint_to_motor_map
+        if joint in config.joint_to_motor_map
     ]
     if any(str(j).lower() == ENCODER_JOINTS_ALL for j in configured):
         return available
@@ -115,7 +120,7 @@ class HandService:
 
     def hand_info(self) -> dict:
         config = self.supervisor.config
-        encoder_backed = set(_encoder_backed_joints(config))
+        encoder_backed = set(_encoder_sensed_joints(config))
         joints = [
             {
                 "id": joint,

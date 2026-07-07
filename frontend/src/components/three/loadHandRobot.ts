@@ -34,7 +34,16 @@ export async function loadHandRobot(urdfUrl: string): Promise<URDFRobot> {
     )
   }) as never
 
+  // GLB meshes stream in through the manager after the URDF parses; wait for
+  // them so callers (camera framing) see real geometry, not an empty box.
+  const meshesLoaded = new Promise<void>((resolve) => {
+    manager.onLoad = () => resolve()
+  })
   const robot = await loader.loadAsync(urdfUrl)
+  await Promise.race([
+    meshesLoaded,
+    new Promise((resolve) => setTimeout(resolve, 5000)),
+  ])
   robot.rotation.x = -Math.PI / 2 // URDF Z-up -> three.js Y-up
   for (const joint of Object.values(robot.joints)) {
     // Clamp against orca_core ROMs upstream, not the URDF's CAD limits

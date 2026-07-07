@@ -98,15 +98,21 @@ class HandSession:
     # ----- joints ----------------------------------------------------------
 
     def measured_joints(self) -> dict | None:
-        """Encoder-measured joint angles in degrees, or None."""
-        if self.caps.feedback_loop:
-            return self.hand.get_measured_joints()
-        if self._encoder_client is not None:
-            reading = self._encoder_client.get_latest()
-            if reading is None:
-                return None
-            return self.hand._raw_to_joint_angle(reading.raw_counts)
-        return None
+        """Encoder-measured joint angles in degrees, or None.
+
+        Decodes the raw encoder frame directly (same math the loop uses)
+        rather than asking the loop, because the loop only tracks its
+        closed-loop joints — the wrist encoder (slot 16) is sensed but
+        deliberately outside the loop, and it must still be reported here.
+        Covers every joint with a ``joint_encoder_calibration`` entry.
+        """
+        client = self._encoder_client or getattr(self.hand, "_encoder_client", None)
+        if client is None:
+            return None
+        reading = client.get_latest()
+        if reading is None:
+            return None
+        return self.hand._raw_to_joint_angle(reading.raw_counts)
 
     def estimate_joints(self) -> dict | None:
         """Naive motor-derived joint angles in degrees (the 'ghost' pose)."""

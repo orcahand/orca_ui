@@ -80,6 +80,6 @@ thumb_mcp:
   verified: false
 wrist:
   evidence: rom_match
-  offset_deg: 0.0
+  offset_deg: -35.0
   sign: 1
-  verified: false
+  verified: true

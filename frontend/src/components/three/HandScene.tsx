@@ -120,9 +120,10 @@ function HandRig({
     if (!rig) return
     return subscribeFrames((frames) => {
       const scene = useAppStore.getState().scene
-      // Layered per-joint knowledge: the motor estimate covers every joint
-      // (including the encoder-less wrist), encoder measurements override
-      // where they exist. Non-encoder hands: commanded targets win instead.
+      // Layered per-joint knowledge: the motor estimate covers every joint,
+      // encoder measurements override where they exist (all 17 slots on a
+      // sensing hand — a joint missing its encoder calibration falls back to
+      // the estimate). Non-encoder hands: commanded targets win instead.
       rig.adapter.apply(frames.joints.estimate)
       if (caps.encoders) {
         rig.adapter.apply(frames.joints.measured)

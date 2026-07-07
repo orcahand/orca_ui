@@ -60,7 +60,9 @@ def test_tactile_stream_delivers_combined_frames(full_hand):
 def test_measured_joints_track_initial_pose(full_hand):
     measured = _wait_for(full_hand.get_measured_joints)
     assert measured is not None
-    assert len(measured) == 16  # all encoder-backed joints (wrist excluded)
+    # orca_core's loop tracks its 16 closed-loop joints; the wrist encoder is
+    # decoded separately by the session layer (see test_hand_service).
+    assert len(measured) == 16
     # Mock motors start at 0 rad, which the mock calibration maps to 0 deg.
     for joint, angle in measured.items():
         assert abs(angle) < 1.0, f"{joint} starts at {angle:.2f} deg"

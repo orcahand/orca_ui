@@ -104,3 +104,5 @@ joint_encoder_calibration:
     enc_at_anchor_count: 8192
   pinky_pip:
     enc_at_anchor_count: 8192
+  wrist:
+    enc_at_anchor_count: 8192
