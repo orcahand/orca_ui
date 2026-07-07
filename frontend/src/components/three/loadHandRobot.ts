@@ -10,7 +10,15 @@ export async function loadHandRobot(urdfUrl: string): Promise<URDFRobot> {
   const loader = new URDFLoader(manager)
   const gltf = new GLTFLoader(manager)
 
-  loader.loadMeshCb = (path, _manager, done) => {
+  // urdf-loader 0.13 calls loadMeshCb(path, manager, material, done) while
+  // its stale .d.ts still declares three args — take the last arg as `done`
+  // so both signatures work.
+  loader.loadMeshCb = ((...args: unknown[]) => {
+    const path = args[0] as string
+    const done = args[args.length - 1] as (
+      obj: THREE.Object3D | null,
+      err?: Error,
+    ) => void
     gltf.load(
       path,
       (result) => done(result.scene),
@@ -24,7 +32,7 @@ export async function loadHandRobot(urdfUrl: string): Promise<URDFRobot> {
         done(box)
       },
     )
-  }
+  }) as never
 
   const robot = await loader.loadAsync(urdfUrl)
   robot.rotation.x = -Math.PI / 2 // URDF Z-up -> three.js Y-up

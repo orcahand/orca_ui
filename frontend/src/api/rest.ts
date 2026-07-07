@@ -69,10 +69,21 @@ export const api = {
   clearTactileZero: () => post('/api/tactile/clear_zero'),
 
   modelMetadata: () => request<ModelMetadata>('/api/model/metadata'),
+  // Flat mapping: joint id -> {sign, offset_deg, verified, evidence}.
   modelCalibration: () =>
-    request<{ schema: number; joints: Record<string, JointCalibrationEntry> }>(
-      '/api/model/calibration',
-    ),
+    request<Record<string, JointCalibrationEntry>>('/api/model/calibration'),
   modelFingertips: () =>
-    request<Record<string, unknown>>('/api/model/fingertips'),
+    request<Record<string, FingertipEntry>>('/api/model/fingertips'),
+  mockJointSweep: (joint: string | null, periodS = 4.0) =>
+    post<{ ok: boolean; sweeping: string | null }>('/api/mock/joint_sweep', {
+      joint,
+      period_s: periodS,
+    }),
+}
+
+export interface FingertipEntry {
+  link: string
+  parent_link: string
+  anchor: [number, number, number]
+  distal_axis: string
 }

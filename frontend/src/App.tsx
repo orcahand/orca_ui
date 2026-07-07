@@ -1,11 +1,17 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { api } from './api/rest'
 import { startStreamClient } from './api/streamClient'
 import { AppHeader } from './components/header/AppHeader'
 import { ErrorBanner } from './components/common/ErrorBanner'
 import { DashboardView } from './components/views/DashboardView'
-import { ThreeDView } from './components/views/ThreeDView'
 import { useAppStore } from './state/appStore'
+
+// three.js only loads when the 3D tab first opens.
+const ThreeDView = lazy(() =>
+  import('./components/views/ThreeDView').then((m) => ({
+    default: m.ThreeDView,
+  })),
+)
 
 export default function App() {
   const view = useAppStore((s) => s.view)
@@ -20,7 +26,15 @@ export default function App() {
     <div className="container">
       <AppHeader />
       <ErrorBanner />
-      {view === 'dashboard' ? <DashboardView /> : <ThreeDView />}
+      {view === 'dashboard' ? (
+        <DashboardView />
+      ) : (
+        <Suspense
+          fallback={<div className="detecting-card">loading 3D view…</div>}
+        >
+          <ThreeDView />
+        </Suspense>
+      )}
     </div>
   )
 }

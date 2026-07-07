@@ -1,0 +1,186 @@
+// The 3D hand scene: solid hand posed from the measured joints (commanded /
+// estimate fallback), optional translucent ghost from the naive motor
+// estimate, joint-glow rings, and fingertip force arrows. Renders on demand;
+// stream data invalidates the frame.
+
+import { Canvas, useThree } from '@react-three/fiber'
+import { OrbitControls, Grid } from '@react-three/drei'
+import { useEffect, useState } from 'react'
+import * as THREE from 'three'
+import type { URDFRobot } from 'urdf-loader'
+import type { FingertipEntry } from '../../api/rest'
+import type {
+  Capabilities,
+  JointCalibrationEntry,
+  JointInfo,
+  ModelMetadata,
+} from '../../api/types'
+import { useAppStore } from '../../state/appStore'
+import { subscribeFrames } from '../../state/streamStore'
+import { ForceArrowLayer } from './ForceArrowLayer'
+import { JointGlowLayer } from './JointGlowLayer'
+import { JointPoseAdapter } from './JointPoseAdapter'
+import { loadHandRobot, makeGhost } from './loadHandRobot'
+
+export interface HandAssets {
+  metadata: ModelMetadata
+  calibration: Record<string, JointCalibrationEntry>
+  fingertips: Record<string, FingertipEntry>
+}
+
+interface Rig {
+  robot: URDFRobot
+  ghost: URDFRobot | null
+  adapter: JointPoseAdapter
+  ghostAdapter: JointPoseAdapter | null
+  glow: JointGlowLayer
+  arrows: ForceArrowLayer
+}
+
+function HandRig({
+  assets,
+  joints,
+  caps,
+}: {
+  assets: HandAssets
+  joints: JointInfo[]
+  caps: Capabilities
+}) {
+  const invalidate = useThree((s) => s.invalidate)
+  const controls = useThree((s) => s.controls) as { target: THREE.Vector3; update: () => void } | null
+  const [rig, setRig] = useState<Rig | null>(null)
+
+  useEffect(() => {
+    let disposed = false
+    let built: Rig | null = null
+    loadHandRobot(assets.metadata.urdf_url)
+      .then((robot) => {
+        if (disposed) {
+          return
+        }
+        const ghost = makeGhost(robot)
+        built = {
+          robot,
+          ghost,
+          adapter: new JointPoseAdapter(robot, assets.calibration, joints),
+          ghostAdapter: ghost
+            ? new JointPoseAdapter(ghost, assets.calibration, joints)
+            : null,
+          glow: new JointGlowLayer(robot),
+          arrows: new ForceArrowLayer(robot, assets.fingertips),
+        }
+        setRig(built)
+      })
+      .catch((error) => {
+        console.error('URDF load failed', error)
+        useAppStore.getState().setError(`3D model load failed: ${error}`)
+      })
+    return () => {
+      disposed = true
+      if (built) {
+        built.glow.dispose()
+        built.arrows.dispose()
+      }
+      setRig(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assets.metadata.urdf_url])
+
+  // Live calibration updates (the YAML-tuning loop).
+  useEffect(() => {
+    rig?.adapter.setCalibration(assets.calibration)
+    rig?.ghostAdapter?.setCalibration(assets.calibration)
+    invalidate()
+  }, [assets.calibration, rig, invalidate])
+
+  // Frame the camera on the hand once it exists.
+  useEffect(() => {
+    if (!rig || !controls) return
+    const box = new THREE.Box3().setFromObject(rig.robot)
+    const center = box.getCenter(new THREE.Vector3())
+    controls.target.copy(center)
+    controls.update()
+    invalidate()
+  }, [rig, controls, invalidate])
+
+  // Pose + overlay updates from the stream (outside React).
+  useEffect(() => {
+    if (!rig) return
+    return subscribeFrames((frames) => {
+      const scene = useAppStore.getState().scene
+      const solidSource = caps.encoders
+        ? frames.joints.measured
+        : Object.keys(frames.joints.target).length
+          ? frames.joints.target
+          : frames.joints.estimate
+      rig.adapter.apply(solidSource)
+
+      if (rig.ghost) {
+        const showGhost = scene.ghost && caps.motors
+        rig.ghost.visible = showGhost
+        if (showGhost) rig.ghostAdapter?.apply(frames.joints.estimate)
+      }
+
+      rig.glow.setVisible(scene.jointGlow && caps.encoders)
+      if (scene.jointGlow && caps.encoders) {
+        rig.glow.update(
+          frames.joints.measured,
+          frames.joints.target,
+          performance.now(),
+        )
+      }
+
+      rig.arrows.setVisible(scene.forceArrows && caps.tactile)
+      if (scene.forceArrows && caps.tactile) {
+        rig.arrows.update(
+          frames.tactile.forces,
+          useAppStore.getState().tactile.colorScheme,
+        )
+      }
+      invalidate()
+    })
+  }, [rig, caps, invalidate])
+
+  if (!rig) return null
+  return (
+    <>
+      <primitive object={rig.robot} />
+      {rig.ghost && <primitive object={rig.ghost} />}
+    </>
+  )
+}
+
+export function HandScene({
+  assets,
+  joints,
+  caps,
+}: {
+  assets: HandAssets
+  joints: JointInfo[]
+  caps: Capabilities
+}) {
+  return (
+    <Canvas
+      frameloop="demand"
+      dpr={[1, 2]}
+      camera={{ fov: 35, position: [0.28, 0.25, 0.3], near: 0.01, far: 10 }}
+      style={{ background: '#14161f', minHeight: 480 }}
+    >
+      <hemisphereLight args={['#cfd6e4', '#20222e', 0.9]} />
+      <directionalLight position={[0.5, 1, 0.6]} intensity={1.4} />
+      <directionalLight position={[-0.6, 0.4, -0.5]} intensity={0.35} />
+      <Grid
+        position={[0, -0.001, 0]}
+        args={[1.2, 1.2]}
+        cellSize={0.025}
+        cellColor="#2a2e3e"
+        sectionSize={0.1}
+        sectionColor="#3a4054"
+        fadeDistance={0.9}
+        infiniteGrid
+      />
+      <OrbitControls makeDefault enableDamping={false} />
+      <HandRig assets={assets} joints={joints} caps={caps} />
+    </Canvas>
+  )
+}
