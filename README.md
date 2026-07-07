@@ -1,72 +1,108 @@
 # ORCA UI
 
-Web-based visualization interface for the ORCA Hand tactile sensors. Uses [orca_core](https://github.com/orcahand/orca_core) for hardware communication.
+Web interface for the [ORCA Hand](https://www.orcahand.com): live sensor
+visualization (tactile taxels + joint encoders), motor control, and a 3D hand
+view. Uses [orca_core](https://github.com/orcahand/orca_core) (the
+`feature/joint-sensing` line) for all hardware communication.
+
+The UI adapts to the hand described by the config: tactile-only hands get the
+taxel/force views, joint-sensing hands get encoder gauges and the closed-loop
+control panel, full hands get everything. Hardware is auto-detected and
+connected on startup — no connect button.
 
 ## Installation
 
-This project uses [uv](https://docs.astral.sh/uv/). `orca_core` is installed automatically from the public GitHub repo —
+This project uses [uv](https://docs.astral.sh/uv/). During development
+`orca_core` tracks a local sibling checkout (`../orca_core`); on machines
+without one, switch the `[tool.uv.sources]` entry in `pyproject.toml` to the
+git source (instructions in the comment there).
 
 ```bash
-# Creates the virtualenv and installs orca_ui + orca_core (from GitHub)
 uv sync
 ```
 
-> Using a local orca_core dev checkout instead? Edit the `[tool.uv.sources]`
-> entry in `pyproject.toml` (instructions are in the comment there), then re-run
-> `uv sync`.
+The frontend ships pre-built in released wheels. From a git checkout, build it
+once (requires node):
+
+```bash
+cd frontend && npm install && npm run build && cd ..
+```
 
 ## Usage
 
-By default, the UI runs for the **right** touch hand:
-
 ```bash
-uv run python -m orca_ui.app
+uv run orca-ui                              # orca_core default model
+uv run orca-ui --model orcahand-full-right  # bundled model by name
+uv run orca-ui --config /path/to/config.yaml   # explicit config (or its folder)
+uv run orca-ui --mock                       # full simulated hand, no hardware
 ```
 
-For the **left** touch hand:
+A browser app window opens automatically and closes when you stop the program
+(Ctrl-C); pass `--no-browser` to open `http://localhost:5001` yourself.
+
+The backend probes for hardware continuously: motor bus, tactile sensors, and
+joint encoders are discovered by USB id (plus the OH board's `ORCA_ID?`
+handshake) and connected at the best achievable tier. Unplugging triggers
+reconnection; sensors-only operation (motor power off) works for viewing.
+**Torque is never enabled automatically** — use the Motor Control panel's
+Enable Torque button (on feedback hands the loop is rebased first so nothing
+lurches).
+
+Useful flags: `--no-feedback` (open-loop sliders even on feedback hands),
+`--host/--port` (default `127.0.0.1:5001` — this UI can move motors, so LAN
+exposure is opt-in), `--model-version`, `--side`.
+
+### Views
+
+- **Dashboard** — tactile taxel grids (magnitude / direction / arrows, zeroing,
+  stream modes), per-finger resultant-force dials, joint-encoder ROM bars with
+  target markers and expandable history sparklines, and the motor slider panel
+  (torque, neutral, per-joint sliders, PI tuning + rebase on feedback hands).
+- **3D View** — the v2 hand posed live from the joint encoders, an optional
+  translucent ghost showing the naive motor-based estimate, joint rings that
+  glow with tracking error, and fingertip force arrows (resultant mode; the
+  per-taxel mode activates once sensor→fingertip transforms land in
+  orca_core).
+
+### Mock mode
+
+`--mock` runs the full production stack (real tactile/encoder clients, real
+PI loop) over in-memory serial links: taxels stream sine waves and the joint
+loop genuinely converges on slider targets. Useful for UI development, demos,
+and CI. Mock mode adds a joint-sweep tool in the 3D view for verifying the
+model calibration.
+
+## Development
 
 ```bash
-uv run python -m orca_ui.app --side left
+uv run orca-ui --mock --no-browser        # backend on :5001
+cd frontend && npm run dev                 # Vite dev server on :5173, proxied
 ```
 
-To use your own **specific config** (e.g. a per-hand calibrated copy), point at it
-with `--config`. This overrides `--side`:
+Tests: `uv run pytest tests/`. The frontend has a headless URDF check:
+`cd frontend && node scripts/check-urdf.mjs`.
+
+### 3D asset bundle
+
+`orca_ui/models/hand_v2/` is generated from the `orcahand_description` repo by
 
 ```bash
-uv run python -m orca_ui.app --config /path/to/orcahand-touch/config.yaml
+uv run --group assets python scripts/build_hand_bundle.py
 ```
 
-A browser window opens automatically on startup and closes again when you stop
-the program (Ctrl-C). If a Chromium-based browser (Chrome/Brave/Edge/Chromium)
-is available it opens a dedicated app window; otherwise your default browser is
-used (and won't auto-close). Pass `--no-browser` to disable this and open
-`http://localhost:5001` yourself.
+which renames the Fusion-exported URDF joints to orca_core canonical ids,
+decimates the meshes to browser-friendly GLBs, adds fingertip frames, and
+derives `joint_calibration.yaml` (per-joint `{sign, offset_deg}` corrections
+between orca_core angles and the URDF). Verify corrections with the mock
+sweep tool joint by joint, then set `verified: true` — rebuilds never
+overwrite verified entries. The calibration file is re-read per request, so
+edit → refresh iterates in seconds.
 
-Right and left have different sensor wiring, so the `--side` you choose (or the
-config you pass) must match your hardware. The config supplies the
-finger→sensor-id wiring map and the directory where `calibration.yaml` (zeroing
-offsets) is read/written; the `--side` defaults load the matching config bundled
-with `orca_core`.
-
-### Mock mode (no hardware)
-
-To try the UI without a touch hand connected, run with `--mock`. It simulates
-all five fingers with sine-wave signals on both the resultant force vectors and
-every taxel:
+## Releasing
 
 ```bash
-uv run python -m orca_ui.app --mock
+cd frontend && npm run build && cd ..
+uv build
 ```
 
-Open the UI and click **Connect** as usual — the port selector is ignored in
-mock mode. Useful for UI development, demos, or verifying the install.
-
-## Features
-
-- **Connection Management**: Connect/disconnect to sensor devices
-- **Sensor Status**: View which sensors are connected
-- **Taxel Counts**: Display number of taxels for each sensor
-- **Force Visualization**: Real-time force vectors displayed as arrows and numerical values
-- **Taxel Visualization**: 2D taxel view with magnitude, direction, and arrow display modes
-- **Zeroing**: Capture sensor baseline offsets
-- **Auto Update**: Continuous monitoring of sensor data via WebSocket
+The wheel force-includes the gitignored `orca_ui/webui` build output.

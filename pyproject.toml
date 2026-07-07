@@ -44,7 +44,11 @@ orca_core = { path = "../orca_core", editable = true }
 requires = ["hatchling>=1.27.0"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build]
+# The built frontend (orca_ui/webui) is gitignored but must ship in releases.
+# Set at build level: uv builds the wheel from the sdist, so both targets
+# need it.
+artifacts = ["/orca_ui/webui/"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["orca_ui"]
-# The built frontend (orca_ui/webui) is gitignored but must ship in the wheel.
-artifacts = ["orca_ui/webui"]
