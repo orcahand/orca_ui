@@ -13,6 +13,7 @@ export type HandState =
   | 'connected'
   | 'degraded'
   | 'reconnecting'
+  | 'maintenance'
 
 export interface Capabilities {
   motors: boolean
@@ -42,11 +43,17 @@ export interface JointInfo {
   encoder_calibrated: boolean | null
 }
 
+// Who owns the joint-target channel. TELEOP is reserved for orca_teleop.
+export type ControlSource = 'manual' | 'operation' | 'teleop'
+
 export interface ControlState {
   torque_enabled: boolean
   max_current: number
   gains: { kp: number; ki: number; correction_max_deg: number }
   tactile_mode: TactileMode
+  control_source: ControlSource
+  // Human-readable owner label, e.g. "manual", "replay", or the op kind.
+  control_owner: string
 }
 
 export interface HandInfo {
@@ -83,12 +90,59 @@ export interface JointCalibrationEntry {
   evidence: string
 }
 
+// ----- operations (orca_ui/hand/operations/) --------------------------------
+
+export type OperationState =
+  | 'starting'
+  | 'running'
+  | 'paused'
+  | 'awaiting_input'
+  | 'stopping'
+  | 'done'
+  | 'error'
+
+export interface OperationSnapshot {
+  kind: string
+  run_id: string
+  state: OperationState
+  phase: string | null
+  detail: string | null
+  progress: number | null // 0..1 or null when indeterminate
+  params: Record<string, unknown>
+  awaiting: { prompt: string; options: string[] } | null
+  result: Record<string, unknown> | null
+  error: string | null
+  started_at: number
+}
+
+export interface OperationLogLine {
+  seq: number
+  t: number
+  line: string
+}
+
+// CUMULATIVE payload (the hub coalesces latest-wins, so every publish carries
+// the run's whole bounded buffer). Merge lines with seq > last seen.
+export interface OperationLogPayload {
+  run_id: string | null
+  next_seq: number
+  lines: OperationLogLine[]
+}
+
+export interface PortInfo {
+  device: string
+  description: string
+  kind: string | null
+}
+
 // ----- WS topics ------------------------------------------------------------
 
 export const TOPICS = {
   status: 'status',
   controlState: 'control.state',
   error: 'error',
+  operationState: 'operation.state',
+  operationLog: 'operation.log',
   tactileForces: 'tactile.forces',
   tactileTaxels: 'tactile.taxels',
   jointsMeasured: 'joints.measured',

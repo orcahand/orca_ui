@@ -1,6 +1,11 @@
-import { useAppStore } from '../../state/appStore'
+// Console header: brand lockup, model badge, status pill, the five view
+// tabs, and the E-stop hard right. Capability badges + Hz meters live in the
+// Motors tab.
+
 import type { HandState } from '../../api/types'
-import { TOPICS } from '../../api/types'
+import type { ViewName } from '../../state/appStore'
+import { useAppStore } from '../../state/appStore'
+import { EStopButton } from './EStopButton'
 
 const STATE_CLASS: Record<HandState, string> = {
   connected: 'connected',
@@ -8,6 +13,7 @@ const STATE_CLASS: Record<HandState, string> = {
   detecting: 'busy',
   connecting: 'busy',
   reconnecting: 'busy',
+  maintenance: 'maintenance',
   disconnected: 'disconnected',
 }
 
@@ -17,8 +23,17 @@ const STATE_LABEL: Record<HandState, string> = {
   detecting: 'Detecting…',
   connecting: 'Connecting…',
   reconnecting: 'Reconnecting…',
+  maintenance: 'Maintenance',
   disconnected: 'Disconnected',
 }
+
+const TABS: { id: ViewName; label: string }[] = [
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: '3d', label: '3D' },
+  { id: 'poses', label: 'Poses' },
+  { id: 'setup', label: 'Setup' },
+  { id: 'motors', label: 'Motors' },
+]
 
 export function AppHeader() {
   const status = useAppStore((s) => s.status)
@@ -26,62 +41,43 @@ export function AppHeader() {
   const wsConnected = useAppStore((s) => s.wsConnected)
   const view = useAppStore((s) => s.view)
   const setView = useAppStore((s) => s.setView)
-  const rates = useAppStore((s) => s.rates)
 
   const state: HandState = !wsConnected
     ? 'disconnected'
     : (status?.state ?? 'detecting')
-  const caps = status?.capabilities
-
-  const measuredHz = rates[TOPICS.jointsMeasured] ?? 0
-  const taxelHz = rates[TOPICS.tactileTaxels] ?? 0
+  // Defensive: a backend state this build doesn't know yet must still render
+  // a legible pill, not a blank one.
+  const pillClass: string = STATE_CLASS[state] ?? 'busy'
+  const pillLabel: string = STATE_LABEL[state] ?? state
 
   return (
     <header>
-      <h1>ORCA HAND</h1>
+      <h1 className="brand">
+        <span className="brand-mark">◈ ORCA</span>
+        <span className="brand-sub">HAND CONSOLE</span>
+      </h1>
       {handInfo && (
         <span className="capability-badge">
           {handInfo.model_name}
           {handInfo.mock ? ' · MOCK' : ''}
         </span>
       )}
-      <span className={`status-indicator ${STATE_CLASS[state]}`}>
-        {wsConnected ? STATE_LABEL[state] : 'Backend offline'}
-      </span>
-      {caps && (
-        <>
-          <span className={`capability-badge ${caps.motors ? 'on' : ''}`}>
-            MOTORS
-          </span>
-          <span className={`capability-badge ${caps.tactile ? 'on' : ''}`}>
-            TACTILE
-          </span>
-          <span className={`capability-badge ${caps.encoders ? 'on' : ''}`}>
-            ENCODERS
-          </span>
-          {caps.degraded && <span className="capability-badge warn">DEGRADED</span>}
-        </>
-      )}
-      <span className="rate-meters">
-        {measuredHz > 0 && `joints ${measuredHz}Hz`}
-        {measuredHz > 0 && taxelHz > 0 && ' · '}
-        {taxelHz > 0 && `taxels ${taxelHz}Hz`}
+      <span className={`status-indicator ${pillClass}`}>
+        {wsConnected ? pillLabel : 'Backend offline'}
       </span>
       <div className="header-spacer" />
       <nav className="view-tabs">
-        <button
-          className={`view-tab ${view === 'dashboard' ? 'active' : ''}`}
-          onClick={() => setView('dashboard')}
-        >
-          Dashboard
-        </button>
-        <button
-          className={`view-tab ${view === '3d' ? 'active' : ''}`}
-          onClick={() => setView('3d')}
-        >
-          3D View
-        </button>
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            className={`view-tab ${view === tab.id ? 'active' : ''}`}
+            onClick={() => setView(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </nav>
+      <EStopButton />
     </header>
   )
 }

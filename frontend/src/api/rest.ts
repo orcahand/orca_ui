@@ -4,6 +4,9 @@ import type {
   HandInfo,
   JointCalibrationEntry,
   ModelMetadata,
+  OperationLogPayload,
+  OperationSnapshot,
+  PortInfo,
   Stats,
   StatusSnapshot,
   TactileMode,
@@ -45,8 +48,24 @@ export const api = {
   status: () => request<StatusSnapshot>('/api/status'),
   handInfo: () => request<HandInfo>('/api/hand/info'),
   stats: () => request<Stats>('/api/stats'),
+  ports: () => request<PortInfo[]>('/api/ports'),
   taxelGeometry: () => request<TaxelGeometry>('/api/tactile/geometry'),
   reconnect: () => post('/api/reconnect'),
+
+  operation: () =>
+    request<{ operation: OperationSnapshot | null }>('/api/operation'),
+  operationLog: () => request<OperationLogPayload>('/api/operation/log'),
+  operationStart: (kind: string, params: Record<string, unknown> = {}) =>
+    post<{ operation: OperationSnapshot }>(`/api/operation/${kind}/start`, {
+      params,
+    }),
+  operationStop: () =>
+    post<{ ok: boolean; stopped: boolean }>('/api/operation/stop'),
+  operationInput: (value: string) =>
+    post<{ ok: boolean }>('/api/operation/input', { value }),
+  // Never raises server-side; always 200 with a report of what was actioned.
+  estop: () =>
+    post<{ ok: boolean; report: Record<string, unknown> }>('/api/estop'),
 
   torqueEnable: () =>
     post<{ seed: Record<string, number> }>('/api/torque/enable'),

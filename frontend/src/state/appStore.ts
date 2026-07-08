@@ -11,7 +11,7 @@ import type {
 
 export type TaxelDisplayMode = 'magnitude' | 'direction' | 'arrows'
 export type ArrowColorScheme = 'heat' | 'intensity' | 'orca'
-export type ViewName = 'dashboard' | '3d'
+export type ViewName = 'dashboard' | '3d' | 'poses' | 'setup' | 'motors'
 
 export interface TactileSettings {
   displayMode: TaxelDisplayMode

@@ -2,13 +2,21 @@
 // the stream store, per-topic rate meters (published to zustand at 1 Hz).
 
 import { useAppStore } from '../state/appStore'
+import { useEventLogStore } from '../state/eventLogStore'
+import { useOperationStore } from '../state/operationStore'
 import {
   latest,
   markDirty,
   pushMeasuredHistory,
 } from '../state/streamStore'
 import { api } from './rest'
-import type { ControlState, ServerMessage, StatusSnapshot } from './types'
+import type {
+  ControlState,
+  OperationLogPayload,
+  OperationSnapshot,
+  ServerMessage,
+  StatusSnapshot,
+} from './types'
 import { TOPICS } from './types'
 
 const ALL_TOPICS = Object.values(TOPICS)
@@ -126,6 +134,15 @@ function dispatch(message: ServerMessage): void {
       break
     case TOPICS.status: {
       const status = data as unknown as StatusSnapshot
+      const previous = useAppStore.getState().status
+      if (previous?.state !== status.state) {
+        useEventLogStore
+          .getState()
+          .pushEvent(
+            'status',
+            `state → ${status.state}${status.message ? ` (${status.message})` : ''}`,
+          )
+      }
       useAppStore.getState().setStatus(status)
       // A fresh session may change capabilities/joints.
       if (status.state === 'connected' || status.state === 'degraded') {
@@ -136,9 +153,22 @@ function dispatch(message: ServerMessage): void {
     case TOPICS.controlState:
       useAppStore.getState().setControl(data as unknown as ControlState)
       break
-    case TOPICS.error:
-      useAppStore.getState().setError((data.message as string) ?? 'unknown error')
+    case TOPICS.operationState:
+      useOperationStore
+        .getState()
+        .setOperation(data as unknown as OperationSnapshot)
       break
+    case TOPICS.operationLog:
+      useOperationStore
+        .getState()
+        .mergeLog(data as unknown as OperationLogPayload)
+      break
+    case TOPICS.error: {
+      const message = (data.message as string) ?? 'unknown error'
+      useAppStore.getState().setError(message)
+      useEventLogStore.getState().pushEvent('error', message)
+      break
+    }
   }
 }
 
