@@ -54,8 +54,8 @@ export function JointSparkline({ joint }: { joint: JointInfo }) {
         ],
         series: [
           {},
-          { stroke: COLORS.accent, width: 1.25 },
-          { stroke: COLORS.dim, width: 1, dash: [4, 4] },
+          { stroke: COLORS.accent, width: 1.25, points: { show: false } },
+          { stroke: COLORS.dim, width: 1, dash: [4, 4], points: { show: false } },
         ],
       },
       [[], [], []],
@@ -72,14 +72,17 @@ export function JointSparkline({ joint }: { joint: JointInfo }) {
       const t = target.snapshot()
       const n = Math.min(time.length, m.length, t.length)
       if (n < 2) return
-      const tEnd = time[time.length - 1]
+      // Anchor ages to the wall clock, not the newest sample: sample spacing
+      // is slightly irregular, and re-pinning the curve to a jittery
+      // reference made the whole trace shimmer between redraws.
+      const nowS = Date.now() / 1000
       const offsetM = m.length - time.length
       const offsetT = t.length - time.length
       const xs: number[] = []
       const ms: number[] = []
       const ts: (number | null)[] = []
       for (let i = time.length - n; i < time.length; i++) {
-        const age = time[i] - tEnd // seconds, <= 0
+        const age = time[i] - nowS // seconds, <= 0
         if (age < -WINDOW_S) continue
         xs.push(age)
         ms.push(m[i + offsetM])
