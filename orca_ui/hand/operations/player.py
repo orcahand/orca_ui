@@ -82,6 +82,9 @@ def play_frames(ctx: OpContext, *, name: str, joint_ids: list[str],
             if delay > 0:
                 ctx.sleep(delay)
         cycles += 1
+        if loop and cycles >= MAX_LOOP_CYCLES:
+            ctx.log(f"loop backstop reached ({MAX_LOOP_CYCLES} cycles) — "
+                    "stopping playback")
         if not loop or cycles >= MAX_LOOP_CYCLES:
             return {"frames": total, "cycles": cycles,
                     "duration_s": duration_s}
@@ -163,10 +166,11 @@ class DemoOperation(Operation):
                 f"unknown demo: {name!r} "
                 f"(available: {sorted(service.list_demos())})",
                 status_code=404)
+        loop = bool(params.get("loop", False))
         cycles = int(params.get("cycles", 1))
-        if not 1 <= cycles <= 10:
+        if not loop and not 1 <= cycles <= 10:
             raise ServiceError("cycles must be between 1 and 10")
-        return {"name": name, "cycles": cycles}
+        return {"name": name, "cycles": 1 if loop else cycles, "loop": loop}
 
     def run(self, ctx: OpContext) -> dict:
         service = ctx.service
@@ -176,12 +180,21 @@ class DemoOperation(Operation):
             raise ServiceError("hand not connected", status_code=503)
         keyframes = service.list_demos()[self.params["name"]]
         joint_ids = list(service.supervisor.config.joint_ids)
+        # Looping playback wraps a single cycle (play_frames repeats it);
+        # finite playback bakes the cycles into the frame list so the
+        # progress bar spans the whole run.
+        repeats = 1 if self.params["loop"] else self.params["cycles"]
         waypoints = []
-        for fractions in keyframes * self.params["cycles"]:
+        for fractions in keyframes * repeats:
             pose = hand_ops.pose_from_fractions(session.hand, fractions)
             waypoints.append([pose.get(j) for j in joint_ids])
+        # When looping, close the cycle so the wrap-around glides back to
+        # the first keyframe instead of jumping.
+        if self.params["loop"] and waypoints:
+            waypoints.append(list(waypoints[0]))
         frames, rate_hz = _interpolate(waypoints)
         return play_frames(
             ctx, name=self.params["name"], joint_ids=joint_ids,
-            frames=frames, rate_hz=rate_hz, speed=1.0, loop=False,
+            frames=frames, rate_hz=rate_hz, speed=1.0,
+            loop=self.params["loop"],
         )

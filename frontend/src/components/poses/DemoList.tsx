@@ -9,7 +9,10 @@ import { useAppStore } from '../../state/appStore'
 import { useStartGate } from '../../state/operationStore'
 import { Panel } from '../common/Panel'
 
-const CYCLE_CHOICES = Array.from({ length: 10 }, (_, i) => i + 1)
+// One run by default; one step up is nonstop (loops until stopped from
+// the transport bar or E-stop).
+const CYCLE_CHOICES = ['1', '∞'] as const
+type CycleChoice = (typeof CYCLE_CHOICES)[number]
 
 function fail(error: unknown) {
   useAppStore.getState().setError(String((error as Error).message ?? error))
@@ -18,16 +21,18 @@ function fail(error: unknown) {
 export function DemoList({ demos }: { demos: DemoEntry[] }) {
   const gate = useStartGate('motors')
   const torqueOn = useAppStore((s) => s.control?.torque_enabled ?? false)
-  const [cycles, setCycles] = useState<Record<string, number>>({})
+  const [cycles, setCycles] = useState<Record<string, CycleChoice>>({})
 
   const blocked = gate.blocked || !torqueOn
   const reason =
     gate.reason ?? (!torqueOn ? 'enable torque to play scripts' : null)
 
-  const play = (name: string) =>
-    void api
-      .operationStart('demo', { name, cycles: cycles[name] ?? 1 })
-      .catch(fail)
+  const play = (name: string) => {
+    const choice = cycles[name] ?? '1'
+    const params =
+      choice === '∞' ? { name, loop: true } : { name, cycles: 1 }
+    void api.operationStart('demo', params).catch(fail)
+  }
 
   return (
     <Panel title="Movement Scripts">
@@ -51,11 +56,11 @@ export function DemoList({ demos }: { demos: DemoEntry[] }) {
                 <label className="demo-cycles">
                   cycles
                   <select
-                    value={cycles[demo.name] ?? 1}
+                    value={cycles[demo.name] ?? '1'}
                     onChange={(e) =>
                       setCycles((prev) => ({
                         ...prev,
-                        [demo.name]: Number(e.target.value),
+                        [demo.name]: e.target.value as CycleChoice,
                       }))
                     }
                   >

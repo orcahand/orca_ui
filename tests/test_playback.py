@@ -260,3 +260,20 @@ def test_demo_unknown_name_404(client):
     client.post("/api/torque/enable")
     assert client.post("/api/operation/demo/start", json={"params": {
         "name": "macarena"}}).status_code == 404
+
+
+def test_demo_loop_runs_until_stopped(client):
+    client.post("/api/torque/enable")
+    response = client.post("/api/operation/demo/start", json={"params": {
+        "name": "open_close", "loop": True}})
+    assert response.status_code == 200
+    _wait_op_state(client, "running")
+    # Still running well past a couple of progress updates — it loops.
+    time.sleep(1.0)
+    assert (_operation(client) or {}).get("state") == "running"
+    client.post("/api/operation/stop")
+    snapshot = _wait_op_state(client, "done")
+    assert snapshot["detail"] == "stopped"
+    # Control returns to manual afterwards.
+    assert client.post("/api/joints/target",
+                       json={"angles": {"index_mcp": 0.0}}).status_code == 200
