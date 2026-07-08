@@ -52,6 +52,7 @@ class OperationManager:
         self._stop_event = threading.Event()
         self._input_queue: queue.Queue = queue.Queue()
         self._stop_reason: str | None = None
+        self._pause_requested = False
         self._log: deque[dict] = deque(maxlen=LOG_BUFFER_LINES)
         self._log_seq = 0
         self._run_id: str | None = None
@@ -125,6 +126,7 @@ class OperationManager:
             self._stop_event = threading.Event()
             self._input_queue = queue.Queue()
             self._stop_reason = None
+            self._pause_requested = False
             self._log.clear()
             self._log_seq = 0
             operation = self._operation
@@ -218,19 +220,41 @@ class OperationManager:
 
         with self._lock:
             if self._snapshot is None or \
-                    self._snapshot.state != OpState.AWAITING_INPUT:
-                raise ServiceError("no operation awaiting input",
-                                   status_code=409)
+                    self._snapshot.state in TERMINAL_STATES:
+                raise ServiceError("no operation running", status_code=409)
+            state = self._snapshot.state
             operation = self._operation
             input_queue = self._input_queue
-        # Ops blocked inside hardware calls consume the input via their
-        # hook (caller thread); everyone else gets the queue.
+        # Ops consuming input mid-run (record's "stop & save", tension's
+        # Release while blocked inside orca_core) take it via their hook on
+        # the caller thread; a blocking ctx.wait_input gets the queue.
         try:
             if operation is not None and operation.handle_input(str(value)):
                 return
         except Exception:
             logger.exception("handle_input hook failed")
+        if state != OpState.AWAITING_INPUT:
+            raise ServiceError("operation is not awaiting input",
+                               status_code=409)
         input_queue.put(value)
+
+    def pause(self) -> None:
+        from orca_ui.hand.service import ServiceError
+
+        with self._lock:
+            if self._snapshot is None or \
+                    self._snapshot.state in TERMINAL_STATES:
+                raise ServiceError("no operation running", status_code=409)
+            self._pause_requested = True
+
+    def resume(self) -> None:
+        with self._lock:
+            self._pause_requested = False
+
+    @property
+    def pause_requested(self) -> bool:
+        with self._lock:
+            return self._pause_requested
 
     def shutdown(self) -> None:
         self.stop(wait=True)

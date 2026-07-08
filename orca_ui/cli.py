@@ -62,6 +62,9 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--slow-hz", type=float, default=1.0,
                         help="Sampling rate for temps/currents/stats "
                              "(motor-bus reads; default 1).")
+    parser.add_argument("--library-dir", type=str, default=None,
+                        help="Pose/trajectory library root "
+                             "(default ~/.orca_ui/library).")
     return parser.parse_args(argv)
 
 
@@ -106,6 +109,7 @@ def build_settings(argv=None) -> UiSettings:
         fast_hz=args.fast_hz,
         mid_hz=args.mid_hz,
         slow_hz=args.slow_hz,
+        library_dir=args.library_dir,
     )
 
 

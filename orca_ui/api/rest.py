@@ -88,6 +88,16 @@ def build_router(service: HandService) -> APIRouter:
         stopped = _manager().stop()
         return {"ok": True, "stopped": stopped}
 
+    @router.post("/operation/pause")
+    def operation_pause():
+        guard(_manager().pause)
+        return {"ok": True}
+
+    @router.post("/operation/resume")
+    def operation_resume():
+        _manager().resume()
+        return {"ok": True}
+
     @router.post("/operation/input")
     def operation_input(body: schemas.OperationInputRequest):
         guard(_manager().send_input, body.value)
@@ -134,6 +144,43 @@ def build_router(service: HandService) -> APIRouter:
     def control_rebase():
         guard(service.rebase)
         return {"ok": True}
+
+    # ----- poses / trajectories / demos --------------------------------------------
+
+    @router.get("/poses")
+    def poses_list():
+        return {"poses": service.list_poses()}
+
+    @router.put("/poses/{name}")
+    def pose_save(name: str, body: schemas.PoseSaveRequest):
+        guard(service.save_pose, name, body.angles)
+        return {"ok": True}
+
+    @router.delete("/poses/{name}")
+    def pose_delete(name: str):
+        guard(service.delete_pose, name)
+        return {"ok": True}
+
+    @router.post("/poses/{name}/apply")
+    def pose_apply(name: str):
+        return guard(service.apply_pose, name)
+
+    @router.post("/poses/capture")
+    def pose_capture(body: schemas.PoseCaptureRequest):
+        return guard(service.capture_pose, body.name)
+
+    @router.get("/trajectories")
+    def trajectories_list():
+        return {"trajectories": service.library.list_trajectories()}
+
+    @router.delete("/trajectories/{name}")
+    def trajectory_delete(name: str):
+        guard(service.delete_trajectory, name)
+        return {"ok": True}
+
+    @router.get("/demos")
+    def demos_list():
+        return {"demos": service.demos_listing()}
 
     # ----- tactile ---------------------------------------------------------------
 

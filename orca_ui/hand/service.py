@@ -18,11 +18,15 @@ from orca_core.control.constants import (
     DEFAULT_KP,
 )
 
+from pathlib import Path
+
 from orca_ui.hand import zeroing
 from orca_ui.hand.commands import CommandWorker
+from orca_ui.hand.presets import BUILTIN_POSES, BUILTIN_SEQUENCES
 from orca_ui.hand.sessions import HandSession
 from orca_ui.hand.states import ControlSource
 from orca_ui.hand.supervisor import HandSupervisor
+from orca_ui.library import Library, LibraryError
 from orca_ui.settings import UiSettings
 
 logger = logging.getLogger(__name__)
@@ -103,6 +107,14 @@ class HandService:
             on_error=self._publish_error,
         )
         self._max_current = int(self.supervisor.config.max_current)
+
+        library_root = (
+            Path(settings.library_dir) if settings.library_dir
+            else Path.home() / ".orca_ui" / "library"
+        )
+        model_name = os.path.basename(
+            os.path.dirname(self.supervisor.config.config_path))
+        self.library = Library(library_root, model_name)
 
     # ----- lifecycle ---------------------------------------------------------
 
@@ -438,6 +450,103 @@ class HandService:
     def rebase(self) -> None:
         session = self._require_feedback()
         session.hand.rebase_loop()
+
+    # ----- poses & demos -------------------------------------------------------
+
+    def list_poses(self) -> list[dict]:
+        user = self.library.user_poses()
+        out = []
+        for name in BUILTIN_POSES:
+            if name in user:
+                continue   # user pose shadows the built-in
+            out.append({"name": name, "builtin": True, "placeholder": True})
+        for name, entry in user.items():
+            out.append({
+                "name": name, "builtin": False, "placeholder": False,
+                "saved_at": entry.get("saved_at"),
+            })
+        out.sort(key=lambda p: p["name"])
+        return out
+
+    def save_pose(self, name: str, angles: dict[str, float]) -> None:
+        known = set(self.supervisor.config.joint_ids)
+        unknown = set(angles) - known
+        if unknown:
+            raise ServiceError(f"unknown joints: {sorted(unknown)}")
+        try:
+            self.library.save_pose(name, angles)
+        except LibraryError as e:
+            raise ServiceError(str(e), status_code=e.status_code)
+
+    def delete_pose(self, name: str) -> None:
+        try:
+            self.library.delete_pose(name)
+        except LibraryError as e:
+            raise ServiceError(str(e), status_code=e.status_code)
+
+    def capture_pose(self, name: str) -> dict:
+        session = self._require_session()
+        measured = session.measured_joints()
+        if not measured:
+            raise ServiceError(
+                "no measured joint angles — capture needs encoders",
+                status_code=409)
+        angles = {j: round(float(v), 2) for j, v in measured.items()}
+        self.save_pose(name, angles)
+        return {"name": name, "angles": angles}
+
+    def apply_pose(self, name: str) -> dict:
+        """One-shot interpolated move to a saved/built-in pose. Not an
+        operation — finishes in one motion, needs no progress/stop."""
+        from orca_ui.hand.operations import hand_ops
+
+        session = self._require_torque()
+        self._require_manual_control()
+        user = self.library.user_poses()
+        if name in user:
+            angles = {j: float(v)
+                      for j, v in (user[name].get("angles") or {}).items()}
+        elif name in BUILTIN_POSES:
+            angles = hand_ops.pose_from_fractions(
+                session.hand, BUILTIN_POSES[name])
+        else:
+            raise ServiceError(f"no pose named {name!r}", status_code=404)
+        if not angles:
+            raise ServiceError(f"pose {name!r} is empty")
+        self.worker.submit_op(
+            lambda: session.hand.set_joint_positions(
+                angles, num_steps=25, step_size=0.02))
+        with self._state_lock:
+            self._targets.update(angles)
+        self._publish_targets()
+        return {"name": name, "angles": angles}
+
+    def list_demos(self) -> dict[str, list[dict[str, float]]]:
+        from orca_ui.hand.operations import hand_ops
+
+        demos = dict(hand_ops.demo_definitions())
+        demos.update(BUILTIN_SEQUENCES)
+        return demos
+
+    def demos_listing(self) -> list[dict]:
+        from orca_ui.hand.operations import hand_ops
+
+        core = hand_ops.demo_definitions()
+        out = []
+        for name, poses in self.list_demos().items():
+            out.append({
+                "name": name,
+                "poses": len(poses),
+                "source": "orca_core" if name in core else "orca_ui",
+            })
+        out.sort(key=lambda d: d["name"])
+        return out
+
+    def delete_trajectory(self, name: str) -> None:
+        try:
+            self.library.delete_trajectory(name)
+        except LibraryError as e:
+            raise ServiceError(str(e), status_code=e.status_code)
 
     # ----- tactile ---------------------------------------------------------------
 

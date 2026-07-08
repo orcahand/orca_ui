@@ -82,6 +82,18 @@ class OpContext:
         finally:
             self._manager.exit_awaiting_input()
 
+    def pause_point(self) -> None:
+        """Honor a pause request (replay/demo): blocks while paused,
+        publishing the ``paused`` state; raises OperationStopped on stop."""
+        if not self._manager.pause_requested:
+            return
+        from orca_ui.hand.operations.events import OpState
+        self._manager.update_snapshot(state=OpState.PAUSED)
+        while self._manager.pause_requested:
+            if self.stop_event.wait(0.1):
+                raise OperationStopped()
+        self._manager.update_snapshot(state=OpState.RUNNING)
+
     def announce_input(self, prompt: str, options: list[str]) -> None:
         """Enter ``awaiting_input`` WITHOUT blocking on the queue.
 

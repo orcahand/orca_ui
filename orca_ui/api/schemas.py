@@ -55,3 +55,11 @@ class OperationInputRequest(BaseModel):
     """Answer to an operation parked in ``awaiting_input``."""
 
     value: str
+
+
+class PoseSaveRequest(BaseModel):
+    angles: dict[str, float]
+
+
+class PoseCaptureRequest(BaseModel):
+    name: str

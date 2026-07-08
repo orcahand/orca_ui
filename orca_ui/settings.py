@@ -21,6 +21,9 @@ class UiSettings:
     host: str = "127.0.0.1"
     port: int = 5001
     open_browser: bool = True
+    # Pose/trajectory library root; None -> ~/.orca_ui/library. Recordings and
+    # user poses live under <root>/<model_name>/.
+    library_dir: str | None = None
 
     # Browser-facing stream rates (Hz). Producers run at hardware rates; the
     # broadcaster decimates to these. Tunable for slow machines / debugging.

@@ -154,3 +154,17 @@ def pose_from_fractions(hand, fractions: dict[str, float]) -> dict[str, float]:
     """Resolve ROM-fraction pose definitions to joint angles in degrees."""
     pose = hand.pose_from_fractions(fractions)
     return {j: float(v) for j, v in pose.as_dict().items() if v is not None}
+
+
+def demo_definitions() -> dict[str, list[dict[str, float]]]:
+    """orca_core's demo presets as fraction-keyframe sequences.
+
+    The presets carry poses only — playback timing is synthesized by the
+    player (fixed per-segment duration), mirroring run_demo's step defaults.
+    """
+    from orca_core.demo_presets import DEMO_POSE_FRACTIONS, DEMO_SEQUENCES
+
+    return {
+        name: [DEMO_POSE_FRACTIONS[name][pose] for pose in poses]
+        for name, poses in DEMO_SEQUENCES.items()
+    }
