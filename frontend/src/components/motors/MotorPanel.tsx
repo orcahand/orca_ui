@@ -1,7 +1,9 @@
 // Motor control with scripts/slider_joint.py parity: per-joint sliders
 // seeded from the current pose (on mount and on every torque enable, never
 // rewritten from the stream afterwards), torque enable/disable, neutral,
-// and for feedback hands live meas/trim readouts + tuning + loop stats.
+// and for feedback hands live meas/trim readouts. Everything is gated on
+// the control-source owner: while an operation (or maintenance) owns the
+// hand, manual commands are disabled with a tooltip naming the owner.
 
 import { useRef, useState } from 'react'
 import { api } from '../../api/rest'
@@ -9,9 +11,8 @@ import type { JointInfo } from '../../api/types'
 import { useStreamFrame } from '../../hooks/useStreamFrame'
 import { useAppStore } from '../../state/appStore'
 import { sendTarget } from '../../state/commandBus'
+import { useControlGate } from '../../state/operationStore'
 import { Panel } from '../common/Panel'
-import { LoopStatsBar } from './LoopStatsBar'
-import { TuningPanel } from './TuningPanel'
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
@@ -33,6 +34,7 @@ export function MotorPanel() {
   const status = useAppStore((s) => s.status)
   const control = useAppStore((s) => s.control)
   const setError = useAppStore((s) => s.setError)
+  const gate = useControlGate()
 
   const [values, setValues] = useState<Record<string, number>>({})
   const [busy, setBusy] = useState(false)
@@ -41,6 +43,8 @@ export function MotorPanel() {
   const caps = status?.capabilities
   const torqueOn = control?.torque_enabled ?? false
   const feedback = caps?.feedback_loop ?? false
+  const locked = !gate.manualAllowed
+  const lockReason = gate.reason ?? undefined
 
   // Initial seed: latch the first available pose (measured, else estimate)
   // so opening the panel never yanks the hand.
@@ -98,15 +102,30 @@ export function MotorPanel() {
   const toolbar = (
     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
       {!torqueOn ? (
-        <button className="btn btn-primary" disabled={busy} onClick={() => void enableTorque()}>
+        <button
+          className="btn btn-primary"
+          disabled={busy || locked}
+          title={lockReason}
+          onClick={() => void enableTorque()}
+        >
           Enable Torque
         </button>
       ) : (
-        <button className="btn btn-danger" onClick={() => void disableTorque()}>
+        <button
+          className="btn btn-danger"
+          disabled={locked}
+          title={lockReason}
+          onClick={() => void disableTorque()}
+        >
           Disable Torque
         </button>
       )}
-      <button className="btn btn-secondary" disabled={!torqueOn} onClick={() => void goNeutral()}>
+      <button
+        className="btn btn-secondary"
+        disabled={!torqueOn || locked}
+        title={lockReason}
+        onClick={() => void goNeutral()}
+      >
         Neutral
       </button>
     </div>
@@ -114,7 +133,12 @@ export function MotorPanel() {
 
   return (
     <Panel title="Motor Control" toolbar={toolbar}>
-      {!torqueOn && (
+      {locked && (
+        <div style={{ fontSize: 10, color: 'var(--warn)', marginBottom: 8 }}>
+          {gate.reason} — manual control resumes when it releases
+        </div>
+      )}
+      {!locked && !torqueOn && (
         <div style={{ fontSize: 10, color: 'var(--dimmer)', marginBottom: 8 }}>
           enable torque to command joints — sliders re-seed from the current
           pose on enable
@@ -126,14 +150,13 @@ export function MotorPanel() {
             key={joint.id}
             joint={joint}
             value={values[joint.id] ?? clamp(0, joint.rom[0], joint.rom[1])}
-            disabled={!torqueOn}
+            disabled={!torqueOn || locked}
+            lockReason={lockReason}
             showFeedback={feedback && joint.encoder_backed}
             onSlide={onSlide}
           />
         ))}
       </div>
-      {feedback && <TuningPanel />}
-      {feedback && <LoopStatsBar />}
     </Panel>
   )
 }
@@ -142,12 +165,14 @@ function SliderRow({
   joint,
   value,
   disabled,
+  lockReason,
   showFeedback,
   onSlide,
 }: {
   joint: JointInfo
   value: number
   disabled: boolean
+  lockReason?: string
   showFeedback: boolean
   onSlide: (joint: JointInfo, value: number) => void
 }) {
@@ -176,6 +201,7 @@ function SliderRow({
         step={0.5}
         value={value}
         disabled={disabled}
+        title={lockReason}
         onChange={(e) => onSlide(joint, parseFloat(e.target.value))}
         style={{ flex: 1, height: 3, accentColor: 'var(--accent)', cursor: 'pointer' }}
       />

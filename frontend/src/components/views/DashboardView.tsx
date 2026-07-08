@@ -1,4 +1,5 @@
 // Capability-driven dashboard: tactile full-width, encoders + motors beneath.
+// Pre-session states never reach here — App renders the BootHero instead.
 
 import { useAppStore } from '../../state/appStore'
 import { EncoderPanel } from '../encoders/EncoderPanel'
@@ -7,29 +8,11 @@ import { TactilePanel } from '../tactile/TactilePanel'
 
 export function DashboardView() {
   const status = useAppStore((s) => s.status)
-  const wsConnected = useAppStore((s) => s.wsConnected)
   const caps = status?.capabilities
 
-  if (!wsConnected) {
-    return (
-      <div className="detecting-card">
-        <div className="big">BACKEND OFFLINE</div>
-        <div>waiting for the orca-ui server…</div>
-      </div>
-    )
-  }
-
-  if (!caps) {
-    return (
-      <div className="detecting-card">
-        <div className="big">SEARCHING FOR HARDWARE</div>
-        <div>{status?.message ?? 'auto-detecting motor bus and sensors…'}</div>
-        <div style={{ marginTop: 8, fontSize: 10 }}>
-          connect the hand via USB — no button pressing required
-        </div>
-      </div>
-    )
-  }
+  // Maintenance closes the session (capabilities go null) — the banner above
+  // the view says why; there's nothing live to draw.
+  if (!caps) return null
 
   const twoColumns = caps.encoders && caps.motors
 
