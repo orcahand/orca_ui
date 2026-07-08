@@ -118,8 +118,11 @@ def test_tactile_zero_persists_offsets(client):
         lambda: client.app.state.service.session.tactile_data() is not None)
     response = client.post("/api/tactile/zero", json={"num_samples": 5})
     assert response.status_code == 200
-    calib_path = os.path.join(os.path.dirname(client.config_path),
-                              "calibration.yaml")
+    # Mock sandboxes calibration writes into a throwaway dir (never the model
+    # folder); offsets must land wherever the session's config points.
+    session = client.app.state.service.session
+    calib_path = session.hand.config.calibration_path
+    assert os.path.dirname(calib_path) != os.path.dirname(client.config_path)
     import yaml
     with open(calib_path) as f:
         calib = yaml.safe_load(f)
