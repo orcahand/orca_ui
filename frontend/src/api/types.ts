@@ -129,6 +129,35 @@ export interface OperationLogPayload {
   lines: OperationLogLine[]
 }
 
+// ----- library: poses / trajectories / demos (orca_ui/library.py) -----------
+
+export interface PoseEntry {
+  name: string
+  builtin: boolean
+  // Built-ins ship as ROM-fraction placeholders until tuned on the real hand.
+  placeholder: boolean
+  saved_at?: string | null
+}
+
+export interface TrajectoryEntry {
+  name: string
+  type: 'continuous' | 'discrete_waypoints' | null
+  frames: number
+  frequency_hz: number | null
+  duration_s: number | null
+  created_at: string | null
+}
+
+export interface DemoEntry {
+  name: string
+  poses: number
+  source: 'orca_core' | 'orca_ui'
+}
+
+// Mirrors the backend library's NAME_RE (orca_ui/library.py): no path
+// traversal, 1-64 chars of letters/digits/_/-.
+export const LIBRARY_NAME_RE = /^[a-zA-Z0-9_-]{1,64}$/
+
 export interface PortInfo {
   device: string
   description: string

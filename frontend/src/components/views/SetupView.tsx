@@ -1,16 +1,22 @@
-// Placeholder — M5 fills this with the tension/calibrate/wizard cards and
-// the live operation log pane.
+// Setup tab: hand lifecycle operations — tension, calibrate (full or a
+// joint subset), the guided bring-up wizard — plus the live operation log.
+// Cross-tab control of a running operation lives in the TransportBar; these
+// cards start operations and mirror their state in place.
 
-import { Panel } from '../common/Panel'
+import { CalibrateCard } from '../setup/CalibrateCard'
+import { OperationLogPane } from '../setup/OperationLogPane'
+import { TensionCard } from '../setup/TensionCard'
+import { WizardCard } from '../setup/WizardCard'
 
 export function SetupView() {
   return (
-    <Panel title="Setup">
-      <div className="detecting-card">
-        <div className="big">SETUP</div>
-        <div>tension · calibrate · guided bring-up wizard</div>
-        <div style={{ marginTop: 8, fontSize: 10 }}>coming in M5</div>
+    <>
+      <div className="setup-grid">
+        <TensionCard />
+        <CalibrateCard />
+        <WizardCard />
       </div>
-    </Panel>
+      <OperationLogPane />
+    </>
   )
 }

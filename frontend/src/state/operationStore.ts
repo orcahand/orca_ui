@@ -95,6 +95,35 @@ export interface ControlGate {
   reason: string | null
 }
 
+// Gate for operation *start* buttons (Setup cards, demo/replay/record):
+// blocked while another operation is active or a required capability is
+// missing; `reason` feeds the tooltip/label.
+export function useStartGate(requires: 'motors' | 'encoders'): {
+  blocked: boolean
+  reason: string | null
+} {
+  const activeKind = useOperationStore((s) =>
+    isOperationActive(s.operation) ? s.operation!.kind : null,
+  )
+  const caps = useAppStore((s) => s.status?.capabilities)
+  if (activeKind) {
+    return {
+      blocked: true,
+      reason: `${activeKind} is running — stop it first`,
+    }
+  }
+  if (!caps?.[requires]) {
+    return {
+      blocked: true,
+      reason:
+        requires === 'motors'
+          ? 'motor bus unavailable'
+          : 'joint encoders unavailable',
+    }
+  }
+  return { blocked: false, reason: null }
+}
+
 export function useControlGate(): ControlGate {
   const source = useAppStore((s) => s.control?.control_source ?? 'manual')
   const owner = useAppStore((s) => s.control?.control_owner ?? 'manual')

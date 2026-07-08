@@ -5,6 +5,7 @@ import { BootHero } from './components/BootHero'
 import { ErrorBanner } from './components/common/ErrorBanner'
 import { MaintenanceBanner } from './components/common/MaintenanceBanner'
 import { AppHeader } from './components/header/AppHeader'
+import { TransportBar } from './components/transport/TransportBar'
 import { DashboardView } from './components/views/DashboardView'
 import { MotorsView } from './components/views/MotorsView'
 import { PosesView } from './components/views/PosesView'
@@ -39,6 +40,7 @@ export default function App() {
   return (
     <div className="container">
       <AppHeader />
+      <TransportBar />
       <ErrorBanner />
       {booting ? (
         <BootHero />
