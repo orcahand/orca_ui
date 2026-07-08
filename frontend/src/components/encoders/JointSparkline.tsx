@@ -6,6 +6,7 @@ import { useEffect, useRef } from 'react'
 import uPlot from 'uplot'
 import 'uplot/dist/uPlot.min.css'
 import type { JointInfo } from '../../api/types'
+import { useAppStore } from '../../state/appStore'
 import { jointHistory } from '../../state/streamStore'
 import { COLORS } from '../../theme/tokens'
 
@@ -14,6 +15,12 @@ const REDRAW_MS = 50
 
 export function JointSparkline({ joint }: { joint: JointInfo }) {
   const hostRef = useRef<HTMLDivElement>(null)
+  const plotRef = useRef<uPlot | null>(null)
+  const showTarget = useAppStore((s) => s.showSparklineTarget)
+
+  useEffect(() => {
+    plotRef.current?.setSeries(2, { show: showTarget })
+  }, [showTarget])
 
   useEffect(() => {
     const host = hostRef.current
@@ -55,12 +62,20 @@ export function JointSparkline({ joint }: { joint: JointInfo }) {
         series: [
           {},
           { stroke: COLORS.accent, width: 1.25, points: { show: false } },
-          { stroke: COLORS.dim, width: 1, dash: [4, 4], points: { show: false } },
+          // Commanded target: off by default (EncoderPanel toggle), solid and
+          // clearly distinct from the measured trace.
+          {
+            stroke: COLORS.purple,
+            width: 1.25,
+            points: { show: false },
+            show: useAppStore.getState().showSparklineTarget,
+          },
         ],
       },
       [[], [], []],
       host,
     )
+    plotRef.current = plot
 
     const measured = jointHistory.measured.get(joint.id)
     const target = jointHistory.target.get(joint.id)
@@ -94,6 +109,7 @@ export function JointSparkline({ joint }: { joint: JointInfo }) {
 
     return () => {
       window.clearInterval(interval)
+      plotRef.current = null
       plot.destroy()
     }
   }, [joint])

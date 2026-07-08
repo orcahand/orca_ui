@@ -25,6 +25,8 @@ function loadExpanded(): Set<string> {
 
 export function EncoderPanel() {
   const handInfo = useAppStore((s) => s.handInfo)
+  const showTarget = useAppStore((s) => s.showSparklineTarget)
+  const setShowTarget = useAppStore((s) => s.setShowSparklineTarget)
   const [expanded, setExpanded] = useState<Set<string>>(loadExpanded)
 
   if (!handInfo) return null
@@ -48,8 +50,24 @@ export function EncoderPanel() {
     groups.get(group)!.push(joint)
   }
 
+  const toolbar = (
+    <div className="toolbar">
+      <label
+        className="toggle-label"
+        title="overlay the commanded target (purple) on expanded history charts"
+      >
+        <input
+          type="checkbox"
+          checked={showTarget}
+          onChange={(e) => setShowTarget(e.target.checked)}
+        />
+        target in history
+      </label>
+    </div>
+  )
+
   return (
-    <Panel title="Joint Encoders">
+    <Panel title="Joint Encoders" toolbar={toolbar}>
       {GROUP_ORDER.filter((g) => groups.has(g)).map((group) => (
         <div key={group} style={{ marginBottom: 8 }}>
           <div

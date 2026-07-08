@@ -37,6 +37,7 @@ interface AppState {
   view: ViewName
   tactile: TactileSettings
   scene: SceneSettings
+  showSparklineTarget: boolean
   rates: Record<string, number>
   error: string | null
 
@@ -47,6 +48,7 @@ interface AppState {
   setView(view: ViewName): void
   setTactile(patch: Partial<TactileSettings>): void
   setScene(patch: Partial<SceneSettings>): void
+  setShowSparklineTarget(show: boolean): void
   setRates(rates: Record<string, number>): void
   setError(error: string | null): void
   setTactileMode(mode: TactileMode): void
@@ -85,6 +87,8 @@ export const useAppStore = create<AppState>((set) => ({
     thicknessMult: 0.5,
   },
   scene: storedScene,
+  showSparklineTarget:
+    localStorage.getItem('orca-ui.sparkline-target') === 'true',
   rates: {},
   error: null,
 
@@ -101,6 +105,10 @@ export const useAppStore = create<AppState>((set) => ({
       localStorage.setItem('orca-ui.scene', JSON.stringify(scene))
       return { scene }
     }),
+  setShowSparklineTarget: (show) => {
+    localStorage.setItem('orca-ui.sparkline-target', String(show))
+    set({ showSparklineTarget: show })
+  },
   setRates: (rates) => set({ rates }),
   setError: (error) => set({ error }),
   setTactileMode: (mode) =>
