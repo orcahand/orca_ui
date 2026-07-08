@@ -118,8 +118,8 @@ New package `orca_ui/hand/operations/`.
    finishes in one motion and needs no progress/stop.)
    - `replay` streams waypoints through the existing CommandWorker at the
      recording's `sampling_frequency_hz` (scaled by speed factor); while it
-     runs, manual slider targets are rejected — the operation owns the target
-     channel.
+     runs, manual slider targets are rejected — the operation acquires the
+     **control source** (see below).
    - `record` reads measured joints from the already-running telemetry path;
      it **disables torque at start** (recording = physically moving the hand)
      and never re-enables it.
@@ -160,10 +160,33 @@ New package `orca_ui/hand/operations/`.
   current measured pose; continuous mode samples at `frequency`. Stop & save
   writes the library YAML.
 
+### Control-source arbiter
+
+The joint-target channel has **exactly one owner at a time**, tracked
+explicitly in `HandService`:
+
+- `MANUAL` — the default; sliders and pose-apply write targets.
+- `OPERATION` — acquired by replay/demo for their duration; manual targets
+  are rejected with a 409 naming the owner.
+- `TELEOP` — **reserved, not implemented this round.** Future integration
+  point for orca_teleop, which will run as a separate process (its
+  retargeter needs torch/pytorch_kinematics — too heavy for the orca_ui env)
+  and stream retargeted joint targets into orca_ui through a dedicated
+  ingress; engaging teleop acquires the control source the same way an
+  operation does.
+
+The current owner is included in `control.state` so the frontend gates
+generically on "who owns control" rather than "is an operation running".
+This is the seam that makes teleop (and any later control source) a plug-in
+instead of a restructure: a future *Teleop tab* holds only configuration
+(ingress source, retargeter, latency); engage/disengage is global and renders
+in the transport bar like any other active control session.
+
 ### E-stop
 
 `POST /api/estop`: stop current operation (its cleanup runs) + disable torque
-+ stop the mock sweeper. One code path, valid in every state.
++ stop the mock sweeper. One code path, valid in every state. (Future teleop
+disengage hooks in here too — e-stop releases whatever owns control.)
 
 ### orca_core changes (local checkout; upstream candidates)
 
@@ -226,11 +249,13 @@ snapshot-replayed on subscribe like `status`).
 - View enum grows to `dashboard | 3d | poses | setup | motors`.
 - New zustand **`operationStore`** fed by `operation.state`; log lines
   accumulate in a bounded buffer for the Setup log pane.
-- **Gating:** one derived selector (`exclusiveActive`) disables motor
-  sliders, torque buttons, and op-start buttons, with a tooltip naming the
-  running operation. `MAINTENANCE` status shows the banner on
-  dashboard/3D/poses.
+- **Gating:** one derived selector keyed on the **control-source owner**
+  (plus exclusive-op state) disables motor sliders, torque buttons, and
+  op-start buttons, with a tooltip naming the owner. `MAINTENANCE` status
+  shows the banner on dashboard/3D/poses.
 - **TransportBar** component in `App` under the header (behavior above).
+  Designed as a generic "active control session" strip — an operation today,
+  a teleop session later — so new kinds add a renderer, not a redesign.
 - **Header:** brand lockup `◈ ORCA HAND CONSOLE`, model badge, status pill,
   five tabs, red E-STOP hard right (styled to the instrument aesthetic:
   bordered, high-contrast, not a gimmick). Capability badges + Hz meters move
@@ -297,6 +322,13 @@ memory).
 
 ## Out of scope / future
 
+- **Teleoperation** (orca_teleop: Mediapipe / Vision Pro / Rokoko ingress +
+  URDF retargeter). Deliberately deferred until after this round and the
+  planned orca_core state-based motor refactor. This design prepares for it:
+  the control-source arbiter reserves `TELEOP` as an owner, the transport
+  bar is a generic control-session strip, and a sixth *Teleop* tab slots
+  into the view enum trivially. Expected shape: separate teleop process
+  streaming retargeted joint targets into an orca_ui ingress endpoint.
 - Jitter and zero-pose buttons (explicitly deferred by user).
 - Splitting tactile vs joint sensing into separate views (kept together).
 - orca_core state-based motor refactor (tracked; `hand_ops.py` is the seam).
