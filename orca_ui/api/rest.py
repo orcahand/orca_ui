@@ -60,6 +60,44 @@ def build_router(service: HandService) -> APIRouter:
         service.supervisor.request_reconnect()
         return {"ok": True}
 
+    # ----- operations / e-stop ----------------------------------------------------
+
+    def _manager():
+        manager = service.operation_manager
+        if manager is None:
+            raise HTTPException(status_code=503,
+                                detail="operations unavailable")
+        return manager
+
+    @router.get("/operation")
+    def operation_snapshot():
+        return {"operation": _manager().snapshot()}
+
+    @router.get("/operation/log")
+    def operation_log():
+        return _manager().log_payload()
+
+    @router.post("/operation/{kind}/start")
+    def operation_start(kind: str,
+                        body: schemas.OperationStartRequest | None = None):
+        params = body.params if body else {}
+        return {"operation": guard(_manager().start, kind, params)}
+
+    @router.post("/operation/stop")
+    def operation_stop():
+        stopped = _manager().stop()
+        return {"ok": True, "stopped": stopped}
+
+    @router.post("/operation/input")
+    def operation_input(body: schemas.OperationInputRequest):
+        guard(_manager().send_input, body.value)
+        return {"ok": True}
+
+    @router.post("/estop")
+    def estop():
+        # Never raises; always 200 with a report of what was actioned.
+        return {"ok": True, "report": service.estop()}
+
     # ----- motor control -------------------------------------------------------
 
     @router.post("/torque/enable")
@@ -125,6 +163,7 @@ def build_router(service: HandService) -> APIRouter:
         from orca_ui.hand.sweep import JointSweeper
 
         sweeper = JointSweeper(service)
+        service.attach_sweeper(sweeper)   # so estop can reach it
 
         @router.post("/mock/joint_sweep")
         def mock_joint_sweep(body: schemas.SweepRequest):

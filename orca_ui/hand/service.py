@@ -21,6 +21,7 @@ from orca_core.control.constants import (
 from orca_ui.hand import zeroing
 from orca_ui.hand.commands import CommandWorker
 from orca_ui.hand.sessions import HandSession
+from orca_ui.hand.states import ControlSource
 from orca_ui.hand.supervisor import HandSupervisor
 from orca_ui.settings import UiSettings
 
@@ -81,6 +82,10 @@ class HandService:
         self._state_lock = threading.Lock()
         self._targets: dict[str, float] = {}
         self._tactile_mode = "combined"
+        self._control_source = ControlSource.MANUAL
+        self._control_owner_label = ControlSource.MANUAL.value
+        self._operation_manager = None   # attached post-construction (server.py)
+        self._sweeper = None             # mock-only dev sweeper, for estop
         self._gains = {
             "kp": DEFAULT_KP,
             "ki": DEFAULT_KI,
@@ -169,6 +174,8 @@ class HandService:
                 "max_current": self._max_current,
                 "gains": dict(self._gains),
                 "tactile_mode": self._tactile_mode,
+                "control_source": self._control_source.value,
+                "control_owner": self._control_owner_label,
             }
 
     def stats(self) -> dict:
@@ -244,6 +251,91 @@ class HandService:
             raise ServiceError("torque is disabled — enable it first", status_code=409)
         return session
 
+    def _require_manual_control(self) -> None:
+        with self._state_lock:
+            source = self._control_source
+            owner = self._control_owner_label
+        if source != ControlSource.MANUAL:
+            raise ServiceError(
+                f"control is owned by {owner} — stop it first", status_code=409)
+
+    # ----- control-source arbiter -------------------------------------------------
+
+    @property
+    def control_source(self) -> ControlSource:
+        with self._state_lock:
+            return self._control_source
+
+    def acquire_control(self, source: ControlSource,
+                        owner_label: str | None = None) -> None:
+        """Take ownership of the joint-target channel (one owner at a time)."""
+        with self._state_lock:
+            if self._control_source != ControlSource.MANUAL:
+                raise ServiceError(
+                    f"control is owned by {self._control_owner_label}",
+                    status_code=409)
+            self._control_source = source
+            self._control_owner_label = owner_label or source.value
+        self._publish_control_state()
+
+    def release_control(self) -> None:
+        with self._state_lock:
+            self._control_source = ControlSource.MANUAL
+            self._control_owner_label = ControlSource.MANUAL.value
+        self._publish_control_state()
+
+    # ----- operations / e-stop ------------------------------------------------------
+
+    def attach_operation_manager(self, manager) -> None:
+        self._operation_manager = manager
+
+    def attach_sweeper(self, sweeper) -> None:
+        self._sweeper = sweeper
+
+    @property
+    def operation_manager(self):
+        return self._operation_manager
+
+    def estop(self) -> dict:
+        """Best-effort emergency stop: never raises.
+
+        Stops the active operation (whose own cleanup handles op-owned
+        hardware, e.g. a maintenance calibrate disables torque on its own
+        hand), disables torque on the supervisor session if one exists, and
+        stops the mock sweeper. Reports what was actioned.
+        """
+        report: dict = {}
+        manager = self._operation_manager
+        if manager is not None:
+            try:
+                report["operation_stopped"] = manager.stop(estop=True)
+            except Exception as e:
+                logger.exception("estop: operation stop failed")
+                report["operation_stopped"] = False
+                report["operation_error"] = str(e)
+        try:
+            session = self.session
+            if session is not None and session.caps.motors:
+                session.hand.disable_torque()
+                self.supervisor.set_torque_flag(False)
+                self._publish_control_state()
+                report["torque_disabled"] = True
+            else:
+                report["torque_disabled"] = False
+        except Exception as e:
+            logger.exception("estop: disable_torque failed")
+            report["torque_disabled"] = False
+            report["torque_error"] = str(e)
+        sweeper = self._sweeper
+        if sweeper is not None:
+            try:
+                sweeper.stop()
+                report["sweeper_stopped"] = True
+            except Exception:
+                logger.exception("estop: sweeper stop failed")
+                report["sweeper_stopped"] = False
+        return report
+
     # ----- motor control ---------------------------------------------------------
 
     def _publish_control_state(self) -> None:
@@ -252,6 +344,7 @@ class HandService:
 
     def enable_torque(self) -> dict:
         session = self._require_motors()
+        self._require_manual_control()
         if session.caps.feedback_loop:
             # Re-anchor first so enabling torque never lurches toward a stale
             # target (the hand may have been posed by hand while limp).
@@ -278,8 +371,18 @@ class HandService:
         estimate = session.estimate_joints()
         return {j: float(v) for j, v in (estimate or {}).items()}
 
-    def set_targets(self, angles: dict[str, float]) -> None:
+    def set_targets(self, angles: dict[str, float],
+                    source: ControlSource = ControlSource.MANUAL) -> None:
+        """Write joint targets. Validation (joints, torque) and the
+        ``joints.target`` echo apply to every source; only the current
+        control-source owner may write."""
         session = self._require_torque()
+        with self._state_lock:
+            current = self._control_source
+            owner = self._control_owner_label
+        if source != current:
+            raise ServiceError(
+                f"joint targets are owned by {owner}", status_code=409)
         known = set(session.hand.config.joint_ids)
         unknown = set(angles) - known
         if unknown:
@@ -299,6 +402,7 @@ class HandService:
 
     def go_neutral(self) -> None:
         session = self._require_torque()
+        self._require_manual_control()
         self.worker.submit_op(session.hand.set_neutral_position)
         with self._state_lock:
             self._targets.update({

@@ -9,6 +9,12 @@ STATUS = "status"
 CONTROL_STATE = "control.state"
 ERROR = "error"
 
+# Long-running operations (calibrate/tension/replay/...). operation.log is a
+# CUMULATIVE payload ({run_id, next_seq, lines}) because the hub coalesces
+# latest-wins — per-line publishes would drop burst lines.
+OPERATION_STATE = "operation.state"
+OPERATION_LOG = "operation.log"
+
 TACTILE_FORCES = "tactile.forces"
 TACTILE_TAXELS = "tactile.taxels"
 
@@ -22,6 +28,7 @@ STATS = "stats"
 
 ALL_TOPICS = [
     STATUS, CONTROL_STATE, ERROR,
+    OPERATION_STATE, OPERATION_LOG,
     TACTILE_FORCES, TACTILE_TAXELS,
     JOINTS_MEASURED, JOINTS_ESTIMATE, JOINTS_TARGET, JOINTS_CORRECTION,
     MOTORS_TELEMETRY, STATS,

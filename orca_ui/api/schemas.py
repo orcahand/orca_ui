@@ -42,3 +42,16 @@ class SweepRequest(BaseModel):
 
     joint: Optional[str] = None
     period_s: float = Field(default=4.0, gt=0.1, le=60)
+
+
+class OperationStartRequest(BaseModel):
+    """Per-kind parameters are validated by the operation itself (the set of
+    kinds is registration-dependent: real vs mock)."""
+
+    params: dict = Field(default_factory=dict)
+
+
+class OperationInputRequest(BaseModel):
+    """Answer to an operation parked in ``awaiting_input``."""
+
+    value: str

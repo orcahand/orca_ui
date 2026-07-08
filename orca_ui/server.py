@@ -25,6 +25,8 @@ def create_app(settings: UiSettings) -> FastAPI:
     from orca_ui.hand.service import HandService
     from orca_ui.hand.telemetry import TelemetryService
 
+    from orca_ui.hand.operations import build_operation_manager
+
     hub = StreamHub()
     service = HandService(
         settings,
@@ -32,6 +34,8 @@ def create_app(settings: UiSettings) -> FastAPI:
         publish_error=lambda message: hub.publish(T.ERROR, {"message": message}),
         publish_topic=hub.publish,
     )
+    operations = build_operation_manager(service, settings, hub.publish)
+    service.attach_operation_manager(operations)
     telemetry = TelemetryService(service, hub, settings)
 
     @contextlib.asynccontextmanager
@@ -43,13 +47,15 @@ def create_app(settings: UiSettings) -> FastAPI:
             yield
         finally:
             broadcaster.cancel()
+            operations.shutdown()
             telemetry.stop()
             service.stop()
 
-    app = FastAPI(title="ORCA UI", version="0.2.0", lifespan=lifespan)
+    app = FastAPI(title="ORCA Hand Console", version="0.2.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.service = service
     app.state.hub = hub
+    app.state.operations = operations
 
     app.include_router(build_rest_router(service))
     app.include_router(build_assets_router(service))

@@ -15,6 +15,19 @@ class HandState(str, Enum):
     RECONNECTING = "reconnecting"
 
 
+class ControlSource(str, Enum):
+    """Who owns the joint-target channel. Exactly one owner at a time.
+
+    TELEOP is reserved for the planned orca_teleop integration (a separate
+    process streaming retargeted joint targets); engaging it will acquire
+    control the same way an operation does.
+    """
+
+    MANUAL = "manual"
+    OPERATION = "operation"
+    TELEOP = "teleop"
+
+
 @dataclass(frozen=True)
 class Capabilities:
     """What the current session can actually do (vs. ``declared`` = config)."""
