@@ -1,16 +1,19 @@
 // Thin fetch wrappers over the REST API. Errors carry the backend's detail.
 
 import type {
+  DemoEntry,
   HandInfo,
   JointCalibrationEntry,
   ModelMetadata,
   OperationLogPayload,
   OperationSnapshot,
   PortInfo,
+  PoseEntry,
   Stats,
   StatusSnapshot,
   TactileMode,
   TaxelGeometry,
+  TrajectoryEntry,
 } from './types'
 
 export class ApiError extends Error {
@@ -44,6 +47,18 @@ function post<T>(path: string, body?: unknown): Promise<T> {
   })
 }
 
+function put<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+function del<T>(path: string): Promise<T> {
+  return request<T>(path, { method: 'DELETE' })
+}
+
 export const api = {
   status: () => request<StatusSnapshot>('/api/status'),
   handInfo: () => request<HandInfo>('/api/hand/info'),
@@ -61,6 +76,8 @@ export const api = {
     }),
   operationStop: () =>
     post<{ ok: boolean; stopped: boolean }>('/api/operation/stop'),
+  operationPause: () => post<{ ok: boolean }>('/api/operation/pause'),
+  operationResume: () => post<{ ok: boolean }>('/api/operation/resume'),
   operationInput: (value: string) =>
     post<{ ok: boolean }>('/api/operation/input', { value }),
   // Never raises server-side; always 200 with a report of what was actioned.
@@ -81,6 +98,28 @@ export const api = {
   }) => post('/api/control/gains', gains),
   setMaxCurrent: (ma: number) => post('/api/control/max_current', { ma }),
   rebase: () => post('/api/control/rebase'),
+
+  poses: () => request<{ poses: PoseEntry[] }>('/api/poses'),
+  poseSave: (name: string, angles: Record<string, number>) =>
+    put<{ ok: boolean }>(`/api/poses/${encodeURIComponent(name)}`, { angles }),
+  poseDelete: (name: string) =>
+    del<{ ok: boolean }>(`/api/poses/${encodeURIComponent(name)}`),
+  poseApply: (name: string) =>
+    post<{ name: string; angles: Record<string, number> }>(
+      `/api/poses/${encodeURIComponent(name)}/apply`,
+    ),
+  // Saves the current MEASURED pose (needs encoders; 409 with reason if not).
+  poseCapture: (name: string) =>
+    post<{ name: string; angles: Record<string, number> }>(
+      '/api/poses/capture',
+      { name },
+    ),
+
+  trajectories: () =>
+    request<{ trajectories: TrajectoryEntry[] }>('/api/trajectories'),
+  trajectoryDelete: (name: string) =>
+    del<{ ok: boolean }>(`/api/trajectories/${encodeURIComponent(name)}`),
+  demos: () => request<{ demos: DemoEntry[] }>('/api/demos'),
 
   setTactileMode: (mode: TactileMode) => post('/api/tactile/mode', { mode }),
   zeroTactile: (numSamples = 100) =>
