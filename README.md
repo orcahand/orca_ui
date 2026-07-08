@@ -1,8 +1,10 @@
-# ORCA UI
+# ORCA Hand Console
 
 Web interface for the [ORCA Hand](https://www.orcahand.com): live sensor
-visualization (tactile taxels + joint encoders), motor control, and a 3D hand
-view. Uses [orca_core](https://github.com/orcahand/orca_core) (the
+visualization (tactile taxels + joint encoders), motor control, a 3D hand
+view, pose/trajectory playback, and the hand's lifecycle operations
+(tensioning, calibration, guided setup). Uses
+[orca_core](https://github.com/orcahand/orca_core) (the
 `feature/joint-sensing` line) for all hardware communication.
 
 The UI adapts to the hand described by the config: tactile-only hands get the
@@ -50,19 +52,41 @@ lurches).
 
 Useful flags: `--no-feedback` (open-loop sliders even on feedback hands),
 `--host/--port` (default `127.0.0.1:5001` — this UI can move motors, so LAN
-exposure is opt-in), `--model-version`, `--side`.
+exposure is opt-in), `--model-version`, `--side`, `--library-dir` (pose &
+trajectory storage, default `~/.orca_ui/library`).
+
+The header's red **E-STOP** stops whatever is running (operation, playback,
+sweep) and disables torque — it never errors, it reports what it actioned.
 
 ### Views
 
 - **Dashboard** — tactile taxel grids (magnitude / direction / arrows, zeroing,
   stream modes), per-finger resultant-force dials, joint-encoder ROM bars with
   target markers and expandable history sparklines, and the motor slider panel
-  (torque, neutral, per-joint sliders, PI tuning + rebase on feedback hands).
+  (torque, neutral, per-joint sliders).
 - **3D View** — the v2 hand posed live from the joint encoders, an optional
   translucent ghost showing the naive motor-based estimate, joint rings that
   glow with tracking error, and tactile force arrows rendered in the real
   sensor frames (orca_core's mesh-registered sensor mounts): toggle the
   per-finger resultant vector, all per-taxel vectors, or both.
+- **Poses** — preset pose buttons (built-ins are ROM-fraction placeholders
+  until tuned; capture your own from the live hand), orca_core demo
+  sequences, and trajectory record/replay: record waypoints or continuous
+  (≤60 Hz) joint streams by physically posing the hand (torque drops and
+  stays off), then replay at ×0.5/×1/×2 with looping. Trajectory YAMLs are
+  interchangeable with orca_core's record/replay example scripts.
+- **Setup** — tensioning (wind → hold while you ratchet the spools →
+  release), calibration (all joints, or expand to select fingers/joints;
+  progress streamed live; partial runs keep completed steps), and the guided
+  setup wizard ((tension → calibrate) × N rounds, like orca_core's
+  `scripts/setup.py`). These take the hand into *maintenance*: the session
+  is handed to the operation and reconnects automatically afterwards.
+- **Motors** — per-motor temps/currents, PI tuning + loop stats (feedback
+  hands), stream rates, a supervisor event log, and a manual reconnect.
+
+A transport bar appears under the header while anything long-running is
+active (calibration, tensioning, playback, recording) — progress, prompts
+(e.g. tension's Release), and stop work from every tab.
 
 ### Mock mode
 
