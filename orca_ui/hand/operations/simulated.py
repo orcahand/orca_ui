@@ -40,6 +40,62 @@ def _calibration_steps(config, joints: list[str] | None) -> list[dict]:
     return steps
 
 
+def simulate_calibration(ctx: OpContext, config, joints: list[str] | None,
+                         step_s: float, phase: str = "calibrating",
+                         detail_prefix: str = "") -> dict:
+    """Lease-free simulated calibration body (shared with the sim wizard)."""
+    steps = _calibration_steps(config, joints)
+    total = len(steps)
+    involved = sorted({j for step in steps for j in step})
+    ctx.set_phase(phase, progress=0.0,
+                  detail=f"{detail_prefix}{total} steps")
+    ctx.log(f"calibration started: {total} steps ({', '.join(involved)})")
+
+    directions_seen: dict[str, set] = {}
+    calibrated: list[str] = []
+    for index, step in enumerate(steps):
+        step_joints = ", ".join(f"{j} {d}" for j, d in step.items())
+        ctx.set_detail(f"{detail_prefix}step {index + 1}/{total}: {step_joints}")
+        ctx.log(f"step {index + 1}/{total}: {step_joints}")
+        ctx.sleep(step_s)
+        for joint, direction in step.items():
+            seen = directions_seen.setdefault(joint, set())
+            seen.add(direction)
+            if seen == {"flex", "extend"}:
+                calibrated.append(joint)
+                ctx.log(f"joint calibrated: {joint} (ratio 0.0500)")
+        ctx.set_progress((index + 1) / max(total, 1))
+    ctx.log("calibration complete")
+    return {
+        "steps_done": total,
+        "joints_calibrated": calibrated,
+        "calibrated": True,
+    }
+
+
+def simulate_tension(ctx: OpContext, move_motors: bool, step_s: float,
+                     detail_prefix: str = "") -> None:
+    """Lease-free simulated tension body: winds, then parks in
+    awaiting_input until released (queue path — nothing is blocked)."""
+    if move_motors:
+        ctx.set_phase("winding",
+                      detail=f"{detail_prefix}pre-conditioning tendons")
+        ctx.log("winding tendons until the motors stall")
+        for wind_pass in (1, 2):
+            ctx.set_detail(f"{detail_prefix}winding pass {wind_pass}/2")
+            ctx.sleep(step_s)
+        ctx.set_phase("ramp", detail=f"{detail_prefix}releasing wind-in current")
+        ctx.log("ramping current down before the hold")
+        ctx.sleep(step_s)
+    ctx.set_phase("holding",
+                  detail=f"{detail_prefix}motors holding — tension the spools")
+    ctx.log("holding — tension the spools, then click Release")
+    ctx.wait_input(RELEASE_PROMPT, ["Release"])
+    ctx.set_phase("released",
+                  detail=f"{detail_prefix}torque off, control mode restored")
+    ctx.log("hold released — torque off, control mode restored")
+
+
 class SimulatedCalibrateOperation(Operation):
     kind = "calibrate"
 
@@ -56,33 +112,9 @@ class SimulatedCalibrateOperation(Operation):
         try:
             ctx.set_phase("connecting", detail="opening motor-only connection")
             ctx.sleep(self.params["step_duration_s"])
-
-            steps = _calibration_steps(supervisor.config, self.params["joints"])
-            total = len(steps)
-            involved = sorted({j for step in steps for j in step})
-            ctx.set_phase("calibrating", progress=0.0, detail=f"{total} steps")
-            ctx.log(f"calibration started: {total} steps ({', '.join(involved)})")
-
-            directions_seen: dict[str, set] = {}
-            calibrated: list[str] = []
-            for index, step in enumerate(steps):
-                step_joints = ", ".join(f"{j} {d}" for j, d in step.items())
-                ctx.set_detail(f"step {index + 1}/{total}: {step_joints}")
-                ctx.log(f"step {index + 1}/{total}: {step_joints}")
-                ctx.sleep(self.params["step_duration_s"])
-                for joint, direction in step.items():
-                    seen = directions_seen.setdefault(joint, set())
-                    seen.add(direction)
-                    if seen == {"flex", "extend"}:
-                        calibrated.append(joint)
-                        ctx.log(f"joint calibrated: {joint} (ratio 0.0500)")
-                ctx.set_progress((index + 1) / max(total, 1))
-            ctx.log("calibration complete")
-            return {
-                "steps_done": total,
-                "joints_calibrated": calibrated,
-                "calibrated": True,
-            }
+            return simulate_calibration(
+                ctx, supervisor.config, self.params["joints"],
+                self.params["step_duration_s"])
         finally:
             supervisor.exit_maintenance()
 
@@ -103,20 +135,8 @@ class SimulatedTensionOperation(Operation):
         try:
             ctx.set_phase("connecting", detail="opening motor-only connection")
             ctx.sleep(self.params["step_duration_s"])
-            if self.params["move_motors"]:
-                ctx.set_phase("winding", detail="pre-conditioning tendons")
-                ctx.log("winding tendons until the motors stall")
-                for wind_pass in (1, 2):
-                    ctx.set_detail(f"winding pass {wind_pass}/2")
-                    ctx.sleep(self.params["step_duration_s"])
-                ctx.set_phase("ramp", detail="releasing wind-in current")
-                ctx.log("ramping current down before the hold")
-                ctx.sleep(self.params["step_duration_s"])
-            ctx.set_phase("holding", detail="motors holding — tension the spools")
-            ctx.log("holding — tension the spools, then click Release")
-            ctx.wait_input(RELEASE_PROMPT, ["Release"])
-            ctx.set_phase("released", detail="torque off, control mode restored")
-            ctx.log("hold released — torque off, control mode restored")
+            simulate_tension(ctx, self.params["move_motors"],
+                             self.params["step_duration_s"])
             return {"released": True}
         finally:
             supervisor.exit_maintenance()

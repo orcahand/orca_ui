@@ -30,13 +30,17 @@ def build_operation_manager(service, settings, publish_topic) -> OperationManage
             SimulatedCalibrateOperation,
             SimulatedTensionOperation,
         )
+        from orca_ui.hand.operations.wizard import SimulatedWizardOperation
         manager.register(SimulatedCalibrateOperation)
         manager.register(SimulatedTensionOperation)
+        manager.register(SimulatedWizardOperation)
     else:
         from orca_ui.hand.operations.calibrate import CalibrateOperation
         from orca_ui.hand.operations.tension import TensionOperation
+        from orca_ui.hand.operations.wizard import WizardOperation
         manager.register(CalibrateOperation)
         manager.register(TensionOperation)
+        manager.register(WizardOperation)
     # In-session ops run for real in mock mode too (the mock stack is the
     # production stack over in-memory links).
     from orca_ui.hand.operations.player import DemoOperation, ReplayOperation
