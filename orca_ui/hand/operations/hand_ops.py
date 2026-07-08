@@ -7,7 +7,12 @@ themselves must not import orca_core directly.
 
 from __future__ import annotations
 
+import logging
+import threading
+import time
 from typing import Callable
+
+logger = logging.getLogger(__name__)
 
 # Mirrors orca_core/scripts/calibrate.py (scripts aren't importable from the
 # installed package). Expansion of finger names to joint lists is a frontend
@@ -30,6 +35,82 @@ def request_stop(hand) -> None:
     supported interrupt signal — the drive/hold loops poll it.
     """
     hand._task_stop_event.set()
+
+
+def build_maintenance_hand(config_path: str, stop_event: threading.Event,
+                           retry_s: float = 2.0):
+    """Fresh motor-only OrcaHand for a maintenance operation.
+
+    Always the plain class — never the feedback subclass, whose 100 Hz loop
+    refuses to calibrate. Port-open is retried briefly to absorb the OS
+    serial release latency after the supervisor closed the session.
+    """
+    from orca_core.hardware_hand import OrcaHand
+
+    hand = OrcaHand(config_path=config_path)
+    deadline = time.monotonic() + retry_s
+    last_message = ""
+    while True:
+        try:
+            ok, last_message = hand.connect()
+        except Exception as e:
+            ok, last_message = False, str(e)
+        if ok:
+            return hand
+        if stop_event.is_set():
+            raise RuntimeError("stopped while connecting")
+        if time.monotonic() >= deadline:
+            raise RuntimeError(f"maintenance connect failed: {last_message}")
+        time.sleep(0.25)
+
+
+def disconnect(hand) -> None:
+    try:
+        hand.disconnect()
+    except Exception:
+        logger.exception("maintenance hand disconnect failed")
+
+
+def open_encoder_client(config, presence):
+    """UI-owned encoder client for the calibration anchor pass (the
+    scripts/calibrate.py pattern). Returns (client, owned_link), or
+    (None, None) when feedback isn't configured or no encoder port exists.
+    """
+    if not getattr(config, "joint_feedback_enabled", False):
+        return None, None
+    port = getattr(getattr(presence, "sensing", None), "encoder", None)
+    if not port:
+        return None, None
+
+    from orca_core.hardware.hand_serial_link import HandSerialLink
+    from orca_core.hardware.joint_encoder_client import JointEncoderClient
+
+    link = HandSerialLink(port=port, baudrate=config.encoder_baudrate)
+    link.connect()
+    try:
+        client = JointEncoderClient(link)
+        client.connect()
+        client.start_stream()
+    except Exception:
+        try:
+            link.disconnect()
+        except Exception:
+            pass
+        raise
+    return client, link
+
+
+def close_encoder_client(client, link) -> None:
+    if client is not None:
+        try:
+            client.disconnect()
+        except Exception:
+            pass
+    if link is not None:
+        try:
+            link.disconnect()
+        except Exception:
+            pass
 
 
 def calibrate(

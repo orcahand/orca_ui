@@ -82,6 +82,18 @@ class OpContext:
         finally:
             self._manager.exit_awaiting_input()
 
+    def announce_input(self, prompt: str, options: list[str]) -> None:
+        """Enter ``awaiting_input`` WITHOUT blocking on the queue.
+
+        For ops whose thread is blocked inside a hardware call while awaiting
+        (e.g. tension's hold loop): the answer arrives via the operation's
+        ``handle_input`` hook instead of the queue. Pair with
+        :meth:`resume_running` once the hardware call returns."""
+        self._manager.enter_awaiting_input(prompt, options)
+
+    def resume_running(self) -> None:
+        self._manager.exit_awaiting_input()
+
 
 class Operation:
     """One long-running hand operation (calibrate, tension, replay, ...).
@@ -115,3 +127,10 @@ class Operation:
         """Called on the *caller* thread when a stop/e-stop is requested,
         after the stop event is set. Override to interrupt blocking calls
         (e.g. set orca_core's task-stop event on an op-owned hand)."""
+
+    def handle_input(self, value: str) -> bool:
+        """Called on the *caller* thread when input arrives for an op in
+        ``awaiting_input``. Return True to consume the value (ops blocked
+        inside hardware calls, paired with ctx.announce_input); return False
+        to route it to the queue for a blocking ctx.wait_input."""
+        return False

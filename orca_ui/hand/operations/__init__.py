@@ -20,11 +20,23 @@ from orca_ui.hand.operations.manager import OperationManager
 def build_operation_manager(service, settings, publish_topic) -> OperationManager:
     """Construct the manager and register the operation set.
 
-    Operation registration grows with the milestones (M2: calibrate/tension,
-    M3: replay/record/demo, M6: wizard); mock mode substitutes simulated
-    maintenance ops that emit the identical event stream.
+    Operation registration grows with the milestones (M3: replay/record/demo,
+    M6: wizard); mock mode substitutes simulated maintenance ops that emit
+    the identical event stream but still take the real maintenance lease.
     """
     manager = OperationManager(service, settings, publish_topic=publish_topic)
+    if settings.mock:
+        from orca_ui.hand.operations.simulated import (
+            SimulatedCalibrateOperation,
+            SimulatedTensionOperation,
+        )
+        manager.register(SimulatedCalibrateOperation)
+        manager.register(SimulatedTensionOperation)
+    else:
+        from orca_ui.hand.operations.calibrate import CalibrateOperation
+        from orca_ui.hand.operations.tension import TensionOperation
+        manager.register(CalibrateOperation)
+        manager.register(TensionOperation)
     return manager
 
 

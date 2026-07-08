@@ -98,16 +98,23 @@ class OperationManager:
             raise ServiceError(f"unknown operation: {kind!r} "
                                f"(available: {self.kinds})", status_code=404)
 
-        # Validate on the caller thread so errors surface as HTTP statuses
-        # before anything is scheduled.
-        clean_params = op_cls.validate(self._service, dict(params or {}))
-
-        with self._lock:
+        def _conflict_check() -> None:
             if self._snapshot is not None and \
                     self._snapshot.state not in TERMINAL_STATES:
                 raise ServiceError(
                     f"operation {self._snapshot.kind!r} is already running",
                     status_code=409)
+
+        # Conflict first: "already running" is the truthful error even when
+        # the running op has the hand in maintenance (no session → param
+        # validation would 503 misleadingly). Then validate on the caller
+        # thread so bad params surface as HTTP statuses before scheduling.
+        with self._lock:
+            _conflict_check()
+        clean_params = op_cls.validate(self._service, dict(params or {}))
+
+        with self._lock:
+            _conflict_check()
             run_id = f"{kind}-{uuid.uuid4().hex[:8]}"
             self._run_id = run_id
             self._snapshot = OperationSnapshot(
@@ -214,7 +221,15 @@ class OperationManager:
                     self._snapshot.state != OpState.AWAITING_INPUT:
                 raise ServiceError("no operation awaiting input",
                                    status_code=409)
+            operation = self._operation
             input_queue = self._input_queue
+        # Ops blocked inside hardware calls consume the input via their
+        # hook (caller thread); everyone else gets the queue.
+        try:
+            if operation is not None and operation.handle_input(str(value)):
+                return
+        except Exception:
+            logger.exception("handle_input hook failed")
         input_queue.put(value)
 
     def shutdown(self) -> None:

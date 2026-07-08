@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from dataclasses import dataclass
 from typing import Callable, Optional
 
 from orca_core.hand_config import OrcaHandConfig, OrcaHandTouchConfig
@@ -41,6 +42,17 @@ def load_config(config_path: str):
     raw = read_yaml(config_path) or {}
     config_cls = OrcaHandTouchConfig if "sensors" in raw else OrcaHandConfig
     return config_cls.from_config_path(config_path=config_path)
+
+
+@dataclass(frozen=True)
+class MaintenanceLease:
+    """Proof that the supervisor released the hardware to an operation.
+
+    ``presence`` is the post-teardown port probe (None in mock mode, where
+    real serial discovery is skipped)."""
+
+    kind: str
+    presence: object | None = None
 
 
 class HandSupervisor(threading.Thread):
@@ -78,6 +90,14 @@ class HandSupervisor(threading.Thread):
         self._last_upgrade_probe = 0.0
         self._tactile_health = (0, time.time())  # (frames_ok, last_progress_ts)
 
+        # Maintenance lease: teardown always executes on the supervisor
+        # thread (the single owner of sessions) so lease entry serializes
+        # with connect/health by construction — no fresh session can appear
+        # while an operation holds the hardware.
+        self._maintenance_kind: str | None = None
+        self._in_maintenance = False
+        self._maintenance_ack = threading.Event()
+
     # ----- public API -------------------------------------------------------
 
     @property
@@ -106,6 +126,38 @@ class HandSupervisor(threading.Thread):
         self._teardown_session("reconnect requested")
         self._wake.set()
 
+    def enter_maintenance(self, kind: str, timeout: float = 15.0) -> MaintenanceLease:
+        """Hand the hardware to an operation: the run loop tears the session
+        down, suspends health checks and reconnects, and acks. Blocks the
+        calling (operation) thread until the hardware is actually free."""
+        with self._lock:
+            if self._maintenance_kind is not None or self._in_maintenance:
+                raise RuntimeError("maintenance already active")
+            self._maintenance_kind = kind
+            self._maintenance_ack.clear()
+        self._wake.set()
+        if not self._maintenance_ack.wait(timeout=timeout):
+            with self._lock:
+                self._maintenance_kind = None
+            raise RuntimeError("supervisor did not release the hand in time")
+        presence = None
+        if not self._settings.mock:
+            # Ports are closed now — a probe finally sees the real picture.
+            try:
+                presence = probe_hardware(self.config)
+            except Exception:
+                logger.exception("maintenance port probe failed")
+        return MaintenanceLease(kind=kind, presence=presence)
+
+    def exit_maintenance(self) -> None:
+        """Return the hardware; the supervisor reconnects via the normal ladder."""
+        with self._lock:
+            self._maintenance_kind = None
+            self._in_maintenance = False
+        self._backoff = DETECT_BACKOFF_START_S
+        self._set_state(HandState.DETECTING, "maintenance finished — reconnecting")
+        self._wake.set()
+
     def shutdown(self) -> None:
         self._stop.set()
         self._wake.set()
@@ -117,12 +169,44 @@ class HandSupervisor(threading.Thread):
     def run(self) -> None:
         self._set_state(HandState.DETECTING, "searching for hardware")
         while not self._stop.is_set():
+            if self._process_maintenance_request():
+                continue
+            if self._maintenance_active():
+                self._wake.wait(timeout=1.0)
+                self._wake.clear()
+                continue
             if self.session is None:
                 delay = self._try_connect()
             else:
                 delay = self._health_tick()
             self._wake.wait(timeout=delay)
             self._wake.clear()
+
+    def _maintenance_active(self) -> bool:
+        with self._lock:
+            return self._in_maintenance
+
+    def _process_maintenance_request(self) -> bool:
+        """Run-loop-owned lease entry: close the session, flip to
+        MAINTENANCE, and ack the waiting operation thread."""
+        with self._lock:
+            pending = self._maintenance_kind is not None and not self._in_maintenance
+            kind = self._maintenance_kind
+        if not pending:
+            return False
+        with self._lock:
+            session, self._session = self._session, None
+            self._torque_enabled = False
+        if session is not None:
+            try:
+                session.close()
+            except Exception:
+                logger.exception("session close failed entering maintenance")
+        with self._lock:
+            self._in_maintenance = True
+        self._set_state(HandState.MAINTENANCE, f"hand handed to {kind}")
+        self._maintenance_ack.set()
+        return True
 
     # ----- internals --------------------------------------------------------
 

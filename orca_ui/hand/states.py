@@ -13,6 +13,7 @@ class HandState(str, Enum):
     CONNECTED = "connected"
     DEGRADED = "degraded"       # connected, but with fewer capabilities than declared
     RECONNECTING = "reconnecting"
+    MAINTENANCE = "maintenance"  # session closed, hardware lent to an operation
 
 
 class ControlSource(str, Enum):
