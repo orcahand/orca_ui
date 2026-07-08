@@ -46,7 +46,7 @@ export const latest: LatestFrames = {
 const HISTORY_CAPACITY = 1024
 
 export const jointHistory = {
-  time: new RingBuffer(HISTORY_CAPACITY),
+  time: new RingBuffer(HISTORY_CAPACITY, Float64Array), // epoch seconds
   measured: new Map<string, RingBuffer>(),
   target: new Map<string, RingBuffer>(),
 }

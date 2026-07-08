@@ -29,7 +29,9 @@ export function JointSparkline({ joint }: { joint: JointInfo }) {
         cursor: { show: true, x: true, y: false },
         legend: { show: false },
         scales: {
-          x: { time: false },
+          // x is seconds relative to "now" (negative past), fixed window so
+          // the trace scrolls steadily instead of rescaling.
+          x: { time: false, range: [-WINDOW_S, 0] },
           y: { range: [romMin - pad, romMax + pad] },
         },
         axes: [
@@ -39,7 +41,7 @@ export function JointSparkline({ joint }: { joint: JointInfo }) {
             ticks: { stroke: 'rgba(255,255,255,0.08)' },
             font: `9px 'Space Mono'`,
             size: 24,
-            values: (_u, ticks) => ticks.map((v) => `${(v - ticks[ticks.length - 1]).toFixed(0)}s`),
+            values: (_u, ticks) => ticks.map((v) => `${v.toFixed(0)}s`),
           },
           {
             stroke: COLORS.dimmer,
@@ -70,22 +72,16 @@ export function JointSparkline({ joint }: { joint: JointInfo }) {
       const t = target.snapshot()
       const n = Math.min(time.length, m.length, t.length)
       if (n < 2) return
-      // Trim to the window.
       const tEnd = time[time.length - 1]
-      let start = time.length - n
-      for (let i = time.length - n; i < time.length; i++) {
-        if (tEnd - time[i] <= WINDOW_S) {
-          start = i
-          break
-        }
-      }
       const offsetM = m.length - time.length
       const offsetT = t.length - time.length
       const xs: number[] = []
       const ms: number[] = []
       const ts: (number | null)[] = []
-      for (let i = start; i < time.length; i++) {
-        xs.push(time[i])
+      for (let i = time.length - n; i < time.length; i++) {
+        const age = time[i] - tEnd // seconds, <= 0
+        if (age < -WINDOW_S) continue
+        xs.push(age)
         ms.push(m[i + offsetM])
         const targetValue = t[i + offsetT]
         ts.push(Number.isNaN(targetValue) ? null : targetValue)

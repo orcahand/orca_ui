@@ -3,13 +3,16 @@
 
 export class RingBuffer {
   readonly capacity: number
-  private data: Float32Array
+  private data: Float32Array | Float64Array
   private head = 0
   private count = 0
 
-  constructor(capacity = 1024) {
+  // Float32 suffices for joint angles; epoch-milliseconds timestamps need
+  // Float64 (float32 resolution at ~1.7e9 s is ~128 s — every sample would
+  // quantize to the same instant).
+  constructor(capacity = 1024, ArrayType: Float32ArrayConstructor | Float64ArrayConstructor = Float32Array) {
     this.capacity = capacity
-    this.data = new Float32Array(capacity)
+    this.data = new ArrayType(capacity)
   }
 
   push(value: number): void {
@@ -23,9 +26,9 @@ export class RingBuffer {
   }
 
   /** Oldest-to-newest copy of the last `n` samples (default: all). */
-  snapshot(n?: number): Float32Array {
+  snapshot(n?: number): Float64Array {
     const take = Math.min(n ?? this.count, this.count)
-    const out = new Float32Array(take)
+    const out = new Float64Array(take)
     for (let i = 0; i < take; i++) {
       out[i] = this.data[(this.head - take + i + this.capacity * 2) % this.capacity]
     }
