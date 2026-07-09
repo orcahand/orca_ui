@@ -17,6 +17,7 @@ import type {
   TaxelGeometry,
 } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
+import { isTeleopActive, useTeleopStore } from '../../state/teleopStore'
 import { subscribeFrames } from '../../state/streamStore'
 import { ForceArrowLayer } from './ForceArrowLayer'
 import { JointGlowLayer } from './JointGlowLayer'
@@ -34,8 +35,12 @@ export interface HandAssets {
 interface Rig {
   robot: URDFRobot
   ghost: URDFRobot | null
+  // Accent-colored second ghost posed from the raw teleop retargeter output
+  // (teleop.targets) — during an engaged ramp it visibly leads the hand.
+  teleopGhost: URDFRobot | null
   adapter: JointPoseAdapter
   ghostAdapter: JointPoseAdapter | null
+  teleopGhostAdapter: JointPoseAdapter | null
   glow: JointGlowLayer
   arrows: ForceArrowLayer
   // Measured from the bare robot BEFORE overlay layers attach: the arrow
@@ -70,12 +75,17 @@ function HandRig({
           .setFromObject(robot)
           .getBoundingSphere(new THREE.Sphere())
         const ghost = makeGhost(robot)
+        const teleopGhost = makeGhost(robot, 0x22d3ee, 0.25)
         built = {
           robot,
           ghost,
+          teleopGhost,
           adapter: new JointPoseAdapter(robot, assets.calibration, joints),
           ghostAdapter: ghost
             ? new JointPoseAdapter(ghost, assets.calibration, joints)
+            : null,
+          teleopGhostAdapter: teleopGhost
+            ? new JointPoseAdapter(teleopGhost, assets.calibration, joints)
             : null,
           glow: new JointGlowLayer(robot),
           arrows: new ForceArrowLayer(
@@ -103,6 +113,7 @@ function HandRig({
   useEffect(() => {
     rig?.adapter.setCalibration(assets.calibration)
     rig?.ghostAdapter?.setCalibration(assets.calibration)
+    rig?.teleopGhostAdapter?.setCalibration(assets.calibration)
     invalidate()
   }, [assets.calibration, rig, invalidate])
 
@@ -170,6 +181,19 @@ function HandRig({
         if (showGhost) rig.ghostAdapter?.apply(frames.joints.estimate)
       }
 
+      if (rig.teleopGhost) {
+        // Self-hides when no teleop session streams targets; the adapter
+        // ROM-clamps + calibrates identically to every other stream.
+        const showTeleop =
+          scene.teleopGhost &&
+          isTeleopActive(useTeleopStore.getState().session) &&
+          Object.keys(frames.joints.teleopTarget).length > 0
+        rig.teleopGhost.visible = showTeleop
+        if (showTeleop) {
+          rig.teleopGhostAdapter?.apply(frames.joints.teleopTarget)
+        }
+      }
+
       rig.glow.setVisible(scene.jointGlow && caps.encoders)
       if (scene.jointGlow && caps.encoders) {
         rig.glow.update(
@@ -198,6 +222,7 @@ function HandRig({
     <>
       <primitive object={rig.robot} />
       {rig.ghost && <primitive object={rig.ghost} />}
+      {rig.teleopGhost && <primitive object={rig.teleopGhost} />}
     </>
   )
 }

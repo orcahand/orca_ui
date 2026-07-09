@@ -36,6 +36,11 @@ def create_app(settings: UiSettings) -> FastAPI:
     )
     operations = build_operation_manager(service, settings, hub.publish)
     service.attach_operation_manager(operations)
+    teleop = None
+    if settings.teleop_enabled:
+        from orca_ui.hand.teleop import build_teleop_manager
+        teleop = build_teleop_manager(service, settings, hub.publish)
+        service.attach_teleop_manager(teleop)
     telemetry = TelemetryService(service, hub, settings)
 
     @contextlib.asynccontextmanager
@@ -47,6 +52,9 @@ def create_app(settings: UiSettings) -> FastAPI:
             yield
         finally:
             broadcaster.cancel()
+            # Teleop first: no targets may race into a dying stack.
+            if teleop is not None:
+                teleop.shutdown()
             operations.shutdown()
             telemetry.stop()
             service.stop()
@@ -56,10 +64,14 @@ def create_app(settings: UiSettings) -> FastAPI:
     app.state.service = service
     app.state.hub = hub
     app.state.operations = operations
+    app.state.teleop = teleop
 
     app.include_router(build_rest_router(service))
     app.include_router(build_assets_router(service))
     app.include_router(build_ws_router(service, hub))
+    if teleop is not None:
+        from orca_ui.api.teleop_ws import build_teleop_ws_router
+        app.include_router(build_teleop_ws_router(teleop))
     # Order matters: /assets/hand (bundle) must register before the frontend's
     # /assets mount so the more specific prefix wins.
     mount_assets(app)

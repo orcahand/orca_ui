@@ -63,3 +63,23 @@ class PoseSaveRequest(BaseModel):
 
 class PoseCaptureRequest(BaseModel):
     name: str
+
+
+class TeleopStartRequest(BaseModel):
+    """Start a teleop session. ``managed`` spawns the orca_teleop streamer
+    child; ``external`` just mints a token for a manually-launched one."""
+
+    source: str
+    mode: Literal["managed", "external"] = "managed"
+    config: dict = Field(default_factory=dict)
+
+
+class TeleopEngageRequest(BaseModel):
+    ramp_s: Optional[float] = Field(default=None, ge=0, le=10)
+
+
+class TeleopConfigRequest(BaseModel):
+    """Partial config update, forwarded to the streamer child (recognized
+    keys are filtered by the manager)."""
+
+    config: dict = Field(default_factory=dict)

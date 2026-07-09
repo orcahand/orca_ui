@@ -30,3 +30,16 @@ class UiSettings:
     fast_hz: float = 60.0
     mid_hz: float = 10.0
     slow_hz: float = 1.0
+
+    # Teleoperation. The streamer child runs in the orca_teleop env, launched
+    # via teleop_cmd (explicit command) or `uv run --project <teleop_dir>`
+    # (teleop_dir / $ORCA_TELEOP_DIR / auto-detected sibling checkout).
+    teleop_enabled: bool = True
+    teleop_cmd: str | None = None
+    teleop_dir: str | None = None
+    # orcahand_description checkout for the retargeter's URDF; None ->
+    # auto-detect the sibling checkout, exported as ORCAHAND_DESCRIPTION_DIR.
+    teleop_urdf_dir: str | None = None
+    teleop_ramp_s: float = 2.0             # engage ramp-in duration
+    teleop_hold_after_ms: int = 250        # target silence -> tracking lost
+    teleop_disengage_after_s: float = 10.0  # lost this long -> auto-disengage (0 = never)

@@ -11,8 +11,8 @@ import type {
 } from '../api/types'
 import { useAppStore } from './appStore'
 import { useEventLogStore } from './eventLogStore'
-
-const LOG_CAP = 500
+import { mergeLogPayload } from './logMerge'
+import { isTeleopEngaged, useTeleopStore } from './teleopStore'
 
 export function isOperationActive(op: OperationSnapshot | null): boolean {
   return op !== null && op.state !== 'done' && op.state !== 'error'
@@ -23,7 +23,8 @@ interface OperationStoreState {
   logRunId: string | null
   logLines: OperationLogLine[]
 
-  setOperation(snapshot: OperationSnapshot): void
+  // null clears the plane (REST resync after a backend restart found no op).
+  setOperation(snapshot: OperationSnapshot | null): void
   mergeLog(payload: OperationLogPayload): void
 }
 
@@ -35,6 +36,7 @@ export const useOperationStore = create<OperationStoreState>((set, get) => ({
   setOperation: (snapshot) => {
     const previous = get().operation
     set({ operation: snapshot })
+    if (!snapshot) return
     const changed =
       !previous ||
       previous.run_id !== snapshot.run_id ||
@@ -59,20 +61,12 @@ export const useOperationStore = create<OperationStoreState>((set, get) => ({
     }
   },
 
-  // The payload is the run's whole bounded buffer (latest-wins coalescing on
-  // the server loses nothing that way); append only lines newer than what we
-  // have, reset on a new run_id. A reload mid-op resyncs the full log.
+  // Cumulative payload, seq-merged (see logMerge.ts). A reload mid-op
+  // resyncs the full log.
   mergeLog: (payload) =>
     set((state) => {
-      const reset = payload.run_id !== state.logRunId
-      const kept = reset ? [] : state.logLines
-      const lastSeq = kept.length > 0 ? kept[kept.length - 1].seq : -1
-      const fresh = payload.lines.filter((line) => line.seq > lastSeq)
-      if (!reset && fresh.length === 0) return state
-      return {
-        logRunId: payload.run_id,
-        logLines: [...kept, ...fresh].slice(-LOG_CAP),
-      }
+      const merged = mergeLogPayload(state.logRunId, state.logLines, payload)
+      return merged ?? state
     }),
 }))
 
@@ -105,11 +99,20 @@ export function useStartGate(requires: 'motors' | 'encoders'): {
   const activeKind = useOperationStore((s) =>
     isOperationActive(s.operation) ? s.operation!.kind : null,
   )
+  const teleopEngaged = useTeleopStore((s) => isTeleopEngaged(s.session))
   const caps = useAppStore((s) => s.status?.capabilities)
   if (activeKind) {
     return {
       blocked: true,
       reason: `${activeKind} is running — stop it first`,
+    }
+  }
+  // Mirrors the backend's require_manual_control gate on operation start.
+  // A teleop PREVIEW deliberately does not block — it owns nothing.
+  if (teleopEngaged) {
+    return {
+      blocked: true,
+      reason: 'teleop is engaged — disengage first',
     }
   }
   if (!caps?.[requires]) {

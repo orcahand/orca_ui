@@ -51,6 +51,12 @@ class OpContext:
     def set_detail(self, detail: str) -> None:
         self._manager.update_snapshot(detail=detail)
 
+    def set_extra(self, extra: dict) -> None:
+        """Publish op-specific structured state (snapshot ``extra``) for rich
+        frontends — e.g. the motor-chain panel's per-motor grid. Replaced
+        wholesale on every call."""
+        self._manager.update_snapshot(extra=extra)
+
     def log(self, line: str) -> None:
         self._manager.append_log(line)
 

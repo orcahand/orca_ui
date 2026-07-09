@@ -11,7 +11,13 @@ import type {
 
 export type TaxelDisplayMode = 'magnitude' | 'direction' | 'arrows'
 export type ArrowColorScheme = 'heat' | 'intensity' | 'orca'
-export type ViewName = 'dashboard' | '3d' | 'poses' | 'setup' | 'motors'
+export type ViewName =
+  | 'dashboard'
+  | '3d'
+  | 'poses'
+  | 'teleop'
+  | 'setup'
+  | 'motors'
 
 export interface TactileSettings {
   displayMode: TaxelDisplayMode
@@ -27,6 +33,8 @@ export interface SceneSettings {
   forceResultant: boolean
   forceTaxels: boolean
   jointGlow: boolean
+  // Accent-colored ghost posed from the live teleop retargeter output.
+  teleopGhost: boolean
 }
 
 interface AppState {
@@ -59,6 +67,7 @@ const SCENE_DEFAULTS: SceneSettings = {
   forceResultant: false,
   forceTaxels: false,
   jointGlow: false,
+  teleopGhost: true,
 }
 
 const storedScene = ((): SceneSettings => {

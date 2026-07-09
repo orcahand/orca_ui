@@ -9,6 +9,7 @@ import { useAppStore } from '../../state/appStore'
 import { Panel } from '../common/Panel'
 import { EventLog } from '../motors/EventLog'
 import { LoopStatsBar } from '../motors/LoopStatsBar'
+import { MotorChainPanel } from '../motors/MotorChainPanel'
 import { MotorHealthPanel } from '../motors/MotorHealthPanel'
 import { TuningPanel } from '../motors/TuningPanel'
 
@@ -84,6 +85,7 @@ export function MotorsView() {
           <LoopStatsBar />
         </Panel>
       )}
+      <MotorChainPanel />
       <EventLog />
     </>
   )

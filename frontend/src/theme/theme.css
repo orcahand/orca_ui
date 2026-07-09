@@ -1604,3 +1604,303 @@ header h1 {
 .record-note.warn {
   color: var(--warn);
 }
+
+/* ----- teleoperation ----- */
+
+.teleop-grid {
+  /* two config cards side by side; the camera panel gets the full width */
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+}
+
+.teleop-source-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  width: 100%;
+}
+
+.teleop-source-tile {
+  font-family: var(--font);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--panel-border);
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 64px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.teleop-source-tile:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.teleop-source-tile.selected {
+  border-color: var(--accent);
+  background: rgba(34, 211, 238, 0.07);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.teleop-source-tile:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.teleop-source-name {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-bright);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.teleop-source-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dimmer);
+  flex-shrink: 0;
+}
+
+.teleop-source-dot.ready {
+  background: var(--ok);
+}
+
+.teleop-source-desc {
+  font-size: 9px;
+  color: var(--dim);
+  line-height: 1.45;
+}
+
+.teleop-state-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border: 1px solid var(--panel-border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.teleop-state-badge.starting {
+  color: var(--warn);
+  border-color: var(--warn);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.teleop-state-badge.preview {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.teleop-state-badge.engaged {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.teleop-state-badge.error {
+  color: var(--err);
+  border-color: var(--err);
+}
+
+.tracking-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.tracking-dot.lost {
+  background: #ff5c5c;
+  animation: rec-pulse 1.1s ease-in-out infinite;
+}
+
+.teleop-stats {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.teleop-stat-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.teleop-stat-label {
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--dimmer);
+}
+
+.teleop-stat-value {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.teleop-preview-stage {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.teleop-preview-img {
+  width: 100%;
+  max-width: 720px;
+  display: block;
+  border: 1px solid var(--panel-border);
+  background: #000;
+}
+
+.teleop-preview-waiting {
+  width: 100%;
+  max-width: 720px;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  border: 1px dashed var(--panel-border);
+  color: var(--dim);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.teleop-token code {
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+/* Engaged teleop: accent the strip — this session owns the hand. */
+.transport-bar.teleop-engaged {
+  border-left: 3px solid var(--accent);
+  background: rgba(34, 211, 238, 0.05);
+  border-color: rgba(34, 211, 238, 0.35);
+}
+
+/* ----- motor chain (Motors tab) ----- */
+
+.chain-flow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+}
+
+.chain-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 46px;
+  padding: 6px 6px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--dimmer);
+}
+
+.chain-node.board {
+  border-color: var(--dim);
+  color: var(--muted);
+}
+
+.chain-node.wrist {
+  border-style: dashed;
+}
+
+.chain-node.configured {
+  border-color: var(--ok);
+  color: var(--ok);
+  background: rgba(52, 211, 153, 0.06);
+}
+
+.chain-node.expected {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(34, 211, 238, 0.08);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.chain-node.invalid {
+  border-color: var(--err);
+  color: var(--err);
+  background: rgba(212, 135, 138, 0.08);
+}
+
+.chain-node.reset {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.chain-node-id {
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.chain-node-model {
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+}
+
+.chain-arrow {
+  color: var(--dimmer);
+  font-size: 10px;
+}
+
+.chain-meta {
+  font-size: 9px;
+  color: var(--dimmer);
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.chain-instruction {
+  font-size: 11px;
+  color: var(--accent);
+  padding: 8px 10px;
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  background: rgba(34, 211, 238, 0.05);
+}
+
+.chain-instruction.done {
+  color: var(--ok);
+  border-color: rgba(52, 211, 153, 0.35);
+  background: rgba(52, 211, 153, 0.05);
+}
+
+.chain-instruction.error {
+  color: var(--err);
+  border-color: rgba(212, 135, 138, 0.4);
+  background: rgba(200, 100, 100, 0.06);
+}
+
+.chain-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 1px solid rgba(212, 135, 138, 0.5);
+  background: rgba(200, 100, 100, 0.07);
+}
+
+.chain-confirm-text {
+  font-size: 10px;
+  color: var(--warn);
+  line-height: 1.5;
+  max-width: 480px;
+}

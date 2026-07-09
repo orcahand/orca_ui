@@ -56,7 +56,11 @@ export async function loadHandRobot(urdfUrl: string): Promise<URDFRobot> {
   return robot
 }
 
-export function makeGhost(robot: URDFRobot): URDFRobot | null {
+export function makeGhost(
+  robot: URDFRobot,
+  color = 0x7f8ea2,
+  opacity = 0.22,
+): URDFRobot | null {
   const ghost = robot.clone(true) as URDFRobot
   // URDFRobot.clone rebuilds the joint map; verify before trusting it.
   if (!ghost.joints || Object.keys(ghost.joints).length !== Object.keys(robot.joints).length) {
@@ -64,9 +68,9 @@ export function makeGhost(robot: URDFRobot): URDFRobot | null {
     return null
   }
   const material = new THREE.MeshStandardMaterial({
-    color: 0x7f8ea2,
+    color,
     transparent: true,
-    opacity: 0.22,
+    opacity,
     depthWrite: false,
     side: THREE.FrontSide,
   })

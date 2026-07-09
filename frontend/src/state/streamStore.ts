@@ -10,9 +10,13 @@ export interface LatestFrames {
     measured: Record<string, number>
     estimate: Record<string, number>
     target: Record<string, number>
+    // Raw (clamped) teleop retargeter output — the 3D "teleop ghost". Flows
+    // in preview AND engaged; cleared when the teleop session ends.
+    teleopTarget: Record<string, number>
     trim: Record<string, number>
     tMeasured: number // ms epoch of last measured update
     tTarget: number
+    tTeleopTarget: number
   }
   tactile: {
     forces: Partial<Record<Finger, Vec3>> | null
@@ -24,6 +28,9 @@ export interface LatestFrames {
     temps: Record<string, number>
     currents: Record<string, number>
   }
+  teleop: {
+    preview: { jpeg: string; seq: number | null } | null
+  }
   stats: Record<string, unknown> | null
 }
 
@@ -32,12 +39,15 @@ export const latest: LatestFrames = {
     measured: {},
     estimate: {},
     target: {},
+    teleopTarget: {},
     trim: {},
     tMeasured: 0,
     tTarget: 0,
+    tTeleopTarget: 0,
   },
   tactile: { forces: null, taxels: null, tForces: 0, tTaxels: 0 },
   motors: { temps: {}, currents: {} },
+  teleop: { preview: null },
   stats: null,
 }
 

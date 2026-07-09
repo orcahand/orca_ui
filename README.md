@@ -75,6 +75,17 @@ sweep) and disables torque — it never errors, it reports what it actioned.
   (≤60 Hz) joint streams by physically posing the hand (torque drops and
   stays off), then replay at ×0.5/×1/×2 with looping. Trajectory YAMLs are
   interchangeable with orca_core's record/replay example scripts.
+- **Teleop** — drive the hand with your own: webcam (MediaPipe), Manus
+  gloves, Apple Vision Pro, or a synthetic waveform (no hardware). The
+  retargeting pipeline runs as a separate `orca_teleop` process (spawned via
+  `uv run --project ../orca_teleop`, or launched manually/remotely in
+  *external* mode with a session token). Sessions start in **preview** —
+  retargeted poses render as a cyan ghost in the 3D view and the hand never
+  moves — then **engage** takes the control channel (manual sliders lock,
+  named owner tooltips) and ramps in from the current pose. Tracking loss
+  holds the last pose and auto-disengages after a timeout; E-stop ends the
+  whole session. Webcam sessions get a live annotated camera preview
+  (landmarks green when the orientation gate passes).
 - **Setup** — tensioning (wind → hold while you ratchet the spools →
   release), calibration (all joints, or expand to select fingers/joints;
   progress streamed live; partial runs keep completed steps), and the guided
@@ -82,11 +93,26 @@ sweep) and disables torque — it never errors, it reports what it actioned.
   `scripts/setup.py`). These take the hand into *maintenance*: the session
   is handed to the operation and reconnects automatically afterwards.
 - **Motors** — per-motor temps/currents, PI tuning + loop stats (feedback
-  hands), stream rates, a supervisor event log, and a manual reconnect.
+  hands), stream rates, a supervisor event log, a manual reconnect, and the
+  **motor chain** panel: assembly-time motor ID'ing (orca_core's
+  `configure_motor_chain` workflow) with a live per-motor chain
+  visualization — reachable with no hand connected, since that's when you
+  need it. Factory reset sits behind an explicit are-you-sure confirmation
+  (a reset means redoing the whole ID'ing process). Dynamixel only for now;
+  Feetech chains still use the CLI script.
 
 A transport bar appears under the header while anything long-running is
-active (calibration, tensioning, playback, recording) — progress, prompts
-(e.g. tension's Release), and stop work from every tab.
+active (calibration, tensioning, playback, recording, a teleop session) —
+progress, prompts (e.g. tension's Release), engage/disengage, and stop work
+from every tab.
+
+Teleop flags: `--teleop-dir` points at an orca_teleop checkout (default:
+`$ORCA_TELEOP_DIR` or the sibling `../orca_teleop`), `--teleop-cmd` overrides
+the launch command entirely, `--no-teleop` disables the subsystem. The
+retargeter's URDF resolves from the sibling `../orcahand_description`
+checkout. Without hardware: `uv run orca-ui --mock`, then either pick the
+*synthetic* source in the Teleop tab or run
+`uv run python scripts/dev_teleop_synthetic.py` for an external-mode session.
 
 ### Mock mode
 

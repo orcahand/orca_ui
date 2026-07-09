@@ -90,6 +90,7 @@ class HandService:
         self._control_owner_label = ControlSource.MANUAL.value
         self._operation_manager = None   # attached post-construction (server.py)
         self._sweeper = None             # mock-only dev sweeper, for estop
+        self._teleop_manager = None      # attached post-construction (server.py)
         self._gains = {
             "kp": DEFAULT_KP,
             "ki": DEFAULT_KI,
@@ -263,13 +264,19 @@ class HandService:
             raise ServiceError("torque is disabled — enable it first", status_code=409)
         return session
 
-    def _require_manual_control(self) -> None:
+    def require_manual_control(self) -> None:
+        """409 unless MANUAL owns the joint-target channel. Public: the
+        operation manager gates op starts on it (an operation or teleop
+        session must not be yanked by another control session starting)."""
         with self._state_lock:
             source = self._control_source
             owner = self._control_owner_label
         if source != ControlSource.MANUAL:
             raise ServiceError(
                 f"control is owned by {owner} — stop it first", status_code=409)
+
+    # Backwards-compatible private alias (existing call sites).
+    _require_manual_control = require_manual_control
 
     # ----- control-source arbiter -------------------------------------------------
 
@@ -290,8 +297,15 @@ class HandService:
             self._control_owner_label = owner_label or source.value
         self._publish_control_state()
 
-    def release_control(self) -> None:
+    def release_control(self, expected: ControlSource | None = None) -> None:
+        """Return the channel to MANUAL. With ``expected`` set, a release from
+        a stale owner (e.g. a teleop disengage racing an operation start) is a
+        logged no-op instead of stomping the new owner."""
         with self._state_lock:
+            if expected is not None and self._control_source != expected:
+                logger.info("release_control(%s) ignored — owner is %s",
+                            expected.value, self._control_source.value)
+                return
             self._control_source = ControlSource.MANUAL
             self._control_owner_label = ControlSource.MANUAL.value
         self._publish_control_state()
@@ -304,9 +318,16 @@ class HandService:
     def attach_sweeper(self, sweeper) -> None:
         self._sweeper = sweeper
 
+    def attach_teleop_manager(self, manager) -> None:
+        self._teleop_manager = manager
+
     @property
     def operation_manager(self):
         return self._operation_manager
+
+    @property
+    def teleop_manager(self):
+        return getattr(self, "_teleop_manager", None)
 
     def estop(self) -> dict:
         """Best-effort emergency stop: never raises.
@@ -317,6 +338,15 @@ class HandService:
         stops the mock sweeper. Reports what was actioned.
         """
         report: dict = {}
+        teleop = self.teleop_manager
+        if teleop is not None:
+            # First: teleop is the one source still streaming new motion.
+            try:
+                report["teleop_stopped"] = teleop.estop()
+            except Exception as e:
+                logger.exception("estop: teleop stop failed")
+                report["teleop_stopped"] = False
+                report["teleop_error"] = str(e)
         manager = self._operation_manager
         if manager is not None:
             try:
@@ -382,6 +412,17 @@ class HandService:
             return {j: float(v) for j, v in measured.items()}
         estimate = session.estimate_joints()
         return {j: float(v) for j, v in (estimate or {}).items()}
+
+    def current_pose(self) -> dict:
+        """Best current joint pose (degrees): measured, else the motor-derived
+        estimate, else the last accepted targets. Used as the teleop ramp-in
+        start pose; empty dict when nothing is known."""
+        session = self.session
+        pose = self._current_pose(session) if session is not None else {}
+        if pose:
+            return pose
+        with self._state_lock:
+            return dict(self._targets)
 
     def set_targets(self, angles: dict[str, float],
                     source: ControlSource = ControlSource.MANUAL) -> None:

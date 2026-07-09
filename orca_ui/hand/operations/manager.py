@@ -112,6 +112,11 @@ class OperationManager:
         # thread so bad params surface as HTTP statuses before scheduling.
         with self._lock:
             _conflict_check()
+        # No op may start while another control session owns the joint-target
+        # channel: an engaged teleop must not have the hand yanked away by a
+        # maintenance lease, and arbiter-acquiring ops get a synchronous 409
+        # instead of an async ERROR snapshot.
+        self._service.require_manual_control()
         clean_params = op_cls.validate(self._service, dict(params or {}))
 
         with self._lock:
@@ -169,7 +174,8 @@ class OperationManager:
         finally:
             if acquired:
                 try:
-                    self._service.release_control()
+                    self._service.release_control(
+                        expected=operation.control_source)
                 except Exception:
                     logger.exception("release_control failed")
 
@@ -264,7 +270,8 @@ class OperationManager:
     def update_snapshot(self, state: OpState | None = None,
                         phase: str | None = None,
                         detail: str | None = None,
-                        progress: float | None = None) -> None:
+                        progress: float | None = None,
+                        extra: dict | None = None) -> None:
         with self._lock:
             snapshot = self._snapshot
             if snapshot is None or snapshot.state in TERMINAL_STATES:
@@ -278,6 +285,8 @@ class OperationManager:
                 snapshot.detail = detail
             if progress is not None:
                 snapshot.progress = float(progress)
+            if extra is not None:
+                snapshot.extra = dict(extra)
         self._publish_state()
 
     def enter_awaiting_input(self, prompt: str, options: list[str]) -> None:

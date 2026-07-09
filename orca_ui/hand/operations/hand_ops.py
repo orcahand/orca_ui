@@ -157,14 +157,106 @@ def pose_from_fractions(hand, fractions: dict[str, float]) -> dict[str, float]:
 
 
 def demo_definitions() -> dict[str, list[dict[str, float]]]:
-    """orca_core's demo presets as fraction-keyframe sequences.
+    """orca_core's packaged demo poses as fraction-keyframe sequences.
 
     The presets carry poses only — playback timing is synthesized by the
-    player (fixed per-segment duration), mirroring run_demo's step defaults.
+    player (fixed per-segment duration). Deliberately not re-exported from
+    the ``orca_core`` namespace, hence the explicit module import.
     """
-    from orca_core.demo_presets import DEMO_POSE_FRACTIONS, DEMO_SEQUENCES
+    from orca_core.demo_poses import load_demo_poses
 
     return {
-        name: [DEMO_POSE_FRACTIONS[name][pose] for pose in poses]
-        for name, poses in DEMO_SEQUENCES.items()
+        name: [dict(demo.pose_fractions[pose]) for pose in demo.sequence]
+        for name, demo in load_demo_poses().items()
     }
+
+
+# ----- motor chain configuration (orca_core.maintenance.motor_chain) -----------
+#
+# Assembly-time motor ID'ing. orca_core ships this as an interaction-free
+# library (progress/prompt callbacks + should_stop), so the wrappers here are
+# deliberately thin — they exist only to keep every orca_core touchpoint
+# inside the seam.
+
+
+def known_motor_types() -> list[str]:
+    from orca_core.constants import SUPPORTED_MOTOR_TYPES
+
+    return list(SUPPORTED_MOTOR_TYPES)
+
+
+def motor_models(motor_type: str) -> dict[str, str]:
+    """{"finger": model, "wrist": model} for a motor family."""
+    from orca_core.constants import MOTOR_MODELS
+
+    return dict(MOTOR_MODELS[motor_type])
+
+
+def chain_error_types() -> tuple[type, type]:
+    """(MotorChainError, MotorChainAborted) for except clauses."""
+    from orca_core.maintenance.motor_chain import (
+        MotorChainAborted,
+        MotorChainError,
+    )
+
+    return MotorChainError, MotorChainAborted
+
+
+def resolve_motor_port(config, presence) -> str | None:
+    """Motor bus port for chain work: the maintenance lease's probe result
+    when it saw one, else the config's port / auto-detection."""
+    if presence is not None and getattr(presence, "motor_port", None):
+        return presence.motor_port
+    from orca_core.maintenance.motor_chain import resolve_port
+
+    port = getattr(config, "port", None)
+    return resolve_port(None if port == "auto" else port,
+                        getattr(config, "motor_type", None))
+
+
+def detect_motor_type(port: str, progress_callback=None) -> str | None:
+    from orca_core.maintenance.motor_chain import detect_motor_type as detect
+
+    return detect(port, progress_callback=progress_callback)
+
+
+def build_chain_plan(config, port: str, motor_type: str):
+    """MotorChainPlan from an OrcaHandConfig (the library takes the raw
+    config mapping)."""
+    from orca_core.maintenance.motor_chain import plan_motor_chain
+
+    return plan_motor_chain(
+        {
+            "motor_ids": list(config.motor_ids),
+            "joint_to_motor_map": dict(config.joint_to_motor_map or {}),
+            "baudrate": getattr(config, "baudrate", None),
+        },
+        port,
+        motor_type,
+    )
+
+
+def run_chain_configure(plan, *, progress_callback, prompt_callback,
+                        should_stop) -> list[int]:
+    """Blocking guided assembly; returns the configured motor IDs."""
+    from orca_core.maintenance.motor_chain import configure_motor_chain
+
+    return configure_motor_chain(
+        plan,
+        progress_callback=progress_callback,
+        prompt_callback=prompt_callback,
+        should_stop=should_stop,
+    )
+
+
+def reset_motors_once(plan, *, progress_callback, prompt_callback,
+                      should_stop) -> list[dict]:
+    """One reset pass over whatever is on the bus (the caller loops)."""
+    from orca_core.maintenance.motor_chain import reset_all_motors
+
+    return reset_all_motors(
+        plan,
+        progress_callback=progress_callback,
+        prompt_callback=prompt_callback,
+        should_stop=should_stop,
+    )

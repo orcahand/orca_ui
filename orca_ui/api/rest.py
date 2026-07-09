@@ -108,6 +108,54 @@ def build_router(service: HandService) -> APIRouter:
         # Never raises; always 200 with a report of what was actioned.
         return {"ok": True, "report": service.estop()}
 
+    # ----- teleoperation ------------------------------------------------------------
+
+    def _teleop():
+        teleop = service.teleop_manager
+        if teleop is None:
+            raise HTTPException(status_code=503, detail="teleop unavailable")
+        return teleop
+
+    @router.get("/teleop/state")
+    def teleop_state():
+        return {"session": _teleop().snapshot()}
+
+    @router.get("/teleop/sources")
+    def teleop_sources():
+        return _teleop().sources()
+
+    @router.post("/teleop/cameras/scan")
+    def teleop_scan_cameras():
+        # Slow (probes each device through the streamer child); the frontend
+        # shows a scanning state. 409 while a session owns the camera.
+        return guard(_teleop().scan_cameras)
+
+    @router.get("/teleop/log")
+    def teleop_log():
+        return _teleop().log_payload()
+
+    @router.post("/teleop/start")
+    def teleop_start(body: schemas.TeleopStartRequest):
+        return guard(_teleop().start, body.source, body.mode, body.config)
+
+    @router.post("/teleop/stop")
+    def teleop_stop():
+        stopped = _teleop().stop()
+        return {"ok": True, "stopped": stopped}
+
+    @router.post("/teleop/engage")
+    def teleop_engage(body: schemas.TeleopEngageRequest | None = None):
+        ramp_s = body.ramp_s if body else None
+        return {"session": guard(_teleop().engage, ramp_s)}
+
+    @router.post("/teleop/disengage")
+    def teleop_disengage():
+        return {"session": guard(_teleop().disengage)}
+
+    @router.post("/teleop/config")
+    def teleop_config(body: schemas.TeleopConfigRequest):
+        return {"config": guard(_teleop().set_config, body.config)}
+
     # ----- motor control -------------------------------------------------------
 
     @router.post("/torque/enable")

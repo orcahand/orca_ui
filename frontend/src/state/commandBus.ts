@@ -28,6 +28,14 @@ function trailing(): void {
 
 function flush(): void {
   if (!pending.size) return
+  // A trailing flush can race a control-source change (operation start,
+  // teleop engage): the sliders are already disabled, so drop the stale
+  // targets instead of bouncing a 409 into the error banner.
+  const control = useAppStore.getState().control
+  if (control && control.control_source !== 'manual') {
+    pending.clear()
+    return
+  }
   const angles = Object.fromEntries(pending)
   pending.clear()
   if (!sendCommand(angles)) {

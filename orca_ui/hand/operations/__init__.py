@@ -26,6 +26,9 @@ def build_operation_manager(service, settings, publish_topic) -> OperationManage
     """
     manager = OperationManager(service, settings, publish_topic=publish_topic)
     if settings.mock:
+        from orca_ui.hand.operations.chain import (
+            SimulatedConfigureChainOperation,
+        )
         from orca_ui.hand.operations.simulated import (
             SimulatedCalibrateOperation,
             SimulatedTensionOperation,
@@ -34,13 +37,16 @@ def build_operation_manager(service, settings, publish_topic) -> OperationManage
         manager.register(SimulatedCalibrateOperation)
         manager.register(SimulatedTensionOperation)
         manager.register(SimulatedWizardOperation)
+        manager.register(SimulatedConfigureChainOperation)
     else:
         from orca_ui.hand.operations.calibrate import CalibrateOperation
+        from orca_ui.hand.operations.chain import ConfigureChainOperation
         from orca_ui.hand.operations.tension import TensionOperation
         from orca_ui.hand.operations.wizard import WizardOperation
         manager.register(CalibrateOperation)
         manager.register(TensionOperation)
         manager.register(WizardOperation)
+        manager.register(ConfigureChainOperation)
     # In-session ops run for real in mock mode too (the mock stack is the
     # production stack over in-memory links).
     from orca_ui.hand.operations.player import DemoOperation, ReplayOperation

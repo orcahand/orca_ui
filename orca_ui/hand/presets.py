@@ -57,3 +57,4 @@ BUILTIN_SEQUENCES: dict[str, list[dict[str, float]]] = {
         BUILTIN_POSES["open"],
     ],
 }
+

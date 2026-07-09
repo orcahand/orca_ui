@@ -5,6 +5,7 @@ import { useAppStore } from '../../state/appStore'
 import { EncoderPanel } from '../encoders/EncoderPanel'
 import { MotorPanel } from '../motors/MotorPanel'
 import { TactilePanel } from '../tactile/TactilePanel'
+import { TeleopStatusCard } from '../teleop/TeleopStatusCard'
 
 export function DashboardView() {
   const status = useAppStore((s) => s.status)
@@ -18,6 +19,7 @@ export function DashboardView() {
 
   return (
     <>
+      <TeleopStatusCard />
       {caps.tactile && <TactilePanel />}
       <div
         style={

@@ -139,6 +139,12 @@ class HandSupervisor(threading.Thread):
         if not self._maintenance_ack.wait(timeout=timeout):
             with self._lock:
                 self._maintenance_kind = None
+                # The run loop may have flipped to MAINTENANCE in the same
+                # instant we gave up — with no lease holder left, roll the
+                # supervisor back or it idles in MAINTENANCE forever.
+                entered_anyway = self._in_maintenance
+            if entered_anyway:
+                self.exit_maintenance()
             raise RuntimeError("supervisor did not release the hand in time")
         presence = None
         if not self._settings.mock:
@@ -203,7 +209,23 @@ class HandSupervisor(threading.Thread):
             except Exception:
                 logger.exception("session close failed entering maintenance")
         with self._lock:
-            self._in_maintenance = True
+            # The waiting operation may have timed out mid-teardown and
+            # cleared the request (enter_maintenance raised) — entering
+            # MAINTENANCE now would strand the supervisor with no lease
+            # holder to ever call exit_maintenance.
+            if self._maintenance_kind is None:
+                logger.warning(
+                    "maintenance request for %s abandoned mid-teardown — "
+                    "resuming the detection ladder", kind)
+                abandoned = True
+            else:
+                abandoned = False
+                self._in_maintenance = True
+        if abandoned:
+            self._backoff = DETECT_BACKOFF_START_S
+            self._set_state(HandState.DETECTING,
+                            "maintenance request abandoned — reconnecting")
+            return True
         self._set_state(HandState.MAINTENANCE, f"hand handed to {kind}")
         self._maintenance_ack.set()
         return True

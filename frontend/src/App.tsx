@@ -10,6 +10,7 @@ import { DashboardView } from './components/views/DashboardView'
 import { MotorsView } from './components/views/MotorsView'
 import { PosesView } from './components/views/PosesView'
 import { SetupView } from './components/views/SetupView'
+import { TeleopView } from './components/views/TeleopView'
 import { useAppStore } from './state/appStore'
 
 // three.js only loads when the 3D tab first opens.
@@ -43,7 +44,19 @@ export default function App() {
       <TransportBar />
       <ErrorBanner />
       {booting ? (
-        <BootHero />
+        // Some tabs stay reachable while the backend is up but no hand
+        // session exists: Teleop (test a camera/glove against the 3D ghost)
+        // and Motors (chain configuration happens at ASSEMBLY time, when
+        // there is no connectable hand at all). Hardware actions remain
+        // backend-gated.
+        wsConnected && (view === 'teleop' || view === 'motors') ? (
+          <>
+            {view === 'teleop' && <TeleopView />}
+            {view === 'motors' && <MotorsView />}
+          </>
+        ) : (
+          <BootHero />
+        )
       ) : (
         <>
           {(view === 'dashboard' || view === '3d' || view === 'poses') && (
@@ -58,6 +71,7 @@ export default function App() {
             </Suspense>
           )}
           {view === 'poses' && <PosesView />}
+          {view === 'teleop' && <TeleopView />}
           {view === 'setup' && <SetupView />}
           {view === 'motors' && <MotorsView />}
         </>

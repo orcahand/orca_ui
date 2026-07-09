@@ -9,6 +9,7 @@ import { api } from '../../api/rest'
 import type { OperationSnapshot } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
 import { useOperationStore } from '../../state/operationStore'
+import { TeleopBar } from './TeleopBar'
 
 const DONE_LINGER_MS = 3000
 
@@ -35,6 +36,18 @@ function fmtSeconds(seconds: number): string {
 }
 
 export function TransportBar() {
+  // Two independent control-session strips stack: an operation bar and a
+  // teleop bar. The arbiter guarantees at most one of them OWNS the hand,
+  // but a teleop preview under a running operation is legitimate.
+  return (
+    <>
+      <OperationBar />
+      <TeleopBar />
+    </>
+  )
+}
+
+function OperationBar() {
   const operation = useOperationStore((s) => s.operation)
   const [dismissedRun, setDismissedRun] = useState<string | null>(null)
   const [expiredRun, setExpiredRun] = useState<string | null>(null)

@@ -5,7 +5,7 @@
 // the control-source owner: while an operation (or maintenance) owns the
 // hand, manual commands are disabled with a tooltip naming the owner.
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../../api/rest'
 import type { JointInfo } from '../../api/types'
 import { useStreamFrame } from '../../hooks/useStreamFrame'
@@ -39,6 +39,15 @@ export function MotorPanel() {
   const [values, setValues] = useState<Record<string, number>>({})
   const [busy, setBusy] = useState(false)
   const seeded = useRef(false)
+  const wasLocked = useRef(false)
+
+  // Re-seed after control returns to manual: a replay/teleop session moved
+  // the hand, so the latched slider values are stale and the first touch
+  // would yank the joint back to wherever the slider was left.
+  useEffect(() => {
+    if (wasLocked.current && gate.manualAllowed) seeded.current = false
+    wasLocked.current = !gate.manualAllowed
+  }, [gate.manualAllowed])
 
   const caps = status?.capabilities
   const torqueOn = control?.torque_enabled ?? false

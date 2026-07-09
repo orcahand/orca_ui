@@ -13,6 +13,10 @@ import type {
   StatusSnapshot,
   TactileMode,
   TaxelGeometry,
+  TeleopCamera,
+  TeleopSnapshot,
+  TeleopSourceId,
+  TeleopSourcesInfo,
   TrajectoryEntry,
 } from './types'
 
@@ -125,6 +129,35 @@ export const api = {
   zeroTactile: (numSamples = 100) =>
     post('/api/tactile/zero', { num_samples: numSamples }),
   clearTactileZero: () => post('/api/tactile/clear_zero'),
+
+  teleopState: () => request<{ session: TeleopSnapshot }>('/api/teleop/state'),
+  teleopSources: () => request<TeleopSourcesInfo>('/api/teleop/sources'),
+  // Slow (probes each device through the streamer child); 409 mid-session.
+  teleopScanCameras: () =>
+    post<{ cameras: TeleopCamera[]; default_camera_index: number | null }>(
+      '/api/teleop/cameras/scan',
+    ),
+  teleopLog: () => request<OperationLogPayload>('/api/teleop/log'),
+  teleopStart: (
+    source: TeleopSourceId,
+    mode: 'managed' | 'external',
+    config: Record<string, unknown> = {},
+  ) =>
+    post<{ session: TeleopSnapshot; token?: string }>('/api/teleop/start', {
+      source,
+      mode,
+      config,
+    }),
+  teleopStop: () => post<{ ok: boolean; stopped: boolean }>('/api/teleop/stop'),
+  teleopEngage: (rampS?: number) =>
+    post<{ session: TeleopSnapshot }>(
+      '/api/teleop/engage',
+      rampS === undefined ? {} : { ramp_s: rampS },
+    ),
+  teleopDisengage: () =>
+    post<{ session: TeleopSnapshot }>('/api/teleop/disengage'),
+  teleopConfig: (config: Record<string, unknown>) =>
+    post<{ config: Record<string, unknown> }>('/api/teleop/config', { config }),
 
   modelMetadata: () => request<ModelMetadata>('/api/model/metadata'),
   // Flat mapping: joint id -> {sign, offset_deg, verified, evidence}.

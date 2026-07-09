@@ -35,6 +35,9 @@ class OperationSnapshot:
     progress: float | None = None
     params: dict = field(default_factory=dict)
     awaiting: dict | None = None    # {"prompt": str, "options": [str]}
+    # Op-specific structured state for rich frontends (e.g. the motor-chain
+    # visualization). Opaque to the manager; replaced wholesale on update.
+    extra: dict | None = None
     result: dict | None = None
     error: str | None = None
     started_at: float = 0.0
@@ -49,6 +52,7 @@ class OperationSnapshot:
             "progress": self.progress,
             "params": dict(self.params),
             "awaiting": dict(self.awaiting) if self.awaiting else None,
+            "extra": dict(self.extra) if self.extra else None,
             "result": dict(self.result) if self.result else None,
             "error": self.error,
             "started_at": self.started_at,

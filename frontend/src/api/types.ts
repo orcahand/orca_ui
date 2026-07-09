@@ -110,9 +110,29 @@ export interface OperationSnapshot {
   progress: number | null // 0..1 or null when indeterminate
   params: Record<string, unknown>
   awaiting: { prompt: string; options: string[] } | null
+  // Op-specific structured state for rich panels (e.g. the motor-chain
+  // grid). Shape is per-kind; see MotorChainExtra.
+  extra: Record<string, unknown> | null
   result: Record<string, unknown> | null
   error: string | null
   started_at: number
+}
+
+// ----- configure_chain operation extra (orca_ui/hand/operations/chain.py) ----
+
+export interface MotorChainSlot {
+  id: number
+  model: string // e.g. XC330 (finger) / XC430 (wrist)
+  role: 'finger' | 'wrist'
+  state: 'pending' | 'expected' | 'configured' | 'invalid' | 'reset'
+}
+
+export interface MotorChainExtra {
+  mode: 'configure' | 'reset'
+  motor_type: string
+  target_baud: number
+  chain: MotorChainSlot[]
+  resets: number[]
 }
 
 export interface OperationLogLine {
@@ -127,6 +147,69 @@ export interface OperationLogPayload {
   run_id: string | null
   next_seq: number
   lines: OperationLogLine[]
+}
+
+// ----- teleoperation (orca_ui/hand/teleop/) ----------------------------------
+
+export type TeleopSourceId = 'mediapipe' | 'manus' | 'avp' | 'synthetic'
+
+// 'idle' means no session; the backend always publishes a full snapshot.
+export type TeleopSessionState =
+  | 'idle'
+  | 'starting' // child spawning / waiting for its hello
+  | 'preview' // targets flow to the 3D ghost only, hand untouched
+  | 'engaged' // arbiter owned as TELEOP; sub-flags ramping/tracking
+  | 'error' // sticky until the next start/stop
+
+export interface TeleopSnapshot {
+  state: TeleopSessionState
+  source: TeleopSourceId | null
+  session_id: string | null
+  mode: 'managed' | 'external' | null
+  engaged: boolean
+  ramping: boolean
+  tracking: 'ok' | 'lost'
+  calibrating: { done: boolean; frames: number; needed: number } | null
+  child: {
+    mode: string | null
+    pid: number | null
+    connected: boolean
+  } | null
+  stats: {
+    ingress_fps?: number
+    retarget_ms?: number
+    target_hz: number | null
+    last_target_age_ms: number | null
+  }
+  config: Record<string, unknown>
+  availability: { available: boolean; detail: string | null }
+  // Last automatic transition, e.g. "auto-disengaged — tracking lost for
+  // 10s". Cleared on the next engage/stop/start.
+  notice: string | null
+  error: string | null
+}
+
+export interface TeleopSourceAvailability {
+  installed: boolean
+  ready: boolean
+  detail: string | null
+}
+
+export interface TeleopCamera {
+  index: number
+  name: string | null // host camera name (macOS), e.g. "FaceTime HD Camera"
+  width: number | null
+  height: number | null
+  // False: the OS knows this camera but the probe couldn't open it — e.g.
+  // an iPhone Continuity Camera that's asleep. Selectable anyway.
+  available: boolean
+}
+
+export interface TeleopSourcesInfo {
+  runner: { available: boolean; detail: string | null }
+  sources: Record<TeleopSourceId, TeleopSourceAvailability>
+  cameras: TeleopCamera[] | null // null = never scanned
+  default_camera_index: number | null // built-in preferred over Continuity
 }
 
 // ----- library: poses / trajectories / demos (orca_ui/library.py) -----------
@@ -180,6 +263,10 @@ export const TOPICS = {
   jointsCorrection: 'joints.correction',
   motorsTelemetry: 'motors.telemetry',
   stats: 'stats',
+  teleopState: 'teleop.state',
+  teleopTargets: 'teleop.targets',
+  teleopLog: 'teleop.log',
+  teleopPreview: 'teleop.preview',
 } as const
 
 export interface ServerMessage {

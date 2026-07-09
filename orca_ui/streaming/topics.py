@@ -26,12 +26,23 @@ JOINTS_CORRECTION = "joints.correction"
 MOTORS_TELEMETRY = "motors.telemetry"
 STATS = "stats"
 
+# Teleoperation. teleop.targets streams the retargeter's (clamped) output in
+# preview AND engaged — the 3D ghost renders raw intent while joints.target
+# carries the post-arbiter ramped command. teleop.log is cumulative like
+# operation.log; teleop.preview carries base64 JPEG camera frames (opt-in
+# subscription on the frontend).
+TELEOP_STATE = "teleop.state"
+TELEOP_TARGETS = "teleop.targets"
+TELEOP_LOG = "teleop.log"
+TELEOP_PREVIEW = "teleop.preview"
+
 ALL_TOPICS = [
     STATUS, CONTROL_STATE, ERROR,
     OPERATION_STATE, OPERATION_LOG,
     TACTILE_FORCES, TACTILE_TAXELS,
     JOINTS_MEASURED, JOINTS_ESTIMATE, JOINTS_TARGET, JOINTS_CORRECTION,
     MOTORS_TELEMETRY, STATS,
+    TELEOP_STATE, TELEOP_TARGETS, TELEOP_LOG, TELEOP_PREVIEW,
 ]
 
 # Broadcast min-interval in seconds (rate ceiling toward the browser).
@@ -39,6 +50,8 @@ MIN_INTERVAL_S = {
     JOINTS_MEASURED: 1.0 / 60.0,
     TACTILE_FORCES: 1.0 / 30.0,
     TACTILE_TAXELS: 1.0 / 30.0,
+    TELEOP_TARGETS: 1.0 / 30.0,
+    TELEOP_PREVIEW: 1.0 / 10.0,
 }
 
 BROADCAST_TICK_S = 1.0 / 60.0
