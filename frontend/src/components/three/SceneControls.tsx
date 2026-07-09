@@ -36,59 +36,74 @@ export function SceneControls({
     }
   }
 
+  // Toggles for layers the connected hand can't produce are hidden outright
+  // (not disabled) — a greyed-out "taxel forces" only confuses the owner of a
+  // sensorless hand. The ghost compares the motor estimate against the
+  // measured pose, so it needs both motors and encoders to mean anything.
+  const showGhost = Boolean(caps?.motors && caps?.encoders)
+  const showForces = Boolean(caps?.tactile)
+  const showGlow = Boolean(caps?.encoders)
+  const anyToggle = showGhost || showForces || showGlow || teleopActive
+
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-      <div className="toolbar">
-        <label className="toggle-label" title="translucent hand posed from the naive motor estimate">
-          <input
-            type="checkbox"
-            checked={scene.ghost}
-            onChange={(e) => setScene({ ghost: e.target.checked })}
-            disabled={!caps?.motors}
-          />
-          ghost (motor estimate)
-        </label>
-        <label className="toggle-label" title="one resultant-force arrow per finger, at the sensor">
-          <input
-            type="checkbox"
-            checked={scene.forceResultant}
-            onChange={(e) => setScene({ forceResultant: e.target.checked })}
-            disabled={!caps?.tactile}
-          />
-          resultant force
-        </label>
-        <label className="toggle-label" title="one arrow per taxel (needs the taxel or combined stream mode)">
-          <input
-            type="checkbox"
-            checked={scene.forceTaxels}
-            onChange={(e) => setScene({ forceTaxels: e.target.checked })}
-            disabled={!caps?.tactile}
-          />
-          taxel forces
-        </label>
-        <label className="toggle-label" title="joint rings colored by tracking error">
-          <input
-            type="checkbox"
-            checked={scene.jointGlow}
-            onChange={(e) => setScene({ jointGlow: e.target.checked })}
-            disabled={!caps?.encoders}
-          />
-          joint glow
-        </label>
-        {teleopActive && (
-          <label
-            className="toggle-label"
-            title="cyan ghost posed from the live teleop retargeter output"
-          >
-            <input
-              type="checkbox"
-              checked={scene.teleopGhost}
-              onChange={(e) => setScene({ teleopGhost: e.target.checked })}
-            />
-            teleop ghost
-          </label>
-        )}
-      </div>
+      {anyToggle && (
+        <div className="toolbar">
+          {showGhost && (
+            <label className="toggle-label" title="translucent hand posed from the naive motor estimate">
+              <input
+                type="checkbox"
+                checked={scene.ghost}
+                onChange={(e) => setScene({ ghost: e.target.checked })}
+              />
+              ghost (motor estimate)
+            </label>
+          )}
+          {showForces && (
+            <label className="toggle-label" title="one resultant-force arrow per finger, at the sensor">
+              <input
+                type="checkbox"
+                checked={scene.forceResultant}
+                onChange={(e) => setScene({ forceResultant: e.target.checked })}
+              />
+              resultant force
+            </label>
+          )}
+          {showForces && (
+            <label className="toggle-label" title="one arrow per taxel (needs the taxel or combined stream mode)">
+              <input
+                type="checkbox"
+                checked={scene.forceTaxels}
+                onChange={(e) => setScene({ forceTaxels: e.target.checked })}
+              />
+              taxel forces
+            </label>
+          )}
+          {showGlow && (
+            <label className="toggle-label" title="joint rings colored by tracking error">
+              <input
+                type="checkbox"
+                checked={scene.jointGlow}
+                onChange={(e) => setScene({ jointGlow: e.target.checked })}
+              />
+              joint glow
+            </label>
+          )}
+          {teleopActive && (
+            <label
+              className="toggle-label"
+              title="cyan ghost posed from the live teleop retargeter output"
+            >
+              <input
+                type="checkbox"
+                checked={scene.teleopGhost}
+                onChange={(e) => setScene({ teleopGhost: e.target.checked })}
+              />
+              teleop ghost
+            </label>
+          )}
+        </div>
+      )}
 
       {handInfo?.mock && (
         <div className="toolbar" title="drive one joint through its ROM to verify the 3D sign/offset calibration">

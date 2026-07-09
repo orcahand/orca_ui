@@ -183,7 +183,9 @@ function HandRig({
       }
 
       if (rig.ghost) {
-        const showGhost = scene.ghost && caps.motors
+        // Without encoders the main hand already shows the motor estimate,
+        // so the ghost would just duplicate it — needs both to mean anything.
+        const showGhost = scene.ghost && caps.motors && caps.encoders
         rig.ghost.visible = showGhost
         if (showGhost) rig.ghostAdapter?.apply(frames.joints.estimate)
       }

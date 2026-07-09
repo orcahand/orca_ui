@@ -28,12 +28,23 @@ export default function App() {
   const view = useAppStore((s) => s.view)
   const wsConnected = useAppStore((s) => s.wsConnected)
   const handState = useAppStore((s) => s.status?.state ?? null)
+  const caps = useAppStore((s) => s.status?.capabilities ?? null)
 
   useEffect(() => {
     startStreamClient()
     api.status().then(useAppStore.getState().setStatus).catch(() => undefined)
     api.handInfo().then(useAppStore.getState().setHandInfo).catch(() => undefined)
   }, [])
+
+  // A sensorless hand has no Dashboard (AppHeader hides the tab); the 3D
+  // view is its front page. Runs on every caps update so it also covers a
+  // reconnect that swaps a sensored hand for a sensorless one.
+  const sensorless = caps !== null && !caps.tactile && !caps.encoders
+  useEffect(() => {
+    if (sensorless && useAppStore.getState().view === 'dashboard') {
+      useAppStore.getState().setView('3d')
+    }
+  }, [sensorless])
 
   const booting =
     !wsConnected || handState === null || BOOT_STATES.has(handState)
