@@ -52,7 +52,7 @@ def build_maintenance_hand(config_path: str, stop_event: threading.Event,
     last_message = ""
     while True:
         try:
-            ok, last_message = hand.connect()
+            ok, last_message = hand.connect(interactive=False)
         except Exception as e:
             ok, last_message = False, str(e)
         if ok:
