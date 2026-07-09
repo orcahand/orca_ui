@@ -5,6 +5,7 @@ import { api } from '../../api/rest'
 import { useAppStore } from '../../state/appStore'
 import { Panel } from '../common/Panel'
 import { MotorPanel } from '../motors/MotorPanel'
+import { CameraPreview } from '../teleop/CameraPreview'
 import type { HandAssets } from '../three/HandScene'
 import { HandScene } from '../three/HandScene'
 import { SceneControls } from '../three/SceneControls'
@@ -85,7 +86,11 @@ export function ThreeDView() {
           <HandScene assets={assets} joints={handInfo.joints} caps={caps} />
         </div>
       </Panel>
-      {caps.motors && <MotorPanel />}
+      {/* CameraPreview self-hides unless a camera teleop session is live. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {caps.motors && <MotorPanel />}
+        <CameraPreview />
+      </div>
     </div>
   )
 }

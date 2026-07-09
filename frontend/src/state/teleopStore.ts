@@ -7,6 +7,7 @@
 // operationStore (operationStore imports us for useStartGate).
 
 import { create } from 'zustand'
+import { api } from '../api/rest'
 import type {
   OperationLogLine,
   OperationLogPayload,
@@ -34,6 +35,9 @@ export interface TeleopDraft {
   // rmsprop: ~12 ms/frame on CPU (fits 30 Hz). adaptive_analytical: higher
   // quality but ~100 ms/frame on CPU-only machines (~10 Hz teleop).
   retargeter: 'rmsprop' | 'adaptive_analytical'
+  // One-click teleop: when the session reaches preview, enable torque and
+  // engage automatically instead of requiring three separate clicks.
+  auto_engage: boolean
 }
 
 const DRAFT_DEFAULTS: TeleopDraft = {
@@ -46,6 +50,7 @@ const DRAFT_DEFAULTS: TeleopDraft = {
   avp_ip: '',
   manual_wrist_deg: 0,
   retargeter: 'rmsprop',
+  auto_engage: true,
 }
 
 const storedDraft = ((): TeleopDraft => {
@@ -78,6 +83,9 @@ interface TeleopStoreState {
   // External-mode token from the last start (shown once so the user can
   // launch a remote streamer with it).
   externalToken: string | null
+  // Armed by Start when the auto-engage draft option is on; consumed on the
+  // first transition into preview (enable torque, then engage).
+  autoEngagePending: boolean
   draft: TeleopDraft
   logRunId: string | null
   logLines: OperationLogLine[]
@@ -85,14 +93,33 @@ interface TeleopStoreState {
   setSession(session: TeleopSnapshot): void
   setSources(info: TeleopSourcesInfo | null): void
   setExternalToken(token: string | null): void
+  setAutoEngagePending(pending: boolean): void
   setDraft(patch: Partial<TeleopDraft>): void
   mergeLog(payload: OperationLogPayload): void
+}
+
+// Torque on (if needed), then engage. Fired once per session on entering
+// preview; the backend re-validates everything, we just surface failures.
+function runAutoEngage() {
+  const { status, control, setError } = useAppStore.getState()
+  if (!status?.capabilities?.motors) return // camera-only preview: no hand to drive
+  const torqueReady = control?.torque_enabled
+    ? Promise.resolve(undefined)
+    : api.torqueEnable().then(() => undefined)
+  torqueReady
+    .then(() => api.teleopEngage())
+    .catch((error) =>
+      setError(
+        `auto-engage failed: ${String((error as Error).message ?? error)} — use ⚡ Engage manually`,
+      ),
+    )
 }
 
 export const useTeleopStore = create<TeleopStoreState>((set, get) => ({
   session: null,
   sources: null,
   externalToken: null,
+  autoEngagePending: false,
   draft: storedDraft,
   logRunId: null,
   logLines: [],
@@ -100,6 +127,14 @@ export const useTeleopStore = create<TeleopStoreState>((set, get) => ({
   setSession: (session) => {
     const previous = get().session
     set({ session })
+    if (get().autoEngagePending) {
+      if (session.state === 'preview') {
+        set({ autoEngagePending: false })
+        runAutoEngage()
+      } else if (session.state === 'error' || session.state === 'idle') {
+        set({ autoEngagePending: false })
+      }
+    }
     const changed =
       !previous ||
       previous.session_id !== session.session_id ||
@@ -126,6 +161,7 @@ export const useTeleopStore = create<TeleopStoreState>((set, get) => ({
 
   setSources: (info) => set({ sources: info }),
   setExternalToken: (token) => set({ externalToken: token }),
+  setAutoEngagePending: (pending) => set({ autoEngagePending: pending }),
 
   setDraft: (patch) =>
     set((state) => {

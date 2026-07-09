@@ -4,6 +4,7 @@
 import { useState } from 'react'
 import { api } from '../../api/rest'
 import { useAppStore } from '../../state/appStore'
+import { isTeleopActive, useTeleopStore } from '../../state/teleopStore'
 
 export function SceneControls({
   onReloadCalibration,
@@ -17,6 +18,7 @@ export function SceneControls({
   const setError = useAppStore((s) => s.setError)
   const [sweeping, setSweeping] = useState<string | null>(null)
   const [sweepJoint, setSweepJoint] = useState('index_mcp')
+  const teleopActive = useTeleopStore((s) => isTeleopActive(s.session))
 
   const caps = status?.capabilities
 
@@ -73,18 +75,19 @@ export function SceneControls({
           />
           joint glow
         </label>
-        <label
-          className="toggle-label"
-          title="cyan ghost posed from the live teleop retargeter output —
-            self-hides when no teleop session is streaming"
-        >
-          <input
-            type="checkbox"
-            checked={scene.teleopGhost}
-            onChange={(e) => setScene({ teleopGhost: e.target.checked })}
-          />
-          teleop ghost
-        </label>
+        {teleopActive && (
+          <label
+            className="toggle-label"
+            title="cyan ghost posed from the live teleop retargeter output"
+          >
+            <input
+              type="checkbox"
+              checked={scene.teleopGhost}
+              onChange={(e) => setScene({ teleopGhost: e.target.checked })}
+            />
+            teleop ghost
+          </label>
+        )}
       </div>
 
       {handInfo?.mock && (

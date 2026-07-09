@@ -56,10 +56,23 @@ export async function loadHandRobot(urdfUrl: string): Promise<URDFRobot> {
   return robot
 }
 
+export interface GhostOptions {
+  color?: number
+  opacity?: number
+  emissiveIntensity?: number
+  // Link names whose meshes are dropped from the ghost (static links like
+  // the tower would just z-fight with the solid hand's identical geometry).
+  hideLinks?: string[]
+}
+
 export function makeGhost(
   robot: URDFRobot,
-  color = 0x7f8ea2,
-  opacity = 0.22,
+  {
+    color = 0x7f8ea2,
+    opacity = 0.22,
+    emissiveIntensity = 0,
+    hideLinks = [],
+  }: GhostOptions = {},
 ): URDFRobot | null {
   const ghost = robot.clone(true) as URDFRobot
   // URDFRobot.clone rebuilds the joint map; verify before trusting it.
@@ -69,17 +82,44 @@ export function makeGhost(
   }
   const material = new THREE.MeshStandardMaterial({
     color,
+    // Self-lit ghosts (teleop) stay recognizably colored from any angle
+    // instead of washing out to gray under the scene lights.
+    emissive: emissiveIntensity > 0 ? color : 0x000000,
+    emissiveIntensity,
     transparent: true,
     opacity,
     depthWrite: false,
     side: THREE.FrontSide,
+    // Pull the ghost toward the camera in the depth test: when it exactly
+    // coincides with the solid hand the coplanar surfaces would otherwise
+    // z-fight and flicker.
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
   })
+  const hidden = new Set(hideLinks)
   ghost.traverse((object) => {
     const mesh = object as THREE.Mesh
-    if (mesh.isMesh) {
-      mesh.material = material
-      mesh.renderOrder = 10
+    if (!mesh.isMesh) return
+    if (hidden.size > 0 && hidden.has(owningLinkName(mesh))) {
+      mesh.visible = false
+      return
     }
+    mesh.material = material
+    mesh.renderOrder = 10
   })
   return ghost
+}
+
+// Nearest URDF link up the parent chain — links nest through joints, so a
+// mesh's owning link is the first ancestor flagged isURDFLink.
+function owningLinkName(mesh: THREE.Object3D): string {
+  let node: THREE.Object3D | null = mesh
+  while (node) {
+    if ((node as unknown as { isURDFLink?: boolean }).isURDFLink) {
+      return node.name
+    }
+    node = node.parent
+  }
+  return ''
 }

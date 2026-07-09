@@ -75,7 +75,14 @@ function HandRig({
           .setFromObject(robot)
           .getBoundingSphere(new THREE.Sphere())
         const ghost = makeGhost(robot)
-        const teleopGhost = makeGhost(robot, 0x22d3ee, 0.25)
+        // Emissive cyan so it can't be confused with the gray motor ghost;
+        // the static tower/forearm never move, so ghosting them adds nothing.
+        const teleopGhost = makeGhost(robot, {
+          color: 0x22d3ee,
+          opacity: 0.45,
+          emissiveIntensity: 0.6,
+          hideLinks: ['tower', 'forearm'],
+        })
         built = {
           robot,
           ghost,

@@ -81,14 +81,21 @@ export function SessionCard() {
     if (draft.source === 'avp') config.avp_ip = draft.avp_ip
     if (draft.source !== 'synthetic') config.retargeter = draft.retargeter
     const mode = draft.external ? 'external' : 'managed'
+    // Armed before the call: the preview transition can arrive over the WS
+    // before the start request resolves.
+    useTeleopStore.getState().setAutoEngagePending(draft.auto_engage)
     api
       .teleopStart(draft.source, mode, config)
       .then((body) => setExternalToken(body.token ?? null))
-      .catch(fail)
+      .catch((error) => {
+        useTeleopStore.getState().setAutoEngagePending(false)
+        fail(error)
+      })
   }
 
   const stop = () => {
     setExternalToken(null)
+    useTeleopStore.getState().setAutoEngagePending(false)
     void api.teleopStop().catch(fail)
   }
 
@@ -184,13 +191,27 @@ export function SessionCard() {
 
       <div className="setup-card-row">
         {!active ? (
-          <button
-            className="btn btn-primary"
-            disabled={!wsConnected}
-            onClick={start}
-          >
-            ▶ Start preview
-          </button>
+          <>
+            <button
+              className="btn btn-primary"
+              disabled={!wsConnected}
+              onClick={start}
+            >
+              {draft.auto_engage ? '▶ Start teleop' : '▶ Start preview'}
+            </button>
+            <label
+              className="toggle-label"
+              title="when the preview comes up, enable torque and engage
+                automatically — one click instead of three"
+            >
+              <input
+                type="checkbox"
+                checked={draft.auto_engage}
+                onChange={(e) => setDraft({ auto_engage: e.target.checked })}
+              />
+              auto-engage
+            </label>
+          </>
         ) : (
           <>
             {!engaged ? (
