@@ -11,10 +11,11 @@ from __future__ import annotations
 
 from orca_core.hand_config import OrcaHandConfig, OrcaHandTouchConfig
 from orca_core.hardware.mock_hand_serial_link import MockHandSerialLink
-from orca_core.hardware_hand import MockOrcaHand, MockOrcaHandTouch
-from orca_core.hardware_hand_joint_feedback import (
+from orca_core import (
+    MockOrcaHand,
     MockOrcaHandFull,
     MockOrcaHandJointFeedback,
+    MockOrcaHandTouch,
 )
 from orca_core.utils.utils import read_yaml
 

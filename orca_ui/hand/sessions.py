@@ -26,11 +26,7 @@ from orca_core.hardware.joint_encoder_client import (
     EncodersNotAvailableError,
     JointEncoderClient,
 )
-from orca_core.hardware_hand import OrcaHand
-from orca_core.hardware_hand_joint_feedback import (
-    JointFeedbackConnectError,
-    OrcaHandJointFeedback,
-)
+from orca_core import JointFeedbackConnectError, OrcaHand, OrcaHandJointFeedback
 
 from orca_ui.hand.detection import HardwarePresence, probe_hardware
 from orca_ui.hand.states import Capabilities
@@ -227,7 +223,7 @@ def _connect_mock(settings: UiSettings, declared: dict) -> HandSession:
     hand = build_mock_hand(settings.config_path,
                            engage_feedback=settings.engage_feedback)
     try:
-        ok, msg = hand.connect()
+        ok, msg = hand.connect(interactive=False)
     except (JointFeedbackConnectError, RuntimeError) as e:
         raise SessionConnectError(f"mock connect failed: {e}")
     if not ok:
@@ -273,7 +269,7 @@ def _connect_with_motors(settings, config, declared, presence: HardwarePresence)
         tier = _tier_name(feedback, tactile)
         hand = _build_hand(settings, config, feedback, tactile)
         try:
-            ok, msg = hand.connect()
+            ok, msg = hand.connect(interactive=False)
         except (JointFeedbackConnectError, RuntimeError) as e:
             attempts.append(f"{tier}: {e}")
             logger.warning("connect tier %s failed: %s", tier, e)

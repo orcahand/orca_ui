@@ -24,7 +24,6 @@ from orca_ui.hand.sessions import (
     connect_session,
     declared_capabilities,
 )
-from orca_ui.hand.shims import neutralize_interactive_picker
 from orca_ui.hand.states import Capabilities, HandState, StatusSnapshot
 from orca_ui.settings import UiSettings
 
@@ -64,7 +63,6 @@ class HandSupervisor(threading.Thread):
         on_error: Callable[[str], None] | None = None,
     ):
         super().__init__(name="HandSupervisor", daemon=True)
-        neutralize_interactive_picker()
         self._settings = settings
         self._on_status = on_status or (lambda snapshot: None)
         self._on_session_ready = on_session_ready or (lambda session: None)

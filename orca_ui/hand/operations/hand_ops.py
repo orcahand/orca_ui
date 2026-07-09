@@ -45,7 +45,7 @@ def build_maintenance_hand(config_path: str, stop_event: threading.Event,
     refuses to calibrate. Port-open is retried briefly to absorb the OS
     serial release latency after the supervisor closed the session.
     """
-    from orca_core.hardware_hand import OrcaHand
+    from orca_core import OrcaHand
 
     hand = OrcaHand(config_path=config_path)
     deadline = time.monotonic() + retry_s

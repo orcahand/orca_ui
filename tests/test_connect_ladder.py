@@ -3,7 +3,7 @@
 import pytest
 
 from orca_core.hardware.sensing.serial_discovery import SensingPorts
-from orca_core.hardware_hand_joint_feedback import JointFeedbackConnectError
+from orca_core import JointFeedbackConnectError
 
 import orca_ui.hand.sessions as sessions
 from orca_ui.hand.detection import HardwarePresence
@@ -23,7 +23,7 @@ class FakeHand:
         self._tactile_client = object() if tactile else None
         self._loop = object() if feedback else None
 
-    def connect(self):
+    def connect(self, interactive: bool = True):
         behavior = self._script.get((self.feedback, self.tactile), "ok")
         if behavior == "raise":
             raise JointFeedbackConnectError("no encoder calibration")
