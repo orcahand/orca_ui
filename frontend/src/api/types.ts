@@ -41,6 +41,11 @@ export interface JointInfo {
   // null: unknown (no session yet) or not an encoder joint. false: the joint
   // has an encoder but no calibration anchor — raw counts can't be decoded.
   encoder_calibrated: boolean | null
+  // true: the feedback loop closes on this joint. false: the loop skipped it
+  // at connect (incomplete motor/encoder calibration) — it runs open-loop
+  // until recalibrated. null: no loop at this tier, or the loop never
+  // targets it by design (e.g. the wrist).
+  loop_controlled: boolean | null
 }
 
 // Who owns the joint-target channel. TELEOP is reserved for orca_teleop.

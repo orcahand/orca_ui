@@ -262,6 +262,14 @@ class HandSupervisor(threading.Thread):
             self._backoff = min(self._backoff * 1.5, DETECT_BACKOFF_MAX_S)
             return delay
 
+        # Enforce the auto-connect contract physically, not just in the flag:
+        # motor clients historically enabled torque inside connect().
+        if session.caps.motors:
+            try:
+                session.hand.disable_torque()
+            except Exception:
+                logger.exception("post-connect torque disable failed")
+
         with self._lock:
             self._session = session
             self._torque_enabled = False

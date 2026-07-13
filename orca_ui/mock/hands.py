@@ -51,6 +51,15 @@ class _PumpOwner:
         self._start_pump(TactilePump(link, state))
 
     def _instrument_encoders(self, link: MockHandSerialLink) -> None:
+        # orca_core's Mock*JointFeedback starts a built-in keepalive pump that
+        # feeds fixed all-zero AA A9 frames. Zero counts carry valid (zero)
+        # parity, so they race our real-count frames on the same link and the
+        # joint loop intermittently anchors to the garbage decode. One writer:
+        # stop the keepalive; our pump satisfies the freshness watchdog.
+        builtin = getattr(self, "_encoder_pump", None)
+        if builtin is not None:
+            builtin.stop()
+            self._encoder_pump = None
         self._start_pump(EncoderPump(link, self))
 
 

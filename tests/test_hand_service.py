@@ -135,8 +135,16 @@ def test_wrist_is_measured_and_follows_commands(service):
 
 def test_hand_info_reports_encoder_calibration_state(service):
     info = service.hand_info()
+    loop_joints = set(service.session.hand.loop_joint_names or [])
     for joint in info["joints"]:
         if joint["encoder_backed"]:
             assert joint["encoder_calibrated"] is True  # mock model is complete
         else:
             assert joint["encoder_calibrated"] is None
+        # loop_controlled: True for loop joints, None for everything the loop
+        # doesn't target by design (wrist, non-encoder joints); False only
+        # for connect-time skips, which the complete mock model never has.
+        if joint["id"] in loop_joints:
+            assert joint["loop_controlled"] is True
+        else:
+            assert joint["loop_controlled"] is None

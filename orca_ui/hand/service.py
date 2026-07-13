@@ -149,6 +149,19 @@ class HandService:
                     session.hand.calibration.joint_encoder_calibration_dict or {})
             except Exception:
                 encoder_calibrated = None
+        # loop_controlled: True = the feedback loop closes on this joint;
+        # False = the loop skipped it at connect (incomplete calibration) and
+        # it runs open-loop; None = not applicable (no loop at this tier, or
+        # the loop never targets it by design — e.g. the wrist).
+        loop_joints: set | None = None
+        loop_skipped: set = set()
+        if session is not None and session.caps.feedback_loop:
+            try:
+                loop_joints = set(session.hand.loop_joint_names or [])
+                loop_skipped = set(session.hand.loop_skipped_joints)
+            except Exception:
+                loop_joints = None
+                loop_skipped = set()
         joints = [
             {
                 "id": joint,
@@ -158,6 +171,11 @@ class HandService:
                 "encoder_calibrated": (
                     None if encoder_calibrated is None or joint not in encoder_backed
                     else joint in encoder_calibrated
+                ),
+                "loop_controlled": (
+                    True if loop_joints is not None and joint in loop_joints
+                    else False if joint in loop_skipped
+                    else None
                 ),
             }
             for joint in config.joint_ids

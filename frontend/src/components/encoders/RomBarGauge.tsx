@@ -18,6 +18,10 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 export function RomBarGauge({ joint }: { joint: JointInfo }) {
   const [min, max] = joint.rom
   const span = max - min
+  // Encoder present but unusable (no anchor) or excluded from the feedback
+  // loop (incomplete calibration): the joint runs open-loop — flag the row.
+  const degraded =
+    joint.encoder_calibrated === false || joint.loop_controlled === false
   const frac = (v: number) => clamp((v - min) / span, 0, 1)
   const zeroFrac = frac(0)
 
@@ -108,9 +112,9 @@ export function RomBarGauge({ joint }: { joint: JointInfo }) {
           y={2}
           width={W}
           height={10}
-          fill="rgba(255,255,255,0.04)"
-          stroke="rgba(255,255,255,0.08)"
-          strokeWidth={0.4}
+          fill={degraded ? 'rgba(212,135,138,0.12)' : 'rgba(255,255,255,0.04)'}
+          stroke={degraded ? COLORS.err : 'rgba(255,255,255,0.08)'}
+          strokeWidth={degraded ? 0.8 : 0.4}
         />
         <rect ref={fillRef} x={zeroFrac * W} y={2} width={0.001} height={10}
               fill={COLORS.accent} opacity={0.55} />
@@ -139,17 +143,33 @@ export function RomBarGauge({ joint }: { joint: JointInfo }) {
       {joint.encoder_calibrated === false ? (
         <span
           title="This joint's encoder streams raw counts, but no calibration
-anchor exists to convert them into an angle. Run orca_core's calibration
-with joint feedback to record the anchors."
+anchor exists to convert them into an angle. It runs on open-loop motor
+control. Run calibration with joint feedback to record the anchors."
           style={{
             width: 52,
-            color: 'var(--warn)',
+            color: 'var(--err)',
             fontSize: 9,
             textAlign: 'right',
             cursor: 'help',
           }}
         >
           no cal
+        </span>
+      ) : joint.loop_controlled === false ? (
+        <span
+          title="This joint's calibration is incomplete (missing motor limits,
+ratio, or a trustworthy encoder anchor), so the feedback loop skipped it —
+it runs on open-loop motor control until recalibrated. The angle shown may
+be wrong."
+          style={{
+            width: 52,
+            color: 'var(--err)',
+            fontSize: 9,
+            textAlign: 'right',
+            cursor: 'help',
+          }}
+        >
+          open loop
         </span>
       ) : (
         <span

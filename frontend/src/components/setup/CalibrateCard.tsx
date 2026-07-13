@@ -26,11 +26,16 @@ function fail(error: unknown) {
 
 function statusMark(joint: JointInfo): { text: string; cls: string } {
   if (!joint.encoder_backed) return { text: 'no enc', cls: 'na' }
-  if (joint.encoder_calibrated === true) {
-    return { text: 'cal ✓ · enc ✓', cls: 'ok' }
-  }
   if (joint.encoder_calibrated === false) {
     return { text: 'enc ✓ · no cal', cls: 'bad' }
+  }
+  // Anchor present but the feedback loop skipped the joint at connect:
+  // its motor calibration is incomplete — it runs open-loop.
+  if (joint.loop_controlled === false) {
+    return { text: 'cal ✗ · open loop', cls: 'bad' }
+  }
+  if (joint.encoder_calibrated === true) {
+    return { text: 'cal ✓ · enc ✓', cls: 'ok' }
   }
   return { text: 'enc ✓ · cal ?', cls: 'na' }
 }
