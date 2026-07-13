@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 
 from orca_ui.settings import UiSettings
 
@@ -96,6 +97,16 @@ def resolve_config_path(args: argparse.Namespace) -> str:
         return materialize_mock_model()
 
     model_name = args.model or (f"orcahand-{args.side}" if args.side else None)
+    if model_name is None:
+        # Plug-and-play: nothing was specified, so ask the connected board which
+        # hand it is. detect_hand() degrades to the default model when nothing is
+        # plugged in, so this never blocks a headless/no-hardware start.
+        try:
+            from orca_core.hand_factory import detect_hand
+            model_name = detect_hand().model_name
+            print(f"No model given — auto-detected {model_name}.", file=sys.stderr)
+        except Exception as e:
+            print(f"Hand autodetection failed ({e}); using the default model.", file=sys.stderr)
     # Same resolver load_hand() uses, so --model names match orca_core's docs.
     from orca_core.hand_config import _resolve_config_path
     try:
