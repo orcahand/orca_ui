@@ -17,15 +17,18 @@ dependencies = [
     "pyserial>=3.5,<4.0.0",
     "pyyaml>=6,<7",
     "numpy>=1.24",
+    # MCP server (orca_ui/mcp): agent access to the running backend.
+    "mcp>=1.12,<2",
+    "httpx>=0.27",
 ]
 
 [project.scripts]
 orca-ui = "orca_ui.cli:main"
+orca-ui-mcp = "orca_ui.mcp.cli:main"
 
 [dependency-groups]
 dev = [
     "pytest>=8.3.5,<9.0.0",
-    "httpx>=0.27",
 ]
 # Only needed to (re)build the 3D hand asset bundle (scripts/build_hand_bundle.py).
 assets = [

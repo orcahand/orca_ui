@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "orca-hand": {
+      "command": "uv",
+      "args": ["run", "orca-ui-mcp"]
+    }
+  }
+}

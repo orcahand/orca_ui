@@ -122,6 +122,49 @@ loop genuinely converges on slider targets. Useful for UI development, demos,
 and CI. Mock mode adds a joint-sweep tool in the 3D view for verifying the
 model calibration.
 
+## MCP server
+
+`orca-ui-mcp` exposes the running console to MCP clients (Claude Code, etc.)
+so AI agents can operate the hand: read telemetry, command poses, run
+operations, debug. It is a pure HTTP/WebSocket client of the backend — the
+same API the browser uses — so agents and the browser coexist under the same
+arbitration (control ownership, torque gates, e-stop), and the backend stays
+the single owner of the hardware.
+
+Start the backend first, then the MCP server:
+
+```bash
+uv run orca-ui --mock --no-browser   # or `uv run orca-ui` for hardware
+uv run orca-ui-mcp                   # stdio; started automatically by clients
+```
+
+Claude Code picks up `.mcp.json` in this repo automatically; elsewhere,
+register with `claude mcp add orca-hand -- uv run orca-ui-mcp`. The MCP
+server boots fine with no backend running — tools return a "backend not
+reachable" hint until it is up. Flags: `--url` (or `ORCA_UI_URL`, default
+`http://127.0.0.1:5001`), `--timeout`, `--read-only` (observation tools plus
+e-stop only), `--require-mock` (refuse mutations unless the backend reports a
+mock hand — for unattended runs).
+
+22 tools, grouped: status/telemetry reads (`orca_get_status`,
+`orca_get_hand_info`, `orca_read_telemetry`, `orca_get_camera_preview`,
+`orca_list_library`, `orca_get_operation`), connection & safety
+(`orca_estop`, `orca_reconnect`, `orca_set_torque`, `orca_set_max_current`,
+`orca_park`), motion (`orca_set_joints` — ROM-clamped, convergence-verified;
+`orca_apply_pose`), library writes (`orca_save_pose`, `orca_delete_asset`),
+operations (`orca_start_operation`, `orca_control_operation`,
+`orca_send_operation_input`), tactile (`orca_configure_tactile`), and teleop
+(`orca_teleop_start`, `orca_teleop_engage`, `orca_teleop_stop`). Run `/mcp`
+in Claude Code to inspect the live catalog.
+
+Safety model: motion needs torque explicitly enabled; nothing enables it
+implicitly. On real hardware the first torque enable, maintenance operations
+(calibrate/tension), teleop engage, and current-limit raises require a
+`confirm` argument — against `--mock` the gates are inactive, so develop
+there. De-escalation (e-stop, torque off, `orca_park`, stop/disengage) is
+never gated. Assembly-time tools (`configure_chain`, `wizard`) and PID gain
+tuning are deliberately not exposed.
+
 ## Development
 
 ```bash
