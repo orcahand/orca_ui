@@ -1,16 +1,12 @@
 // Layer toggles for the 3D view + the mock-only joint-sweep dev panel used
-// to verify per-joint sign/offset calibration.
+// to verify each joint's motion direction against the URDF.
 
 import { useState } from 'react'
 import { api } from '../../api/rest'
 import { useAppStore } from '../../state/appStore'
 import { isTeleopActive, useTeleopStore } from '../../state/teleopStore'
 
-export function SceneControls({
-  onReloadCalibration,
-}: {
-  onReloadCalibration: () => void
-}) {
+export function SceneControls() {
   const scene = useAppStore((s) => s.scene)
   const setScene = useAppStore((s) => s.setScene)
   const status = useAppStore((s) => s.status)
@@ -106,7 +102,7 @@ export function SceneControls({
       )}
 
       {handInfo?.mock && (
-        <div className="toolbar" title="drive one joint through its ROM to verify the 3D sign/offset calibration">
+        <div className="toolbar" title="drive one joint through its ROM to verify its 3D motion direction">
           <label className="toggle-label" style={{ gap: 6 }}>
             sweep
             <select
@@ -130,14 +126,6 @@ export function SceneControls({
           </button>
         </div>
       )}
-
-      <button
-        className="btn btn-secondary"
-        title="re-read models/hand_v2/joint_calibration.yaml"
-        onClick={onReloadCalibration}
-      >
-        Reload cal
-      </button>
     </div>
   )
 }

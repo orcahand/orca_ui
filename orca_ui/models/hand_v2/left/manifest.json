@@ -2,7 +2,7 @@
   "schema_version": 1,
   "source": {
     "description_path": "/Users/fbourquin/Documents/orca/orcahand_description",
-    "git_sha": "ec4f6ae9e75692357c37e572e5018bfc13c808c5",
+    "git_sha": "921b57407bb280d9e25e1654dd0e3f1f79f2fd9f",
     "dirty": true
   },
   "side": "left",
@@ -54,7 +54,7 @@
   "meshes": {
     "link_forearm.glb": {
       "tris": 3000,
-      "bytes": 55948
+      "bytes": 55940
     },
     "link_tower.glb": {
       "tris": 2068,
@@ -62,62 +62,62 @@
     },
     "link_carpals.glb": {
       "tris": 8000,
-      "bytes": 142544
+      "bytes": 142836
     },
     "link_thumb_tp.glb": {
-      "tris": 1746,
-      "bytes": 32580
+      "tris": 1776,
+      "bytes": 33192
     },
     "link_thumb_ap.glb": {
-      "tris": 2904,
-      "bytes": 53356
+      "tris": 2900,
+      "bytes": 53260
     },
     "link_thumb_pp.glb": {
       "tris": 3000,
-      "bytes": 55672
+      "bytes": 55664
     },
     "link_thumb_dp.glb": {
       "tris": 3000,
       "bytes": 55764
     },
     "link_index_ap.glb": {
-      "tris": 3094,
-      "bytes": 56860
+      "tris": 3036,
+      "bytes": 55672
     },
     "link_index_pp.glb": {
       "tris": 3000,
-      "bytes": 55644
+      "bytes": 55652
     },
     "link_index_fingertip_assembly.glb": {
       "tris": 3226,
-      "bytes": 59880
+      "bytes": 59868
     },
     "link_middle_ap.glb": {
       "tris": 2966,
-      "bytes": 54632
+      "bytes": 54384
     },
     "link_middle_pp.glb": {
       "tris": 3000,
-      "bytes": 55648
+      "bytes": 55652
     },
     "link_middle_fingertip_assembly.glb": {
       "tris": 3226,
-      "bytes": 59880
+      "bytes": 59868
     },
     "link_pinky_ap.glb": {
       "tris": 3110,
-      "bytes": 57120
+      "bytes": 56948
     },
     "link_pinky_pp.glb": {
       "tris": 3000,
-      "bytes": 55640
+      "bytes": 55652
     },
     "link_pinky_fingertip_assembly.glb": {
       "tris": 4142,
-      "bytes": 76368
+      "bytes": 76356
     }
   },
-  "total_tris": 52482,
+  "total_tris": 52450,
   "rest_pose_offsets_deg": {},
   "built_with": "build_hand_bundle.py"
 }

@@ -76,15 +76,3 @@ def test_fingertips_yaml_has_five_fingers(side_dir):
         assert all(isinstance(v, float) and abs(v) < 0.1 for v in anchor)
 
 
-def test_joint_calibration_covers_all_joints():
-    cal = yaml.safe_load((BUNDLE_DIR / "joint_calibration.yaml").read_text())
-    ids = _core_joint_ids()
-    assert ids <= set(cal)
-    for jid in ids:
-        entry = cal[jid]
-        assert entry["sign"] in (1, -1)
-        assert isinstance(entry["offset_deg"], (int, float))
-        # Evidence is provenance text: the build script's ROM classification,
-        # optionally extended with later verification sources.
-        assert entry["evidence"].split(" + ")[0] in {
-            "rom_match", "rom_mirrored", "rom_mismatch", "ambiguous"}

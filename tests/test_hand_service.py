@@ -133,6 +133,37 @@ def test_wrist_is_measured_and_follows_commands(service):
     assert _wait_for(wrist_tracks), service.session.measured_joints()
 
 
+def test_direct_motor_mode_gating_and_moves(service):
+    snapshot = service.motor_snapshot()
+    assert snapshot["direct_mode"] is False
+    assert snapshot["motors"], "expected configured motors"
+    motor = snapshot["motors"][0]
+
+    service.enable_torque()
+
+    # Writes are refused until the mode is armed.
+    with pytest.raises(ServiceError, match="not armed"):
+        service.set_motor_position(motor["id"], motor["position"] + 0.1)
+
+    service.set_direct_motor_mode(True)
+    assert service.control_state()["direct_motor_mode"] is True
+
+    # Joint targets are suspended while armed.
+    with pytest.raises(ServiceError, match="direct motor mode"):
+        service.set_targets({"index_mcp": 10.0})
+
+    # A small move lands; an implausible jump is rejected.
+    moved = service.set_motor_position(motor["id"], motor["position"] + 0.1)
+    assert moved["position"] == pytest.approx(motor["position"] + 0.1)
+    with pytest.raises(ServiceError, match="capped"):
+        service.set_motor_position(motor["id"], moved["position"] + 5.0)
+
+    # Disarm restores normal joint control.
+    service.set_direct_motor_mode(False)
+    assert service.control_state()["direct_motor_mode"] is False
+    service.set_targets({"index_mcp": 10.0})
+
+
 def test_hand_info_reports_encoder_calibration_state(service):
     info = service.hand_info()
     loop_joints = set(service.session.hand.loop_joint_names or [])

@@ -13,6 +13,7 @@ import { useAppStore } from '../../state/appStore'
 import { sendTarget } from '../../state/commandBus'
 import { useControlGate } from '../../state/operationStore'
 import { Panel } from '../common/Panel'
+import { DirectMotorPanel } from './DirectMotorPanel'
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
@@ -54,6 +55,7 @@ export function MotorPanel() {
   const feedback = caps?.feedback_loop ?? false
   const locked = !gate.manualAllowed
   const lockReason = gate.reason ?? undefined
+  const directArmed = control?.direct_motor_mode ?? false
 
   // Initial seed: latch the first available pose (measured, else estimate)
   // so opening the panel never yanks the hand.
@@ -159,13 +161,16 @@ export function MotorPanel() {
             key={joint.id}
             joint={joint}
             value={values[joint.id] ?? clamp(0, joint.rom[0], joint.rom[1])}
-            disabled={!torqueOn || locked}
-            lockReason={lockReason}
+            disabled={!torqueOn || locked || directArmed}
+            lockReason={
+              directArmed ? 'direct motor mode is armed' : lockReason
+            }
             showFeedback={feedback && joint.encoder_backed}
             onSlide={onSlide}
           />
         ))}
       </div>
+      <DirectMotorPanel torqueOn={torqueOn} locked={locked} />
     </Panel>
   )
 }

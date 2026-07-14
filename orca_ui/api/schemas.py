@@ -33,6 +33,15 @@ class TactileModeRequest(BaseModel):
     mode: Literal["resultant", "taxels", "combined"]
 
 
+class DirectMotorModeRequest(BaseModel):
+    enabled: bool
+
+
+class DirectMotorPositionRequest(BaseModel):
+    id: int = Field(ge=0)
+    position: float  # motor position in radians; step-clamped server-side
+
+
 class ZeroRequest(BaseModel):
     num_samples: int = Field(default=100, ge=1, le=2000)
 

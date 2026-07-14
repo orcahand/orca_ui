@@ -17,8 +17,10 @@ from orca_ui.hand.states import ControlSource
 from orca_ui.library import CONTINUOUS, WAYPOINTS, LibraryError
 
 SPEEDS = (0.5, 1.0, 2.0)
-WAYPOINT_SEGMENT_S = 1.5      # synthesized timing for waypoint/demo segments
+WAYPOINT_SPEED_DEG_S = 60.0   # cruise speed for synthesized waypoint segments
+MIN_SEGMENT_S = 0.3           # floor so near-identical waypoints still glide
 WAYPOINT_RATE_HZ = 25.0
+LEAD_IN_MIN_DEG = 2.0         # skip the approach glide when already at start
 PROGRESS_EVERY_S = 0.2
 MAX_LOOP_CYCLES = 1000
 
@@ -36,19 +38,78 @@ def _require_playable(service) -> None:
                            status_code=409)
 
 
+def _segment_frames(start: list, end: list,
+                    rate_hz: float) -> list[list[float]]:
+    """Frames gliding from ``start`` to ``end`` at the cruise speed.
+
+    Segment duration is proportional to the largest joint travel, so short
+    adjustments and long sweeps move at the same angular speed. ``None``
+    entries (unknown start pose or unrecorded joint) pass the end value
+    through untouched — ``play_frames`` drops ``None`` before commanding.
+    """
+    deltas = [abs(b - a) for a, b in zip(start, end)
+              if a is not None and b is not None]
+    segment_s = max(max(deltas, default=0.0) / WAYPOINT_SPEED_DEG_S,
+                    MIN_SEGMENT_S)
+    steps = max(int(segment_s * rate_hz), 1)
+    frames: list[list[float]] = []
+    for step in range(steps):
+        alpha = (step + 1) / steps
+        frames.append([
+            b if a is None or b is None else a + (b - a) * alpha
+            for a, b in zip(start, end)
+        ])
+    return frames
+
+
 def _interpolate(waypoints: list[list[float]],
-                 segment_s: float = WAYPOINT_SEGMENT_S,
                  rate_hz: float = WAYPOINT_RATE_HZ) -> tuple[list[list[float]], float]:
     """Expand sparse waypoints into linearly interpolated frames."""
     frames: list[list[float]] = []
-    steps = max(int(segment_s * rate_hz), 1)
     for start, end in zip(waypoints, waypoints[1:]):
-        for step in range(steps):
-            alpha = (step + 1) / steps
-            frames.append([
-                a + (b - a) * alpha for a, b in zip(start, end)
-            ])
+        frames.extend(_segment_frames(start, end, rate_hz))
     return (frames or list(waypoints)), rate_hz
+
+
+def _lead_in(service, joint_ids: list[str],
+             first_row: list, rate_hz: float) -> list[list[float]]:
+    """Approach glide from the measured pose to the first frame.
+
+    Without it, the first command of playback jumps the hand from wherever
+    it currently is at full motor speed. Empty when the pose is unknown or
+    already within LEAD_IN_MIN_DEG of the start.
+    """
+    session = service.session
+    measured = (session.measured_joints() or {}) if session else {}
+    start = [measured.get(j) for j in joint_ids]
+    deltas = [abs(b - a) for a, b in zip(start, first_row)
+              if a is not None and b is not None]
+    if max(deltas, default=0.0) < LEAD_IN_MIN_DEG:
+        return []
+    return _segment_frames(start, first_row, rate_hz)
+
+
+def _stream(ctx: OpContext, joint_ids: list[str], frames: list[list[float]],
+            dt: float, progress=None) -> None:
+    """Command frames at a fixed cadence, honoring pause/stop."""
+    total = len(frames)
+    next_t = time.monotonic()
+    last_progress = 0.0
+    for index, row in enumerate(frames):
+        ctx.check_stop()
+        ctx.pause_point()
+        angles = {j: float(v) for j, v in zip(joint_ids, row)
+                  if v is not None}
+        ctx.service.set_targets(angles, source=ControlSource.OPERATION)
+        if progress is not None:
+            now = time.monotonic()
+            if now - last_progress >= PROGRESS_EVERY_S or index == total - 1:
+                progress((index + 1) / total)
+                last_progress = now
+        next_t += dt
+        delay = next_t - time.monotonic()
+        if delay > 0:
+            ctx.sleep(delay)
 
 
 def play_frames(ctx: OpContext, *, name: str, joint_ids: list[str],
@@ -56,31 +117,26 @@ def play_frames(ctx: OpContext, *, name: str, joint_ids: list[str],
                 speed: float, loop: bool) -> dict:
     """Paced playback with pause/stop; returns {frames, cycles}."""
     total = len(frames)
+    if not total:
+        return {"frames": 0, "cycles": 0, "duration_s": 0.0}
     duration_s = total / (rate_hz * speed)
     dt = 1.0 / (rate_hz * speed)
     cycles = 0
+
+    # Approach glide runs once, at cruise pacing regardless of the
+    # playback speed multiplier — it is not part of the recording.
+    approach = _lead_in(ctx.service, joint_ids, frames[0], rate_hz)
+    if approach:
+        ctx.set_phase("approach", detail=f"{name} · moving to start")
+        _stream(ctx, joint_ids, approach, 1.0 / rate_hz)
+
     ctx.set_phase("playing", progress=0.0,
                   detail=f"{name} · {duration_s:.1f}s @ ×{speed:g}")
     ctx.log(f"playing {name}: {total} frames, {duration_s:.1f}s at ×{speed:g}"
             f"{' (loop)' if loop else ''}")
 
     while True:
-        next_t = time.monotonic()
-        last_progress = 0.0
-        for index, row in enumerate(frames):
-            ctx.check_stop()
-            ctx.pause_point()
-            angles = {j: float(v) for j, v in zip(joint_ids, row)
-                      if v is not None}
-            ctx.service.set_targets(angles, source=ControlSource.OPERATION)
-            now = time.monotonic()
-            if now - last_progress >= PROGRESS_EVERY_S or index == total - 1:
-                ctx.set_progress((index + 1) / total)
-                last_progress = now
-            next_t += dt
-            delay = next_t - time.monotonic()
-            if delay > 0:
-                ctx.sleep(delay)
+        _stream(ctx, joint_ids, frames, dt, progress=ctx.set_progress)
         cycles += 1
         if loop and cycles >= MAX_LOOP_CYCLES:
             ctx.log(f"loop backstop reached ({MAX_LOOP_CYCLES} cycles) — "
@@ -143,7 +199,12 @@ class ReplayOperation(Operation):
             frames = data.get("angles") or []
             rate_hz = float(meta["sampling_frequency_hz"])
         else:
-            frames, rate_hz = _interpolate(data.get("waypoints") or [])
+            waypoints = data.get("waypoints") or []
+            # Close the cycle when looping so the wrap-around glides back
+            # to the first waypoint instead of jumping at motor speed.
+            if self.params["loop"] and len(waypoints) > 1:
+                waypoints = waypoints + [list(waypoints[0])]
+            frames, rate_hz = _interpolate(waypoints)
         return play_frames(
             ctx, name=self.params["name"], joint_ids=joint_ids,
             frames=frames, rate_hz=rate_hz,

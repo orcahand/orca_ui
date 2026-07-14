@@ -19,31 +19,19 @@ export function ThreeDView() {
   const loadAssets = useCallback(() => {
     Promise.all([
       api.modelMetadata(),
-      api.modelCalibration(),
       api.modelFingertips(),
       // Tactile extras are optional — non-touch hands have neither.
       api.modelSensorMounts().catch(() => null),
       api.taxelGeometry().catch(() => null),
     ])
-      .then(([metadata, calibration, fingertips, sensorMounts, taxelGeometry]) => {
-        setAssets({ metadata, calibration, fingertips, sensorMounts, taxelGeometry })
+      .then(([metadata, fingertips, sensorMounts, taxelGeometry]) => {
+        setAssets({ metadata, fingertips, sensorMounts, taxelGeometry })
         setAssetError(null)
       })
       .catch((error) => setAssetError(String(error.message ?? error)))
   }, [])
 
   useEffect(loadAssets, [loadAssets])
-
-  const reloadCalibration = useCallback(() => {
-    api
-      .modelCalibration()
-      .then((calibration) =>
-        setAssets((prev) => (prev ? { ...prev, calibration } : prev)),
-      )
-      .catch((error) =>
-        useAppStore.getState().setError(String(error.message ?? error)),
-      )
-  }, [])
 
   const caps = status?.capabilities
 
@@ -80,7 +68,7 @@ export function ThreeDView() {
     >
       <Panel
         title={`3D View · ${assets.metadata.side} hand`}
-        toolbar={<SceneControls onReloadCalibration={reloadCalibration} />}
+        toolbar={<SceneControls />}
       >
         <div style={{ height: 'calc(100vh - 240px)', minHeight: 480 }}>
           <HandScene assets={assets} joints={handInfo.joints} caps={caps} />

@@ -185,11 +185,10 @@ uv run --group assets python scripts/build_hand_bundle.py
 
 which renames the Fusion-exported URDF joints to orca_core canonical ids,
 decimates the meshes to browser-friendly GLBs, adds fingertip frames, and
-derives `joint_calibration.yaml` (per-joint `{sign, offset_deg}` corrections
-between orca_core angles and the URDF). Verify corrections with the mock
-sweep tool joint by joint, then set `verified: true` — rebuilds never
-overwrite verified entries. The calibration file is re-read per request, so
-edit → refresh iterates in seconds.
+prints a per-joint ROM report cross-checking the URDF limits against
+orca_core's ROMs (orca_core degrees map onto the URDF 1:1 — there is no
+per-joint correction table). Verify joint directions with the mock sweep
+tool, one joint at a time.
 
 ## Releasing
 

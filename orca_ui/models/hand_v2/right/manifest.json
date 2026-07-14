@@ -2,7 +2,7 @@
   "schema_version": 1,
   "source": {
     "description_path": "/Users/fbourquin/Documents/orca/orcahand_description",
-    "git_sha": "ec4f6ae9e75692357c37e572e5018bfc13c808c5",
+    "git_sha": "921b57407bb280d9e25e1654dd0e3f1f79f2fd9f",
     "dirty": true
   },
   "side": "right",
@@ -118,8 +118,6 @@
     }
   },
   "total_tris": 52450,
-  "rest_pose_offsets_deg": {
-    "wrist": -35.0
-  },
+  "rest_pose_offsets_deg": {},
   "built_with": "build_hand_bundle.py"
 }

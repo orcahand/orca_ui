@@ -6,7 +6,6 @@ converts the v2 ORCA hand description (URDF + MJCF + STL meshes) into a
 committed bundle under ``orca_ui/models/hand_v2/``:
 
     orca_ui/models/hand_v2/
-    ├── joint_calibration.yaml      # per-joint {sign, offset_deg, verified, evidence}
     ├── right/
     │   ├── hand.urdf               # canonical joint/link names, GLB mesh refs
     │   ├── manifest.json
@@ -72,9 +71,9 @@ Dedup. Middle and ring links share identical part meshes; GLBs are deduped
 by content hash, so ring_* link visuals reference the middle_* GLB files
 (written once per side). Same for any other byte-identical GLB.
 
-Calibration. joint_calibration.yaml (shared by both sides, derived from
-the 'right' side when built) is merged on rebuild: an existing entry with
-``verified: true`` is NEVER overwritten.
+Angle convention. orca_core degrees map onto the URDF 1:1 (urdf_rad =
+deg2rad(angle_deg)); the ROM report below is the audit trail that would
+flag a joint whose URDF limits stop matching orca_core's ROM.
 """
 
 from __future__ import annotations
@@ -806,31 +805,6 @@ def write_urdf(side, urdf, joint_map, link_map, link_glb, anchors, out: Path):
     out.write_text(out.read_text() + "\n")
 
 
-# --- calibration --------------------------------------------------------------
-
-def write_calibration(path: Path, rom_result, log):
-    existing = {}
-    if path.is_file():
-        existing = yaml.safe_load(path.read_text()) or {}
-    out = {}
-    kept = []
-    for canonical in sorted(rom_result):
-        prev = existing.get(canonical)
-        if isinstance(prev, dict) and prev.get("verified") is True:
-            out[canonical] = prev  # never overwrite a verified entry
-            kept.append(canonical)
-            continue
-        cls, sign = rom_result[canonical]
-        out[canonical] = {"sign": sign, "offset_deg": 0.0,
-                          "verified": False, "evidence": cls}
-    # keep any extra (unknown) entries the user added
-    for k, v in existing.items():
-        out.setdefault(k, v)
-    if kept:
-        log(f"kept {len(kept)} verified calibration entries: {', '.join(kept)}")
-    path.write_text(yaml.safe_dump(out, sort_keys=True))
-
-
 # --- per-side build -----------------------------------------------------------
 
 def git_source_info(description: Path):
@@ -954,25 +928,9 @@ def main(argv=None):
     source_info = git_source_info(args.description)
     log(f"source: {source_info}")
 
-    rom_by_side = {}
-    for side in args.sides:
-        rom_by_side[side] = build_side(side, args, core_roms, source_info, log)
-
-    # Calibration is shared across sides; derive from 'right' when built.
-    cal_side = "right" if "right" in rom_by_side else args.sides[0]
-    if len(rom_by_side) > 1:
-        for other, res in rom_by_side.items():
-            if other == cal_side:
-                continue
-            for jid, (cls, sign) in res.items():
-                if rom_by_side[cal_side][jid] != (cls, sign):
-                    log(f"warning: {jid} ROM classification differs between "
-                        f"sides ({cal_side}: {rom_by_side[cal_side][jid]}, "
-                        f"{other}: {(cls, sign)}); using {cal_side}")
     args.out.mkdir(parents=True, exist_ok=True)
-    write_calibration(args.out / "joint_calibration.yaml",
-                      rom_by_side[cal_side], log)
-    log(f"joint_calibration.yaml written (derived from {cal_side} side)")
+    for side in args.sides:
+        build_side(side, args, core_roms, source_info, log)
     log("done")
 
 

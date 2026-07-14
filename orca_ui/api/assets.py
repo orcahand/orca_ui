@@ -1,4 +1,4 @@
-"""3D hand asset serving: the processed URDF bundle + live joint calibration.
+"""3D hand asset serving: the processed URDF bundle.
 
 The bundle under ``orca_ui/models/hand_v2/<side>/`` is produced by
 ``scripts/build_hand_bundle.py``. Endpoints degrade gracefully (404 with a
@@ -48,16 +48,6 @@ def build_router(service: HandService) -> APIRouter:
             "mesh_base_url": f"/assets/hand/{side}/meshes/",
             "manifest": manifest,
         }
-
-    @router.get("/model/calibration")
-    def model_calibration():
-        """Per-joint {sign, offset_deg} URDF corrections. Re-read per request
-        so the edit-YAML -> refresh tuning loop needs no server restart."""
-        path = os.path.join(HAND_V2_DIR, "joint_calibration.yaml")
-        if not os.path.isfile(path):
-            raise HTTPException(status_code=404, detail=BUILD_HINT)
-        with open(path) as f:
-            return yaml.safe_load(f)
 
     @router.get("/model/fingertips")
     def model_fingertips():

@@ -193,6 +193,20 @@ def build_router(service: HandService) -> APIRouter:
         guard(service.rebase)
         return {"ok": True}
 
+    # ----- direct motor control (advanced diagnostics) ---------------------------
+
+    @router.get("/motors/direct")
+    def motors_direct_snapshot():
+        return guard(service.motor_snapshot)
+
+    @router.post("/motors/direct/mode")
+    def motors_direct_mode(body: schemas.DirectMotorModeRequest):
+        return guard(service.set_direct_motor_mode, body.enabled)
+
+    @router.post("/motors/direct/position")
+    def motors_direct_position(body: schemas.DirectMotorPositionRequest):
+        return guard(service.set_motor_position, body.id, body.position)
+
     # ----- poses / trajectories / demos --------------------------------------------
 
     @router.get("/poses")

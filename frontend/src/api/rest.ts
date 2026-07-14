@@ -2,8 +2,8 @@
 
 import type {
   DemoEntry,
+  DirectMotorSnapshot,
   HandInfo,
-  JointCalibrationEntry,
   ModelMetadata,
   OperationLogPayload,
   OperationSnapshot,
@@ -103,6 +103,15 @@ export const api = {
   setMaxCurrent: (ma: number) => post('/api/control/max_current', { ma }),
   rebase: () => post('/api/control/rebase'),
 
+  motorsDirect: () => request<DirectMotorSnapshot>('/api/motors/direct'),
+  motorsDirectMode: (enabled: boolean) =>
+    post<{ direct_mode: boolean }>('/api/motors/direct/mode', { enabled }),
+  motorsDirectPosition: (id: number, position: number) =>
+    post<{ id: number; position: number; previous: number }>(
+      '/api/motors/direct/position',
+      { id, position },
+    ),
+
   poses: () => request<{ poses: PoseEntry[] }>('/api/poses'),
   poseSave: (name: string, angles: Record<string, number>) =>
     put<{ ok: boolean }>(`/api/poses/${encodeURIComponent(name)}`, { angles }),
@@ -160,9 +169,6 @@ export const api = {
     post<{ config: Record<string, unknown> }>('/api/teleop/config', { config }),
 
   modelMetadata: () => request<ModelMetadata>('/api/model/metadata'),
-  // Flat mapping: joint id -> {sign, offset_deg, verified, evidence}.
-  modelCalibration: () =>
-    request<Record<string, JointCalibrationEntry>>('/api/model/calibration'),
   modelFingertips: () =>
     request<Record<string, FingertipEntry>>('/api/model/fingertips'),
   // Per-finger T_fingertip_sensor as row-major 4x4 (meters), from orca_core's

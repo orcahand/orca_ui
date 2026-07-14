@@ -59,6 +59,22 @@ export interface ControlState {
   control_source: ControlSource
   // Human-readable owner label, e.g. "manual", "replay", or the op kind.
   control_owner: string
+  // Raw motor-space control armed: loop writes paused, joint targets 409.
+  direct_motor_mode: boolean
+}
+
+export interface DirectMotorInfo {
+  id: number
+  joint: string
+  position: number // radians
+  hw_error: number | null
+  hw_error_flags: string[] | null
+}
+
+export interface DirectMotorSnapshot {
+  direct_mode: boolean
+  max_step_rad: number
+  motors: DirectMotorInfo[]
 }
 
 export interface HandInfo {
@@ -86,13 +102,6 @@ export interface ModelMetadata {
   urdf_url: string
   mesh_base_url: string
   manifest: { joints: string[]; [key: string]: unknown }
-}
-
-export interface JointCalibrationEntry {
-  sign: 1 | -1
-  offset_deg: number
-  verified: boolean
-  evidence: string
 }
 
 // ----- operations (orca_ui/hand/operations/) --------------------------------

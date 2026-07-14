@@ -11,7 +11,6 @@ import type { URDFRobot } from 'urdf-loader'
 import type { FingertipEntry, SensorMounts } from '../../api/rest'
 import type {
   Capabilities,
-  JointCalibrationEntry,
   JointInfo,
   ModelMetadata,
   TaxelGeometry,
@@ -26,7 +25,6 @@ import { loadHandRobot, makeGhost } from './loadHandRobot'
 
 export interface HandAssets {
   metadata: ModelMetadata
-  calibration: Record<string, JointCalibrationEntry>
   fingertips: Record<string, FingertipEntry>
   sensorMounts: SensorMounts | null // null: no tactile kinematics available
   taxelGeometry: TaxelGeometry | null
@@ -87,12 +85,10 @@ function HandRig({
           robot,
           ghost,
           teleopGhost,
-          adapter: new JointPoseAdapter(robot, assets.calibration, joints),
-          ghostAdapter: ghost
-            ? new JointPoseAdapter(ghost, assets.calibration, joints)
-            : null,
+          adapter: new JointPoseAdapter(robot, joints),
+          ghostAdapter: ghost ? new JointPoseAdapter(ghost, joints) : null,
           teleopGhostAdapter: teleopGhost
-            ? new JointPoseAdapter(teleopGhost, assets.calibration, joints)
+            ? new JointPoseAdapter(teleopGhost, joints)
             : null,
           glow: new JointGlowLayer(robot),
           arrows: new ForceArrowLayer(
@@ -115,14 +111,6 @@ function HandRig({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assets.metadata.urdf_url])
-
-  // Live calibration updates (the YAML-tuning loop).
-  useEffect(() => {
-    rig?.adapter.setCalibration(assets.calibration)
-    rig?.ghostAdapter?.setCalibration(assets.calibration)
-    rig?.teleopGhostAdapter?.setCalibration(assets.calibration)
-    invalidate()
-  }, [assets.calibration, rig, invalidate])
 
   // Frame the camera on the hand once it exists: fit the whole model with a
   // margin, looking down from a 3/4 angle.

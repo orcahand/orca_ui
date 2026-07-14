@@ -37,6 +37,26 @@ TACTILE_MODES = {
     "combined": (True, True),
 }
 
+# Direct motor moves are clamped to this distance from the current position
+# per command — sliders nudge, they don't teleport.
+MAX_DIRECT_MOTOR_STEP_RAD = 0.8
+
+# Dynamixel X-series Hardware Error Status bits. Any latched bit makes the
+# motor refuse to energize until rebooted. The UI decodes the bits to human-readable names for display.
+_HW_ERROR_BITS = (
+    (0x01, "input_voltage"),
+    (0x04, "overheating"),
+    (0x08, "motor_encoder"),
+    (0x10, "electrical_shock"),
+    (0x20, "overload"),
+)
+
+
+def _decode_hw_error(value: int | None) -> list[str] | None:
+    if value is None:
+        return None
+    return [name for bit, name in _HW_ERROR_BITS if value & bit]
+
 
 class ServiceError(RuntimeError):
     def __init__(self, message: str, status_code: int = 400):
@@ -85,6 +105,7 @@ class HandService:
 
         self._state_lock = threading.Lock()
         self._targets: dict[str, float] = {}
+        self._direct_motor_mode = False
         self._tactile_mode = "combined"
         self._control_source = ControlSource.MANUAL
         self._control_owner_label = ControlSource.MANUAL.value
@@ -207,6 +228,7 @@ class HandService:
                 "tactile_mode": self._tactile_mode,
                 "control_source": self._control_source.value,
                 "control_owner": self._control_owner_label,
+                "direct_motor_mode": self._direct_motor_mode,
             }
 
     def stats(self) -> dict:
@@ -240,6 +262,9 @@ class HandService:
     def _session_ready(self, session: HandSession) -> None:
         with self._state_lock:
             self._targets = {}
+            # Fresh session, fresh (unpaused) loop: a stale armed flag must
+            # not survive the reconnect and block joint targets.
+            self._direct_motor_mode = False
         self._publish_control_state()
         if session.caps.tactile:
             try:
@@ -313,6 +338,9 @@ class HandService:
                     status_code=409)
             self._control_source = source
             self._control_owner_label = owner_label or source.value
+        # A new owner streams joint targets; a paused loop would silently
+        # ignore them for loop joints.
+        self._exit_direct_motor_mode()
         self._publish_control_state()
 
     def release_control(self, expected: ControlSource | None = None) -> None:
@@ -373,6 +401,7 @@ class HandService:
                 logger.exception("estop: operation stop failed")
                 report["operation_stopped"] = False
                 report["operation_error"] = str(e)
+        self._exit_direct_motor_mode()
         try:
             session = self.session
             if session is not None and session.caps.motors:
@@ -451,6 +480,11 @@ class HandService:
         with self._state_lock:
             current = self._control_source
             owner = self._control_owner_label
+            direct = self._direct_motor_mode
+        if direct:
+            raise ServiceError(
+                "direct motor mode is armed — joint targets are suspended "
+                "(loop writes paused); disarm it first", status_code=409)
         if source != current:
             raise ServiceError(
                 f"joint targets are owned by {owner}", status_code=409)
@@ -509,6 +543,116 @@ class HandService:
     def rebase(self) -> None:
         session = self._require_feedback()
         session.hand.rebase_loop()
+
+    # ----- direct motor control (advanced diagnostics) -----------------------
+    #
+    # Raw motor-space access for bring-up/diagnosis (e.g. a single motor that
+    # refuses to turn). Deliberately friction-ful: an explicit arm step that
+    # pauses the feedback loop's writes, per-move step clamp, and joint
+    # targets 409 while armed.
+
+    def motor_snapshot(self) -> dict:
+        """Per-motor position + latched hardware-error state.
+
+        Reads happen under the loop-write fence (when a loop runs) so the
+        per-motor status round-trips don't interleave with 100 Hz writes on
+        the shared bus.
+        """
+        from contextlib import nullcontext
+
+        session = self._require_motors()
+        hand = session.hand
+        fence = getattr(hand, "_loop_writes_paused", None)
+        with (fence() if fence is not None else nullcontext()):
+            positions = hand.get_motor_pos(as_dict=True)
+            read_error = getattr(
+                getattr(hand, "_motor_client", None), "read_hardware_error", None)
+            errors: dict = {}
+            for mid in hand.config.motor_ids:
+                err = None
+                if read_error is not None:
+                    try:
+                        err = read_error(mid)
+                    except Exception:
+                        err = None
+                errors[mid] = err
+        motor_to_joint = hand.config.motor_to_joint_dict
+        with self._state_lock:
+            direct = self._direct_motor_mode
+        return {
+            "direct_mode": direct,
+            "max_step_rad": MAX_DIRECT_MOTOR_STEP_RAD,
+            "motors": [
+                {
+                    "id": int(mid),
+                    "joint": str(motor_to_joint.get(mid, "")),
+                    "position": float(positions[mid]),
+                    "hw_error": errors[mid],
+                    "hw_error_flags": _decode_hw_error(errors[mid]),
+                }
+                for mid in hand.config.motor_ids
+            ],
+        }
+
+    def set_direct_motor_mode(self, enabled: bool) -> dict:
+        session = self._require_motors()
+        self._require_manual_control()
+        if not enabled:
+            self._exit_direct_motor_mode()
+            return {"direct_mode": False}
+        loop = getattr(session.hand, "_loop", None)
+        with self._state_lock:
+            already = self._direct_motor_mode
+            self._direct_motor_mode = True
+        if not already and loop is not None:
+            # The loop would immediately overwrite raw motor writes for its
+            # joints; fence it out for the whole armed window.
+            loop.pause_writes()
+        self._publish_control_state()
+        return {"direct_mode": True}
+
+    def _exit_direct_motor_mode(self) -> None:
+        """Disarm + resume loop writes. Safe to call from any state; never
+        raises (used by estop and control-source handover)."""
+        with self._state_lock:
+            was = self._direct_motor_mode
+            self._direct_motor_mode = False
+        if not was:
+            return
+        session = self.session
+        loop = getattr(session.hand, "_loop", None) if session else None
+        if loop is not None:
+            try:
+                loop.resume_writes()
+            except Exception:
+                logger.exception("resume_writes failed leaving direct motor mode")
+        self._publish_control_state()
+
+    def set_motor_position(self, motor_id: int, position: float) -> dict:
+        """Raw motor-space position write (radians) for one motor."""
+        import math
+
+        session = self._require_torque()
+        self._require_manual_control()
+        with self._state_lock:
+            if not self._direct_motor_mode:
+                raise ServiceError(
+                    "direct motor mode is not armed", status_code=409)
+        hand = session.hand
+        motor_id = int(motor_id)
+        if motor_id not in hand.config.motor_ids:
+            raise ServiceError(f"unknown motor id {motor_id}")
+        position = float(position)
+        if not math.isfinite(position):
+            raise ServiceError("position must be finite")
+        current = float(hand.get_motor_pos(as_dict=True)[motor_id])
+        if abs(position - current) > MAX_DIRECT_MOTOR_STEP_RAD:
+            raise ServiceError(
+                f"refusing a {abs(position - current):.2f} rad move — direct "
+                f"moves are capped at {MAX_DIRECT_MOTOR_STEP_RAD} rad from "
+                "the current position")
+        hand.write_motor_pos([motor_id], [position])
+        return {"id": motor_id, "position": position, "previous": current}
 
     # ----- poses & demos -------------------------------------------------------
 

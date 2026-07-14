@@ -1,6 +1,6 @@
 """Dev-only joint sweeper (mock mode): drives one joint through its ROM as a
-triangle wave so the 3D view's sign/offset calibration can be verified
-visually, one joint at a time."""
+triangle wave so the 3D view's joint directions can be verified
+visually against the URDF, one joint at a time."""
 
 from __future__ import annotations
 

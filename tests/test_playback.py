@@ -6,6 +6,8 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
+from orca_ui.hand.operations.player import (
+    MIN_SEGMENT_S, WAYPOINT_RATE_HZ, WAYPOINT_SPEED_DEG_S, _interpolate)
 from orca_ui.mock import materialize_mock_model
 from orca_ui.server import create_app
 from orca_ui.settings import UiSettings
@@ -242,6 +244,74 @@ def test_replay_pause_resume_and_slider_gating(client):
     # Control returns to manual.
     assert client.post("/api/joints/target",
                        json={"angles": {"index_mcp": 0.0}}).status_code == 200
+
+
+def _waypoint_trajectory(client, name, waypoints):
+    service = client.app.state.service
+    joint_ids = _joint_ids(client)
+    service.library.save_trajectory(name, {
+        "metadata": {"type": "discrete_waypoints", "created_at": "test",
+                     "joint_ids": joint_ids,
+                     "hand_type": service.supervisor.config.type},
+        "waypoints": waypoints,
+    })
+    return joint_ids
+
+
+def test_interpolate_paces_segments_by_travel():
+    # 60 deg of travel at the cruise speed -> a 1 s segment.
+    frames, rate = _interpolate([[0.0, 0.0], [60.0, 0.0]])
+    assert rate == WAYPOINT_RATE_HZ
+    assert len(frames) == int(60.0 / WAYPOINT_SPEED_DEG_S * WAYPOINT_RATE_HZ)
+    # A tiny adjustment still glides over the minimum segment duration.
+    tiny, _ = _interpolate([[0.0, 0.0], [0.5, 0.0]])
+    assert len(tiny) == int(MIN_SEGMENT_S * WAYPOINT_RATE_HZ)
+    # None (unrecorded joint) passes through untouched.
+    sparse, _ = _interpolate([[0.0, None], [60.0, None]])
+    assert all(row[1] is None for row in sparse)
+
+
+def test_looped_waypoint_replay_closes_the_cycle(client):
+    """Looping a 2-pose recording synthesizes the return segment, so both
+    directions play at the same speed instead of snapping back."""
+    joint_ids = _joint_ids(client)
+    closed = [0.0] * len(joint_ids)
+    closed[joint_ids.index("index_mcp")] = 60.0
+    opened = [0.0] * len(joint_ids)
+    _waypoint_trajectory(client, "ring2", [closed, opened])
+    client.post("/api/torque/enable")
+
+    # One-shot: a single 1 s segment (60 deg at cruise speed).
+    client.post("/api/operation/replay/start",
+                json={"params": {"name": "ring2"}})
+    snapshot = _wait_op_state(client, "done")
+    one_way = snapshot["result"]["frames"]
+    assert one_way == int(60.0 / WAYPOINT_SPEED_DEG_S * WAYPOINT_RATE_HZ)
+
+    # Looped: the return glide doubles the cycle -> 2.0 s in the detail.
+    client.post("/api/operation/replay/start",
+                json={"params": {"name": "ring2", "loop": True}})
+    detail = _wait_for(lambda: (
+        d := ((_operation(client) or {}).get("detail") or ""))
+        and "@" in d and d)
+    assert "2.0s" in detail, detail
+    client.post("/api/operation/stop")
+    _wait_op_state(client, "done")
+
+
+def test_replay_glides_to_the_first_frame(client):
+    """Playback approaches the start pose instead of jumping at motor speed."""
+    joint_ids = _joint_ids(client)
+    away = [0.0] * len(joint_ids)
+    away[joint_ids.index("index_mcp")] = 50.0
+    _waypoint_trajectory(client, "faraway", [away, [0.0] * len(joint_ids)])
+    client.post("/api/torque/enable")
+    client.post("/api/operation/replay/start",
+                json={"params": {"name": "faraway"}})
+    assert _wait_for(
+        lambda: (_operation(client) or {}).get("phase") == "approach"), \
+        _operation(client)
+    _wait_op_state(client, "done")
 
 
 # ----- demo -----------------------------------------------------------------------
