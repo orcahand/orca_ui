@@ -23,11 +23,19 @@ git source (instructions in the comment there).
 uv sync
 ```
 
-The frontend ships pre-built in released wheels. From a git checkout, build it
-once (requires node):
+The built frontend is committed to git (`orca_ui/webui/`), so a plain checkout
+runs without node. If you change frontend code, rebuild and commit the output:
 
 ```bash
 cd frontend && npm install && npm run build && cd ..
+```
+
+A pre-commit hook warns when frontend sources are committed without a rebuilt
+`orca_ui/webui/`. Enable it once per clone (only needed on machines that edit
+the frontend):
+
+```bash
+git config core.hooksPath .githooks
 ```
 
 ## Usage
@@ -197,4 +205,5 @@ cd frontend && npm run build && cd ..
 uv build
 ```
 
-The wheel force-includes the gitignored `orca_ui/webui` build output.
+The `orca_ui/webui` build output is committed to git and ships in the wheel;
+rebuild before releasing so the committed bundle is current.

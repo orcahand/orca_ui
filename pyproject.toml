@@ -48,9 +48,10 @@ requires = ["hatchling>=1.27.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build]
-# The built frontend (orca_ui/webui) is gitignored but must ship in releases.
-# Set at build level: uv builds the wheel from the sdist, so both targets
-# need it.
+# The built frontend (orca_ui/webui) is committed to git so plain checkouts
+# work without node. Keep it in artifacts anyway so wheels still ship it even
+# if it is ever re-gitignored. Set at build level: uv builds the wheel from
+# the sdist, so both targets need it.
 artifacts = ["/orca_ui/webui/"]
 
 [tool.hatch.build.targets.wheel]

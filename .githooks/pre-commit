@@ -1,0 +1,20 @@
+#!/bin/sh
+# The built frontend (orca_ui/webui/) is committed to git so npm-less machines
+# can run the UI from a plain checkout. Committing frontend sources without a
+# rebuilt bundle would ship a stale UI to every clone.
+
+staged=$(git diff --cached --name-only)
+
+echo "$staged" | grep -Eq '^frontend/(src/|public/|index\.html|package(-lock)?\.json|vite\.config\.ts|tsconfig)' || exit 0
+echo "$staged" | grep -q '^orca_ui/webui/' && exit 0
+
+cat >&2 <<'EOF'
+pre-commit: frontend sources are staged but orca_ui/webui/ is unchanged.
+The committed bundle would be stale on other machines. Rebuild and stage it:
+
+    cd frontend && npm run build && cd ..
+    git add orca_ui/webui
+
+or bypass this check with --no-verify if the bundle really is current.
+EOF
+exit 1
