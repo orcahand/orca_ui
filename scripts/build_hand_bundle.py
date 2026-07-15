@@ -9,7 +9,7 @@ committed bundle under ``orca_ui/models/hand_v2/``:
     ├── right/
     │   ├── hand.urdf               # canonical joint/link names, GLB mesh refs
     │   ├── manifest.json
-    │   ├── joint_map.yaml          # provenance: machine name -> canonical id
+    │   ├── joint_map.yaml          # provenance: source name -> canonical id
     │   ├── fingertips.yaml         # per finger: fingertip link + tip anchor [m]
     │   └── meshes/*.glb
     └── left/                       # same layout
@@ -22,16 +22,15 @@ Run with:
 Design notes
 ------------
 
-Name mapping. The source URDF/MJCF use machine-generated Fusion export
-names ("P-AP_f5e42b61"). Canonical joint ids come from orca_core's
-config.yaml. The mapping is derived from the MJCF, whose joint names are
-human-readable ("right_m-abd"): for each MJCF body carrying a joint we strip
-the side prefix to get the machine link name and find the URDF joint whose
-CHILD link matches it exactly. If exact matching fails, we fall back to
-matching by joint world position at the zero pose (< 1 mm, with the
-second-best candidate > 5 mm away). This is what disambiguates the two
-"M-AP" chains (middle vs ring share part geometry and part names; only the
-MJCF joint names and the FK cross-check tell them apart).
+Name mapping. The source URDF/MJCF names are semantic and side-prefixed,
+matching orca_core's config.yaml joint ids: joints are "{side}_{canonical}"
+("right_index_mcp"), links/bodies "{side}_{part}" ("right_carpals").
+Stripping the side prefix therefore IS the mapping. The build still
+cross-validates it: URDF and MJCF joints must each cover exactly the 17
+canonical ids, every MJCF joint must sit on the body named like the URDF
+joint's child link, and each child link must be the canonical one for its
+joint. The FK smoke test below verifies the geometry independently of any
+naming.
 
 Frames. GLB root frame = the URDF link's VISUAL frame. Every URDF visual
 origin has rpy == 0, and the MJCF body frame coincides with that visual
@@ -48,13 +47,12 @@ right_wrist first — identical axis components — and enforced for every
 joint via the rotational residual below), so axes are compared directly in
 that shared local frame.
 
-Rest pose. The two models do NOT share a zero pose on the right side: the
-right URDF bakes a -35 deg wrist offset (exactly the wrist ROM bound) into
-the wrist joint origin, while the MJCF rest pose holds the palm straight;
-the left side agrees everywhere. The URDF wrist limits are the ones that
-match orca_core's ROM, so the URDF convention is kept. The FK smoke test
-therefore solves, per joint in tree order, the angle about the *known*
-joint axis that aligns the URDF chain with the MJCF chain, then requires
+Rest pose. The URDF and MJCF zero poses currently agree everywhere on both
+sides (rest_pose_offsets_deg == {}), but this has historically diverged
+(the right URDF once baked a -35 deg wrist offset into the wrist joint
+origin), so the guard is kept. The FK smoke test solves, per joint in tree
+order, the angle about the *known* joint axis that aligns the URDF chain
+with the MJCF chain, then requires
 (a) the remaining rotational residual to be < 1e-9 and (b) the joint anchor
 world positions to agree < 1e-4 m. A swapped middle/ring mapping still
 fails loudly (the mount points are ~22 mm apart, which no rotation about
@@ -109,28 +107,8 @@ BUILT_WITH = "build_hand_bundle.py"
 
 # --- canonical naming -------------------------------------------------------
 
-# MJCF clean joint name (side prefix stripped) -> canonical joint id.
-CLEAN_JOINT_TO_CANONICAL = {
-    "wrist": "wrist",
-    "t-cmc": "thumb_cmc",
-    "t-abd": "thumb_abd",
-    "t-mcp": "thumb_mcp",
-    "t-pip": "thumb_dip",  # note: MJCF calls the thumb distal joint "pip"
-    "i-abd": "index_abd",
-    "i-mcp": "index_mcp",
-    "i-pip": "index_pip",
-    "m-abd": "middle_abd",
-    "m-mcp": "middle_mcp",
-    "m-pip": "middle_pip",
-    "r-abd": "ring_abd",
-    "r-mcp": "ring_mcp",
-    "r-pip": "ring_pip",
-    "p-abd": "pinky_abd",
-    "p-mcp": "pinky_mcp",
-    "p-pip": "pinky_pip",
-}
-
-# canonical joint id -> canonical name of its CHILD link.
+# canonical joint id -> canonical name of its CHILD link. The keys are the
+# 17 canonical joint ids (source names are these with a "{side}_" prefix).
 CANONICAL_CHILD_LINK = {
     "wrist": "carpals",
     "thumb_cmc": "thumb_tp",
@@ -249,28 +227,6 @@ class UrdfModel:
 
     def joint_by_child(self):
         return {j.child: j for j in self.joints}
-
-    def world_tf(self):
-        """link name -> 4x4 world transform at zero pose."""
-        tf = {self.root: np.eye(4)}
-        pending = list(self.joints)
-        while pending:
-            progressed = False
-            rest = []
-            for j in pending:
-                if j.parent in tf:
-                    local = make_tf(j.origin_xyz, rpy_to_matrix(j.origin_rpy))
-                    tf[j.child] = tf[j.parent] @ local
-                    progressed = True
-                else:
-                    rest.append(j)
-            pending = rest
-            if not progressed and pending:
-                raise SystemExit(
-                    f"URDF kinematic tree is disconnected at joints: "
-                    f"{[j.name for j in pending]}"
-                )
-        return tf
 
 
 def parse_urdf(path: Path) -> UrdfModel:
@@ -412,72 +368,56 @@ def mjcf_world_tf(bodies):
 
 # --- mapping derivation ------------------------------------------------------
 
-def derive_mapping(side, urdf: UrdfModel, bodies, log):
-    """Returns (joint_map: machine joint name -> canonical id,
-                link_map: machine link name -> canonical link name,
-                mjcf_joint_of: canonical id -> (body name, joint tuple))."""
+def strip_side(name: str, side: str, what: str) -> str:
     prefix = side + "_"
-    by_child = urdf.joint_by_child()
-    urdf_tf = urdf.world_tf()
-    m_tf = mjcf_world_tf(bodies)
+    if not name.startswith(prefix):
+        raise SystemExit(f"[{side}] {what} {name!r} lacks the {prefix!r} prefix")
+    return name[len(prefix):]
 
+
+def derive_mapping(side, urdf: UrdfModel, bodies, log):
+    """Returns (joint_map: source joint name -> canonical id,
+                link_map: source link name -> canonical link name,
+                mjcf_joint_of: canonical id -> (body name, joint tuple)).
+
+    Source names are already "{side}_{canonical}"; this derives the maps by
+    stripping the prefix and cross-validates URDF against MJCF (see module
+    docstring, "Name mapping")."""
     joint_map, mjcf_joint_of = {}, {}
-    for b in bodies.values():
-        for (jname, jpos, jaxis, jrange) in b.joints:
-            clean = jname[len(prefix):] if jname.startswith(prefix) else jname
-            canonical = CLEAN_JOINT_TO_CANONICAL.get(clean)
-            if canonical is None:
-                raise SystemExit(f"[{side}] unknown MJCF joint name {jname!r}")
-            machine_link = b.name[len(prefix):] if b.name.startswith(prefix) else b.name
-            uj = by_child.get(machine_link)
-            if uj is None:
-                # Fallback: match by joint world position at zero pose.
-                target = m_tf[b.name] @ np.array([*jpos, 1.0])
-                dists = sorted(
-                    (float(np.linalg.norm(urdf_tf[j.child][:3, 3] - target[:3])), j)
-                    for j in urdf.joints if j.type == "revolute"
-                )
-                best_d, best_j = dists[0]
-                second_d = dists[1][0] if len(dists) > 1 else float("inf")
-                if best_d < 1e-3 and second_d > 5e-3:
-                    log(f"[{side}] {jname}: no exact child-link match for "
-                        f"{machine_link!r}; matched {best_j.name!r} by position "
-                        f"({best_d * 1e3:.3f} mm, runner-up {second_d * 1e3:.1f} mm)")
-                    uj = best_j
-                else:
-                    raise SystemExit(
-                        f"[{side}] cannot map MJCF joint {jname!r}: no URDF child "
-                        f"link {machine_link!r} and position fallback ambiguous "
-                        f"(best {best_d * 1e3:.2f} mm, second {second_d * 1e3:.2f} mm)")
-            if uj.type != "revolute":
-                raise SystemExit(f"[{side}] {jname} mapped to non-revolute URDF "
-                                 f"joint {uj.name}")
-            joint_map[uj.name] = canonical
-            mjcf_joint_of[canonical] = (b.name, (jname, jpos, jaxis, jrange))
-
-    # Bijection onto the 17 canonical ids.
-    canon = sorted(CLEAN_JOINT_TO_CANONICAL.values())
-    got = sorted(joint_map.values())
-    if got != canon:
-        raise SystemExit(f"[{side}] mapping is not a bijection onto the 17 "
-                         f"canonical ids: got {got}")
-    if len(joint_map) != 17:
-        raise SystemExit(f"[{side}] expected 17 mapped joints, got {len(joint_map)}")
-
-    # Canonical link names.
-    link_map = {}
     for uj in urdf.joints:
-        if uj.name in joint_map:
-            link_map[uj.child] = CANONICAL_CHILD_LINK[joint_map[uj.name]]
-        elif uj.type == "fixed":
-            link_map[uj.child] = "tower"
-        else:
-            raise SystemExit(f"[{side}] unexpected joint {uj.name!r} of type "
-                             f"{uj.type!r}")
-    link_map[urdf.root] = "forearm"
-    if len(link_map) != len(urdf.links):
-        missing = set(urdf.links) - set(link_map)
-        raise SystemExit(f"[{side}] links without canonical names: {missing}")
+        if uj.type != "revolute":
+            continue
+        canonical = strip_side(uj.name, side, "URDF joint")
+        if canonical not in CANONICAL_CHILD_LINK:
+            raise SystemExit(f"[{side}] unknown URDF joint {uj.name!r}")
+        child = strip_side(uj.child, side, "URDF link")
+        if child != CANONICAL_CHILD_LINK[canonical]:
+            raise SystemExit(f"[{side}] joint {uj.name}: child link {uj.child!r} "
+                             f"is not {CANONICAL_CHILD_LINK[canonical]!r}")
+        joint_map[uj.name] = canonical
+
+    urdf_joint_by_child = {j.child: j for j in urdf.joints if j.type == "revolute"}
+    for b in bodies.values():
+        for joint in b.joints:  # (name, pos, axis, range)
+            canonical = strip_side(joint[0], side, "MJCF joint")
+            if canonical not in CANONICAL_CHILD_LINK:
+                raise SystemExit(f"[{side}] unknown MJCF joint {joint[0]!r}")
+            uj = urdf_joint_by_child.get(b.name)
+            if uj is None or joint_map[uj.name] != canonical:
+                raise SystemExit(
+                    f"[{side}] MJCF joint {joint[0]!r} sits on body {b.name!r}, "
+                    f"which is not the child link of the matching URDF joint")
+            mjcf_joint_of[canonical] = (b.name, joint)
+
+    # Bijection onto the 17 canonical ids, on both models.
+    canon = sorted(CANONICAL_CHILD_LINK)
+    for what, got in (("URDF", sorted(joint_map.values())),
+                      ("MJCF", sorted(mjcf_joint_of))):
+        if got != canon:
+            raise SystemExit(f"[{side}] {what} joints are not a bijection onto "
+                             f"the 17 canonical ids: got {got}")
+
+    link_map = {name: strip_side(name, side, "URDF link") for name in urdf.links}
     return joint_map, link_map, mjcf_joint_of
 
 
@@ -492,8 +432,8 @@ def rotation_about_axis(axis, angle):
 
 def validate_kinematics(side, urdf, bodies, joint_map, mjcf_joint_of, log):
     """FK smoke test + axis check (see module docstring, "Rest pose").
-    Returns {canonical id: solved rest-pose offset in degrees} for the
-    joints whose URDF and MJCF zero poses disagree (right wrist: -35 deg)."""
+    Returns {canonical id: solved rest-pose offset in degrees} for any
+    joint whose URDF and MJCF zero poses disagree (currently none)."""
     revolute = [j for j in urdf.joints if j.type == "revolute"]
     if len(revolute) != 17:
         raise SystemExit(f"[{side}] expected exactly 17 revolute URDF joints, "
@@ -658,8 +598,6 @@ def build_link_glbs(side, urdf, bodies, link_map, mesh_files, mesh_cache,
      skin_bounds: canonical link -> (min, max) of its skin sub-meshes,
      pre-decimation, in the link's VISUAL frame)."""
     prefix = side + "_"
-    body_of_machine = {name[len(prefix):]: b for name, b in bodies.items()
-                       if name.startswith(prefix)}
     mat_cache, hash_to_file = {}, {}
     link_glb, glb_info, skin_bounds = {}, {}, {}
 
@@ -668,8 +606,8 @@ def build_link_glbs(side, urdf, bodies, link_map, mesh_files, mesh_cache,
     order += [l for l in link_map.values() if l not in order]  # safety net
 
     for canonical_link in order:
-        machine = inv_link_map[canonical_link]
-        body = body_of_machine.get(machine)
+        machine = inv_link_map[canonical_link]  # == the MJCF body name
+        body = bodies.get(machine)
         if body is None or not body.geoms:
             raise SystemExit(f"[{side}] no MJCF geoms found for link "
                              f"{canonical_link} ({machine})")
@@ -776,7 +714,9 @@ def write_urdf(side, urdf, joint_map, link_map, link_glb, anchors, out: Path):
         ET.SubElement(geo, "mesh", {"filename": link_glb[canonical]})
         # (source has no collision elements; none are emitted: viz-only URDF)
     for uj in urdf.joints:
-        name = joint_map.get(uj.name, "tower_fixed" if uj.type == "fixed" else None)
+        name = joint_map.get(uj.name)
+        if name is None and uj.type == "fixed":
+            name = strip_side(uj.name, side, "URDF joint")
         if name is None:
             raise SystemExit(f"[{side}] joint {uj.name} has no canonical name")
         je = ET.SubElement(robot, "joint", {"type": uj.type, "name": name})
@@ -857,7 +797,7 @@ def build_side(side, args, core_roms, source_info, log):
                side_dir / "hand.urdf")
 
     (side_dir / "joint_map.yaml").write_text(
-        "# Provenance: original machine-generated names -> canonical ids.\n"
+        "# Provenance: source (side-prefixed) names -> canonical ids.\n"
         "# Generated by scripts/build_hand_bundle.py — do not edit.\n"
         + yaml.safe_dump({
             "joints": joint_map,
@@ -919,7 +859,7 @@ def main(argv=None):
     log = print
     core_cfg = yaml.safe_load(args.core_config.read_text())
     core_ids = list(core_cfg["joint_ids"])
-    if sorted(core_ids) != sorted(CLEAN_JOINT_TO_CANONICAL.values()):
+    if sorted(core_ids) != sorted(CANONICAL_CHILD_LINK):
         raise SystemExit("orca_core joint_ids do not match the canonical ids "
                          "known to this script")
     core_roms = {k: [float(v[0]), float(v[1])]
