@@ -215,6 +215,7 @@ class UrdfJoint:
 class UrdfLink:
     name: str
     visual_origin_xyz: list
+    has_visual: bool
     element: object
 
 
@@ -247,7 +248,7 @@ def parse_urdf(path: Path) -> UrdfModel:
                         f"non-zero rpy {rpy}; the visual-frame convention of this "
                         "script assumes rpy == 0 (see module docstring)"
                     )
-        links[le.get("name")] = UrdfLink(le.get("name"), origin, le)
+        links[le.get("name")] = UrdfLink(le.get("name"), origin, vis is not None, le)
     for je in root.findall("joint"):
         oe, ae, lim = je.find("origin"), je.find("axis"), je.find("limit")
         joints.append(UrdfJoint(
@@ -609,6 +610,8 @@ def build_link_glbs(side, urdf, bodies, link_map, mesh_files, mesh_cache,
         machine = inv_link_map[canonical_link]  # == the MJCF body name
         body = bodies.get(machine)
         if body is None or not body.geoms:
+            if not urdf.links[machine].has_visual:
+                continue  # anchor-only link (e.g. fingertip frames): no mesh
             raise SystemExit(f"[{side}] no MJCF geoms found for link "
                              f"{canonical_link} ({machine})")
         scene = trimesh.Scene()
@@ -651,37 +654,57 @@ def build_link_glbs(side, urdf, bodies, link_map, mesh_files, mesh_cache,
 
 # --- fingertip anchors -------------------------------------------------------
 
-def derive_fingertip_anchors(side, urdf, link_map, skin_bounds, log):
-    """Anchor per finger, in the fingertip LINK frame: bbox center on the two
-    transverse axes, bbox max along the distal axis. The distal axis is
-    verified from the fingertip joint's offset in its parent (PP/thumb-PP)
-    frame, rotated into the child frame."""
+def fingertip_anchors(side, urdf, link_map, skin_bounds, log):
+    """Read the {side}_{finger}_fingertip anchor links from the SOURCE URDF
+    (orcahand_description owns them since the fingertip links moved there)
+    and verify each against the skin-mesh derivation this script used to
+    bake them: bbox center on the two transverse axes, bbox max along the
+    distal axis. Drift beyond 10 um means the skin meshes changed and the
+    source anchors must be re-derived."""
     inv = {v: k for k, v in link_map.items()}
     by_child = urdf.joint_by_child()
     anchors = {}
     for finger in FINGERS:
         tip_link = FINGERTIP_PARENT_LINK[finger]
         machine = inv[tip_link]
+
+        # Source anchor: the fixed fingertip joint in the description URDF.
+        anchor_joint = by_child.get(f"{side}_{finger}_fingertip")
+        if anchor_joint is None or anchor_joint.type != "fixed":
+            raise SystemExit(f"[{side}] source URDF has no fixed "
+                             f"{side}_{finger}_fingertip anchor link")
+        if anchor_joint.parent != machine:
+            raise SystemExit(f"[{side}] {finger} fingertip anchor hangs off "
+                             f"{anchor_joint.parent!r}, expected {machine!r}")
+        anchor = np.array(anchor_joint.origin_xyz)
+
+        # Distal axis: the fingertip-assembly joint's offset in its parent
+        # frame, rotated into the child frame (v_parent = R @ v_child).
         uj = by_child[machine]
         d_parent = np.array(uj.origin_xyz)
         d_parent /= np.linalg.norm(d_parent)
-        # v_parent = R @ v_child  =>  d_child = R.T @ d_parent
         d_child = rpy_to_matrix(uj.origin_rpy).T @ d_parent
         axis = int(np.argmax(np.abs(d_child)))
         sign = 1.0 if d_child[axis] >= 0 else -1.0
         axis_name = "xyz"[axis] if sign > 0 else "-" + "xyz"[axis]
-        if not (axis == 2 and sign > 0):
-            log(f"[{side}] note: {finger} distal axis is {axis_name}, not +z; "
-                f"anchor adjusted accordingly")
+
+        # Verification against the skin sub-mesh bounds.
         if tip_link not in skin_bounds:
             raise SystemExit(f"[{side}] no skin sub-mesh found on {tip_link}; "
-                             f"cannot derive {finger} fingertip anchor")
+                             f"cannot verify {finger} fingertip anchor")
         lo, hi = skin_bounds[tip_link]  # in the link's visual frame
-        anchor_vis = (lo + hi) / 2.0
-        anchor_vis[axis] = hi[axis] if sign > 0 else lo[axis]
+        derived_vis = (lo + hi) / 2.0
+        derived_vis[axis] = hi[axis] if sign > 0 else lo[axis]
         # visual frame -> link frame (visual origin is a pure translation)
-        vis_origin = np.array(urdf.links[machine].visual_origin_xyz)
-        anchor = anchor_vis + vis_origin
+        derived = derived_vis + np.array(urdf.links[machine].visual_origin_xyz)
+        err = float(np.max(np.abs(anchor - derived)))
+        if err > 1e-5:
+            raise SystemExit(
+                f"[{side}] {finger} fingertip anchor drifted from the skin "
+                f"mesh: source {anchor.tolist()} vs derived "
+                f"{[round(float(v), 6) for v in derived]} ({err * 1e3:.4f} mm); "
+                "re-derive the anchors in orcahand_description")
+
         anchors[finger] = {
             "link": f"{finger}_fingertip",
             "parent_link": tip_link,
@@ -689,13 +712,14 @@ def derive_fingertip_anchors(side, urdf, link_map, skin_bounds, log):
             "distal_axis": axis_name,
         }
         log(f"[{side}] {finger} fingertip anchor on {tip_link}: "
-            f"{anchors[finger]['anchor']} (distal axis {axis_name})")
+            f"{anchors[finger]['anchor']} (distal axis {axis_name}, "
+            f"skin-mesh drift {err * 1e6:.2f} um)")
     return anchors
 
 
 # --- URDF rewrite -------------------------------------------------------------
 
-def write_urdf(side, urdf, joint_map, link_map, link_glb, anchors, out: Path):
+def write_urdf(side, urdf, joint_map, link_map, link_glb, out: Path):
     import xml.etree.ElementTree as ET
     robot = ET.Element("robot", {"name": f"orcahand_{side}"})
     for ul in [urdf.links[n] for n in urdf.links]:
@@ -704,6 +728,8 @@ def write_urdf(side, urdf, joint_map, link_map, link_glb, anchors, out: Path):
         src_inertial = ul.element.find("inertial")
         if src_inertial is not None:
             le.append(src_inertial)
+        if canonical not in link_glb:  # anchor-only link (fingertip frames)
+            continue
         vis = ET.SubElement(le, "visual")
         ET.SubElement(vis, "origin", {
             "xyz": " ".join(repr(v) for v in ul.visual_origin_xyz),
@@ -727,18 +753,6 @@ def write_urdf(side, urdf, joint_map, link_map, link_glb, anchors, out: Path):
             e = src.find(tag)
             if e is not None:
                 je.append(e)
-    # fingertip anchor links (massless, no visual)
-    for finger in FINGERS:
-        a = anchors[finger]
-        ET.SubElement(robot, "link", {"name": a["link"]})
-        je = ET.SubElement(robot, "joint",
-                           {"type": "fixed", "name": f"{finger}_fingertip_fixed"})
-        ET.SubElement(je, "parent", {"link": a["parent_link"]})
-        ET.SubElement(je, "child", {"link": a["link"]})
-        ET.SubElement(je, "origin", {
-            "xyz": " ".join(repr(float(v)) for v in a["anchor"]),
-            "rpy": "0 0 0",
-        })
     tree = ET.ElementTree(robot)
     ET.indent(tree, space="  ")
     tree.write(out, encoding="unicode", xml_declaration=True)
@@ -792,9 +806,8 @@ def build_side(side, args, core_roms, source_info, log):
     link_glb, glb_info, skin_bounds = build_link_glbs(
         side, urdf, bodies, link_map, mesh_files, mesh_cache, meshes_dir, log)
 
-    anchors = derive_fingertip_anchors(side, urdf, link_map, skin_bounds, log)
-    write_urdf(side, urdf, joint_map, link_map, link_glb, anchors,
-               side_dir / "hand.urdf")
+    anchors = fingertip_anchors(side, urdf, link_map, skin_bounds, log)
+    write_urdf(side, urdf, joint_map, link_map, link_glb, side_dir / "hand.urdf")
 
     (side_dir / "joint_map.yaml").write_text(
         "# Provenance: source (side-prefixed) names -> canonical ids.\n"
@@ -815,8 +828,7 @@ def build_side(side, args, core_roms, source_info, log):
         "source": source_info,
         "side": side,
         "joints": [joint_map[j.name] for j in urdf.joints if j.name in joint_map],
-        "links": [link_map[n] for n in urdf.links]
-                 + [a["link"] for a in anchors.values()],
+        "links": [link_map[n] for n in urdf.links],
         "meshes": glb_info,
         "total_tris": total_tris,
         # URDF-vs-MJCF rest-pose disagreements absorbed by the FK validation

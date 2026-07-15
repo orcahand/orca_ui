@@ -247,6 +247,11 @@
       </geometry>
     </visual>
   </link>
+  <link name="thumb_fingertip" />
+  <link name="index_fingertip" />
+  <link name="middle_fingertip" />
+  <link name="ring_fingertip" />
+  <link name="pinky_fingertip" />
   <joint type="fixed" name="tower_fixed">
     <parent link="forearm" />
     <child link="tower" />
@@ -371,34 +376,29 @@
     <axis xyz="4.718447854656915e-16 0.9999999999999946 -3.164135620181696e-15" />
     <limit lower="-0.2617993877991494" upper="1.8675022996339325" effort="100" velocity="100" />
   </joint>
-  <link name="thumb_fingertip" />
   <joint type="fixed" name="thumb_fingertip_fixed">
     <parent link="thumb_dp" />
     <child link="thumb_fingertip" />
     <origin xyz="-0.001017 0.0 0.03" rpy="0 0 0" />
   </joint>
-  <link name="index_fingertip" />
   <joint type="fixed" name="index_fingertip_fixed">
     <parent link="index_fingertip_assembly" />
     <child link="index_fingertip" />
     <origin xyz="0.001718 0.0 0.0444" rpy="0 0 0" />
   </joint>
-  <link name="middle_fingertip" />
   <joint type="fixed" name="middle_fingertip_fixed">
     <parent link="middle_fingertip_assembly" />
     <child link="middle_fingertip" />
     <origin xyz="0.001718 0.0 0.0444" rpy="0 0 0" />
   </joint>
-  <link name="ring_fingertip" />
   <joint type="fixed" name="ring_fingertip_fixed">
     <parent link="ring_fingertip_assembly" />
     <child link="ring_fingertip" />
     <origin xyz="0.001718 0.0 0.0444" rpy="0 0 0" />
   </joint>
-  <link name="pinky_fingertip" />
   <joint type="fixed" name="pinky_fingertip_fixed">
     <parent link="pinky_fingertip_assembly" />
     <child link="pinky_fingertip" />
-    <origin xyz="0.002225 -0.0 0.0374" rpy="0 0 0" />
+    <origin xyz="0.002225 0.0 0.0374" rpy="0 0 0" />
   </joint>
 </robot>

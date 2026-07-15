@@ -22,19 +22,24 @@ links:
   right_carpals: carpals
   right_forearm: forearm
   right_index_ap: index_ap
+  right_index_fingertip: index_fingertip
   right_index_fingertip_assembly: index_fingertip_assembly
   right_index_pp: index_pp
   right_middle_ap: middle_ap
+  right_middle_fingertip: middle_fingertip
   right_middle_fingertip_assembly: middle_fingertip_assembly
   right_middle_pp: middle_pp
   right_pinky_ap: pinky_ap
+  right_pinky_fingertip: pinky_fingertip
   right_pinky_fingertip_assembly: pinky_fingertip_assembly
   right_pinky_pp: pinky_pp
   right_ring_ap: ring_ap
+  right_ring_fingertip: ring_fingertip
   right_ring_fingertip_assembly: ring_fingertip_assembly
   right_ring_pp: ring_pp
   right_thumb_ap: thumb_ap
   right_thumb_dp: thumb_dp
+  right_thumb_fingertip: thumb_fingertip
   right_thumb_pp: thumb_pp
   right_thumb_tp: thumb_tp
   right_tower: tower
