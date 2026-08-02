@@ -31,7 +31,7 @@ class CommandWorker(threading.Thread):
         self._pending_targets: dict[str, float] = {}
         self._ops: deque[Callable[[], None]] = deque()
         self._wake = threading.Event()
-        self._stop = threading.Event()
+        self._stop_event = threading.Event()
         self._last_apply = 0.0
 
     def submit_targets(self, angles: dict[str, float]) -> None:
@@ -46,15 +46,15 @@ class CommandWorker(threading.Thread):
         self._wake.set()
 
     def shutdown(self) -> None:
-        self._stop.set()
+        self._stop_event.set()
         self._wake.set()
         self.join(timeout=2.0)
 
     def run(self) -> None:
-        while not self._stop.is_set():
+        while not self._stop_event.is_set():
             self._wake.wait()
             self._wake.clear()
-            if self._stop.is_set():
+            if self._stop_event.is_set():
                 return
 
             while True:

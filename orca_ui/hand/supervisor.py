@@ -82,7 +82,7 @@ class HandSupervisor(threading.Thread):
         self._since = time.time()
 
         self._wake = threading.Event()
-        self._stop = threading.Event()
+        self._stop_event = threading.Event()
         self._backoff = DETECT_BACKOFF_START_S
         self._motor_failures = 0
         self._last_upgrade_probe = 0.0
@@ -163,7 +163,7 @@ class HandSupervisor(threading.Thread):
         self._wake.set()
 
     def shutdown(self) -> None:
-        self._stop.set()
+        self._stop_event.set()
         self._wake.set()
         self.join(timeout=5.0)
         self._teardown_session("shutdown")
@@ -172,7 +172,7 @@ class HandSupervisor(threading.Thread):
 
     def run(self) -> None:
         self._set_state(HandState.DETECTING, "searching for hardware")
-        while not self._stop.is_set():
+        while not self._stop_event.is_set():
             if self._process_maintenance_request():
                 continue
             if self._maintenance_active():
