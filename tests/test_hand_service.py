@@ -54,7 +54,7 @@ def test_hand_info_shape(service):
     assert info["side"] == "right"
     assert len(info["joints"]) == 17
     index_mcp = next(j for j in info["joints"] if j["id"] == "index_mcp")
-    assert index_mcp["rom"] == [-60.0, 100.0]
+    assert index_mcp["rom"] == [-25.0, 100.0]
     assert index_mcp["encoder_backed"] is True
     wrist = next(j for j in info["joints"] if j["id"] == "wrist")
     assert wrist["encoder_backed"] is True  # slot 16 is sensed (loop-excluded only)
