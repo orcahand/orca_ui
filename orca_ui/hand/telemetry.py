@@ -40,13 +40,13 @@ class _Sampler(threading.Thread):
         super().__init__(name=name, daemon=True)
         self._period = period_s
         self._tick = tick
-        self._stop = threading.Event()
+        self._stop_event = threading.Event()
 
     def stop(self) -> None:
-        self._stop.set()
+        self._stop_event.set()
 
     def run(self) -> None:
-        while not self._stop.is_set():
+        while not self._stop_event.is_set():
             started = time.monotonic()
             try:
                 self._tick()
@@ -55,7 +55,7 @@ class _Sampler(threading.Thread):
                 # supervisor owns recovery, samplers just keep sampling.
                 logger.debug("sampler tick failed", exc_info=True)
             elapsed = time.monotonic() - started
-            self._stop.wait(timeout=max(0.0, self._period - elapsed))
+            self._stop_event.wait(timeout=max(0.0, self._period - elapsed))
 
 
 class TelemetryService:
