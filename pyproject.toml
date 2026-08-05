@@ -10,7 +10,7 @@ license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "orca_core",
+    "orca-core>=0.4,<0.5",
     "fastapi>=0.110",
     "uvicorn>=0.30",
     "websockets>=12",
@@ -25,6 +25,7 @@ dependencies = [
 [project.scripts]
 orca-ui = "orca_ui.cli:main"
 orca-ui-mcp = "orca_ui.mcp.cli:main"
+orca-dev = "orca_ui.core_source:main"
 
 [dependency-groups]
 dev = [
@@ -36,12 +37,10 @@ assets = [
     "fast-simplification>=0.1.9",
 ]
 
-# The UI targets orca_core's joint-sensing work. During development it tracks a
-# local sibling checkout (which may be ahead of the public branch); on machines
-# without one, swap in the git source instead:
-#   orca_core = { git = "https://github.com/orcahand/orca_core.git", branch = "feature/joint-sensing" }
-[tool.uv.sources]
-orca_core = { path = "../orca_core", editable = true }
+# No [tool.uv.sources] here on purpose: `uv sync` in a fresh clone installs the
+# published orca_core and works on any machine. To develop against a local
+# checkout or a branch, use `uv run orca-dev local` / `orca-dev branch <name>`
+# — those write the source entry for you, and `orca-dev release` removes it.
 
 [build-system]
 requires = ["hatchling>=1.27.0"]

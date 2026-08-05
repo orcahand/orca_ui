@@ -4,8 +4,8 @@ Web interface for the [ORCA Hand](https://www.orcahand.com): live sensor
 visualization (tactile taxels + joint encoders), motor control, a 3D hand
 view, pose/trajectory playback, and the hand's lifecycle operations
 (tensioning, calibration, guided setup). Uses
-[orca_core](https://github.com/orcahand/orca_core) (the
-`feature/joint-sensing` line) for all hardware communication.
+[orca_core](https://github.com/orcahand/orca_core) for all hardware
+communication.
 
 The UI adapts to the hand described by the config: tactile-only hands get the
 taxel/force views, joint-sensing hands get encoder gauges and the closed-loop
@@ -14,29 +14,21 @@ connected on startup — no connect button.
 
 ## Installation
 
-This project uses [uv](https://docs.astral.sh/uv/). During development
-`orca_core` tracks a local sibling checkout (`../orca_core`); on machines
-without one, switch the `[tool.uv.sources]` entry in `pyproject.toml` to the
-git source (instructions in the comment there).
+This project uses [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync
 ```
 
+That installs the released `orca_core` from PyPI, so a plain clone runs
+anywhere — no sibling checkout needed.
+
 The built frontend is committed to git (`orca_ui/webui/`), so a plain checkout
-runs without node. If you change frontend code, rebuild and commit the output:
+also runs without node.
 
-```bash
-cd frontend && npm install && npm run build && cd ..
-```
-
-A pre-commit hook warns when frontend sources are committed without a rebuilt
-`orca_ui/webui/`. Enable it once per clone (only needed on machines that edit
-the frontend):
-
-```bash
-git config core.hooksPath .githooks
-```
+Working on the console itself, or on `orca_core` alongside it? See
+**[DEVELOPMENT.md](DEVELOPMENT.md)** — `uv run orca-dev` points the console at
+your own `orca_core` checkout in one step.
 
 ## Usage
 

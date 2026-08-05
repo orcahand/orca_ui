@@ -22,6 +22,9 @@ env/
 # OS
 .DS_Store
 
+# Where `orca-dev` remembers this machine's orca_core checkout
+.orca-dev.json
+
 # Frontend
 node_modules/
 .superpowers/

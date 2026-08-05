@@ -1,9 +1,33 @@
 #!/bin/sh
+# Keeps two local-only things out of shared history: a developer's orca_core
+# override, and a stale frontend bundle.
+
+staged=$(git diff --cached --name-only)
+
+# --- dev-mode override -------------------------------------------------------
+# `orca-dev local` / `orca-dev branch` point this checkout at an orca_core that
+# exists only on this machine. uv has no local-only override file, so that edit
+# lands in tracked files; this strips it from the commit and leaves the working
+# tree in dev mode. Nothing is blocked — you can always commit.
+if echo "$staged" | grep -qE '^(pyproject\.toml|uv\.lock)$'; then
+    if [ -x .venv/bin/python ]; then
+        PY=.venv/bin/python
+    else
+        PY=$(command -v python3 || command -v python)
+    fi
+    [ -n "$PY" ] && "$PY" -c 'import sys
+sys.path.insert(0, ".")
+try:
+    from orca_ui.core_source import precommit_fix
+except Exception:
+    sys.exit(0)
+sys.exit(precommit_fix())'
+fi
+
+# --- frontend bundle ---------------------------------------------------------
 # The built frontend (orca_ui/webui/) is committed to git so npm-less machines
 # can run the UI from a plain checkout. Committing frontend sources without a
 # rebuilt bundle would ship a stale UI to every clone.
-
-staged=$(git diff --cached --name-only)
 
 echo "$staged" | grep -Eq '^frontend/(src/|public/|index\.html|package(-lock)?\.json|vite\.config\.ts|tsconfig)' || exit 0
 echo "$staged" | grep -q '^orca_ui/webui/' && exit 0
