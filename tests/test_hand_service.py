@@ -107,6 +107,49 @@ def test_gains_and_mode_roundtrip(service):
     assert _wait_for(has_taxels)
 
 
+def test_per_joint_gain_overrides(service):
+    loop_joints = service.session.hand.loop_joint_names
+    assert loop_joints, "mock hand should close the loop on its joints"
+    tuned = loop_joints[0]
+
+    service.set_gains(kp=2.0, ki=6.0, correction_max_deg=30.0)
+    service.set_gains(kp=5.0, ki=1.0, correction_max_deg=10.0, i_clamp_deg=4.0,
+                      joints=[tuned])
+
+    state = service.control_state()
+    assert state["gains"]["kp"] == 2.0          # baseline untouched
+    assert state["joint_gains"][tuned]["kp"] == 5.0
+
+    # The controller carries one channel per loop joint: the tuned joint's
+    # gains differ from the baseline every other channel still runs.
+    controller = service.session.hand._controller
+    index = loop_joints.index(tuned)
+    assert controller._Kp[index] == 5.0
+    assert controller._i_clamp_deg[index] == 4.0
+    others = [i for i in range(len(loop_joints)) if i != index]
+    assert all(controller._Kp[i] == 2.0 for i in others)
+    assert all(controller._i_clamp_deg[i] == 30.0 for i in others)
+
+    gains = service.gains_state()
+    assert gains["baseline"]["kp"] == 2.0
+    assert len(gains["joints"]) == len(loop_joints)
+    entry = next(j for j in gains["joints"] if j["joint"] == tuned)
+    assert entry["source"] == "override" and entry["kp"] == 5.0
+    # Joints outside the loop (wrist and friends) have no gains to set.
+    assert "wrist" in gains["open_loop_joints"]
+
+    service.clear_joint_gains([tuned])
+    assert service.control_state()["joint_gains"] == {}
+    assert service.session.hand._controller._Kp[index] == 2.0
+
+
+def test_gains_reject_joints_outside_the_loop(service):
+    with pytest.raises(ServiceError):
+        service.set_gains(kp=1.0, ki=1.0, correction_max_deg=10.0,
+                          joints=["wrist"])
+    assert service.control_state()["joint_gains"] == {}
+
+
 def test_stats_shape(service):
     time.sleep(0.3)
     stats = service.stats()

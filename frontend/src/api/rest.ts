@@ -94,12 +94,18 @@ export const api = {
   jointsTarget: (angles: Record<string, number>) =>
     post('/api/joints/target', { angles }),
   jointsNeutral: () => post('/api/joints/neutral'),
+  // joints omitted = the hand-wide baseline; a joint list writes per-joint
+  // overrides for exactly those joints.
   setGains: (gains: {
     kp: number
     ki: number
     correction_max_deg: number
     i_clamp_deg?: number
+    joints?: string[]
   }) => post('/api/control/gains', gains),
+  // joints omitted = drop every per-joint override.
+  resetGains: (joints?: string[]) =>
+    post('/api/control/gains/reset', { joints: joints ?? null }),
   setMaxCurrent: (ma: number) => post('/api/control/max_current', { ma }),
   rebase: () => post('/api/control/rebase'),
 
