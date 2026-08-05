@@ -6,6 +6,7 @@ import { useStreamFrame } from '../../hooks/useStreamFrame'
 interface LoopStats {
   cycles_ok?: number
   cycles_overrun?: number
+  cycles_clamped?: number
   e_stops?: number
   last_dt_s?: number
   fallback_active?: boolean
@@ -39,6 +40,10 @@ export function LoopStatsBar() {
     >
       <span>cycles {stats.cycles_ok ?? 0}</span>
       <span>overrun {stats.cycles_overrun ?? 0}</span>
+      <span title="cycles whose motor target hit its travel limit — the loop
+asked for more range than the joint has">
+        clamped {stats.cycles_clamped ?? 0}
+      </span>
       <span>e-stops {stats.e_stops ?? 0}</span>
       <span>dt {((stats.last_dt_s ?? 0) * 1000).toFixed(1)}ms</span>
       {stats.fallback_active && (

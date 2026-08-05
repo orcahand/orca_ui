@@ -10,7 +10,6 @@ license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "orca-core>=0.4,<0.5",
     "fastapi>=0.110",
     "uvicorn>=0.30",
     "websockets>=12",
@@ -20,6 +19,9 @@ dependencies = [
     # MCP server (orca_ui/mcp): agent access to the running backend.
     "mcp>=1.12,<2",
     "httpx>=0.27",
+    # 0.4.1 drops the outer loop's i_clamp gain and brings the wrist into the
+    # feedback loop; 0.4.0 cannot satisfy this package's imports.
+    "orca-core>=0.4.1,<0.5",
 ]
 
 [project.scripts]

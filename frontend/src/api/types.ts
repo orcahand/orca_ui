@@ -43,9 +43,20 @@ export interface JointInfo {
   encoder_calibrated: boolean | null
   // true: the feedback loop closes on this joint. false: the loop skipped it
   // at connect (incomplete motor/encoder calibration) — it runs open-loop
-  // until recalibrated. null: no loop at this tier, or the loop never
-  // targets it by design (e.g. the wrist).
+  // until recalibrated. null: no loop at this tier, or the joint has no
+  // encoder to close on.
   loop_controlled: boolean | null
+}
+
+export interface CalibrationInfo {
+  // Motor limits + ratios recorded. null when no motor session.
+  motors: boolean | null
+  // Motors calibrated AND every encoder-backed joint anchored.
+  joint_feedback: boolean | null
+  // Encoder-backed joints with no anchor — they run open-loop.
+  missing_anchors: string[]
+  // Set when recalibrating would capture the missing anchors.
+  hint: string | null
 }
 
 // Who owns the joint-target channel. TELEOP is reserved for orca_teleop.
@@ -55,16 +66,17 @@ export interface JointGains {
   kp: number
   ki: number
   correction_max_deg: number
-  i_clamp_deg: number
 }
 
 export interface ControlState {
   torque_enabled: boolean
   max_current: number
-  // Hand-wide baseline: every loop-controlled joint without an override.
-  gains: JointGains
-  // Per-joint overrides only — joints absent here follow the baseline.
+  // The one gain set every loop joint shares, or null when they differ.
+  gains: JointGains | null
+  // Live gains per loop-controlled joint, read back from the controller.
   joint_gains: Record<string, JointGains>
+  // What connect() installed from config.yaml — what Reset returns to.
+  config_gains: Record<string, JointGains>
   tactile_mode: TactileMode
   control_source: ControlSource
   // Human-readable owner label, e.g. "manual", "replay", or the op kind.
@@ -103,6 +115,7 @@ export interface HandInfo {
   side: 'left' | 'right'
   mock: boolean
   joints: JointInfo[]
+  calibration: CalibrationInfo
   control: ControlState
   core?: CoreSourceInfo
   finger_to_sensor_id?: Record<Finger, number>

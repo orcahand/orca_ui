@@ -184,12 +184,12 @@ def build_router(service: HandService) -> APIRouter:
     @router.post("/control/gains")
     def control_gains(body: schemas.GainsRequest):
         guard(service.set_gains, body.kp, body.ki, body.correction_max_deg,
-              body.i_clamp_deg, body.joints)
+              body.joints)
         return {"ok": True, "control": service.control_state()}
 
     @router.post("/control/gains/reset")
     def control_gains_reset(body: schemas.GainsResetRequest | None = None):
-        guard(service.clear_joint_gains, body.joints if body else None)
+        guard(service.reset_gains, body.joints if body else None)
         return {"ok": True, "control": service.control_state()}
 
     @router.post("/control/max_current")

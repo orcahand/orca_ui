@@ -30,7 +30,9 @@ from typing import List, Optional
 
 CORE_PACKAGE = "orca_core"
 CORE_REPO = "https://github.com/orcahand/orca_core.git"
-CORE_RELEASE_SPEC = "orca_core>=0.4,<0.5"
+# Keep in sync with pyproject.toml's orca-core pin — `orca-dev release`
+# rewrites that entry from here.
+CORE_RELEASE_SPEC = "orca_core>=0.4.1,<0.5"
 SIBLING_PATH = "../orca_core"
 
 SETTINGS_FILE = ".orca-dev.json"

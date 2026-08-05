@@ -57,7 +57,7 @@ def test_hand_info_shape(service):
     assert index_mcp["rom"] == [-25.0, 100.0]
     assert index_mcp["encoder_backed"] is True
     wrist = next(j for j in info["joints"] if j["id"] == "wrist")
-    assert wrist["encoder_backed"] is True  # slot 16 is sensed (loop-excluded only)
+    assert wrist["encoder_backed"] is True
     assert info["control"]["tactile_mode"] == "combined"
 
 
@@ -107,47 +107,39 @@ def test_gains_and_mode_roundtrip(service):
     assert _wait_for(has_taxels)
 
 
-def test_per_joint_gain_overrides(service):
+def test_per_joint_gains_are_read_back_from_the_controller(service):
     loop_joints = service.session.hand.loop_joint_names
-    assert loop_joints, "mock hand should close the loop on its joints"
+    assert "wrist" in loop_joints, "the wrist is a loop joint like any other"
     tuned = loop_joints[0]
+    config_gains = service.control_state()["config_gains"]
 
     service.set_gains(kp=2.0, ki=6.0, correction_max_deg=30.0)
-    service.set_gains(kp=5.0, ki=1.0, correction_max_deg=10.0, i_clamp_deg=4.0,
-                      joints=[tuned])
+    service.set_gains(kp=5.0, ki=1.0, correction_max_deg=10.0, joints=[tuned])
 
     state = service.control_state()
-    assert state["gains"]["kp"] == 2.0          # baseline untouched
+    assert state["gains"] is None                    # no longer uniform
     assert state["joint_gains"][tuned]["kp"] == 5.0
+    assert all(state["joint_gains"][j]["kp"] == 2.0
+               for j in loop_joints if j != tuned)
 
-    # The controller carries one channel per loop joint: the tuned joint's
-    # gains differ from the baseline every other channel still runs.
+    # control_state reports what the controller runs, not a UI shadow copy.
     controller = service.session.hand._controller
-    index = loop_joints.index(tuned)
-    assert controller._Kp[index] == 5.0
-    assert controller._i_clamp_deg[index] == 4.0
-    others = [i for i in range(len(loop_joints)) if i != index]
-    assert all(controller._Kp[i] == 2.0 for i in others)
-    assert all(controller._i_clamp_deg[i] == 30.0 for i in others)
+    assert controller._Kp[loop_joints.index(tuned)] == 5.0
 
-    gains = service.gains_state()
-    assert gains["baseline"]["kp"] == 2.0
-    assert len(gains["joints"]) == len(loop_joints)
-    entry = next(j for j in gains["joints"] if j["joint"] == tuned)
-    assert entry["source"] == "override" and entry["kp"] == 5.0
-    # Joints outside the loop (wrist and friends) have no gains to set.
-    assert "wrist" in gains["open_loop_joints"]
+    entry = next(j for j in service.gains_state()["joints"]
+                 if j["joint"] == tuned)
+    assert entry["modified"] is True and entry["kp"] == 5.0
 
-    service.clear_joint_gains([tuned])
-    assert service.control_state()["joint_gains"] == {}
-    assert service.session.hand._controller._Kp[index] == 2.0
+    service.reset_gains()
+    assert service.control_state()["joint_gains"] == config_gains
 
 
 def test_gains_reject_joints_outside_the_loop(service):
+    before = service.control_state()["joint_gains"]
     with pytest.raises(ServiceError):
         service.set_gains(kp=1.0, ki=1.0, correction_max_deg=10.0,
-                          joints=["wrist"])
-    assert service.control_state()["joint_gains"] == {}
+                          joints=["nonexistent_joint"])
+    assert service.control_state()["joint_gains"] == before
 
 
 def test_stats_shape(service):
@@ -158,8 +150,7 @@ def test_stats_shape(service):
 
 
 def test_wrist_is_measured_and_follows_commands(service):
-    """The wrist encoder (slot 16) is sensed even though it stays outside
-    orca_core's closed loop — measured must include it and track commands."""
+    """The wrist is a closed-loop joint: sensed, and driven by the loop."""
     measured = _wait_for(service.session.measured_joints) or {}
     assert "wrist" in measured
     assert len(measured) == 17
@@ -168,10 +159,8 @@ def test_wrist_is_measured_and_follows_commands(service):
     service.set_targets({"wrist": 20.0})
 
     def wrist_tracks():
-        estimate = service.session.estimate_joints() or {}
         angles = service.session.measured_joints() or {}
-        return (abs(estimate.get("wrist", 0.0) - 20.0) < 1.0
-                and abs(angles.get("wrist", 0.0) - 20.0) < 2.0)
+        return abs(angles.get("wrist", 0.0) - 20.0) < 0.5
 
     assert _wait_for(wrist_tracks), service.session.measured_joints()
 
@@ -215,10 +204,44 @@ def test_hand_info_reports_encoder_calibration_state(service):
             assert joint["encoder_calibrated"] is True  # mock model is complete
         else:
             assert joint["encoder_calibrated"] is None
-        # loop_controlled: True for loop joints, None for everything the loop
-        # doesn't target by design (wrist, non-encoder joints); False only
-        # for connect-time skips, which the complete mock model never has.
+        # loop_controlled: True for loop joints, None for joints with no
+        # encoder to close on; False only for connect-time skips, which the
+        # complete mock model never has.
         if joint["id"] in loop_joints:
             assert joint["loop_controlled"] is True
         else:
             assert joint["loop_controlled"] is None
+
+
+def test_encoder_sensed_joints_match_orca_core(service):
+    """The UI's config-only mirror must not drift from orca_core's list."""
+    from orca_ui.hand.service import _encoder_sensed_joints
+
+    assert (_encoder_sensed_joints(service.supervisor.config)
+            == service.session.hand.encoder_backed_joints)
+
+
+def test_fully_calibrated_hand_offers_no_recalibration_hint(service):
+    calibration = service.hand_info()["calibration"]
+    assert calibration["motors"] is True
+    assert calibration["joint_feedback"] is True
+    assert calibration["missing_anchors"] == []
+    assert calibration["hint"] is None
+
+
+def test_missing_anchor_is_reported_with_a_recalibration_hint(service):
+    """A calibration made before the wrist joined the loop has no wrist
+    anchor: the motors are still calibrated and the hint names the joint."""
+    import dataclasses
+
+    hand = service.session.hand
+    anchors = dict(hand.calibration.joint_encoder_calibration_dict)
+    anchors.pop("wrist")
+    hand.calibration = dataclasses.replace(
+        hand.calibration, joint_encoder_calibration_dict=anchors)
+
+    calibration = service.hand_info()["calibration"]
+    assert calibration["motors"] is True
+    assert calibration["joint_feedback"] is False
+    assert calibration["missing_anchors"] == ["wrist"]
+    assert "wrist" in calibration["hint"]

@@ -100,10 +100,10 @@ class HandSession:
         """Encoder-measured joint angles in degrees, or None.
 
         Decodes the raw encoder frame directly (same math the loop uses)
-        rather than asking the loop, because the loop only tracks its
-        closed-loop joints — the wrist encoder (slot 16) is sensed but
-        deliberately outside the loop, and it must still be reported here.
-        Covers every joint with a ``joint_encoder_calibration`` entry.
+        rather than asking the loop, because the loop only tracks the joints
+        it closes on — a joint skipped at connect is still sensed, and it
+        must still be reported here. Covers every joint with a
+        ``joint_encoder_calibration`` entry.
         """
         client = self._encoder_client or getattr(self.hand, "_encoder_client", None)
         if client is None:
@@ -120,8 +120,11 @@ class HandSession:
         if self._estimate_ok is None:
             # _motor_to_joint_pos prints per-joint warnings on uncalibrated
             # hands; check once instead of spamming at the sampler rate.
+            # Motor calibration only: the estimate is motor-derived, so a
+            # missing encoder anchor is irrelevant to it.
             try:
-                self._estimate_ok = bool(self.hand.is_calibrated())
+                self._estimate_ok = bool(
+                    self.hand.is_calibrated(use_joint_feedback=False))
             except Exception:
                 self._estimate_ok = False
             if not self._estimate_ok:
@@ -201,8 +204,11 @@ def connect_session(settings: UiSettings, config) -> HandSession:
                 )
     if sensing_present:
         return _connect_sensors_only(settings, config, declared, presence)
+    busy = presence.busy_ports
     raise SessionConnectError(
         "No ORCA hardware found (no motor bus, tactile, or encoder port)."
+        + (f" {', '.join(busy)} is held by another process — close it and "
+           "reconnect." if busy else "")
     )
 
 

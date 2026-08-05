@@ -1,8 +1,8 @@
-// Feedback-loop tuning: the hand-wide Kp / Ki / correction_max / i_clamp
-// baseline + max_current with Apply and Rebase (mirrors slider_joint.py's
-// _apply_tuning), plus per-joint overrides for the joints the loop closes on.
-// Joints the loop doesn't control have no PI channel — gains never apply to
-// them, so they're listed as open-loop rather than made editable.
+// Feedback-loop tuning: a hand-wide Kp / Ki / correction_max row (applies to
+// every loop joint) + max_current with Apply and Rebase, plus a per-joint
+// table showing the gains the controller is actually running. Joints the loop
+// doesn't control have no PI channel — gains never apply to them, so they're
+// listed as open-loop rather than made editable.
 
 import { useEffect, useState } from 'react'
 import { api } from '../../api/rest'
@@ -13,14 +13,12 @@ interface GainEdit {
   kp: string
   ki: string
   corr: string
-  clamp: string
 }
 
 const toEdit = (gains: JointGains): GainEdit => ({
   kp: String(gains.kp),
   ki: String(gains.ki),
   corr: String(gains.correction_max_deg),
-  clamp: String(gains.i_clamp_deg),
 })
 
 /** Parsed gain payload, or null when any field isn't a number. */
@@ -29,15 +27,21 @@ function parseEdit(edit: GainEdit) {
     kp: parseFloat(edit.kp),
     ki: parseFloat(edit.ki),
     correction_max_deg: parseFloat(edit.corr),
-    i_clamp_deg: parseFloat(edit.clamp),
   }
   return Object.values(parsed).some(Number.isNaN) ? null : parsed
 }
 
-const EMPTY_EDIT: GainEdit = { kp: '', ki: '', corr: '', clamp: '' }
+const EMPTY_EDIT: GainEdit = { kp: '', ki: '', corr: '' }
 
 const sameEdit = (a: GainEdit, b: GainEdit): boolean =>
-  a.kp === b.kp && a.ki === b.ki && a.corr === b.corr && a.clamp === b.clamp
+  a.kp === b.kp && a.ki === b.ki && a.corr === b.corr
+
+const sameGains = (a: JointGains | undefined, b: JointGains | undefined): boolean =>
+  a !== undefined &&
+  b !== undefined &&
+  a.kp === b.kp &&
+  a.ki === b.ki &&
+  a.correction_max_deg === b.correction_max_deg
 
 const inputStyle = {
   width: 56,
@@ -55,7 +59,7 @@ const smallBtn = { padding: '2px 6px', fontSize: 9 } as const
 export function TuningPanel() {
   const control = useAppStore((s) => s.control)
   const handInfo = useAppStore((s) => s.handInfo)
-  const [baseline, setBaseline] = useState<GainEdit | null>(null)
+  const [handWide, setHandWide] = useState<GainEdit | null>(null)
   const [maxCurrent, setMaxCurrent] = useState('')
   // Only joints the user has typed into; everything else renders live state.
   const [edits, setEdits] = useState<Record<string, GainEdit>>({})
@@ -63,13 +67,16 @@ export function TuningPanel() {
   const [statusLine, setStatusLine] = useState('')
 
   useEffect(() => {
-    if (!baseline && control) {
-      setBaseline(toEdit(control.gains))
+    if (!handWide && control) {
+      // control.gains is null when the joints carry different gains — the
+      // hand-wide fields then start blank rather than claiming a value.
+      setHandWide(control.gains ? toEdit(control.gains) : EMPTY_EDIT)
       setMaxCurrent(String(control.max_current))
     }
-  }, [control, baseline])
+  }, [control, handWide])
 
-  const overrides = control?.joint_gains ?? {}
+  const live = control?.joint_gains ?? {}
+  const configGains = control?.config_gains ?? {}
   const loopJoints = (handInfo?.joints ?? [])
     .filter((joint) => joint.loop_controlled === true)
     .map((joint) => joint.id)
@@ -77,16 +84,11 @@ export function TuningPanel() {
     .filter((joint) => joint.loop_controlled === false)
     .map((joint) => joint.id)
 
-  const effective = (joint: string): GainEdit | null =>
-    control ? toEdit(overrides[joint] ?? control.gains) : null
   const rowEdit = (joint: string): GainEdit =>
-    edits[joint] ?? effective(joint) ?? EMPTY_EDIT
+    edits[joint] ?? (live[joint] ? toEdit(live[joint]) : EMPTY_EDIT)
 
   const setRow = (joint: string, patch: Partial<GainEdit>) =>
-    setEdits((prev) => ({
-      ...prev,
-      [joint]: { ...(prev[joint] ?? effective(joint) ?? EMPTY_EDIT), ...patch },
-    }))
+    setEdits((prev) => ({ ...prev, [joint]: { ...rowEdit(joint), ...patch } }))
   const clearRows = (joints: string[]) =>
     setEdits((prev) => {
       const next = { ...prev }
@@ -94,9 +96,9 @@ export function TuningPanel() {
       return next
     })
 
-  const applyBaseline = async () => {
-    if (!baseline) return
-    const values = parseEdit(baseline)
+  const applyHandWide = async () => {
+    if (!handWide) return
+    const values = parseEdit(handWide)
     const maxCurrentValue = parseInt(maxCurrent, 10)
     if (!values || Number.isNaN(maxCurrentValue)) {
       setStatusLine('parse error: all fields must be numeric')
@@ -107,13 +109,11 @@ export function TuningPanel() {
         await api.setMaxCurrent(maxCurrentValue)
       }
       await api.setGains(values)
-      const held = Object.keys(overrides).length
+      clearRows(loopJoints)
       setStatusLine(
-        `applied to all joints: Kp=${values.kp} Ki=${values.ki} ` +
-          `correction_max=${values.correction_max_deg.toFixed(1)}° ` +
-          `i_clamp=${values.i_clamp_deg.toFixed(1)}° ` +
-          `max_current=${maxCurrentValue}mA` +
-          (held ? ` (${held} joint override${held > 1 ? 's' : ''} kept)` : ''),
+        `applied to all ${loopJoints.length} loop joints: Kp=${values.kp} ` +
+          `Ki=${values.ki} correction_max=${values.correction_max_deg.toFixed(1)}° ` +
+          `max_current=${maxCurrentValue}mA`,
       )
     } catch (error) {
       setStatusLine(`apply failed: ${(error as Error).message}`)
@@ -141,9 +141,8 @@ export function TuningPanel() {
       setStatusLine(
         requests.length === 1
           ? `${first.joint}: Kp=${first.values.kp} Ki=${first.values.ki} ` +
-              `correction_max=${first.values.correction_max_deg.toFixed(1)}° ` +
-              `i_clamp=${first.values.i_clamp_deg.toFixed(1)}°`
-          : `applied overrides to ${requests.length} joints`,
+              `correction_max=${first.values.correction_max_deg.toFixed(1)}°`
+          : `applied gains to ${requests.length} joints`,
       )
     } catch (error) {
       setStatusLine(`apply failed: ${(error as Error).message}`)
@@ -162,11 +161,11 @@ export function TuningPanel() {
   const resetJoints = async (joints?: string[]) => {
     try {
       await api.resetGains(joints)
-      clearRows(joints ?? Object.keys(edits))
+      clearRows(joints ?? loopJoints)
       setStatusLine(
         joints
-          ? `${joints.join(', ')} back on the hand-wide baseline`
-          : 'all per-joint overrides cleared',
+          ? `${joints.join(', ')} back on the config gains`
+          : 'every loop joint back on the config gains',
       )
     } catch (error) {
       setStatusLine(`reset failed: ${(error as Error).message}`)
@@ -201,11 +200,13 @@ export function TuningPanel() {
     />
   )
 
-  const dirtyJoints = loopJoints.filter((joint) => {
-    const live = effective(joint)
-    return live !== null && joint in edits && !sameEdit(edits[joint], live)
-  })
-  const overrideCount = Object.keys(overrides).length
+  const dirtyJoints = loopJoints.filter(
+    (joint) =>
+      joint in edits && live[joint] && !sameEdit(edits[joint], toEdit(live[joint])),
+  )
+  const tunedJoints = loopJoints.filter(
+    (joint) => joint in configGains && !sameGains(live[joint], configGains[joint]),
+  )
 
   return (
     <div
@@ -222,25 +223,22 @@ export function TuningPanel() {
         <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--dimmer)', letterSpacing: 1 }}>
           TUNING
         </span>
-        {baseline && (
+        {handWide && (
           <>
-            {field('Kp', baseline.kp, (v) => setBaseline({ ...baseline, kp: v }), () =>
-              void applyBaseline(),
+            {field('Kp', handWide.kp, (v) => setHandWide({ ...handWide, kp: v }), () =>
+              void applyHandWide(),
             )}
-            {field('Ki', baseline.ki, (v) => setBaseline({ ...baseline, ki: v }), () =>
-              void applyBaseline(),
+            {field('Ki', handWide.ki, (v) => setHandWide({ ...handWide, ki: v }), () =>
+              void applyHandWide(),
             )}
-            {field('corr_max °', baseline.corr, (v) => setBaseline({ ...baseline, corr: v }), () =>
-              void applyBaseline(),
-            )}
-            {field('i_clamp °', baseline.clamp, (v) => setBaseline({ ...baseline, clamp: v }), () =>
-              void applyBaseline(),
+            {field('corr_max °', handWide.corr, (v) => setHandWide({ ...handWide, corr: v }), () =>
+              void applyHandWide(),
             )}
           </>
         )}
-        {field('max mA', maxCurrent, setMaxCurrent, () => void applyBaseline())}
-        <button className="btn btn-primary" onClick={() => void applyBaseline()}>
-          Apply
+        {field('max mA', maxCurrent, setMaxCurrent, () => void applyHandWide())}
+        <button className="btn btn-primary" onClick={() => void applyHandWide()}>
+          Apply To All
         </button>
         <button className="btn btn-secondary" onClick={() => void rebase()}>
           Rebase Loop
@@ -257,10 +255,11 @@ export function TuningPanel() {
           {expanded ? '▾' : '▸'} PER-JOINT GAINS ({loopJoints.length})
         </button>
         <span style={{ fontSize: 9, color: 'var(--dimmer)' }}>
-          {overrideCount === 0
-            ? 'every loop joint on the hand-wide baseline'
-            : `${overrideCount} joint${overrideCount > 1 ? 's' : ''} overridden: ` +
-              Object.keys(overrides).join(', ')}
+          {control && control.gains === null
+            ? 'joints are tuned individually'
+            : 'every loop joint on the same gains'}
+          {tunedJoints.length > 0 &&
+            ` · ${tunedJoints.length} changed from config: ${tunedJoints.join(', ')}`}
         </span>
       </div>
 
@@ -272,14 +271,13 @@ export function TuningPanel() {
             </div>
           ) : (
             <>
-              <table className="motor-table" style={{ maxWidth: 560 }}>
+              <table className="motor-table" style={{ maxWidth: 500 }}>
                 <thead>
                   <tr>
                     <th>JOINT</th>
                     <th>Kp</th>
                     <th>Ki</th>
                     <th>CORR °</th>
-                    <th>CLAMP °</th>
                     <th />
                   </tr>
                 </thead>
@@ -288,14 +286,13 @@ export function TuningPanel() {
                     <tr key={joint}>
                       <td>
                         {joint}
-                        {joint in overrides && (
+                        {tunedJoints.includes(joint) && (
                           <span style={{ color: 'var(--accent)', marginLeft: 4 }}>*</span>
                         )}
                       </td>
                       <td>{cellInput(joint, 'kp')}</td>
                       <td>{cellInput(joint, 'ki')}</td>
                       <td>{cellInput(joint, 'corr')}</td>
-                      <td>{cellInput(joint, 'clamp')}</td>
                       <td style={{ whiteSpace: 'nowrap' }}>
                         <button
                           className="btn btn-primary"
@@ -307,7 +304,7 @@ export function TuningPanel() {
                         <button
                           className="btn btn-secondary"
                           style={smallBtn}
-                          disabled={!(joint in overrides) && !(joint in edits)}
+                          disabled={!tunedJoints.includes(joint) && !(joint in edits)}
                           onClick={() => void resetJoints([joint])}
                         >
                           Reset
@@ -337,13 +334,13 @@ export function TuningPanel() {
                 <button
                   className="btn btn-secondary"
                   style={smallBtn}
-                  disabled={overrideCount === 0}
+                  disabled={tunedJoints.length === 0}
                   onClick={() => void resetJoints()}
                 >
-                  Reset All To Baseline
+                  Reset All To Config
                 </button>
                 <span style={{ fontSize: 9, color: 'var(--dimmer)' }}>
-                  * = overridden; unmarked rows follow the baseline row above
+                  * = changed from config.yaml's joint_control_gains
                 </span>
               </div>
               {openLoopJoints.length > 0 && (

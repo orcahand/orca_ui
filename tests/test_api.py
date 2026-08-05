@@ -141,8 +141,8 @@ def test_gains_endpoint_updates_control_state(client):
 def test_per_joint_gains_endpoints(client):
     listing = client.get("/api/control/gains").json()
     tunable = [entry["joint"] for entry in listing["joints"]]
-    assert tunable and all(entry["source"] == "baseline"
-                           for entry in listing["joints"])
+    assert "wrist" in tunable  # the wrist is a loop joint like any other
+    assert not any(entry["modified"] for entry in listing["joints"])
     joint = tunable[0]
 
     response = client.post("/api/control/gains",
@@ -153,19 +153,20 @@ def test_per_joint_gains_endpoints(client):
     assert response.json()["control"]["joint_gains"][joint]["kp"] == 3.0
     entry = next(e for e in client.get("/api/control/gains").json()["joints"]
                  if e["joint"] == joint)
-    assert entry == {"joint": joint, "source": "override", "kp": 3.0,
-                     "ki": 2.0, "correction_max_deg": 20.0, "i_clamp_deg": 20.0}
+    assert entry == {"joint": joint, "modified": True, "kp": 3.0,
+                     "ki": 2.0, "correction_max_deg": 20.0}
 
-    # A joint the loop doesn't control has no gains to set.
+    # A joint with no PI channel has no gains to set.
     rejected = client.post("/api/control/gains",
                            json={"kp": 3.0, "ki": 2.0,
                                  "correction_max_deg": 20.0,
-                                 "joints": ["wrist"]})
+                                 "joints": ["nonexistent_joint"]})
     assert rejected.status_code == 400
 
     reset = client.post("/api/control/gains/reset", json={"joints": None})
     assert reset.status_code == 200
-    assert reset.json()["control"]["joint_gains"] == {}
+    assert (reset.json()["control"]["joint_gains"]
+            == listing["config_gains"])
 
 
 def test_model_metadata_hints_when_bundle_missing(client):

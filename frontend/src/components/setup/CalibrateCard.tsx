@@ -27,7 +27,7 @@ function fail(error: unknown) {
 function statusMark(joint: JointInfo): { text: string; cls: string } {
   if (!joint.encoder_backed) return { text: 'no enc', cls: 'na' }
   if (joint.encoder_calibrated === false) {
-    return { text: 'enc ✓ · no cal', cls: 'bad' }
+    return { text: 'enc ✓ · no anchor', cls: 'bad' }
   }
   // Anchor present but the feedback loop skipped the joint at connect:
   // its motor calibration is incomplete — it runs open-loop.
@@ -57,6 +57,7 @@ export function CalibrateCard() {
   const [forceWrist, setForceWrist] = useState(false)
 
   const joints = useMemo(() => handInfo?.joints ?? [], [handInfo])
+  const calibration = handInfo?.calibration
   const groups = useMemo(() => {
     const map = new Map<string, JointInfo[]>()
     for (const joint of joints) {
@@ -120,6 +121,20 @@ export function CalibrateCard() {
         </>
       ) : (
         <>
+          {calibration?.hint && (
+            <div className="setup-card-reason" style={{ color: 'var(--warn)' }}>
+              {calibration.hint}{' '}
+              <button
+                className="setup-clear"
+                onClick={() => {
+                  setSelected(new Set(calibration.missing_anchors))
+                  setSelectorOpen(true)
+                }}
+              >
+                select those joints
+              </button>
+            </div>
+          )}
           <div className="setup-card-row">
             <button
               className="btn btn-primary"
