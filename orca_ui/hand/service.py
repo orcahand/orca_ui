@@ -12,8 +12,11 @@ import os
 import threading
 from typing import Callable
 
+import numpy as np
+
 from orca_core.control.constants import (
     DEFAULT_CORRECTION_MAX_DEG,
+    DEFAULT_I_CLAMP_DEG,
     DEFAULT_KI,
     DEFAULT_KP,
 )
@@ -57,6 +60,24 @@ def _decode_hw_error(value: int | None) -> list[str] | None:
     if value is None:
         return None
     return [name for bit, name in _HW_ERROR_BITS if value & bit]
+
+
+def _gain_entry(kp: float, ki: float, correction_max_deg: float,
+                i_clamp_deg: float | None) -> dict:
+    """One control channel's PI settings. ``i_clamp_deg`` defaults to the
+    output clamp, matching orca_core's ``set_pid_gains``."""
+    return {
+        "kp": float(kp),
+        "ki": float(ki),
+        "correction_max_deg": float(correction_max_deg),
+        "i_clamp_deg": float(correction_max_deg if i_clamp_deg is None
+                             else i_clamp_deg),
+    }
+
+
+# What connect() installs on a fresh controller — the gains a session starts on.
+DEFAULT_GAINS = _gain_entry(DEFAULT_KP, DEFAULT_KI, DEFAULT_CORRECTION_MAX_DEG,
+                            DEFAULT_I_CLAMP_DEG)
 
 
 class ServiceError(RuntimeError):
@@ -113,11 +134,10 @@ class HandService:
         self._operation_manager = None   # attached post-construction (server.py)
         self._sweeper = None             # mock-only dev sweeper, for estop
         self._teleop_manager = None      # attached post-construction (server.py)
-        self._gains = {
-            "kp": DEFAULT_KP,
-            "ki": DEFAULT_KI,
-            "correction_max_deg": DEFAULT_CORRECTION_MAX_DEG,
-        }
+        # Hand-wide baseline every loop joint follows, plus per-joint
+        # overrides for the joints tuned individually.
+        self._gains = dict(DEFAULT_GAINS)
+        self._joint_gains: dict[str, dict] = {}
 
         self.supervisor = HandSupervisor(
             settings,
@@ -227,6 +247,8 @@ class HandService:
                 "torque_enabled": self.supervisor.status().torque_enabled,
                 "max_current": self._max_current,
                 "gains": dict(self._gains),
+                "joint_gains": {joint: dict(gains)
+                                for joint, gains in self._joint_gains.items()},
                 "tactile_mode": self._tactile_mode,
                 "control_source": self._control_source.value,
                 "control_owner": self._control_owner_label,
@@ -267,6 +289,11 @@ class HandService:
             # Fresh session, fresh (unpaused) loop: a stale armed flag must
             # not survive the reconnect and block joint targets.
             self._direct_motor_mode = False
+            # connect() builds a new controller on orca_core's defaults, so
+            # last session's tuning is gone from the hardware — report that
+            # rather than gains the loop isn't actually running.
+            self._gains = dict(DEFAULT_GAINS)
+            self._joint_gains = {}
         self._publish_control_state()
         if session.caps.tactile:
             try:
@@ -518,18 +545,121 @@ class HandService:
             })
         self._publish_targets()
 
-    def set_gains(self, kp: float, ki: float, correction_max_deg: float,
-                  i_clamp_deg: float | None = None) -> None:
-        session = self._require_feedback()
+    # ----- feedback-loop gains -------------------------------------------------
+    #
+    # The loop's controller is vectorised (one PI channel per loop-controlled
+    # joint), so gains are a hand-wide baseline plus per-joint overrides for
+    # the joints that need their own tuning. Joints the loop doesn't close on
+    # (the wrist, connect-time skips, non-encoder joints) have no PI channel
+    # at all — they run open-loop and no gain applies to them.
+
+    def _loop_joints(self, session: HandSession) -> list[str]:
+        """Joints the loop closes on, in the controller's channel order —
+        the order per-joint gain vectors must follow."""
+        names = session.hand.loop_joint_names
+        if not names:
+            raise ServiceError("joint loop controls no joints",
+                               status_code=409)
+        return list(names)
+
+    def _resolve_loop_joints(self, session: HandSession,
+                             joints: list[str]) -> list[str]:
+        names = self._loop_joints(session)
+        unknown = sorted(set(joints) - set(names))
+        if unknown:
+            raise ServiceError(
+                f"joints not under the feedback loop (gains do not apply): "
+                f"{unknown}; tunable joints: {names}")
+        return list(dict.fromkeys(joints))
+
+    def _apply_gains(self, session: HandSession, baseline: dict,
+                     overrides: dict[str, dict]) -> None:
+        """Push baseline + overrides down as one gain set. Uniform gains go as
+        scalars (orca_core broadcasts them); a mixed set goes as per-channel
+        vectors in loop-joint order."""
+        if not overrides:
+            session.hand.set_pid_gains(
+                Kp=baseline["kp"], Ki=baseline["ki"],
+                correction_max_deg=baseline["correction_max_deg"],
+                i_clamp_deg=baseline["i_clamp_deg"],
+            )
+            return
+        per_joint = [overrides.get(joint, baseline)
+                     for joint in self._loop_joints(session)]
+
+        def column(key: str) -> np.ndarray:
+            return np.array([gains[key] for gains in per_joint], dtype=float)
+
         session.hand.set_pid_gains(
-            Kp=kp, Ki=ki,
-            correction_max_deg=correction_max_deg,
-            i_clamp_deg=i_clamp_deg,
+            Kp=column("kp"), Ki=column("ki"),
+            correction_max_deg=column("correction_max_deg"),
+            i_clamp_deg=column("i_clamp_deg"),
         )
+
+    def set_gains(self, kp: float, ki: float, correction_max_deg: float,
+                  i_clamp_deg: float | None = None,
+                  joints: list[str] | None = None) -> None:
+        """Retune the outer PI loop.
+
+        ``joints=None`` sets the hand-wide baseline (every loop joint without
+        an override follows it); a joint list writes overrides for exactly
+        those joints and leaves the rest alone.
+        """
+        session = self._require_feedback()
+        entry = _gain_entry(kp, ki, correction_max_deg, i_clamp_deg)
+        targets = (None if joints is None
+                   else self._resolve_loop_joints(session, joints))
         with self._state_lock:
-            self._gains = {"kp": kp, "ki": ki,
-                           "correction_max_deg": correction_max_deg}
+            baseline = entry if targets is None else dict(self._gains)
+            overrides = {joint: dict(gains)
+                         for joint, gains in self._joint_gains.items()}
+            if targets is not None:
+                overrides.update({joint: dict(entry) for joint in targets})
+            # Hardware first: a rejected gain set leaves state untouched.
+            self._apply_gains(session, baseline, overrides)
+            self._gains = baseline
+            self._joint_gains = overrides
         self._publish_control_state()
+
+    def clear_joint_gains(self, joints: list[str] | None = None) -> None:
+        """Drop per-joint overrides — all of them, or just ``joints`` — so the
+        affected joints follow the hand-wide baseline again."""
+        session = self._require_feedback()
+        drop = None if joints is None else set(joints)
+        with self._state_lock:
+            baseline = dict(self._gains)
+            overrides = {} if drop is None else {
+                joint: dict(gains)
+                for joint, gains in self._joint_gains.items()
+                if joint not in drop
+            }
+            self._apply_gains(session, baseline, overrides)
+            self._joint_gains = overrides
+        self._publish_control_state()
+
+    def gains_state(self) -> dict:
+        """Effective gains for every loop-controlled joint, plus the joints
+        that run open-loop (no PI channel, so no gains to set)."""
+        session = self._require_feedback()
+        names = self._loop_joints(session)
+        with self._state_lock:
+            baseline = dict(self._gains)
+            overrides = {joint: dict(gains)
+                         for joint, gains in self._joint_gains.items()}
+        controlled = set(names)
+        return {
+            "baseline": baseline,
+            "joints": [
+                {
+                    "joint": joint,
+                    "source": "override" if joint in overrides else "baseline",
+                    **overrides.get(joint, baseline),
+                }
+                for joint in names
+            ],
+            "open_loop_joints": [joint for joint in session.hand.config.joint_ids
+                                 if joint not in controlled],
+        }
 
     def set_max_current(self, ma: int) -> None:
         import dataclasses

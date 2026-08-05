@@ -51,10 +51,20 @@ export interface JointInfo {
 // Who owns the joint-target channel. TELEOP is reserved for orca_teleop.
 export type ControlSource = 'manual' | 'operation' | 'teleop'
 
+export interface JointGains {
+  kp: number
+  ki: number
+  correction_max_deg: number
+  i_clamp_deg: number
+}
+
 export interface ControlState {
   torque_enabled: boolean
   max_current: number
-  gains: { kp: number; ki: number; correction_max_deg: number }
+  // Hand-wide baseline: every loop-controlled joint without an override.
+  gains: JointGains
+  // Per-joint overrides only — joints absent here follow the baseline.
+  joint_gains: Record<string, JointGains>
   tactile_mode: TactileMode
   control_source: ControlSource
   // Human-readable owner label, e.g. "manual", "replay", or the op kind.
