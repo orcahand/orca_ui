@@ -70,6 +70,15 @@ export function AppHeader() {
           {handInfo.mock ? ' · MOCK' : ''}
         </span>
       )}
+      {handInfo?.core?.development && (
+        // Only shown off a release: on a dev build the hand's behaviour may
+        // not match any shipped version, and that should never be a surprise.
+        <span className="capability-badge dev-build" title={handInfo.core.summary}>
+          DEV CORE
+          {handInfo.core.branch ? ` · ${handInfo.core.branch}` : ''}
+          {handInfo.core.dirty ? ' *' : ''}
+        </span>
+      )}
       <span className={`status-indicator ${pillClass}`}>
         {wsConnected ? pillLabel : 'Backend offline'}
       </span>

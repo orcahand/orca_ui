@@ -20,6 +20,7 @@ from orca_core.control.constants import (
 
 from pathlib import Path
 
+from orca_ui.core_source import resolve_cached as resolve_core_source
 from orca_ui.hand import zeroing
 from orca_ui.hand.commands import CommandWorker
 from orca_ui.hand.presets import BUILTIN_POSES, BUILTIN_SEQUENCES
@@ -207,6 +208,7 @@ class HandService:
             "mock": self.settings.mock,
             "joints": joints,
             "control": self.control_state(),
+            "core": resolve_core_source().as_dict(),
         }
         mapping = getattr(config, "finger_to_sensor_id", None)
         if mapping:
