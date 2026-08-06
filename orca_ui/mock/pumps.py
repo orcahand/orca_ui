@@ -22,8 +22,8 @@ from orca_core.hardware.sensing.constants import (
     AUTO_ENC_NUM_JOINTS,
     ENCODER_COUNTS_PER_REV,
     ENCODER_LSB_DEG,
-    JOINT_ENCODER_POLARITY,
     JOINT_TO_ENCODER_SLOT,
+    joint_encoder_polarity_for_side,
 )
 from orca_core.hardware.sensing.tactile_protocol import (
     encode_combined_auto_for_mock,
@@ -65,6 +65,9 @@ class EncoderPump(_Pump):
         self._link = link
         self._hand = hand
         self._sim_deg: dict[str, float] = {}
+        # Resolved here, not per frame: an unrecognised side must fail at
+        # connect rather than silently killing the pump thread mid-run.
+        self._polarity = joint_encoder_polarity_for_side(hand.config.type)
 
     def run(self) -> None:
         while not self._stop_event.is_set():
@@ -97,8 +100,11 @@ class EncoderPump(_Pump):
                 continue
             # Invert encoder_to_joint_angle: the anchor angle is the ROM upper
             # (the pose the real calibration sweep stalls the motor at).
+            # Side-specific: the mirrored assembly flips the abduction axes,
+            # so encoding with the right-hand signs on a left hand decodes
+            # those joints as (2*rom_upper - angle).
             anchor_angle = roms[joint][1]
-            polarity = JOINT_ENCODER_POLARITY[joint]
+            polarity = self._polarity[joint]
             count = round(
                 cal.enc_at_anchor_count + polarity * (deg - anchor_angle) / ENCODER_LSB_DEG
             )
