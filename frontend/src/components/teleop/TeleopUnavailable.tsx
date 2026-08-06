@@ -1,26 +1,30 @@
-// Shown at the head of the Teleop tab when no usable orca_teleop checkout is
-// present. Managed mode is dead without one; external mode still works, which
-// is why this card sits alongside the source picker rather than replacing it.
+// Takes over the whole Teleop tab when no usable orca_teleop checkout is
+// present. Nothing else renders: a source picker and a Start button that can
+// only fail read as broken UI, so the tab states the reason once and offers
+// the one action that fixes it. External mode is the exception — a streamer
+// launched by hand needs no checkout — and hides behind the footer link.
 
 import { useEffect, useState } from 'react'
 import { api } from '../../api/rest'
 import type { TeleopInstallTarget } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
 import { useTeleopStore } from '../../state/teleopStore'
+import { SOURCE_TILES } from './sources'
 
 // Why managed teleop can't run, in the user's terms. The backend sends the
 // machine-readable reason so this never parses prose.
 const REASONS: Record<string, string> = {
-  no_checkout: 'No orca_teleop checkout was found.',
+  no_checkout: 'No orca_teleop checkout was found on this machine.',
   no_pyproject: 'The configured path is not an orca_teleop checkout.',
   no_streamer_entrypoint:
     'The checkout is on a branch that predates the console streamer, so it ' +
     'has no orca-teleop-streamer entry point.',
-  no_uv: 'uv is not on PATH — install it from https://docs.astral.sh/uv/ and ' +
+  no_uv:
+    'uv is not on PATH — install it from https://docs.astral.sh/uv/ and ' +
     'restart the console.',
 }
 
-export function InstallCard() {
+export function TeleopUnavailable({ onExternal }: { onExternal: () => void }) {
   const sources = useTeleopStore((s) => s.sources)
   const install = useTeleopStore((s) => s.install)
   const setInstall = useTeleopStore((s) => s.setInstall)
@@ -67,6 +71,8 @@ export function InstallCard() {
   const running = install?.running ?? false
   const reason = sources?.runner.reason ?? 'no_checkout'
   const uvMissing = reason === 'no_uv'
+  const adopting = target?.state === 'existing_checkout'
+  const occupied = target?.state === 'occupied'
 
   const begin = () => {
     setConfirming(false)
@@ -78,17 +84,24 @@ export function InstallCard() {
       )
   }
 
-  const adopting = target?.state === 'existing_checkout'
-  const occupied = target?.state === 'occupied'
-
   return (
-    <div className="setup-card">
-      <div className="setup-card-title">Teleop unavailable</div>
-      <div className="setup-card-hint">
+    <div className="teleop-gate">
+      <div className="teleop-gate-eyebrow">Teleoperation</div>
+      <h2 className="teleop-gate-title">
+        {running ? 'Installing orca_teleop…' : 'Teleop is not installed'}
+      </h2>
+      <p className="teleop-gate-lede">
         {REASONS[reason] ?? sources?.runner.detail ?? 'No runner available.'}{' '}
-        orca_teleop is a separate repository — its retargeting stack is heavy
-        and it needs Python &lt;3.13, so it runs in its own environment rather
-        than as a dependency of the console.
+        orca_teleop is an optional add-on that installs alongside the console.
+      </p>
+
+      <div className="teleop-gate-features">
+        {SOURCE_TILES.map(({ id, label, hint }) => (
+          <div key={id} className="teleop-gate-feature">
+            <span className="teleop-gate-feature-name">{label}</span>
+            <span className="teleop-gate-feature-desc">{hint}</span>
+          </div>
+        ))}
       </div>
 
       {install?.finished && install.ok === false && install.error && (
@@ -96,12 +109,17 @@ export function InstallCard() {
       )}
       {install?.finished && install.ok && (
         <div className="chain-instruction done">
-          orca_teleop installed — managed sources are available now.
+          orca_teleop installed — reload if this panel doesn't clear on its own.
         </div>
       )}
 
-      {!uvMissing && (
-        <>
+      {uvMissing ? (
+        <div className="teleop-gate-note">
+          Nothing to install from here: uv builds the environment, so it has to
+          come first.
+        </div>
+      ) : (
+        <div className="teleop-gate-actions">
           <div className="setup-card-row">
             <label className="setup-card-detail" htmlFor="teleop-install-path">
               Install to
@@ -119,7 +137,8 @@ export function InstallCard() {
           {target && (
             <div className="setup-card-detail">
               {target.state === 'empty' && `→ ${target.detail}`}
-              {adopting && '→ already a checkout here; it will be built, not re-cloned'}
+              {adopting &&
+                '→ already a checkout here; it will be built, not re-cloned'}
               {occupied && `✗ ${target.detail}`}
             </div>
           )}
@@ -127,11 +146,14 @@ export function InstallCard() {
           {running ? (
             <div className="setup-card-row">
               <span className="setup-card-detail">
-                {install?.phase ?? 'working'}…
+                {install?.phase ?? 'working'}… this takes several minutes; the
+                log below is live.
               </span>
               <button
                 className="btn btn-secondary"
-                onClick={() => void api.teleopInstallCancel().catch(() => undefined)}
+                onClick={() =>
+                  void api.teleopInstallCancel().catch(() => undefined)
+                }
               >
                 Cancel
               </button>
@@ -156,15 +178,24 @@ export function InstallCard() {
             </div>
           ) : (
             <button
-              className="btn btn-primary"
+              className="btn btn-primary teleop-gate-install"
               disabled={occupied || !path}
               onClick={() => setConfirming(true)}
             >
               {adopting ? 'Build orca_teleop environment' : 'Install orca_teleop'}
             </button>
           )}
-        </>
+        </div>
       )}
+
+      <button
+        className="teleop-gate-link"
+        onClick={onExternal}
+        title="connect a streamer you launch yourself — no checkout needed on
+          this machine"
+      >
+        Already running orca-teleop-streamer elsewhere? Connect it instead →
+      </button>
     </div>
   )
 }

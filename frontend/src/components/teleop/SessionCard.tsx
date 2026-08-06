@@ -202,8 +202,9 @@ export function SessionCard() {
               disabled={!wsConnected || managedBlocked}
               title={
                 managedBlocked
-                  ? 'no orca_teleop checkout to launch — install it above, ' +
-                    'or switch to external mode and start the streamer yourself'
+                  ? 'no orca_teleop checkout to launch — keep external mode ' +
+                    'on and start the streamer yourself, or install the ' +
+                    'checkout from the Teleop tab'
                   : undefined
               }
               onClick={start}

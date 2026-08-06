@@ -1642,6 +1642,125 @@ header h1 {
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
 }
 
+/* Install gate: the whole tab when there is no orca_teleop checkout. Reads as
+   a statement with one action, not as a disabled console. */
+
+.teleop-gate {
+  max-width: 720px;
+  margin: 32px auto 12px;
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--panel-border);
+  border-top: 2px solid var(--accent);
+  padding: 28px 32px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.teleop-gate-eyebrow {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.teleop-gate-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-bright);
+}
+
+.teleop-gate-lede {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.75;
+  color: var(--dim);
+  max-width: 62ch;
+}
+
+.teleop-gate-lede code {
+  color: var(--muted);
+}
+
+.teleop-gate-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  width: 100%;
+  margin: 2px 0;
+}
+
+.teleop-gate-feature {
+  border: 1px solid var(--panel-border);
+  border-left: 2px solid var(--panel-border-strong);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.teleop-gate-feature-name {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.teleop-gate-feature-desc {
+  font-size: 9px;
+  line-height: 1.45;
+  color: var(--dimmer);
+}
+
+.teleop-gate-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.teleop-gate-install {
+  padding: 7px 18px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.teleop-gate-note {
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--warn);
+  padding-top: 12px;
+  border-top: 1px solid var(--panel-border);
+  width: 100%;
+}
+
+.teleop-gate-link {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: var(--font);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: var(--dim);
+  cursor: pointer;
+  text-align: left;
+}
+
+.teleop-gate-link:hover {
+  color: var(--accent);
+}
+
 .teleop-source-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

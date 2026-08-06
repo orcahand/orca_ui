@@ -5,32 +5,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../../api/rest'
-import type { TeleopSourceId } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
 import { isTeleopActive, useTeleopStore } from '../../state/teleopStore'
-
-const SOURCE_TILES: { id: TeleopSourceId; label: string; hint: string }[] = [
-  {
-    id: 'mediapipe',
-    label: 'Webcam',
-    hint: 'MediaPipe hand tracking — just a camera',
-  },
-  {
-    id: 'avp',
-    label: 'Vision Pro',
-    hint: 'Tracking Streamer visionOS app over WiFi',
-  },
-  {
-    id: 'manus',
-    label: 'Manus gloves',
-    hint: 'SDK publisher on a Linux box (see docs)',
-  },
-  {
-    id: 'synthetic',
-    label: 'Synthetic',
-    hint: 'waveform generator — no hardware, dev/demo',
-  },
-]
+import { SOURCE_TILES } from './sources'
 
 export function SourceCard() {
   const sources = useTeleopStore((s) => s.sources)
@@ -143,8 +120,8 @@ export function SourceCard() {
       </div>
       {runnerMissing && (
         <div className="setup-card-reason">
-          no orca_teleop checkout — see the card above to install one. Managed
-          start is unavailable until then; external mode still works.
+          no orca_teleop checkout on this machine — external mode only, i.e.
+          the streamer runs somewhere else and connects in.
         </div>
       )}
 
