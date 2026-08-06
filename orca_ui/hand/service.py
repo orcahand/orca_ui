@@ -122,6 +122,7 @@ class HandService:
         self._operation_manager = None   # attached post-construction (server.py)
         self._sweeper = None             # mock-only dev sweeper, for estop
         self._teleop_manager = None      # attached post-construction (server.py)
+        self._teleop_installer = None    # ditto; exists even with teleop off
         # Gains connect() installed from config.yaml — what "reset" restores.
         # Live gains are read back from the controller, never shadowed here.
         self._config_gains: dict[str, dict] = {}
@@ -234,12 +235,17 @@ class HandService:
                            encoder_calibrated: set | None) -> dict:
         """Motor vs joint-feedback calibration, and what recalibrating fixes.
 
-        ``hint`` is set when the motors are calibrated but encoder anchors are
-        missing — the state every calibration recorded before the wrist joined
-        the loop lands in.
+        ``needs_calibration`` is the single flag the UI gates its "calibrate
+        the hand" prompt on, and ``hint`` is the matching sentence. Two states
+        set them: nothing recorded at all, and motors recorded but encoder
+        anchors missing (where every calibration taken before the wrist joined
+        the loop lands). The first is the one worth surfacing loudly — the
+        connect ladder has already dropped to a non-feedback tier by then, so
+        joint sensing is gone from the UI with no other explanation.
         """
         state: dict = {"motors": None, "joint_feedback": None,
-                       "missing_anchors": [], "hint": None}
+                       "missing_anchors": [], "needs_calibration": False,
+                       "hint": None}
         if session is None or not session.caps.motors:
             return state
         try:
@@ -247,13 +253,24 @@ class HandService:
                 session.hand.is_calibrated(use_joint_feedback=False))
         except Exception:
             return state
-        if not encoder_backed or encoder_calibrated is None:
-            return state
-        missing = [joint for joint in session.hand.config.joint_ids
-                   if joint in encoder_backed and joint not in encoder_calibrated]
-        state["missing_anchors"] = missing
-        state["joint_feedback"] = bool(state["motors"]) and not missing
-        if missing and state["motors"]:
+        if encoder_backed and encoder_calibrated is not None:
+            missing = [joint for joint in session.hand.config.joint_ids
+                       if joint in encoder_backed
+                       and joint not in encoder_calibrated]
+            state["missing_anchors"] = missing
+            state["joint_feedback"] = bool(state["motors"]) and not missing
+        if not state["motors"]:
+            # Motor limits, ratios and encoder anchors all come out of the
+            # same sweep, so an uncalibrated hand has one thing to say.
+            state["needs_calibration"] = True
+            state["hint"] = (
+                "hand is not calibrated — run Setup → Calibrate to record "
+                + ("motor limits and the joint-encoder anchors"
+                   if encoder_backed else "the motor limits")
+            )
+        elif state["missing_anchors"]:
+            missing = state["missing_anchors"]
+            state["needs_calibration"] = True
             state["hint"] = (
                 f"no encoder anchor for {', '.join(missing)} — recalibrate "
                 f"{'them' if len(missing) > 1 else 'it'} to capture the "
@@ -433,6 +450,9 @@ class HandService:
     def attach_teleop_manager(self, manager) -> None:
         self._teleop_manager = manager
 
+    def attach_teleop_installer(self, installer) -> None:
+        self._teleop_installer = installer
+
     @property
     def operation_manager(self):
         return self._operation_manager
@@ -440,6 +460,12 @@ class HandService:
     @property
     def teleop_manager(self):
         return getattr(self, "_teleop_manager", None)
+
+    @property
+    def teleop_installer(self):
+        # Present even when teleop_manager is None (--no-teleop): fetching the
+        # checkout is exactly what an install-less console needs to offer.
+        return getattr(self, "_teleop_installer", None)
 
     def estop(self) -> dict:
         """Best-effort emergency stop: never raises.

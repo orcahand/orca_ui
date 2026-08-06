@@ -14,6 +14,7 @@ import type {
   TactileMode,
   TaxelGeometry,
   TeleopCamera,
+  TeleopInstallState,
   TeleopSnapshot,
   TeleopSourceId,
   TeleopSourcesInfo,
@@ -172,6 +173,19 @@ export const api = {
     post<{ session: TeleopSnapshot }>('/api/teleop/disengage'),
   teleopConfig: (config: Record<string, unknown>) =>
     post<{ config: Record<string, unknown> }>('/api/teleop/config', { config }),
+
+  // Install works with teleop disabled — it is what makes teleop possible.
+  teleopInstallState: (path?: string) =>
+    request<TeleopInstallState>(
+      '/api/teleop/install' +
+        (path ? `?path=${encodeURIComponent(path)}` : ''),
+    ),
+  teleopInstallLog: () =>
+    request<OperationLogPayload>('/api/teleop/install/log'),
+  teleopInstall: (path?: string) =>
+    post<TeleopInstallState>('/api/teleop/install', path ? { path } : {}),
+  teleopInstallCancel: () =>
+    post<{ ok: boolean }>('/api/teleop/install/cancel'),
 
   modelMetadata: () => request<ModelMetadata>('/api/model/metadata'),
   modelFingertips: () =>

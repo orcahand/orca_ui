@@ -185,8 +185,11 @@ class TeleopManager:
         }
         with self._lock:
             cameras = list(self._cameras) if self._cameras is not None else None
+        from orca_ui.hand.teleop.paths import default_install_dir
+
         return {
-            "runner": availability,
+            "runner": {**availability,
+                       "default_install_path": default_install_dir()},
             "sources": sources,
             # None = never scanned; [] = scanned, nothing found.
             "cameras": cameras,

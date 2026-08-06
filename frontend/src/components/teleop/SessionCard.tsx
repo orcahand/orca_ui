@@ -49,6 +49,7 @@ export function SessionCard() {
   const setDraft = useTeleopStore((s) => s.setDraft)
   const externalToken = useTeleopStore((s) => s.externalToken)
   const setExternalToken = useTeleopStore((s) => s.setExternalToken)
+  const sources = useTeleopStore((s) => s.sources)
   const handInfo = useAppStore((s) => s.handInfo)
   const wsConnected = useAppStore((s) => s.wsConnected)
   const engageGate = useEngageGate()
@@ -58,6 +59,10 @@ export function SessionCard() {
   const caps = useAppStore((s) => s.status?.capabilities)
 
   const active = isTeleopActive(session)
+  // Only managed mode needs the checkout; external mode is a manually
+  // launched streamer, so it must stay startable without one.
+  const managedBlocked =
+    !draft.external && sources !== null && !sources.runner.available
   const engaged = session?.state === 'engaged'
   // The most common "why won't it engage" — offer the fix inline.
   const torqueMissing =
@@ -194,7 +199,13 @@ export function SessionCard() {
           <>
             <button
               className="btn btn-primary"
-              disabled={!wsConnected}
+              disabled={!wsConnected || managedBlocked}
+              title={
+                managedBlocked
+                  ? 'no orca_teleop checkout to launch — install it above, ' +
+                    'or switch to external mode and start the streamer yourself'
+                  : undefined
+              }
               onClick={start}
             >
               {draft.auto_engage ? '▶ Start teleop' : '▶ Start preview'}

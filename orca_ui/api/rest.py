@@ -156,6 +156,44 @@ def build_router(service: HandService) -> APIRouter:
     def teleop_config(body: schemas.TeleopConfigRequest):
         return {"config": guard(_teleop().set_config, body.config)}
 
+    # ----- teleop install -----------------------------------------------------------
+    # Not behind _teleop(): that 503s when there is no teleop MANAGER
+    # (--no-teleop), which is unrelated to whether the orca_teleop checkout
+    # exists — and the install is what fixes the latter.
+
+    def _installer():
+        installer = service.teleop_installer
+        if installer is None:
+            raise HTTPException(status_code=503, detail="installer unavailable")
+        return installer
+
+    @router.get("/teleop/install")
+    def teleop_install_state(path: str | None = None):
+        from orca_ui.hand.teleop.installer import inspect_target
+
+        installer = _installer()
+        state = installer.snapshot()
+        state["target"] = inspect_target(path or state["default_path"])
+        return state
+
+    @router.get("/teleop/install/log")
+    def teleop_install_log():
+        return _installer().log_payload()
+
+    @router.post("/teleop/install")
+    def teleop_install(body: schemas.TeleopInstallRequest | None = None):
+        from orca_ui.hand.teleop.installer import InstallError
+
+        try:
+            return _installer().start(body.path if body else None)
+        except InstallError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+
+    @router.post("/teleop/install/cancel")
+    def teleop_install_cancel():
+        _installer().cancel()
+        return {"ok": True}
+
     # ----- motor control -------------------------------------------------------
 
     @router.post("/torque/enable")

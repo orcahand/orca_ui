@@ -11,6 +11,7 @@ import { api } from '../api/rest'
 import type {
   OperationLogLine,
   OperationLogPayload,
+  TeleopInstallState,
   TeleopSnapshot,
   TeleopSourceId,
   TeleopSourcesInfo,
@@ -89,6 +90,12 @@ interface TeleopStoreState {
   draft: TeleopDraft
   logRunId: string | null
   logLines: OperationLogLine[]
+  // orca_teleop checkout install. Separate log ring from the session log: a
+  // session starting clears that one, which would wipe the install history
+  // exactly when the user acts on it.
+  install: TeleopInstallState | null
+  installLogRunId: string | null
+  installLogLines: OperationLogLine[]
 
   setSession(session: TeleopSnapshot): void
   setSources(info: TeleopSourcesInfo | null): void
@@ -96,6 +103,8 @@ interface TeleopStoreState {
   setAutoEngagePending(pending: boolean): void
   setDraft(patch: Partial<TeleopDraft>): void
   mergeLog(payload: OperationLogPayload): void
+  setInstall(install: TeleopInstallState | null): void
+  mergeInstallLog(payload: OperationLogPayload): void
 }
 
 // Torque on (if needed), then engage. Fired once per session on entering
@@ -123,6 +132,9 @@ export const useTeleopStore = create<TeleopStoreState>((set, get) => ({
   draft: storedDraft,
   logRunId: null,
   logLines: [],
+  install: null,
+  installLogRunId: null,
+  installLogLines: [],
 
   setSession: (session) => {
     const previous = get().session
@@ -174,6 +186,23 @@ export const useTeleopStore = create<TeleopStoreState>((set, get) => ({
     set((state) => {
       const merged = mergeLogPayload(state.logRunId, state.logLines, payload)
       return merged ?? state
+    }),
+
+  setInstall: (install) => set({ install }),
+
+  mergeInstallLog: (payload) =>
+    set((state) => {
+      const merged = mergeLogPayload(
+        state.installLogRunId,
+        state.installLogLines,
+        payload,
+      )
+      return merged
+        ? {
+            installLogRunId: merged.logRunId,
+            installLogLines: merged.logLines,
+          }
+        : state
     }),
 }))
 

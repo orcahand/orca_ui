@@ -6,6 +6,8 @@ TestClient (external mode), so CI needs no orca_teleop environment.
 """
 
 import math
+import os
+import shutil
 import sys
 import threading
 import time
@@ -629,3 +631,208 @@ def test_camera_scan_via_fake_probe(tmp_path):
                     json={"source": "synthetic", "mode": "external"})
         assert client.post("/api/teleop/cameras/scan").status_code == 409
         client.post("/api/teleop/stop")
+
+
+# ----- orca_teleop checkout: availability probe + install ---------------------------------
+
+
+def _write_teleop_checkout(path, *, name="orca_teleop", streamer=True):
+    """A directory that looks (or deliberately does not look) like a checkout."""
+    path.mkdir(parents=True, exist_ok=True)
+    scripts = ('[project.scripts]\norca-teleop-streamer = "orca_teleop.streamer:main"\n'
+               if streamer else "")
+    (path / "pyproject.toml").write_text(
+        f'[project]\nname = "{name}"\nversion = "0.1.0"\n\n{scripts}')
+    return str(path)
+
+
+@pytest.mark.parametrize("build,expected", [
+    (lambda p: None, "no_checkout"),
+    (lambda p: str(p / "not_a_dir"), "no_checkout"),
+    (lambda p: _write_teleop_checkout(p / "co", name="something_else"), "no_pyproject"),
+    (lambda p: _write_teleop_checkout(p / "co", streamer=False), "no_streamer_entrypoint"),
+    (lambda p: _write_teleop_checkout(p / "co"), "ok"),
+])
+def test_resolve_command_reports_why_the_runner_is_unusable(
+        tmp_path, monkeypatch, build, expected):
+    """A checkout on a branch without the console's entry point used to probe
+    as available and then fail at spawn."""
+    from orca_ui.hand.teleop import runner as R
+
+    # Isolate from this machine's real sibling checkout / memo.
+    monkeypatch.setattr(R, "_find_sibling_teleop_dir", lambda: None)
+    monkeypatch.setattr(R, "remembered_teleop_dir", lambda: None)
+    monkeypatch.delenv("ORCA_TELEOP_DIR", raising=False)
+    teleop_dir = build(tmp_path)
+    settings = UiSettings(config_path=materialize_mock_model(), mock=True,
+                          open_browser=False, teleop_dir=teleop_dir)
+    argv, detail, reason = R.resolve_command(settings)
+    assert reason == expected, detail
+    assert (argv is not None) == (expected == "ok")
+
+
+def test_remembered_path_precedence(tmp_path, monkeypatch):
+    """The memo beats the sibling scan, loses to explicit settings/env, and a
+    stale entry falls through instead of pinning a deleted directory."""
+    from orca_ui.hand.teleop import paths as P
+    from orca_ui.hand.teleop import runner as R
+
+    memo = tmp_path / ".orca-ui.json"
+    monkeypatch.setattr(P, "settings_path", lambda: str(memo))
+    monkeypatch.setattr(P, "_memo_cache", None, raising=False)
+    sibling = _write_teleop_checkout(tmp_path / "sibling")
+    monkeypatch.setattr(R, "_find_sibling_teleop_dir", lambda: sibling)
+    base = dict(config_path=materialize_mock_model(), mock=True, open_browser=False)
+
+    # nothing remembered -> sibling
+    assert R.resolve_command(UiSettings(**base))[0][3] == sibling
+
+    remembered = _write_teleop_checkout(tmp_path / "remembered")
+    P.remember_teleop_dir(remembered)
+    assert R.resolve_command(UiSettings(**base))[0][3] == remembered
+
+    # explicit settings and the env var both outrank the memo
+    explicit = _write_teleop_checkout(tmp_path / "explicit")
+    assert R.resolve_command(UiSettings(**base, teleop_dir=explicit))[0][3] == explicit
+    monkeypatch.setenv("ORCA_TELEOP_DIR", explicit)
+    assert R.resolve_command(UiSettings(**base))[0][3] == explicit
+    monkeypatch.delenv("ORCA_TELEOP_DIR")
+
+    # a remembered checkout that has since been deleted must not win
+    shutil.rmtree(remembered)
+    monkeypatch.setattr(P, "_memo_cache", None, raising=False)
+    assert R.resolve_command(UiSettings(**base))[0][3] == sibling
+
+
+def _fake_bin(tmp_path, name, body):
+    """An executable stand-in for git/uv, so the installer's real Popen +
+    output pump + exit-code handling is what gets exercised."""
+    path = tmp_path / name
+    path.write_text("#!/bin/sh\n" + body)
+    path.chmod(0o755)
+    return str(path)
+
+
+@pytest.fixture()
+def install_client(tmp_path, monkeypatch):
+    """App whose installer shells into fake git/uv, with teleop DISABLED —
+    the case where /api/teleop/* 503s but install must still work."""
+    from orca_ui.hand.teleop import installer as I
+    from orca_ui.hand.teleop import paths as P
+
+    monkeypatch.setattr(P, "settings_path", lambda: str(tmp_path / ".orca-ui.json"))
+    monkeypatch.setattr(P, "_memo_cache", None, raising=False)
+    # Patch on the installer module: it binds these names at import, so
+    # patching only `paths` would let the install target this machine's real
+    # ../orca_teleop checkout.
+    monkeypatch.setattr(I, "default_install_dir", lambda: str(tmp_path / "orca_teleop"))
+    monkeypatch.setattr(I, "default_description_dir",
+                        lambda: str(tmp_path / "orcahand_description"))
+    (tmp_path / "orcahand_description").mkdir()   # already present: no clone
+    # `git clone [--branch B] REPO TARGET` -> materialize a plausible checkout.
+    monkeypatch.setattr(I, "GIT_BIN", _fake_bin(tmp_path, "git", """
+echo "cloning"
+eval "target=\\${$#}"
+mkdir -p "$target"
+printf '[project]\\nname = "orca_teleop"\\n\\n[project.scripts]\\norca-teleop-streamer = "x:main"\\n' > "$target/pyproject.toml"
+"""))
+    monkeypatch.setattr(I, "UV_BIN", _fake_bin(tmp_path, "uv", 'echo "Resolved 1 package"\n'))
+    settings = UiSettings(config_path=materialize_mock_model(), mock=True,
+                          open_browser=False, teleop_enabled=False)
+    app = create_app(settings)
+    with TestClient(app) as client:
+        client.installer = app.state.teleop_installer
+        client.tmp_path = tmp_path
+        yield client
+
+
+def _await_install(client, timeout=10.0):
+    _wait_for(lambda: client.get("/api/teleop/install").json()["finished"],
+              timeout=timeout)
+    return client.get("/api/teleop/install").json()
+
+
+def test_install_is_reachable_with_teleop_disabled(install_client):
+    """--no-teleop turns off the teleop MANAGER, which is unrelated to whether
+    a checkout exists — and installing one is the whole point."""
+    assert install_client.get("/api/teleop/state").status_code == 503
+    assert install_client.get("/api/teleop/install").status_code == 200
+
+
+def test_install_clones_builds_and_remembers(install_client):
+    from orca_ui.hand.teleop.paths import remembered_teleop_dir
+
+    target = str(install_client.tmp_path / "orca_teleop")
+    assert install_client.post("/api/teleop/install").status_code == 200
+    state = _await_install(install_client)
+    assert state["ok"] is True, state["error"]
+    assert os.path.isfile(os.path.join(target, "pyproject.toml"))
+    assert remembered_teleop_dir() == target
+
+    log = install_client.get("/api/teleop/install/log").json()
+    text = "\n".join(line["line"] for line in log["lines"])
+    assert "cloning" in text and "Resolved 1 package" in text
+    # Its own run_id space: a teleop session must never clear this pane.
+    assert log["run_id"].startswith("install:")
+
+
+def test_install_refuses_an_occupied_target(install_client):
+    occupied = install_client.tmp_path / "occupied"
+    occupied.mkdir()
+    (occupied / "some_file").write_text("x")
+    response = install_client.post("/api/teleop/install",
+                                   json={"path": str(occupied)})
+    assert response.status_code == 409
+    assert "not an orca_teleop checkout" in response.json()["detail"]
+
+
+def test_install_adopts_an_existing_checkout(install_client):
+    """Re-running over a checkout builds it rather than failing or re-cloning."""
+    existing = _write_teleop_checkout(install_client.tmp_path / "existing")
+    assert install_client.get(
+        f"/api/teleop/install?path={existing}").json()["target"]["state"] == "existing_checkout"
+    install_client.post("/api/teleop/install", json={"path": existing})
+    state = _await_install(install_client)
+    assert state["ok"] is True, state["error"]
+    text = "\n".join(l["line"] for l in
+                     install_client.get("/api/teleop/install/log").json()["lines"])
+    assert "skipping clone" in text
+
+
+def test_install_does_not_remember_a_failed_build(install_client, monkeypatch):
+    """A remembered path must point at something usable."""
+    from orca_ui.hand.teleop import installer as I
+    from orca_ui.hand.teleop.paths import remembered_teleop_dir
+
+    monkeypatch.setattr(I, "UV_BIN", _fake_bin(
+        install_client.tmp_path, "uv_fail", 'echo "resolution failed" >&2\nexit 1\n'))
+    install_client.post("/api/teleop/install")
+    state = _await_install(install_client)
+    assert state["ok"] is False
+    assert "uv_fail failed (exit 1)" in state["error"]
+    assert remembered_teleop_dir() is None
+
+
+def test_install_rejects_a_second_concurrent_run(install_client, monkeypatch):
+    from orca_ui.hand.teleop import installer as I
+
+    monkeypatch.setattr(I, "UV_BIN", _fake_bin(
+        install_client.tmp_path, "uv_slow", 'sleep 5\n'))
+    assert install_client.post("/api/teleop/install").status_code == 200
+    _wait_for(lambda: install_client.get("/api/teleop/install").json()["running"])
+    assert install_client.post("/api/teleop/install").status_code == 409
+    install_client.post("/api/teleop/install/cancel")
+    assert _await_install(install_client)["ok"] is False
+
+
+def test_install_cancel_kills_the_child(install_client, monkeypatch):
+    from orca_ui.hand.teleop import installer as I
+
+    monkeypatch.setattr(I, "UV_BIN", _fake_bin(
+        install_client.tmp_path, "uv_hang", 'sleep 30\n'))
+    install_client.post("/api/teleop/install")
+    _wait_for(lambda: install_client.get("/api/teleop/install").json()["phase"]
+              == "building environment")
+    install_client.post("/api/teleop/install/cancel")
+    state = _await_install(install_client, timeout=15.0)
+    assert state["ok"] is False and state["error"] == "cancelled"

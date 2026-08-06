@@ -55,7 +55,10 @@ export interface CalibrationInfo {
   joint_feedback: boolean | null
   // Encoder-backed joints with no anchor — they run open-loop.
   missing_anchors: string[]
-  // Set when recalibrating would capture the missing anchors.
+  // Calibration is missing or incomplete: nothing recorded at all, or motors
+  // recorded but encoder anchors missing. What the "calibrate" prompts gate on.
+  needs_calibration: boolean
+  // Set whenever needs_calibration is — the sentence to show the user.
   hint: string | null
 }
 
@@ -255,7 +258,20 @@ export interface TeleopCamera {
 }
 
 export interface TeleopSourcesInfo {
-  runner: { available: boolean; detail: string | null }
+  runner: {
+    available: boolean
+    detail: string | null
+    // Machine-readable cause, so the UI can offer the right fix instead of
+    // parsing `detail`. 'no_streamer_entrypoint' = a checkout on a branch
+    // that predates the console's streamer script.
+    reason?:
+      | 'ok'
+      | 'no_checkout'
+      | 'no_pyproject'
+      | 'no_streamer_entrypoint'
+      | 'no_uv'
+    default_install_path?: string
+  }
   sources: Record<TeleopSourceId, TeleopSourceAvailability>
   cameras: TeleopCamera[] | null // null = never scanned
   default_camera_index: number | null // built-in preferred over Continuity
@@ -316,7 +332,29 @@ export const TOPICS = {
   teleopTargets: 'teleop.targets',
   teleopLog: 'teleop.log',
   teleopPreview: 'teleop.preview',
+  teleopInstall: 'teleop.install',
+  teleopInstallLog: 'teleop.install.log',
 } as const
+
+// Fetching + building the orca_teleop checkout. Its own log run_id space, so
+// install output is never cleared by a teleop session starting.
+export interface TeleopInstallTarget {
+  path: string
+  state: 'empty' | 'existing_checkout' | 'occupied'
+  detail: string
+}
+
+export interface TeleopInstallState {
+  running: boolean
+  phase: string | null
+  target: string | TeleopInstallTarget | null
+  error: string | null
+  finished: boolean
+  ok: boolean | null
+  default_path: string
+  repo: string
+  branch: string
+}
 
 export interface ServerMessage {
   type: string

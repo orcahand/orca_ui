@@ -3,6 +3,7 @@ import { api } from './api/rest'
 import { startStreamClient } from './api/streamClient'
 import { BootHero } from './components/BootHero'
 import { ErrorBanner } from './components/common/ErrorBanner'
+import { CalibrationBanner } from './components/common/CalibrationBanner'
 import { MaintenanceBanner } from './components/common/MaintenanceBanner'
 import { AppHeader } from './components/header/AppHeader'
 import { TransportBar } from './components/transport/TransportBar'
@@ -71,7 +72,10 @@ export default function App() {
       ) : (
         <>
           {(view === 'dashboard' || view === '3d' || view === 'poses') && (
-            <MaintenanceBanner />
+            <>
+              <MaintenanceBanner />
+              <CalibrationBanner />
+            </>
           )}
           {view === 'dashboard' && <DashboardView />}
           {view === '3d' && (

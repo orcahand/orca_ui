@@ -3,6 +3,7 @@
 
 import { useAppStore } from '../../state/appStore'
 import { EncoderPanel } from '../encoders/EncoderPanel'
+import { EncoderUnavailableCard } from '../encoders/EncoderUnavailableCard'
 import { MotorPanel } from '../motors/MotorPanel'
 import { TactilePanel } from '../tactile/TactilePanel'
 import { TeleopStatusCard } from '../teleop/TeleopStatusCard'
@@ -15,7 +16,10 @@ export function DashboardView() {
   // the view says why; there's nothing live to draw.
   if (!caps) return null
 
-  const twoColumns = caps.encoders && caps.motors
+  // A declared-but-missing encoder tier still occupies its column — the
+  // placeholder explains the absence in situ rather than leaving a gap.
+  const encoderSlot = caps.encoders || Boolean(caps.declared.encoders)
+  const twoColumns = encoderSlot && caps.motors
 
   return (
     <>
@@ -34,7 +38,11 @@ export function DashboardView() {
             : undefined
         }
       >
-        {caps.encoders && <EncoderPanel />}
+        {caps.encoders ? (
+          <EncoderPanel />
+        ) : (
+          encoderSlot && <EncoderUnavailableCard />
+        )}
         {caps.motors && <MotorPanel />}
       </div>
     </>

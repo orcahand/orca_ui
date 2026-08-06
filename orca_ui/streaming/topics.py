@@ -36,6 +36,13 @@ TELEOP_TARGETS = "teleop.targets"
 TELEOP_LOG = "teleop.log"
 TELEOP_PREVIEW = "teleop.preview"
 
+# Fetching + building the orca_teleop checkout. Separate from teleop.log on
+# purpose: that ring belongs to a session and is cleared when one starts, which
+# would wipe the install history at the moment the user acts on it — and it
+# lives on the teleop manager, which does not exist under --no-teleop.
+TELEOP_INSTALL = "teleop.install"
+TELEOP_INSTALL_LOG = "teleop.install.log"
+
 ALL_TOPICS = [
     STATUS, CONTROL_STATE, ERROR,
     OPERATION_STATE, OPERATION_LOG,
@@ -43,6 +50,7 @@ ALL_TOPICS = [
     JOINTS_MEASURED, JOINTS_ESTIMATE, JOINTS_TARGET, JOINTS_CORRECTION,
     MOTORS_TELEMETRY, STATS,
     TELEOP_STATE, TELEOP_TARGETS, TELEOP_LOG, TELEOP_PREVIEW,
+    TELEOP_INSTALL, TELEOP_INSTALL_LOG,
 ]
 
 # Broadcast min-interval in seconds (rate ceiling toward the browser).
@@ -52,6 +60,9 @@ MIN_INTERVAL_S = {
     TACTILE_TAXELS: 1.0 / 30.0,
     TELEOP_TARGETS: 1.0 / 30.0,
     TELEOP_PREVIEW: 1.0 / 10.0,
+    # uv sync is chatty. The payload is cumulative, so throttling drops
+    # snapshots, never lines.
+    TELEOP_INSTALL_LOG: 1.0 / 10.0,
 }
 
 BROADCAST_TICK_S = 1.0 / 60.0

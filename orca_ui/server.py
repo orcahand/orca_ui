@@ -41,6 +41,16 @@ def create_app(settings: UiSettings) -> FastAPI:
         from orca_ui.hand.teleop import build_teleop_manager
         teleop = build_teleop_manager(service, settings, hub.publish)
         service.attach_teleop_manager(teleop)
+    # Unconditional, and deliberately outside the teleop_enabled branch: this
+    # is what makes teleop possible, so it has to exist precisely when the
+    # manager does not. Refuses to run while a session is live (uv sync would
+    # rewrite the venv under the running child).
+    from orca_ui.hand.teleop.installer import TeleopInstaller
+    installer = TeleopInstaller(
+        publish=hub.publish,
+        is_teleop_active=lambda: teleop is not None and teleop.active(),
+    )
+    service.attach_teleop_installer(installer)
     telemetry = TelemetryService(service, hub, settings)
 
     @contextlib.asynccontextmanager
@@ -55,6 +65,7 @@ def create_app(settings: UiSettings) -> FastAPI:
             # Teleop first: no targets may race into a dying stack.
             if teleop is not None:
                 teleop.shutdown()
+            installer.shutdown()
             operations.shutdown()
             telemetry.stop()
             service.stop()
@@ -65,6 +76,7 @@ def create_app(settings: UiSettings) -> FastAPI:
     app.state.hub = hub
     app.state.operations = operations
     app.state.teleop = teleop
+    app.state.teleop_installer = installer
 
     app.include_router(build_rest_router(service))
     app.include_router(build_assets_router(service))

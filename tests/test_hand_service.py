@@ -245,3 +245,69 @@ def test_missing_anchor_is_reported_with_a_recalibration_hint(service):
     assert calibration["joint_feedback"] is False
     assert calibration["missing_anchors"] == ["wrist"]
     assert "wrist" in calibration["hint"]
+
+
+# ----- calibration prompts ---------------------------------------------------------------
+
+
+class _FakeHand:
+    def __init__(self, calibrated, joint_ids, anchors):
+        self._calibrated = calibrated
+        self.config = type("C", (), {"joint_ids": joint_ids})()
+        self.calibration = type(
+            "Cal", (), {"joint_encoder_calibration_dict": anchors})()
+
+    def is_calibrated(self, use_joint_feedback=False):
+        return self._calibrated
+
+
+class _FakeSession:
+    def __init__(self, hand):
+        self.hand = hand
+        self.caps = type("Caps", (), {"motors": True})()
+
+
+def _calibration(service, *, calibrated, anchors, encoder_backed=("index_mcp", "wrist")):
+    joints = ["index_mcp", "wrist"]
+    session = _FakeSession(_FakeHand(calibrated, joints, dict.fromkeys(anchors)))
+    return service._calibration_state(session, set(encoder_backed), set(anchors))
+
+
+def test_fully_uncalibrated_hand_asks_to_be_calibrated(service):
+    """The worst case used to report hint=None: the connect ladder has already
+    dropped joint sensing and nothing on screen said why."""
+    state = _calibration(service, calibrated=False, anchors=())
+    assert state["motors"] is False
+    assert state["needs_calibration"] is True
+    assert "not calibrated" in state["hint"]
+    assert "Calibrate" in state["hint"]
+
+
+def test_missing_anchors_still_name_the_joints(service):
+    state = _calibration(service, calibrated=True, anchors=("index_mcp",))
+    assert state["needs_calibration"] is True
+    assert state["missing_anchors"] == ["wrist"]
+    assert "wrist" in state["hint"]
+    assert state["joint_feedback"] is False
+
+
+def test_calibrated_hand_asks_for_nothing(service):
+    state = _calibration(service, calibrated=True, anchors=("index_mcp", "wrist"))
+    assert state["needs_calibration"] is False
+    assert state["hint"] is None
+    assert state["joint_feedback"] is True
+
+
+def test_uncalibrated_hand_without_encoders_does_not_mention_anchors(service):
+    state = _calibration(service, calibrated=False, anchors=(), encoder_backed=())
+    assert state["needs_calibration"] is True
+    assert "anchor" not in state["hint"]
+
+
+def test_no_motor_bus_asks_for_nothing(service):
+    """Calibration needs motors; prompting a motorless session is noise."""
+    session = _FakeSession(_FakeHand(False, ["index_mcp"], {}))
+    session.caps = type("Caps", (), {"motors": False})()
+    state = service._calibration_state(session, {"index_mcp"}, set())
+    assert state["needs_calibration"] is False
+    assert state["hint"] is None

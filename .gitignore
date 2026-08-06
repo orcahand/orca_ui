@@ -25,6 +25,9 @@ env/
 # Where `orca-dev` remembers this machine's orca_core checkout
 .orca-dev.json
 
+# Where the console remembers this machine's orca_teleop checkout
+.orca-ui.json
+
 # Frontend
 node_modules/
 .superpowers/

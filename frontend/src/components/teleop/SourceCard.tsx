@@ -143,8 +143,8 @@ export function SourceCard() {
       </div>
       {runnerMissing && (
         <div className="setup-card-reason">
-          teleop runner not found — {sources?.runner.detail}. Managed start is
-          unavailable; external mode still works.
+          no orca_teleop checkout — see the card above to install one. Managed
+          start is unavailable until then; external mode still works.
         </div>
       )}
 

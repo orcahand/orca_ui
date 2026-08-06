@@ -17,6 +17,7 @@ import type {
   OperationSnapshot,
   ServerMessage,
   StatusSnapshot,
+  TeleopInstallState,
   TeleopSnapshot,
 } from './types'
 import { TOPICS } from './types'
@@ -234,6 +235,24 @@ function dispatch(message: ServerMessage): void {
       useTeleopStore
         .getState()
         .mergeLog(data as unknown as OperationLogPayload)
+      break
+    case TOPICS.teleopInstall: {
+      const install = data as unknown as TeleopInstallState
+      useTeleopStore.getState().setInstall(install)
+      // A finished install changes runner availability; re-probe so the card
+      // collapses back to the source picker without a reload.
+      if (install.finished) {
+        void api
+          .teleopSources()
+          .then(useTeleopStore.getState().setSources)
+          .catch(() => undefined)
+      }
+      break
+    }
+    case TOPICS.teleopInstallLog:
+      useTeleopStore
+        .getState()
+        .mergeInstallLog(data as unknown as OperationLogPayload)
       break
     case TOPICS.teleopPreview:
       latest.teleop.preview = data as { jpeg: string; seq: number | null }

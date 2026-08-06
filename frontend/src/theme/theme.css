@@ -672,6 +672,28 @@ header h1 {
   letter-spacing: 0.5px;
 }
 
+/* Inline call-to-action inside a banner: the banner states the problem, this
+   is the one click that fixes it. */
+.banner-cta {
+  margin-left: 10px;
+  padding: 2px 8px;
+  border: 1px solid rgba(200, 160, 80, 0.45);
+  border-radius: 0;
+  background: transparent;
+  color: var(--warn);
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.banner-cta:hover {
+  background: rgba(200, 160, 80, 0.16);
+  color: var(--text-bright);
+}
+
 /* --- Detecting / empty state --- */
 
 .detecting-card {
@@ -1894,6 +1916,26 @@ header h1 {
   color: var(--err);
   border-color: rgba(212, 135, 138, 0.4);
   background: rgba(200, 100, 100, 0.06);
+}
+
+/* Filesystem path entry (teleop install destination). */
+.path-input {
+  background: var(--bg);
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 0;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 11px;
+  padding: 4px 6px;
+  outline: none;
+}
+
+.path-input:focus {
+  border-color: rgba(34, 211, 238, 0.4);
+}
+
+.path-input:disabled {
+  color: var(--dim);
 }
 
 .chain-confirm {

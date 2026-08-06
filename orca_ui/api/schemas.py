@@ -94,6 +94,13 @@ class TeleopEngageRequest(BaseModel):
     ramp_s: Optional[float] = Field(default=None, ge=0, le=10)
 
 
+class TeleopInstallRequest(BaseModel):
+    """Fetch + build the orca_teleop checkout. ``path`` defaults to the sibling
+    location beside the orca_ui checkout."""
+
+    path: Optional[str] = None
+
+
 class TeleopConfigRequest(BaseModel):
     """Partial config update, forwarded to the streamer child (recognized
     keys are filtered by the manager)."""
