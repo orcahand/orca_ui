@@ -1,0 +1,5 @@
+#!/bin/sh
+# Runs after `git rebase` and `git commit --amend`. A rebase replays commits
+# that touch pyproject.toml, which drops the override the same way a merge
+# does. See .githooks/restore-dev-mode.
+exec "$(dirname "$0")/restore-dev-mode"

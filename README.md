@@ -22,8 +22,8 @@ uv sync
 That installs the released `orca_core` from PyPI.
 
 Working on the console itself, or on `orca_core` alongside it? See
-**[DEVELOPMENT.md](DEVELOPMENT.md)** — `uv run orca-dev` points the console at
-your own `orca_core` checkout in one step.
+**[DEVELOPMENT.md](DEVELOPMENT.md)** — `./dev` points the console at your own
+`orca_core` checkout in one step.
 
 ## Usage
 

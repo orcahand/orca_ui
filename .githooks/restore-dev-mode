@@ -1,0 +1,33 @@
+#!/bin/sh
+# Shared by post-merge, post-checkout and post-rewrite.
+#
+# Dev mode (`./dev local`) points this checkout at an orca_core that exists
+# only on this machine, and uv has no local-only override file — so it lives in
+# tracked pyproject.toml/uv.lock. The pre-commit hook keeps that out of your
+# commits; this keeps it in your working tree, because incoming changes to
+# those same files silently revert it and the next `orca-ui` would run against
+# an orca_core you did not choose.
+#
+# Never fails the git operation it follows: every path exits 0.
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+
+# The common case is someone who never turned dev mode on. Cost them one stat,
+# not a Python start-up, on every checkout and merge.
+[ -f "$root/.orca-dev.json" ] || exit 0
+
+if [ -x "$root/.venv/bin/python" ]; then
+    PY="$root/.venv/bin/python"
+else
+    PY=$(command -v python3 || command -v python)
+fi
+[ -n "$PY" ] || exit 0
+
+cd "$root" || exit 0
+"$PY" -c 'import sys
+sys.path.insert(0, ".")
+try:
+    from orca_ui.core_source import restore
+except Exception:
+    sys.exit(0)
+sys.exit(restore())' || exit 0

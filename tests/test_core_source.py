@@ -259,3 +259,193 @@ def test_only_orca_cores_source_is_consulted():
         + LOCK_RELEASED
     )
     assert core_source.lock_has_dev_source(text) is False
+
+
+# ---------------------------------------------------------------------------
+# Reporting on the project's environment rather than this process's
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def project(tmp_path, monkeypatch):
+    """A project root with a .venv, standing in for a real checkout."""
+    (tmp_path / "pyproject.toml").write_text("[project]\nname = 'orca_ui'\n")
+    bin_dir = tmp_path / ".venv" / "bin"
+    bin_dir.mkdir(parents=True)
+    (bin_dir / "python").write_text("")
+    monkeypatch.setattr(core_source, "_project_root", lambda: str(tmp_path))
+    return tmp_path
+
+
+def test_a_bare_interpreter_is_pointed_at_the_project_venv(project, monkeypatch):
+    """The bootstrap runs outside the venv it just populated, so it has to ask
+    that venv rather than its own environment."""
+    monkeypatch.setattr(core_source.sys, "prefix", "/usr")
+    found = core_source._project_venv_python()
+    assert found == str(project / ".venv" / "bin" / "python")
+
+
+def test_running_inside_the_project_venv_asks_nobody(project, monkeypatch):
+    """Guards the delegation against recursing into itself."""
+    monkeypatch.setattr(core_source.sys, "prefix", str(project / ".venv"))
+    assert core_source._project_venv_python() is None
+
+
+def test_the_venv_is_identified_by_environment_not_by_interpreter(project, monkeypatch):
+    """.venv/bin/python is routinely a symlink to the same binary a bare
+    `python3` resolves to; that identity says nothing about site-packages."""
+    monkeypatch.setattr(core_source.sys, "prefix", "/usr")
+    monkeypatch.setattr(
+        core_source.sys, "executable", str(project / ".venv" / "bin" / "python")
+    )
+    assert core_source._project_venv_python() is not None
+
+
+def test_status_falls_back_when_the_venv_cannot_answer(project, monkeypatch):
+    """A venv too broken to introspect must still produce a report."""
+    monkeypatch.setattr(core_source.sys, "prefix", "/usr")
+    monkeypatch.setattr(
+        core_source.subprocess, "run",
+        lambda *a, **k: (_ for _ in ()).throw(OSError("boom")),
+    )
+    monkeypatch.setattr(
+        core_source.Distribution, "from_name",
+        staticmethod(lambda name: FakeDist(version="0.4.0")),
+    )
+    assert core_source.resolve_in_project_env().version == "0.4.0"
+
+
+def test_the_venvs_answer_wins_over_this_processs(project, monkeypatch):
+    """What the venv reports is what gets shown, even when the running
+    interpreter has its own (stale, or absent) orca_core."""
+    import subprocess as _sp
+
+    payload = json.dumps({
+        "version": "0.4.1", "kind": "local", "location": "/somewhere",
+        "editable": True, "branch": "feature/per-joint-gains", "dirty": False,
+    })
+    monkeypatch.setattr(core_source.sys, "prefix", "/usr")
+    monkeypatch.setattr(
+        core_source.subprocess, "run",
+        lambda *a, **k: _sp.CompletedProcess(a[0], 0, stdout=payload, stderr=""),
+    )
+
+    def missing(name):
+        raise PackageNotFoundError(name)
+
+    monkeypatch.setattr(core_source.Distribution, "from_name", staticmethod(missing))
+
+    source = core_source.resolve_in_project_env()
+    assert source.version == "0.4.1"
+    assert source.branch == "feature/per-joint-gains"
+    assert source.is_development
+
+
+# ---------------------------------------------------------------------------
+# Putting dev mode back after git reverts it
+# ---------------------------------------------------------------------------
+
+WITH_OVERRIDE = """[project]
+name = "orca_ui"
+
+[tool.uv.sources]
+orca-core = { path = "../orca_core", editable = true }
+"""
+
+WITHOUT_OVERRIDE = """[project]
+name = "orca_ui"
+"""
+
+
+@pytest.fixture
+def checkout(tmp_path, monkeypatch):
+    """A project root whose pyproject.toml and settings the test controls."""
+    monkeypatch.setattr(core_source, "_project_root", lambda: str(tmp_path))
+    monkeypatch.setattr(core_source, "_is_core_checkout", lambda path: True)
+
+    calls = []
+    monkeypatch.setattr(core_source, "use_local",
+                        lambda path=None: calls.append(("local", path)))
+    monkeypatch.setattr(core_source, "use_branch",
+                        lambda name: calls.append(("branch", name)))
+
+    def setup(pyproject, settings):
+        (tmp_path / "pyproject.toml").write_text(pyproject)
+        if settings is not None:
+            (tmp_path / core_source.SETTINGS_FILE).write_text(json.dumps(settings))
+        return calls
+
+    return setup
+
+
+def test_a_reverted_local_override_is_reinstated(checkout):
+    calls = checkout(WITHOUT_OVERRIDE, {"mode": "local", "core_path": "/src/orca_core"})
+    assert core_source.restore() == 0
+    assert calls == [("local", "/src/orca_core")]
+
+
+def test_a_surviving_override_is_left_alone(checkout):
+    """The common case: the operation did not touch pyproject.toml."""
+    calls = checkout(WITH_OVERRIDE, {"mode": "local", "core_path": "/src/orca_core"})
+    assert core_source.restore() == 0
+    assert calls == []
+
+
+def test_a_branch_override_is_reinstated(checkout):
+    calls = checkout(
+        WITHOUT_OVERRIDE,
+        {"mode": "branch", "branch_ref": "feature/per-joint-gains"},
+    )
+    assert core_source.restore() == 0
+    assert calls == [("branch", "feature/per-joint-gains")]
+
+
+def test_going_back_to_release_is_not_undone(checkout):
+    """`./dev release` forgets the mode, so the next pull must not resurrect
+    dev mode behind the developer's back."""
+    calls = checkout(WITHOUT_OVERRIDE, {"core_path": "/src/orca_core"})
+    assert core_source.restore() == 0
+    assert calls == []
+
+
+def test_a_checkout_that_never_had_dev_mode_does_nothing(checkout):
+    calls = checkout(WITHOUT_OVERRIDE, None)
+    assert core_source.restore() == 0
+    assert calls == []
+
+
+def test_a_vanished_checkout_is_reported_not_reinstated(checkout, monkeypatch, capsys):
+    """The remembered orca_core was deleted or moved: say so, do not fail."""
+    monkeypatch.setattr(core_source, "_is_core_checkout", lambda path: False)
+    calls = checkout(WITHOUT_OVERRIDE, {"mode": "local", "core_path": "/gone"})
+    assert core_source.restore() == 0
+    assert calls == []
+    assert "./dev local" in capsys.readouterr().out
+
+
+def test_restore_never_fails_the_git_operation(checkout, monkeypatch, capsys):
+    """Hooks run after a merge that already happened; raising here would be
+    noise at best and a broken-looking pull at worst."""
+    calls = checkout(WITHOUT_OVERRIDE, {"mode": "local", "core_path": "/src/orca_core"})
+    monkeypatch.setattr(
+        core_source, "use_local",
+        lambda path=None: (_ for _ in ()).throw(RuntimeError("uv exploded")),
+    )
+    assert core_source.restore() == 0
+    assert "could not restore" in capsys.readouterr().out
+    assert calls == []
+
+
+def test_release_clears_the_remembered_mode(tmp_path, monkeypatch):
+    monkeypatch.setattr(core_source, "_project_root", lambda: str(tmp_path))
+    core_source._remember_mode("local")
+    assert core_source._read_settings().get("mode") == "local"
+    core_source._remember_mode("release")
+    assert "mode" not in core_source._read_settings()
+
+
+def test_switching_to_a_branch_override_forgets_the_previous_ref(tmp_path, monkeypatch):
+    monkeypatch.setattr(core_source, "_project_root", lambda: str(tmp_path))
+    core_source._remember_mode("branch", "feature/a")
+    core_source._remember_mode("local")
+    assert "branch_ref" not in core_source._read_settings()

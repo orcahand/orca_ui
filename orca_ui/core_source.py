@@ -18,6 +18,7 @@ the working tree in dev mode: see :func:`precommit_fix`.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import re
@@ -235,22 +236,53 @@ def _settings_path() -> str:
     return os.path.join(_project_root(), SETTINGS_FILE)
 
 
-def _remembered_path() -> Optional[str]:
+def _read_settings() -> dict:
     try:
         with open(_settings_path()) as fh:
-            path = json.load(fh).get("core_path")
+            data = json.load(fh)
     except (OSError, ValueError):
-        return None
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _write_settings(data: dict) -> None:
+    try:
+        with open(_settings_path(), "w") as fh:
+            json.dump(data, fh, indent=2)
+            fh.write("\n")
+    except OSError:
+        pass  # Remembering is a convenience; failing to is not an error.
+
+
+def _remembered_path() -> Optional[str]:
+    path = _read_settings().get("core_path")
     return path if path and _is_core_checkout(path) else None
 
 
 def _remember_path(path: str) -> None:
-    try:
-        with open(_settings_path(), "w") as fh:
-            json.dump({"core_path": path}, fh, indent=2)
-            fh.write("\n")
-    except OSError:
-        pass  # Remembering is a convenience; failing to is not an error.
+    data = _read_settings()
+    data["core_path"] = path
+    _write_settings(data)
+
+
+def _remember_mode(mode: str, ref: Optional[str] = None) -> None:
+    """Record which orca_core this checkout is *meant* to run against.
+
+    The override itself lives in tracked files, so git can revert it without
+    saying so; this is the machine-local memory of what the developer actually
+    asked for, and what :func:`restore` puts back. ``release`` forgets, so
+    going back to the published package is not undone on the next pull."""
+    data = _read_settings()
+    if mode == "release":
+        data.pop("mode", None)
+        data.pop("branch_ref", None)
+    else:
+        data["mode"] = mode
+        if ref:
+            data["branch_ref"] = ref
+        else:
+            data.pop("branch_ref", None)
+    _write_settings(data)
 
 
 def _is_core_checkout(path: str) -> bool:
@@ -396,6 +428,7 @@ def use_local(path: Optional[str] = None) -> None:
     # one relative to that root — otherwise pyproject.toml ends up with a path
     # relative to wherever this happened to be invoked.
     _run_uv("add", "--editable", os.path.relpath(checkout, _project_root()))
+    _remember_mode("local")
 
 
 def use_branch(name: str) -> None:
@@ -404,11 +437,13 @@ def use_branch(name: str) -> None:
     # in place, which would silently outrank the branch.
     _run_uv("remove", CORE_PACKAGE, required=False)
     _run_uv("add", f"{CORE_PACKAGE} @ git+{CORE_REPO}", "--branch", name)
+    _remember_mode("branch", name)
 
 
 def use_release() -> None:
     _run_uv("remove", CORE_PACKAGE, required=False)
     _run_uv("add", CORE_RELEASE_SPEC)
+    _remember_mode("release")
 
 
 # ---------------------------------------------------------------------------
@@ -515,8 +550,55 @@ def precommit_fix() -> int:
     if _dependency_block(new_pyproject) != _dependency_block(old_pyproject):
         print("orca-dev: WARNING — dependencies changed. uv.lock was kept at "
               "its committed state and is now stale. Before pushing, run:\n"
-              "    uv run orca-dev release && uv lock && git add uv.lock\n"
-              "    git commit --amend --no-edit && uv run orca-dev local")
+              "    ./dev release && uv lock && git add uv.lock\n"
+              "    git commit --amend --no-edit && ./dev local")
+    return 0
+
+
+def restore() -> int:
+    """Put dev mode back after a git operation reverted it.
+
+    The mirror image of :func:`precommit_fix`. That one keeps the override out
+    of commits; this one keeps it in the working tree. Both exist because the
+    override has to live in a tracked file: incoming changes to pyproject.toml
+    silently return the checkout to the released core, and the next run is
+    against an orca_core the developer did not choose.
+
+    Runs from post-merge/post-checkout, so it must never fail the git operation
+    it follows: every path returns 0.
+    """
+    try:
+        data = _read_settings()
+        mode = data.get("mode")
+        if mode not in ("local", "branch"):
+            return 0  # never turned on here, or deliberately released
+
+        with open(os.path.join(_project_root(), PYPROJECT)) as fh:
+            if has_dev_override(fh.read()):
+                return 0  # survived this operation
+
+        if mode == "branch":
+            ref = data.get("branch_ref")
+            if not ref:
+                return 0
+            print(f"orca-dev: restoring your orca_core branch override ({ref}).",
+                  flush=True)  # ordered ahead of uv's own output when piped
+            use_branch(ref)
+            return 0
+
+        path = data.get("core_path")
+        if not path or not _is_core_checkout(path):
+            print("orca-dev: this git operation reverted your local orca_core "
+                  "override, and the checkout it pointed at is gone.\n"
+                  "          Turn dev mode back on with `./dev local <path>`.")
+            return 0
+
+        print(f"orca-dev: restoring your local orca_core override "
+              f"({_display_path(path)}).", flush=True)
+        use_local(path)
+    except Exception as e:  # never break a merge or a checkout over this
+        print(f"orca-dev: could not restore dev mode ({e}). "
+              f"Run `./dev local` when convenient.")
     return 0
 
 
@@ -546,6 +628,54 @@ def _print_status(source: Optional[CoreSource] = None) -> CoreSource:
     return source
 
 
+def _project_venv_python() -> Optional[str]:
+    """The project venv's interpreter, when it is not the one already running.
+
+    ``None`` means "the current interpreter is the right one to ask" — either
+    it already is the venv's, or there is no venv yet."""
+    venv = os.path.join(_project_root(), ".venv")
+    # Compare environments, not interpreters: .venv/bin/python is frequently a
+    # symlink to the same binary a bare `python3` resolves to, so identity of
+    # the executable says nothing about which site-packages is in play.
+    if os.path.realpath(sys.prefix) == os.path.realpath(venv):
+        return None
+    for rel in (("bin", "python"), ("Scripts", "python.exe")):
+        candidate = os.path.join(venv, *rel)
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
+def resolve_in_project_env() -> CoreSource:
+    """Like :func:`resolve`, but describes the project's venv rather than the
+    environment this process happens to be running in.
+
+    The bootstrap path runs under a bare interpreter: ``uv run orca-dev`` syncs
+    before it spawns, so it cannot run while the committed pin is
+    unresolvable — which is exactly when dev mode needs turning on. Such a run
+    has just told uv to install into ``.venv``, and asking its own environment
+    would report "not installed" at the precise moment the install succeeded.
+    """
+    python = _project_venv_python()
+    if python is None:
+        return resolve()
+    try:
+        out = subprocess.run([python, "-m", "orca_ui.core_source", "_resolve"],
+                             cwd=_project_root(), capture_output=True,
+                             text=True, timeout=30)
+        if out.returncode == 0:
+            return CoreSource(**json.loads(out.stdout))
+    except Exception:
+        pass
+    return resolve()  # venv too broken to answer; say what we can
+
+
+def _report_status() -> CoreSource:
+    """Print the status of the project's environment. See
+    :func:`resolve_in_project_env` for why that is not always this one."""
+    return _print_status(resolve_in_project_env())
+
+
 def _confirm(question: str, default: bool = True) -> bool:
     if not sys.stdin.isatty():
         return default
@@ -558,7 +688,7 @@ def _confirm(question: str, default: bool = True) -> bool:
 
 def _interactive_default() -> None:
     """``orca-dev`` with no arguments: report, then offer the obvious move."""
-    source = _print_status()
+    source = _report_status()
     print()
 
     if source.is_development:
@@ -580,7 +710,7 @@ def _interactive_default() -> None:
     if _confirm("Develop against it?"):
         use_local(checkout)
         print()
-        _print_status()
+        _report_status()
 
 
 def main(argv=None) -> None:
@@ -607,6 +737,8 @@ def main(argv=None) -> None:
 
     sub.add_parser("release", help="Use the published orca_core from PyPI.")
     sub.add_parser("_precommit", help=argparse.SUPPRESS)
+    sub.add_parser("_resolve", help=argparse.SUPPRESS)
+    sub.add_parser("_restore", help=argparse.SUPPRESS)
 
     args = parser.parse_args(argv)
 
@@ -614,10 +746,18 @@ def main(argv=None) -> None:
         _interactive_default()
         return
     if args.command == "status":
-        _print_status()
+        _report_status()
         return
     if args.command == "_precommit":
         raise SystemExit(precommit_fix())
+    if args.command == "_restore":
+        raise SystemExit(restore())
+    if args.command == "_resolve":
+        # Machine-readable, for resolve_in_project_env() in a bare interpreter.
+        # Unlike CoreSource.as_dict this keeps ``location``: it never leaves
+        # this machine.
+        print(json.dumps(dataclasses.asdict(resolve())))
+        return
 
     if args.command == "local":
         use_local(args.path)
@@ -627,7 +767,7 @@ def main(argv=None) -> None:
         use_release()
 
     print()
-    _print_status()
+    _report_status()
 
 
 if __name__ == "__main__":

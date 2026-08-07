@@ -1,0 +1,11 @@
+#!/bin/sh
+# Runs after `git checkout` / `git switch`. Args: old HEAD, new HEAD, and a
+# flag that is 1 for a branch checkout and 0 for a file checkout.
+#
+# Only branch checkouts are restored. `git checkout -- pyproject.toml` is how
+# people clear the override to let a blocked pull through, and restoring it
+# there would re-block the pull they are trying to run — and would override an
+# explicit "discard this". The post-merge hook picks it up after the pull.
+# See .githooks/restore-dev-mode.
+[ "$3" = "1" ] || exit 0
+exec "$(dirname "$0")/restore-dev-mode"

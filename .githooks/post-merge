@@ -1,0 +1,4 @@
+#!/bin/sh
+# `git pull` / `git merge` can revert your local orca_core override, which has
+# to live in tracked files. Put it back. See .githooks/restore-dev-mode.
+exec "$(dirname "$0")/restore-dev-mode"
