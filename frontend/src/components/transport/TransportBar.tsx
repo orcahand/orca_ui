@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../../api/rest'
 import type { OperationSnapshot } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
-import { useOperationStore } from '../../state/operationStore'
+import { operationLabel, useOperationStore } from '../../state/operationStore'
 import { TeleopBar } from './TeleopBar'
 
 const DONE_LINGER_MS = 3000
@@ -72,14 +72,14 @@ function OperationBar() {
     const dismiss = () => {
       // Belt-and-braces with the global banner: if it shows this same
       // failure, dismissing the bar clears it too.
-      const banner = `${operation.kind} failed: ${operation.error ?? 'unknown error'}`
+      const banner = `${operationLabel(operation.kind)} failed: ${operation.error ?? 'unknown error'}`
       const app = useAppStore.getState()
       if (app.error === banner) app.setError(null)
       setDismissedRun(operation.run_id)
     }
     return (
       <div className="transport-bar error">
-        <span className="transport-kind">{operation.kind}</span>
+        <span className="transport-kind">{operationLabel(operation.kind)}</span>
         <span className="transport-detail">
           {operation.error ?? operation.detail ?? 'failed'}
         </span>
@@ -99,7 +99,7 @@ function OperationBar() {
   if (operation.state === 'done') {
     return (
       <div className="transport-bar done">
-        <span className="transport-kind">✓ {operation.kind}</span>
+        <span className="transport-kind">✓ {operationLabel(operation.kind)}</span>
         <span className="transport-detail">{operation.detail ?? 'done'}</span>
       </div>
     )
@@ -232,7 +232,7 @@ function MaintenanceBar({ operation }: { operation: OperationSnapshot }) {
     operation.state === 'awaiting_input' ? operation.awaiting : null
   return (
     <div className="transport-bar">
-      <span className="transport-kind">{operation.kind}</span>
+      <span className="transport-kind">{operationLabel(operation.kind)}</span>
       {operation.phase && (
         <span className="transport-phase">{operation.phase}</span>
       )}

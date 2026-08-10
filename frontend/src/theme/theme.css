@@ -1007,7 +1007,366 @@ header h1 {
   50% { opacity: 0.2; }
 }
 
+/* ----- hover notes: the label stays, the detail arrives on demand ----- */
+
+.note-anchor {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+}
+
+.note-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 11px;
+  color: var(--dim);
+  text-align: left;
+  cursor: help;
+}
+
+.note-label {
+  border-bottom: 1px dotted rgba(255, 255, 255, 0.28);
+}
+
+.note-trigger.note-title {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-bright);
+}
+
+.note-trigger:hover,
+.note-trigger:focus-visible {
+  color: var(--accent);
+  outline: none;
+}
+
+.note-trigger:hover .note-label,
+.note-trigger:focus-visible .note-label {
+  border-bottom-color: rgba(34, 211, 238, 0.6);
+}
+
+.note-marker {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  color: var(--accent);
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.note-trigger:hover .note-marker,
+.note-trigger:focus-visible .note-marker {
+  opacity: 1;
+}
+
+/* Child of the anchor, so the pointer can travel into it and it stays open. */
+.note-pop {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 30;
+  width: 340px;
+  max-width: calc(100vw - 48px);
+  padding: 9px 11px;
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  background: #232637;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.6;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s ease;
+}
+
+.note-anchor:hover .note-pop,
+.note-anchor:focus-within .note-pop {
+  opacity: 1;
+  visibility: visible;
+}
+
 /* ----- M5 — setup tab cards ----- */
+
+/* Readiness line at the top of the tab: what to do, not what is wrong. */
+.setup-status {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+}
+
+.setup-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  align-self: center;
+}
+
+.setup-status.ok .setup-status-dot {
+  background: var(--ok);
+}
+
+.setup-status.warn .setup-status-dot {
+  background: var(--warn);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.setup-status-text {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+
+.setup-status-text strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.setup-status.warn .setup-status-text strong {
+  color: var(--warn);
+}
+
+/* The full-setup card: same chrome as a setup card, given the weight of the
+   thing a new hand actually needs. */
+.setup-hero {
+  border-left: 2px solid var(--accent);
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.setup-hero-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.setup-hero .setup-card-title {
+  font-size: 14px;
+}
+
+.setup-badge {
+  padding: 2px 7px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  background: rgba(34, 211, 238, 0.08);
+}
+
+/* Instructional body copy — bigger and lighter than .setup-card-hint, which
+   stays for incidental notes. */
+.setup-copy {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
+  max-width: 82ch;
+}
+
+.setup-copy.dim {
+  color: var(--dim);
+}
+
+/* Steps on the left, the decision (how many rounds, and why) on the right —
+   one column once the card is too narrow to hold both. */
+.setup-hero-body {
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 420px);
+  gap: 12px 32px;
+}
+
+@media (max-width: 900px) {
+  .setup-hero-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.setup-hero-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.setup-round-shape {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-self: stretch;
+}
+
+.setup-steps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setup-step {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
+  max-width: 82ch;
+}
+
+.setup-step-num {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--accent);
+  border: 1px solid rgba(34, 211, 238, 0.3);
+}
+
+.setup-step-title {
+  color: var(--text-bright);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.setup-why {
+  border-left: 2px solid var(--panel-border-strong);
+  padding-left: 10px;
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--dim);
+  max-width: 82ch;
+}
+
+.setup-why-label {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--dimmer);
+}
+
+/* Standing consequence of what the user just did (e.g. tension → calibrate). */
+.setup-note {
+  align-self: stretch;
+  padding: 7px 9px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--warn);
+  border: 1px solid rgba(200, 168, 112, 0.25);
+  background: rgba(200, 168, 112, 0.06);
+}
+
+.setup-note.accent {
+  color: var(--accent);
+  border-color: rgba(34, 211, 238, 0.3);
+  background: rgba(34, 211, 238, 0.07);
+}
+
+/* Do this now: the hold, and the between-rounds gate. */
+.setup-callout {
+  align-self: stretch;
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  background: rgba(34, 211, 238, 0.07);
+}
+
+.setup-callout-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.setup-section {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 18px 0 10px;
+}
+
+.setup-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.setup-section-note {
+  font-size: 10px;
+  color: var(--dimmer);
+}
+
+.setup-section-rule {
+  flex: 1;
+  height: 1px;
+  background: var(--panel-border);
+}
+
+.setup-summary {
+  font-size: 10px;
+  color: var(--dimmer);
+}
+
+.setup-summary.ok {
+  color: var(--ok);
+}
+
+.setup-summary.warn {
+  color: var(--warn);
+}
+
+.setup-advanced {
+  align-self: stretch;
+  padding-top: 8px;
+  border-top: 1px solid var(--panel-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+/* Joint status closes the card: pin it to the bottom so the two cards in the
+   grid line their footers up however tall each one is. */
+.setup-card > .setup-advanced:last-child {
+  margin-top: auto;
+}
+
+.setup-option-hint {
+  padding-left: 17px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+
+.btn-hero {
+  padding: 8px 16px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
 
 .setup-grid {
   display: grid;
@@ -1027,6 +1386,14 @@ header h1 {
   flex-direction: column;
   align-items: flex-start;
   gap: 10px;
+  /* backdrop-filter makes every card its own stacking context, so a hover
+     note would otherwise paint behind the cards after it. */
+  position: relative;
+}
+
+.setup-card:hover,
+.setup-card:focus-within {
+  z-index: 10;
 }
 
 .setup-card-title {
@@ -1212,7 +1579,7 @@ header h1 {
 
 .joint-status-list {
   align-self: stretch;
-  max-height: 150px;
+  max-height: 230px;
   overflow-y: auto;
   display: grid;
   grid-template-columns: 1fr 1fr;

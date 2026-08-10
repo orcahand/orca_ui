@@ -18,6 +18,14 @@ export function isOperationActive(op: OperationSnapshot | null): boolean {
   return op !== null && op.state !== 'done' && op.state !== 'error'
 }
 
+// Wire names the UI calls something else. The guided setup run is "wizard"
+// on the API; everywhere a user can see it, it is the full setup.
+const OPERATION_LABELS: Record<string, string> = { wizard: 'full setup' }
+
+export function operationLabel(kind: string): string {
+  return OPERATION_LABELS[kind] ?? kind
+}
+
 interface OperationStoreState {
   operation: OperationSnapshot | null
   logRunId: string | null
@@ -44,20 +52,19 @@ export const useOperationStore = create<OperationStoreState>((set, get) => ({
     if (!changed) return
     // Terminal snapshots surface on every tab: errors hit the global banner,
     // both terminals land in the Motors tab event log.
+    const label = operationLabel(snapshot.kind)
     if (snapshot.state === 'error') {
       useAppStore
         .getState()
-        .setError(`${snapshot.kind} failed: ${snapshot.error ?? 'unknown error'}`)
+        .setError(`${label} failed: ${snapshot.error ?? 'unknown error'}`)
       useEventLogStore
         .getState()
         .pushEvent(
           'operation',
-          `${snapshot.kind} → error: ${snapshot.error ?? 'unknown'}`,
+          `${label} → error: ${snapshot.error ?? 'unknown'}`,
         )
     } else if (snapshot.state === 'done') {
-      useEventLogStore
-        .getState()
-        .pushEvent('operation', `${snapshot.kind} → done`)
+      useEventLogStore.getState().pushEvent('operation', `${label} → done`)
     }
   },
 
@@ -104,7 +111,7 @@ export function useStartGate(requires: 'motors' | 'encoders'): {
   if (activeKind) {
     return {
       blocked: true,
-      reason: `${activeKind} is running — stop it first`,
+      reason: `${operationLabel(activeKind)} is running — stop it first`,
     }
   }
   // Mirrors the backend's require_manual_control gate on operation start.

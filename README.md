@@ -80,11 +80,13 @@ trajectory storage, default `~/.orca_ui/library`).
   moves; **engage** then takes the control channel (manual sliders lock) and
   ramps in from the current pose. Tracking loss holds the last pose and
   auto-disengages after a timeout. See [Teleop](#teleop) below for setup.
-- **Setup** — tensioning (wind → hold while you ratchet the spools → release),
-  calibration (all joints, or expand to select fingers/joints), and the guided
-  setup wizard ((tension → calibrate) × N rounds, like orca_core's
-  `scripts/setup.py`). These take the hand into *maintenance*: the session is
-  handed to the operation and reconnects automatically afterwards.
+- **Setup** — **full setup** leads: (tension → calibrate) × N rounds with a
+  confirm gate between them, like orca_core's `scripts/setup.py`, written as
+  step-by-step instructions for a hand that has just been built. Under it, the
+  same two things on their own — tensioning (wind → hold while you ratchet the
+  spools → release) and calibration (all joints, or a picked subset). These take
+  the hand into *maintenance*: the session is handed to the operation and
+  reconnects automatically afterwards.
 - **Motors** — per-motor temps/currents, PI tuning and loop stats (feedback
   hands), stream rates, a supervisor event log, and a manual reconnect. The
   **motor chain** panel does assembly-time motor ID'ing (orca_core's
@@ -146,7 +148,7 @@ mock hand — for unattended runs).
 The tools cover status and telemetry reads, connection and safety, motion,
 library writes, operations, tactile configuration, and teleop. Run `/mcp` in
 Claude Code for the live catalog. Assembly-time tools (chain configuration,
-the setup wizard) and PID gain tuning are not exposed.
+the guided full setup) and PID gain tuning are not exposed.
 
 Safety model: motion needs torque explicitly enabled; nothing enables it
 implicitly. On real hardware the first torque enable, maintenance operations

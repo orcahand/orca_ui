@@ -1,20 +1,30 @@
-// Setup tab: hand lifecycle operations — tension, calibrate (full or a
-// joint subset), the guided bring-up wizard — plus the live operation log.
+// Setup tab: getting a hand ready to use. The full setup leads — it is what
+// a new hand needs and what most people should run — and tension/calibrate sit
+// under it as the same two things on their own, for when only one is needed.
 // Cross-tab control of a running operation lives in the TransportBar; these
 // cards start operations and mirror their state in place.
 
 import { CalibrateCard } from '../setup/CalibrateCard'
+import { FullSetupCard } from '../setup/FullSetupCard'
 import { OperationLogPane } from '../setup/OperationLogPane'
+import { SetupStatus } from '../setup/SetupStatus'
 import { TensionCard } from '../setup/TensionCard'
-import { WizardCard } from '../setup/WizardCard'
 
 export function SetupView() {
   return (
     <>
+      <SetupStatus />
+      <FullSetupCard />
+      <div className="setup-section">
+        <span className="setup-section-title">Single steps</span>
+        <span className="setup-section-note">
+          the same two things on their own — for a hand that is already set up
+        </span>
+        <span className="setup-section-rule" />
+      </div>
       <div className="setup-grid">
         <TensionCard />
         <CalibrateCard />
-        <WizardCard />
       </div>
       <OperationLogPane />
     </>
