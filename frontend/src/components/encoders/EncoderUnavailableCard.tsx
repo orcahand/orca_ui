@@ -53,10 +53,12 @@ export function EncoderUnavailableCard() {
         ) : (
           <>
             <div>
-              the hand is calibrated, so this is the encoders themselves — they
-              did not come up when the hand connected, and the console dropped
-              to a tier without them. Check the encoder board and its cable,
-              then reconnect.
+              the hand is calibrated, so calibrating again will not help — the
+              encoder stream did not come up when the hand connected, and the
+              console has been running without it since. Reconnect to try the
+              feedback tier again; if it keeps dropping, check the encoder board
+              and its cable. The reason for each failed attempt is printed by
+              the backend as a “connect tier … failed” warning.
             </div>
             <div style={{ marginTop: 16 }}>
               <button

@@ -44,10 +44,9 @@ export function SetupStatus() {
   if (caps !== null && Boolean(caps.declared.encoders) && !caps.encoders) {
     return (
       <Strip tone="warn">
-        <strong>Calibrated, but joint sensing is off.</strong> The encoders did
-        not come up when the hand connected — calibrating again will not change
-        that. Check the encoder board and its cable, then reconnect from the
-        Motors tab.
+        <strong>Calibrated, but joint sensing is off.</strong> The encoder
+        stream did not come up when the hand connected, and calibrating again
+        will not change that. Reconnect from the Motors tab to try again.
       </Strip>
     )
   }
