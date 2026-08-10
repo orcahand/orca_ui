@@ -810,7 +810,7 @@ header h1 {
 
 .motor-table {
   width: 100%;
-  max-width: 480px;
+  max-width: 560px;
   border-collapse: collapse;
   font-size: 11px;
 }
@@ -825,7 +825,8 @@ header h1 {
   border-bottom: 1px solid var(--panel-border-strong);
 }
 
-.motor-table th:first-child {
+.motor-table th:first-child,
+.motor-table th:nth-child(2) {
   text-align: left;
 }
 
@@ -839,6 +840,11 @@ header h1 {
 .motor-table td:first-child {
   text-align: left;
   color: var(--dim);
+}
+
+.motor-table td.motor-joint {
+  text-align: left;
+  color: var(--muted);
 }
 
 .motor-table td.warn {

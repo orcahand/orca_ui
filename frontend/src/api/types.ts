@@ -40,6 +40,8 @@ export interface StatusSnapshot {
 
 export interface JointInfo {
   id: string
+  // Motor driving this joint, or null when the config maps none.
+  motor_id: number | null
   rom: [number, number] // degrees
   neutral: number
   encoder_backed: boolean

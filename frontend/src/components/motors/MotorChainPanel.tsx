@@ -80,8 +80,7 @@ export function MotorChainPanel() {
       <p className="setup-card-hint" style={{ marginBottom: 10 }}>
         Assembly-time motor ID'ing: fresh motors ship at factory defaults and
         are programmed one at a time as you build the daisy chain (highest ID
-        at the board, wrist last). Works without a connected hand — only the
-        powered OH board on USB.
+        at the board, wrist last).
       </p>
 
       {extra && <ChainFlow extra={extra} />}

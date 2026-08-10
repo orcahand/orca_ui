@@ -64,17 +64,22 @@ interface AppState {
 
 const SCENE_DEFAULTS: SceneSettings = {
   ghost: false,
-  forceResultant: false,
-  forceTaxels: false,
+  forceResultant: true,
+  forceTaxels: true,
   jointGlow: false,
   teleopGhost: true,
 }
+
+// Bumped when a default changes: stored settings win over defaults, so a new
+// default would never reach anyone who has opened the 3D tab before. The key
+// change drops the old blob once and everything returns to the defaults above.
+const SCENE_KEY = 'orca-ui.scene.v2'
 
 const storedScene = ((): SceneSettings => {
   try {
     return {
       ...SCENE_DEFAULTS,
-      ...JSON.parse(localStorage.getItem('orca-ui.scene') ?? '{}'),
+      ...JSON.parse(localStorage.getItem(SCENE_KEY) ?? '{}'),
     }
   } catch {
     return { ...SCENE_DEFAULTS }
@@ -111,7 +116,7 @@ export const useAppStore = create<AppState>((set) => ({
   setScene: (patch) =>
     set((state) => {
       const scene = { ...state.scene, ...patch }
-      localStorage.setItem('orca-ui.scene', JSON.stringify(scene))
+      localStorage.setItem(SCENE_KEY, JSON.stringify(scene))
       return { scene }
     }),
   setShowSparklineTarget: (show) => {

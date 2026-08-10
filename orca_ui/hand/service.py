@@ -193,6 +193,9 @@ class HandService:
         joints = [
             {
                 "id": joint,
+                # Which motor drives it — the only place the UI can turn a
+                # motor id from telemetry back into something a human names.
+                "motor_id": config.joint_to_motor_map.get(joint),
                 "rom": [float(v) for v in config.joint_roms_dict[joint]],
                 "neutral": float(config.neutral_position.get(joint, 0.0)),
                 "encoder_backed": joint in encoder_backed,

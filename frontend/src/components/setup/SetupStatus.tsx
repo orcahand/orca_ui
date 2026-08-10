@@ -7,6 +7,7 @@ import { useAppStore } from '../../state/appStore'
 
 export function SetupStatus() {
   const calibration = useAppStore((s) => s.handInfo?.calibration ?? null)
+  const caps = useAppStore((s) => s.status?.capabilities ?? null)
   // null: no motor session, so there is nothing to report — the cards below
   // carry their own blocked reason.
   if (!calibration || calibration.motors === null) return null
@@ -33,6 +34,20 @@ export function SetupStatus() {
         ({shown}
         {missing.length > 4 ? `, +${missing.length - 4} more` : ''}) — the hand
         cannot read where they are until you calibrate them.
+      </Strip>
+    )
+  }
+
+  // Calibration is complete, yet the hand came up without the joint encoders
+  // it declares. Calibrating again cannot fix that, so do not let the strip
+  // say "ready" while the header says degraded.
+  if (caps !== null && Boolean(caps.declared.encoders) && !caps.encoders) {
+    return (
+      <Strip tone="warn">
+        <strong>Calibrated, but joint sensing is off.</strong> The encoders did
+        not come up when the hand connected — calibrating again will not change
+        that. Check the encoder board and its cable, then reconnect from the
+        Motors tab.
       </Strip>
     )
   }

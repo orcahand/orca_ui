@@ -1,7 +1,7 @@
 // Per-motor health table from the 1 Hz motors.telemetry topic (flows through
 // the rAF stream store; a JSON compare keeps React renders at telemetry rate).
 
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useStreamFrame } from '../../hooks/useStreamFrame'
 import { useAppStore } from '../../state/appStore'
 import { Panel } from '../common/Panel'
@@ -33,8 +33,21 @@ function buildRows(
 
 export function MotorHealthPanel() {
   const maxCurrent = useAppStore((s) => s.control?.max_current ?? null)
+  const joints = useAppStore((s) => s.handInfo?.joints)
   const [rows, setRows] = useState<MotorRow[]>([])
   const lastJson = useRef('')
+
+  // Telemetry is keyed by motor id; a hot motor is only actionable once you
+  // know which joint it drives.
+  const jointOfMotor = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const joint of joints ?? []) {
+      if (joint.motor_id !== null && joint.motor_id !== undefined) {
+        map.set(String(joint.motor_id), joint.id)
+      }
+    }
+    return map
+  }, [joints])
 
   useStreamFrame((frames) => {
     const next = buildRows(frames.motors.temps, frames.motors.currents)
@@ -71,6 +84,7 @@ export function MotorHealthPanel() {
           <thead>
             <tr>
               <th>MOTOR</th>
+              <th>JOINT</th>
               <th>TEMP °C</th>
               <th>CURRENT mA</th>
             </tr>
@@ -79,6 +93,9 @@ export function MotorHealthPanel() {
             {rows.map((row) => (
               <tr key={row.id}>
                 <td>{row.id}</td>
+                <td className="motor-joint">
+                  {jointOfMotor.get(row.id) ?? '--'}
+                </td>
                 <td className={tempClass(row.temp)}>
                   {row.temp === null ? '--' : row.temp.toFixed(1)}
                 </td>
