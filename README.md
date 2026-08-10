@@ -28,7 +28,7 @@ Working on the console itself, or on `orca_core` alongside it? See
 ## Usage
 
 ```bash
-uv run orca-ui                              # orca_core default model
+uv run orca-ui                              # ask the hand which model it is
 uv run orca-ui --model orcahand-full-right  # bundled model by name
 uv run orca-ui --config /path/to/config.yaml   # explicit config (or its folder)
 uv run orca-ui --mock                       # full simulated hand, no hardware
@@ -43,6 +43,13 @@ handshake) and connected at the best achievable tier. Unplugging triggers
 reconnection; sensors-only operation (motor power off) works for viewing.
 **Torque is never enabled automatically** — use the Enable Torque button in the
 Motor Control panel.
+
+Without `--model`/`--side`/`--config`, *which* hand it is stays an open
+question too: the side and sensing capabilities are re-read from the boards on
+every detection pass, so starting the console before switching the hand on, or
+swapping a left hand for a right one while it runs, picks the right model up
+instead of holding on to the startup guess. Name a model and that model is
+final — nothing detected overrides it.
 
 The header's red **E-STOP** stops whatever is running (operation, playback,
 sweep) and disables torque.

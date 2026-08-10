@@ -8,7 +8,6 @@ status code the REST layer forwards verbatim.
 from __future__ import annotations
 
 import logging
-import os
 import threading
 from typing import Callable
 
@@ -22,7 +21,7 @@ from orca_ui.hand.commands import CommandWorker
 from orca_ui.hand.presets import BUILTIN_POSES, BUILTIN_SEQUENCES
 from orca_ui.hand.sessions import HandSession
 from orca_ui.hand.states import ControlSource
-from orca_ui.hand.supervisor import HandSupervisor
+from orca_ui.hand.supervisor import HandSupervisor, model_name_of
 from orca_ui.library import Library, LibraryError
 from orca_ui.settings import UiSettings
 
@@ -132,6 +131,7 @@ class HandService:
             on_status=lambda snapshot: self._publish_status(snapshot.as_dict()),
             on_session_ready=self._session_ready,
             on_error=self._publish_error,
+            on_model_changed=self._model_changed,
         )
         self.worker = CommandWorker(
             get_session=lambda: self.supervisor.session,
@@ -139,13 +139,11 @@ class HandService:
         )
         self._max_current = int(self.supervisor.config.max_current)
 
-        library_root = (
+        self._library_root = (
             Path(settings.library_dir) if settings.library_dir
             else Path.home() / ".orca_ui" / "library"
         )
-        model_name = os.path.basename(
-            os.path.dirname(self.supervisor.config.config_path))
-        self.library = Library(library_root, model_name)
+        self.library = Library(self._library_root, self.supervisor.model_name)
 
     # ----- lifecycle ---------------------------------------------------------
 
@@ -211,7 +209,7 @@ class HandService:
             for joint in config.joint_ids
         ]
         info = {
-            "model_name": os.path.basename(os.path.dirname(config.config_path)),
+            "model_name": model_name_of(config),
             "side": config.type,
             "mock": self.settings.mock,
             "joints": joints,
@@ -336,6 +334,16 @@ class HandService:
         return out
 
     # ----- session bootstrap ---------------------------------------------------
+
+    def _model_changed(self, config) -> None:
+        """The supervisor swapped in the model the hardware reports (a hand
+        that was off at startup, or a different one plugged in since). Repoint
+        everything keyed by model; the browser refetches ``/hand/info`` off
+        the model field in the status stream."""
+        self._max_current = int(config.max_current)
+        # Poses and recordings are per-model — a left hand's library must not
+        # follow the right hand that replaced it.
+        self.library = Library(self._library_root, model_name_of(config))
 
     def _session_ready(self, session: HandSession) -> None:
         # connect() builds a new controller on the config's gains, so last

@@ -4,20 +4,38 @@ The supervisor is the only place sessions are created or destroyed. It
 publishes :class:`StatusSnapshot` on every transition via ``on_status`` and
 hands the live session to callers through the thread-safe :attr:`session`
 property. Auto-connect never enables torque or moves the hand.
+
+It also owns the *model*. Unless the command line pinned one, which hand
+config is in force is a running conclusion rather than a startup decision:
+every detection pass re-reads the side and sensing capabilities the boards
+report, so a hand that was powered off at startup — or a different hand
+plugged in later — is adopted rather than forced into the guess the CLI made
+against an empty bus.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 from dataclasses import dataclass
 from typing import Callable, Optional
 
-from orca_core.hand_config import OrcaHandConfig, OrcaHandTouchConfig
+from orca_core import HandDetection
+from orca_core.hand_config import (
+    OrcaHandConfig,
+    OrcaHandTouchConfig,
+    _resolve_config_path,
+)
 from orca_core.utils.utils import read_yaml
 
-from orca_ui.hand.detection import probe_hardware
+from orca_ui.hand.detection import (
+    names_a_hand,
+    presence_from_detection,
+    probe_hardware,
+    run_detection,
+)
 from orca_ui.hand.sessions import (
     HandSession,
     SessionConnectError,
@@ -35,12 +53,25 @@ HEALTH_PERIOD_S = 2.0
 UPGRADE_PROBE_PERIOD_S = 10.0
 MOTOR_FAILURES_BEFORE_RECONNECT = 3
 
+MODEL_CONFIRM_PROBES = 3
+"""Model re-checks to run after connecting at a model that could still be an
+understatement. A hand that has just been powered on can answer on the motor
+bus a moment before its encoder stream is flowing, which reads as a simpler
+hand than it is; these probes (one per :data:`UPGRADE_PROBE_PERIOD_S`) catch
+the late arrival. Bounded because the probe opens serial ports, and a hand
+that genuinely has no sensors would otherwise be probed forever."""
+
 
 def load_config(config_path: str):
     """Load the model config with the same class selection as the factory."""
     raw = read_yaml(config_path) or {}
     config_cls = OrcaHandTouchConfig if "sensors" in raw else OrcaHandConfig
     return config_cls.from_config_path(config_path=config_path)
+
+
+def model_name_of(config) -> str:
+    """The bundled-model name a config came from (its directory name)."""
+    return os.path.basename(os.path.dirname(config.config_path))
 
 
 @dataclass(frozen=True)
@@ -61,17 +92,22 @@ class HandSupervisor(threading.Thread):
         on_status: Callable[[StatusSnapshot], None] | None = None,
         on_session_ready: Callable[[HandSession], None] | None = None,
         on_error: Callable[[str], None] | None = None,
+        on_model_changed: Callable[[object], None] | None = None,
     ):
         super().__init__(name="HandSupervisor", daemon=True)
         self._settings = settings
         self._on_status = on_status or (lambda snapshot: None)
         self._on_session_ready = on_session_ready or (lambda session: None)
         self._on_error = on_error or (lambda message: None)
+        self._on_model_changed = on_model_changed or (lambda config: None)
 
         self.config = load_config(settings.config_path)
         self._declared = declared_capabilities(
             self.config, settings.engage_feedback,
             motors_enabled=settings.motors_enabled)
+        # Mock mode has no bus to ask, so its model is its own answer.
+        self._model_pinned = bool(settings.model_pinned or settings.mock)
+        self._model_probes_left = 0
 
         self._lock = threading.Lock()
         self._session: Optional[HandSession] = None
@@ -103,7 +139,12 @@ class HandSupervisor(threading.Thread):
         with self._lock:
             return self._session
 
+    @property
+    def model_name(self) -> str:
+        return model_name_of(self.config)
+
     def status(self) -> StatusSnapshot:
+        config = self.config
         with self._lock:
             caps = self._session.caps if self._session else None
             return StatusSnapshot(
@@ -113,6 +154,8 @@ class HandSupervisor(threading.Thread):
                 message=self._message,
                 ports=dict(self._ports),
                 since=self._since,
+                model=model_name_of(config),
+                side=str(config.type),
             )
 
     def set_torque_flag(self, enabled: bool) -> None:
@@ -245,8 +288,19 @@ class HandSupervisor(threading.Thread):
 
     def _try_connect(self) -> float:
         self._set_state(HandState.DETECTING, "searching for hardware")
+        presence = None
+        if not self._settings.mock:
+            # Nothing is connected, so every port is free and this detection
+            # sees the whole hand — the one moment its answer is authoritative
+            # about which model this is. Adopting it here also means the
+            # presence below is resolved against the *new* config's declared
+            # capabilities, off the same probe.
+            detection = run_detection(self.config, force=not self._model_pinned)
+            self._adopt_model(detection)
+            presence = presence_from_detection(self.config, detection)
         try:
-            session = connect_session(self._settings, self.config)
+            session = connect_session(self._settings, self.config,
+                                      presence=presence)
         except SessionConnectError as e:
             detail = "; ".join(e.attempts) if e.attempts else str(e)
             self._set_state(HandState.DETECTING,
@@ -276,6 +330,9 @@ class HandSupervisor(threading.Thread):
             self._motor_failures = 0
             self._tactile_health = (0, time.time())
         self._backoff = DETECT_BACKOFF_START_S
+        self._model_probes_left = (
+            0 if self._model_pinned or self._model_is_maximal()
+            else MODEL_CONFIRM_PROBES)
 
         state = HandState.DEGRADED if session.caps.degraded else HandState.CONNECTED
         self._set_state(state, f"[{session.tier}] {session.message}", session.ports)
@@ -298,12 +355,13 @@ class HandSupervisor(threading.Thread):
             self._teardown_session(reason)
             return 0.1  # go straight back to detection
 
-        if session.caps.degraded and not self._settings.mock:
+        if not self._settings.mock:
             now = time.time()
             if now - self._last_upgrade_probe > UPGRADE_PROBE_PERIOD_S:
                 self._last_upgrade_probe = now
-                if self._upgrade_available(session):
-                    self._teardown_session("missing hardware appeared — upgrading")
+                reason = self._rescan(session)
+                if reason:
+                    self._teardown_session(reason)
                     return 0.1
         return HEALTH_PERIOD_S
 
@@ -345,19 +403,107 @@ class HandSupervisor(threading.Thread):
                 pass
         return None
 
-    def _upgrade_available(self, session: HandSession) -> bool:
+    def _rescan(self, session: HandSession) -> str | None:
+        """Has the hand more to offer than this session took? Returns the
+        reconnect reason, or None to stay put.
+
+        Two ways to be short-changed: the config declares hardware the connect
+        ladder couldn't reach (the session is ``degraded``), or the *config
+        itself* understates the hand — the model was derived while a capability
+        was still coming up. The second is only re-checked for a bounded window
+        after connecting; see :data:`MODEL_CONFIRM_PROBES`.
+        """
+        confirming_model = self._model_probes_left > 0
+        if not (session.caps.degraded or confirming_model):
+            return None
+        if confirming_model:
+            self._model_probes_left -= 1
         try:
-            presence = probe_hardware(self.config)
+            detection = run_detection(self.config, force=confirming_model)
+            if confirming_model and self._adopt_model(detection, upgrade_only=True):
+                return ("hand reports more hardware than the model declared — "
+                        f"switching to {self.model_name}")
+            if not session.caps.degraded:
+                return None
+            presence = presence_from_detection(self.config, detection)
         except Exception:
-            return False
+            logger.exception("upgrade probe failed")
+            return None
         caps = session.caps
-        if self._declared["motors"] and not caps.motors and presence.motor_port:
-            return True
-        if self._declared["tactile"] and not caps.tactile and presence.sensing.tactile:
-            return True
-        if self._declared["encoders"] and not caps.encoders and presence.sensing.encoder:
-            return True
-        return False
+        if ((self._declared["motors"] and not caps.motors and presence.motor_port)
+                or (self._declared["tactile"] and not caps.tactile
+                    and presence.sensing.tactile)
+                or (self._declared["encoders"] and not caps.encoders
+                    and presence.sensing.encoder)):
+            return "missing hardware appeared — upgrading"
+        return None
+
+    # ----- model adoption ---------------------------------------------------
+
+    def _model_is_maximal(self) -> bool:
+        """True when no richer bundled model exists than the current one, so
+        re-checking the model while connected could only ever confirm it."""
+        return (isinstance(self.config, OrcaHandTouchConfig)
+                and bool(self.config.has_joint_encoders))
+
+    def _is_upgrade(self, detection: HandDetection) -> bool:
+        """True when ``detection`` names a strictly more capable model of the
+        same side.
+
+        The only model change that is safe to make while a session holds
+        ports: probes can't see through a link we own ourselves, so a
+        *poorer* answer describes our own connection, not the hardware.
+        """
+        if detection.side != self.config.type:
+            return False
+        tactile = isinstance(self.config, OrcaHandTouchConfig)
+        encoders = bool(self.config.has_joint_encoders)
+        if detection.has_tactile < tactile or detection.has_encoders < encoders:
+            return False
+        return detection.has_tactile > tactile or detection.has_encoders > encoders
+
+    def _adopt_model(self, detection: HandDetection | None, *,
+                     upgrade_only: bool = False) -> bool:
+        """Swap in the model the hardware reports. Returns True when the
+        config changed.
+
+        No-ops when the command line pinned a model, and when nothing
+        answered — ``detect_hand()`` degrades to the plain right-hand model on
+        an empty bus, and adopting that would throw away what we know about
+        the hand that was just unplugged.
+        """
+        if self._model_pinned or not names_a_hand(detection):
+            return False
+        if detection.model_name == self.model_name:
+            return False
+        if upgrade_only and not self._is_upgrade(detection):
+            return False
+        try:
+            path = _resolve_config_path(
+                None, model_version=self._settings.model_version,
+                model_name=detection.model_name)
+            config = load_config(path)
+        except Exception:
+            logger.exception("could not load detected model %r",
+                             detection.model_name)
+            return False
+
+        previous = self.model_name
+        with self._lock:
+            self.config = config
+            self._declared = declared_capabilities(
+                config, self._settings.engage_feedback,
+                motors_enabled=self._settings.motors_enabled)
+        logger.info("hand identifies as %s (was %s) — switching model",
+                    detection.model_name, previous)
+        try:
+            self._on_model_changed(config)
+        except Exception:
+            logger.exception("model-change hook failed")
+        # The model rides on the status snapshot, so the browser learns about
+        # the swap even while there is still no session to connect.
+        self._publish()
+        return True
 
     def _teardown_session(self, reason: str) -> None:
         with self._lock:

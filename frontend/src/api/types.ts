@@ -31,6 +31,11 @@ export interface StatusSnapshot {
   message: string
   ports: Record<string, string | null>
   since: number
+  // Hand config currently in force. Not fixed for the session: unless a model
+  // was pinned on the command line, the backend re-derives it from whatever
+  // is plugged in, so a swapped hand shows up as a change here.
+  model: string
+  side: string
 }
 
 export interface JointInfo {

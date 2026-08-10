@@ -1,6 +1,6 @@
 // 3D view: URDF hand scene + the same motor panel as the dashboard.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../../api/rest'
 import { useAppStore } from '../../state/appStore'
 import { Panel } from '../common/Panel'
@@ -13,10 +13,15 @@ import { SceneControls } from '../three/SceneControls'
 export function ThreeDView() {
   const status = useAppStore((s) => s.status)
   const handInfo = useAppStore((s) => s.handInfo)
+  // The URDF bundle, fingertips and sensor mounts are all per-side, and the
+  // backend serves whichever hand it currently believes is plugged in — so a
+  // model swap has to re-fetch them, not just re-render.
+  const side = handInfo?.side ?? null
   const [assets, setAssets] = useState<HandAssets | null>(null)
   const [assetError, setAssetError] = useState<string | null>(null)
 
-  const loadAssets = useCallback(() => {
+  useEffect(() => {
+    let cancelled = false
     Promise.all([
       api.modelMetadata(),
       api.modelFingertips(),
@@ -25,13 +30,17 @@ export function ThreeDView() {
       api.taxelGeometry().catch(() => null),
     ])
       .then(([metadata, fingertips, sensorMounts, taxelGeometry]) => {
+        if (cancelled) return
         setAssets({ metadata, fingertips, sensorMounts, taxelGeometry })
         setAssetError(null)
       })
-      .catch((error) => setAssetError(String(error.message ?? error)))
-  }, [])
-
-  useEffect(loadAssets, [loadAssets])
+      .catch((error) => {
+        if (!cancelled) setAssetError(String(error.message ?? error))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [side])
 
   const caps = status?.capabilities
 

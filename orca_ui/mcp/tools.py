@@ -98,6 +98,7 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
         frame health. Call this first — motion tools need torque enabled AND
         control_owner 'manual'."""
         status = await backend.get("/api/status")
+        state.note_status(status)
         torque = bool(status.get("torque_enabled"))
         out: dict = {
             "torque": ("ENABLED — hand is energized" if torque

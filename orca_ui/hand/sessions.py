@@ -174,15 +174,22 @@ class HandSession:
 # ---------------------------------------------------------------------------
 
 
-def connect_session(settings: UiSettings, config) -> HandSession:
-    """Probe hardware and connect at the best achievable tier."""
+def connect_session(settings: UiSettings, config,
+                    presence: HardwarePresence | None = None) -> HandSession:
+    """Connect at the best achievable tier.
+
+    ``presence`` may be supplied by a caller that has already probed (the
+    supervisor does, because the same probe decides which model ``config``
+    is); left out, this probes for itself.
+    """
     declared = declared_capabilities(config, settings.engage_feedback,
                                      motors_enabled=settings.motors_enabled)
 
     if settings.mock:
         return _connect_mock(settings, declared)
 
-    presence = probe_hardware(config)
+    if presence is None:
+        presence = probe_hardware(config)
     sensing_present = bool(presence.sensing.tactile or presence.sensing.encoder)
 
     if settings.motors_enabled and presence.motor_port:
@@ -244,14 +251,19 @@ def _connect_mock(settings: UiSettings, declared: dict) -> HandSession:
 
 
 def _build_hand(settings: UiSettings, config, feedback: bool, tactile: bool):
-    """Fresh hand instance for one ladder rung (never reuse across attempts)."""
+    """Fresh hand instance for one ladder rung (never reuse across attempts).
+
+    Always built from ``config`` — settings.config_path is only where the
+    process *started*, and the supervisor may since have swapped the model to
+    match the hand that is actually plugged in.
+    """
     if feedback and not tactile and isinstance(config, OrcaHandTouchConfig):
         # No factory entry for 'feedback hand from a touch config': construct
         # directly; OrcaHandJointFeedback ignores the sensors block.
         return OrcaHandJointFeedback(config=config)
     if not feedback and not tactile and isinstance(config, OrcaHandTouchConfig):
         return OrcaHand(config=config)
-    return load_hand(config_path=settings.config_path,
+    return load_hand(config_path=config.config_path,
                      engage_feedback=feedback)
 
 
@@ -307,7 +319,7 @@ def _tier_name(feedback: bool, tactile: bool) -> str:
 
 def _connect_sensors_only(settings, config, declared, presence: HardwarePresence):
     """Motors unpowered: tactile viewing and/or encoder viewing only."""
-    hand = load_hand(config_path=settings.config_path, engage_feedback=False)
+    hand = load_hand(config_path=config.config_path, engage_feedback=False)
     ports = {"motor": None, "tactile": None, "encoder": None}
     messages: list[str] = []
     owned_links: list[HandSerialLink] = []

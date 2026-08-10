@@ -184,7 +184,7 @@ function dispatch(message: ServerMessage): void {
       break
     case TOPICS.status: {
       const status = data as unknown as StatusSnapshot
-      const previous = useAppStore.getState().status
+      const { status: previous, handInfo } = useAppStore.getState()
       if (previous?.state !== status.state) {
         useEventLogStore
           .getState()
@@ -193,9 +193,23 @@ function dispatch(message: ServerMessage): void {
             `state → ${status.state}${status.message ? ` (${status.message})` : ''}`,
           )
       }
+      // The backend re-derives the model from the hardware, so this changes
+      // when a hand that was off comes up, or when a different one is plugged
+      // in. Everything model-shaped (joints, ROMs, 3D side) has to follow.
+      const modelChanged = !!status.model && status.model !== previous?.model
+      if (modelChanged && previous?.model) {
+        useEventLogStore
+          .getState()
+          .pushEvent('status', `hand → ${status.model}`)
+      }
       useAppStore.getState().setStatus(status)
       // A fresh session may change capabilities/joints.
-      if (status.state === 'connected' || status.state === 'degraded') {
+      if (
+        status.state === 'connected' ||
+        status.state === 'degraded' ||
+        modelChanged ||
+        (!!status.model && status.model !== handInfo?.model_name)
+      ) {
         void refreshHandInfo()
       }
       break

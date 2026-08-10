@@ -111,14 +111,38 @@ class TeleopManager:
         self._cameras: list[dict] | None = None
 
         self._watchdog: threading.Thread | None = None
-
-        config = service.supervisor.config
-        self._roms = {j: (float(rom[0]), float(rom[1]))
-                      for j, rom in config.joint_roms_dict.items()}
-        self._neutral = {j: float(v)
-                         for j, v in config.neutral_position.items()}
+        self._limits_cache: tuple | None = None
 
     # ----- reads ------------------------------------------------------------------
+
+    def _joint_limits(self) -> tuple[dict, dict]:
+        """``(roms, neutral)`` for the model currently in force.
+
+        Derived from the live config rather than snapshotted at construction:
+        the supervisor swaps the model when the hardware turns out to be a
+        different hand, and clamping incoming targets to the *previous* hand's
+        ROM is exactly the mistake the clamp exists to prevent. Cached on the
+        config object's identity, since this is on the per-frame path.
+        """
+        config = self._service.supervisor.config
+        cached = self._limits_cache
+        if cached is None or cached[0] is not config:
+            cached = (
+                config,
+                {j: (float(rom[0]), float(rom[1]))
+                 for j, rom in config.joint_roms_dict.items()},
+                {j: float(v) for j, v in config.neutral_position.items()},
+            )
+            self._limits_cache = cached
+        return cached[1], cached[2]
+
+    @property
+    def _roms(self) -> dict[str, tuple[float, float]]:
+        return self._joint_limits()[0]
+
+    @property
+    def _neutral(self) -> dict[str, float]:
+        return self._joint_limits()[1]
 
     def snapshot(self) -> dict:
         with self._lock:
@@ -294,7 +318,7 @@ class TeleopManager:
             argv = [
                 "--connect", f"ws://127.0.0.1:{self._settings.port}/ws/teleop",
                 "--token", token,
-                "--model-path", self._settings.config_path,
+                "--model-path", self._service.supervisor.config.config_path,
             ] + protocol.config_to_argv(source, clean_config)
             env_extra = {"ORCA_TELEOP_TOKEN": token}
             urdf_dir = self._resolve_urdf_dir()
@@ -453,9 +477,7 @@ class TeleopManager:
                                          session_config=session_config)
 
     def _model_name(self) -> str:
-        import os
-        return os.path.basename(
-            os.path.dirname(self._service.supervisor.config.config_path))
+        return self._service.supervisor.model_name
 
     def ingress_disconnected(self, link) -> None:
         with self._lock:
