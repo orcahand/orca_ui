@@ -5,8 +5,9 @@ Per-taxel offsets live under ``sensor_offsets`` in the model's
 keep working. Resultant offsets are a *separate* baseline under
 ``resultant_offsets``: the sensor reports the resultant on the same
 single-byte-per-axis scale as one taxel, not as the sum of its taxels, so it
-cannot be derived from ``sensor_offsets``. Files written before that key
-existed simply leave the resultant unzeroed.
+cannot be derived from ``sensor_offsets``. Per-taxel noise gates live under
+``taxel_noise_gates``. Files written before those keys existed simply leave
+the resultant unzeroed and the taxels ungated.
 """
 
 from __future__ import annotations
@@ -40,6 +41,7 @@ def apply_saved_offsets(session) -> None:
     data = read_yaml(path) or {}
     offsets = data.get("sensor_offsets")
     resultants = data.get("resultant_offsets")
+    gates = data.get("taxel_noise_gates")
     if not offsets and not resultants:
         return
     try:
@@ -47,9 +49,14 @@ def apply_saved_offsets(session) -> None:
             client.set_taxel_offsets(offsets)
         if resultants:
             client.set_resultant_offsets(resultants)
+        # Gates measure the dither left over *after* these offsets, so they
+        # only mean anything paired with the run that produced them.
+        if gates and offsets:
+            client.set_taxel_noise_gates(gates)
         logger.info(
-            "restored tactile zero offsets from %s (taxels=%s, resultant=%s)",
-            path, bool(offsets), bool(resultants),
+            "restored tactile zero offsets from %s "
+            "(taxels=%s, resultant=%s, noise gates=%s)",
+            path, bool(offsets), bool(resultants), bool(gates and offsets),
         )
     except Exception:
         logger.exception("failed to apply saved sensor offsets")
@@ -68,6 +75,7 @@ def capture_and_persist(session, num_samples: int = 100) -> dict:
         # when the stream is taxels-only, and then persisted as such so a
         # reconnect doesn't restore a baseline from a different zeroing run.
         update_yaml(path, "resultant_offsets", client.resultant_offsets)
+        update_yaml(path, "taxel_noise_gates", client.taxel_noise_gates)
     return offsets
 
 

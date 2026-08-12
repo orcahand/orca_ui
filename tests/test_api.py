@@ -138,15 +138,23 @@ def test_tactile_zero_persists_offsets(client):
         assert max(abs(v) for v in vec) < 26.0
         assert vec != [sum(axis) for axis in zip(*calib["sensor_offsets"][finger])]
 
-    # Restoring on reconnect applies both baselines, unchanged.
+    # One noise gate per taxel, measured from the same frames.
+    gates = calib["taxel_noise_gates"]
+    for finger, per_taxel in gates.items():
+        assert len(per_taxel) == len(calib["sensor_offsets"][finger])
+        assert all(g > 0 for g in per_taxel)
+
+    # Restoring on reconnect applies all three, unchanged.
     zeroing.apply_saved_offsets(session)
     tactile = session.tactile_client
     assert tactile.taxel_offsets == calib["sensor_offsets"]
     assert tactile.resultant_offsets == resultants
+    assert tactile.taxel_noise_gates == gates
 
     assert client.post("/api/tactile/clear_zero").status_code == 200
     assert tactile.taxel_offsets is None
     assert tactile.resultant_offsets is None
+    assert tactile.taxel_noise_gates is None
 
 
 def test_gains_endpoint_updates_control_state(client):
