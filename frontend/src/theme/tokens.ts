@@ -53,7 +53,12 @@ export function maxTaxelForce(finger: string): number {
   return MAX_TAXEL_FORCE_BY_FINGER[finger] ?? MAX_TAXEL_FORCE
 }
 
-export const MAX_FORCE_SCALE = 10 // N; resultant dial normalization
+// Resultant normalization, shared by the 2D dial and the 3D resultant arrow.
+// Unlike the taxels this is NOT per-model: the resultant is a single reading
+// of one byte per axis, so 25.5 N (uint8 fz * 0.1 N) is its full scale on
+// every sensor. Normalizing against 10 N pinned the dial at the edge well
+// before the sensor ran out of range.
+export const MAX_FORCE_SCALE = 25.5
 
 // Zero-force taxel shade in the magnitude ramp. Matches COLORS.taxelIdle so an
 // unloaded taxel reads the same in every display mode; the ramp used to floor
