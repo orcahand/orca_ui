@@ -201,14 +201,18 @@ function HandRig({
       }
 
       const tactileOk = caps.tactile && rig.arrows.available
-      const scheme = useAppStore.getState().tactile.colorScheme
+      // Same settings the 2D taxel maps render from, so the toolbar threshold
+      // hides the same forces here as it does there.
+      const tactile = useAppStore.getState().tactile
+      const scheme = tactile.colorScheme
+      const threshold = tactile.thresholdEnabled ? tactile.threshold : 0
       rig.arrows.setResultantVisible(scene.forceResultant && tactileOk)
       rig.arrows.setTaxelsVisible(scene.forceTaxels && tactileOk)
       if (scene.forceResultant && tactileOk) {
-        rig.arrows.updateResultants(frames.tactile.forces, scheme)
+        rig.arrows.updateResultants(frames.tactile.forces, scheme, threshold)
       }
       if (scene.forceTaxels && tactileOk) {
-        rig.arrows.updateTaxels(frames.tactile.taxels, scheme)
+        rig.arrows.updateTaxels(frames.tactile.taxels, scheme, threshold)
       }
       invalidate()
     })

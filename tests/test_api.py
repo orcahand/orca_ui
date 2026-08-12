@@ -7,6 +7,7 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
+from orca_ui.hand import zeroing
 from orca_ui.mock import materialize_mock_model
 from orca_ui.server import create_app
 from orca_ui.settings import UiSettings
@@ -127,7 +128,25 @@ def test_tactile_zero_persists_offsets(client):
     with open(calib_path) as f:
         calib = yaml.safe_load(f)
     assert "sensor_offsets" in calib
+
+    # The resultant baseline is persisted separately: it is one [fx, fy, fz]
+    # per finger read off the resultant stream, not the sum of that finger's
+    # taxel offsets (which would be tens of N on a 25.5 N full scale).
+    resultants = calib["resultant_offsets"]
+    for finger, vec in resultants.items():
+        assert len(vec) == 3
+        assert max(abs(v) for v in vec) < 26.0
+        assert vec != [sum(axis) for axis in zip(*calib["sensor_offsets"][finger])]
+
+    # Restoring on reconnect applies both baselines, unchanged.
+    zeroing.apply_saved_offsets(session)
+    tactile = session.tactile_client
+    assert tactile.taxel_offsets == calib["sensor_offsets"]
+    assert tactile.resultant_offsets == resultants
+
     assert client.post("/api/tactile/clear_zero").status_code == 200
+    assert tactile.taxel_offsets is None
+    assert tactile.resultant_offsets is None
 
 
 def test_gains_endpoint_updates_control_state(client):

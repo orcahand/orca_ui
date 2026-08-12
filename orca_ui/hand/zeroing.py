@@ -1,7 +1,12 @@
 """Tactile zero-offset capture, persistence, and restore.
 
-Offsets live under ``sensor_offsets`` in the model's ``calibration.yaml`` —
-same convention as the original UI, so existing files keep working.
+Per-taxel offsets live under ``sensor_offsets`` in the model's
+``calibration.yaml`` — same convention as the original UI, so existing files
+keep working. Resultant offsets are a *separate* baseline under
+``resultant_offsets``: the sensor reports the resultant on the same
+single-byte-per-axis scale as one taxel, not as the sum of its taxels, so it
+cannot be derived from ``sensor_offsets``. Files written before that key
+existed simply leave the resultant unzeroed.
 """
 
 from __future__ import annotations
@@ -34,12 +39,20 @@ def apply_saved_offsets(session) -> None:
         return
     data = read_yaml(path) or {}
     offsets = data.get("sensor_offsets")
-    if offsets:
-        try:
+    resultants = data.get("resultant_offsets")
+    if not offsets and not resultants:
+        return
+    try:
+        if offsets:
             client.set_taxel_offsets(offsets)
-            logger.info("restored tactile zero offsets from %s", path)
-        except Exception:
-            logger.exception("failed to apply saved sensor offsets")
+        if resultants:
+            client.set_resultant_offsets(resultants)
+        logger.info(
+            "restored tactile zero offsets from %s (taxels=%s, resultant=%s)",
+            path, bool(offsets), bool(resultants),
+        )
+    except Exception:
+        logger.exception("failed to apply saved sensor offsets")
 
 
 def capture_and_persist(session, num_samples: int = 100) -> dict:
@@ -51,6 +64,10 @@ def capture_and_persist(session, num_samples: int = 100) -> dict:
     path = _calibration_path(session)
     if path:
         update_yaml(path, "sensor_offsets", offsets)
+        # Captured from the resultant stream alongside the taxels; ``None``
+        # when the stream is taxels-only, and then persisted as such so a
+        # reconnect doesn't restore a baseline from a different zeroing run.
+        update_yaml(path, "resultant_offsets", client.resultant_offsets)
     return offsets
 
 
