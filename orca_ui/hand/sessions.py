@@ -113,10 +113,7 @@ class HandSession:
             return None
         return self.hand._raw_to_joint_angle(reading.raw_counts)
 
-    def estimate_joints(self) -> dict | None:
-        """Naive motor-derived joint angles in degrees (the 'ghost' pose)."""
-        if not self.caps.motors:
-            return None
+    def _estimate_allowed(self) -> bool:
         if self._estimate_ok is None:
             # _motor_to_joint_pos prints per-joint warnings on uncalibrated
             # hands; check once instead of spamming at the sampler rate.
@@ -131,10 +128,28 @@ class HandSession:
                 logger.warning(
                     "motor calibration incomplete — joint estimate disabled "
                     "(run orca_core's calibration first)")
-        if not self._estimate_ok:
-            return None
-        pos = self.hand._motor_to_joint_pos(self.hand.get_motor_pos())
+        return self._estimate_ok
+
+    def _joint_estimate(self, motor_pos) -> dict | None:
+        pos = self.hand._motor_to_joint_pos(motor_pos)
         return {j: v for j, v in pos.items() if v is not None}
+
+    def estimate_joints(self) -> dict | None:
+        """Naive motor-derived joint angles in degrees (the 'ghost' pose)."""
+        if not self.caps.motors or not self._estimate_allowed():
+            return None
+        return self._joint_estimate(self.hand.get_motor_pos())
+
+    def motor_snapshot(self) -> tuple[dict | None, dict | None]:
+        """``(joint estimate, per-motor currents)`` from one bus read — they
+        share a register block, so asking separately costs two round trips."""
+        if not self.caps.motors:
+            return None, None
+        state = self.hand.get_motor_state()
+        currents = dict(zip(self.hand.config.motor_ids, state.current))
+        if not self._estimate_allowed():
+            return None, currents
+        return self._joint_estimate(state.position), currents
 
     def loop_correction(self) -> dict | None:
         return self.hand.get_loop_correction() if self.caps.feedback_loop else None
