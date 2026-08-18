@@ -110,11 +110,17 @@ def _mount_webui(app: FastAPI) -> None:
     if os.path.isdir(assets_dir):
         app.mount("/assets", StaticFiles(directory=assets_dir), name="webui-assets")
 
+    # index.html names the content-hashed bundle, so it must be revalidated on
+    # every load or a rebuild goes unnoticed: without an explicit Cache-Control
+    # browsers fall back to heuristic caching and a soft reload keeps running
+    # the old JS. The ETag keeps the common case a 304.
+    no_cache = {"Cache-Control": "no-cache"}
+
     # SPA fallback: any non-API path serves index.html so client-side routes work.
     @app.get("/{path:path}")
     def spa(path: str):
         candidate = os.path.realpath(os.path.join(WEBUI_DIR, path))
         if path and candidate.startswith(os.path.realpath(WEBUI_DIR) + os.sep) \
                 and os.path.isfile(candidate):
-            return FileResponse(candidate)
-        return FileResponse(index_html)
+            return FileResponse(candidate, headers=no_cache)
+        return FileResponse(index_html, headers=no_cache)

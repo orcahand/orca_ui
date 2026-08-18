@@ -220,3 +220,30 @@ def test_mock_joint_sweep_endpoint(client):
     assert _wait_for(moved, timeout=3.0)
     response = client.post("/api/mock/joint_sweep", json={"joint": None})
     assert response.json()["sweeping"] is None
+
+
+def test_spa_shell_is_revalidated_not_heuristically_cached(client):
+    """index.html names the content-hashed bundle. Served without an explicit
+    Cache-Control, browsers cache it heuristically and a soft reload after a
+    rebuild silently keeps running the old JS."""
+    response = client.get("/")
+    if response.status_code == 503:
+        pytest.skip("frontend not built")
+    assert response.headers.get("cache-control") == "no-cache"
+
+
+def test_stats_expose_the_command_feed(client):
+    """The feed counter is how you tell interpolation is actually live: diff it
+    during motion and it should climb at FEED_HZ, not the source rate."""
+    from orca_ui.hand.commands import FEED_HZ
+
+    command = client.get("/api/stats").json()["command"]
+    assert command["feed_hz"] == FEED_HZ
+    assert command["writes"] == 0
+    assert command["ramping"] is False
+
+    assert client.post("/api/torque/enable").status_code == 200
+    assert client.post("/api/joints/target",
+                       json={"angles": {"index_mcp": 12.0}}).status_code == 200
+    assert _wait_for(
+        lambda: client.get("/api/stats").json()["command"]["writes"] > 0)
