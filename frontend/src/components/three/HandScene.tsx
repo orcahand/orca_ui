@@ -21,7 +21,7 @@ import { subscribeFrames } from '../../state/streamStore'
 import { ForceArrowLayer } from './ForceArrowLayer'
 import { JointGlowLayer } from './JointGlowLayer'
 import { JointPoseAdapter } from './JointPoseAdapter'
-import { loadHandRobot, makeGhost } from './loadHandRobot'
+import { loadHandRobot, makeGhost, setSkinTone } from './loadHandRobot'
 
 export interface HandAssets {
   metadata: ModelMetadata
@@ -111,6 +111,17 @@ function HandRig({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assets.metadata.urdf_url])
+
+  // Touch and full hands carry Paxini sensors under black silicone; plain
+  // hands wear the white skin the bundle ships with. Keyed on the declared
+  // capability (i.e. the configured hand type), not the live one, so a sensor
+  // board that drops off mid-session doesn't repaint the hand.
+  const blackSkin = (caps.declared?.tactile ?? caps.tactile) === true
+  useEffect(() => {
+    if (!rig) return
+    setSkinTone(rig.robot, blackSkin ? 'black' : 'white')
+    invalidate()
+  }, [rig, blackSkin, invalidate])
 
   // Frame the camera on the hand once it exists: fit the whole model with a
   // margin, looking down from a 3/4 angle.
@@ -228,6 +239,44 @@ function HandRig({
   )
 }
 
+// Three-point lighting parented to the camera, so the hand is lit from the
+// viewer's front-top-left at every orbit angle instead of falling into shadow
+// whenever you swing around to the unlit side. Camera space: -Z is where the
+// camera looks, so a light at +Z sits behind the lens and shines forward.
+const CAMERA_LIGHTS: [x: number, y: number, z: number, intensity: number, color: string][] = [
+  [-0.55, 0.85, 0.5, 1.8, '#ffffff'], // key: front, above, slightly left
+  [0.9, -0.15, 0.45, 0.55, '#c8d2e6'], // fill: opposite side, softens the shadow
+  [0.25, 0.7, -1.0, 0.8, '#8fa6c8'], // rim: from behind, lifts the silhouette
+]
+
+function ViewerLights() {
+  const camera = useThree((s) => s.camera)
+  const scene = useThree((s) => s.scene)
+  const invalidate = useThree((s) => s.invalidate)
+  useEffect(() => {
+    // The renderer only collects lights it finds under the scene, and R3F
+    // keeps the default camera outside the graph — attach it first.
+    const detached = !camera.parent
+    if (detached) scene.add(camera)
+    const lights = CAMERA_LIGHTS.map(([x, y, z, intensity, color]) => {
+      const light = new THREE.DirectionalLight(color, intensity)
+      light.position.set(x, y, z)
+      light.target.position.set(0, 0, -1) // aim into the view direction
+      camera.add(light, light.target)
+      return light
+    })
+    invalidate()
+    return () => {
+      for (const light of lights) {
+        camera.remove(light, light.target)
+        light.dispose()
+      }
+      if (detached) scene.remove(camera)
+    }
+  }, [camera, scene, invalidate])
+  return null
+}
+
 export function HandScene({
   assets,
   joints,
@@ -244,9 +293,8 @@ export function HandScene({
       camera={{ fov: 35, position: [0.28, 0.25, 0.3], near: 0.01, far: 10 }}
       style={{ background: '#14161f', minHeight: 480 }}
     >
-      <hemisphereLight args={['#cfd6e4', '#20222e', 0.9]} />
-      <directionalLight position={[0.5, 1, 0.6]} intensity={1.4} />
-      <directionalLight position={[-0.6, 0.4, -0.5]} intensity={0.35} />
+      <hemisphereLight args={['#e2e8f5', '#2b3040', 0.75]} />
+      <ViewerLights />
       <Grid
         position={[0, -0.001, 0]}
         args={[1.2, 1.2]}
