@@ -45,6 +45,10 @@ class ServerState:
         self.set_joints_times: list[float] = []
         self._summary: dict | None = None
         self._summary_at = 0.0
+        # Bumped by every tool call (tools.py's `tool()` wrapper); read by
+        # cli.py's idle watchdog. Starts counting from server boot, so a
+        # server nobody ever calls still times out.
+        self.last_activity = time.monotonic()
 
     def invalidate_hand_summary(self) -> None:
         self._summary = None
@@ -181,6 +185,13 @@ async def mock_gate(state: ServerState) -> dict | None:
 
 
 def build_server(settings: McpSettings) -> FastMCP:
+    mcp, _state = build_server_with_state(settings)
+    return mcp
+
+
+def build_server_with_state(settings: McpSettings) -> tuple[FastMCP, ServerState]:
+    """Same as :func:`build_server`, but also hands back the ``ServerState``
+    — cli.py's idle watchdog needs to read ``state.last_activity``."""
     backend = BackendClient(settings.url, timeout=settings.timeout)
     state = ServerState(backend, settings)
 
@@ -198,4 +209,4 @@ def build_server(settings: McpSettings) -> FastMCP:
                   lifespan=lifespan)
     from orca_ui.mcp.tools import register_tools
     register_tools(mcp, state)
-    return mcp
+    return mcp, state

@@ -23,7 +23,8 @@ from orca_ui.hand.operations import Operation
 from orca_ui.hand.states import ControlSource
 from orca_ui.mcp import telemetry
 from orca_ui.mcp.client import BackendClient, BackendError, _translate
-from orca_ui.mcp.server import (ServerState, build_server, confirm_gate,
+from orca_ui.mcp.server import (ServerState, build_server,
+                                build_server_with_state, confirm_gate,
                                 mock_gate, state_block)
 from orca_ui.mcp.settings import McpSettings
 from orca_ui.mock import materialize_mock_model
@@ -134,6 +135,16 @@ def test_status_tool_happy_path(mcp):
     assert out["torque"].startswith("disabled")
     assert out["connection"]["capabilities"]["motors"] is True
     assert out["control_owner"] == "manual"
+
+
+def test_tool_call_marks_last_activity(backend_url):
+    """The idle watchdog (cli.py) reads state.last_activity to decide when
+    to exit — every tool call, not just the initial handshake, must bump it."""
+    mcp_server, state = build_server_with_state(McpSettings(url=backend_url))
+    before = state.last_activity
+    time.sleep(0.01)
+    _call(mcp_server, "orca_get_status")
+    assert state.last_activity > before
 
 
 def test_estop_is_first_and_always_registered(mcp):
