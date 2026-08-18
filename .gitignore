@@ -31,3 +31,6 @@ env/
 # Frontend
 node_modules/
 .superpowers/
+
+# Personal Claude Code instructions (see CLAUDE.local.md)
+CLAUDE.local.md
