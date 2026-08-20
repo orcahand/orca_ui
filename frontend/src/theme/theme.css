@@ -4,12 +4,43 @@
 @import '@fontsource/space-mono/400.css';
 @import '@fontsource/space-mono/700.css';
 
+/* --- Theme tokens ---------------------------------------------------
+
+   Two themes, one rule set: everything below is written against tokens, and
+   no rule hard-codes a color.
+
+   The `*-rgb` tokens are bare channel triples so a tint can be authored once
+   and still carry its own alpha where it is used —
+   `rgb(var(--accent-rgb) / 0.12)`. Re-pointing the triple per theme re-tints
+   every fill, border and glow built from it, while the alphas — which encode
+   how loud each thing is meant to be next to its neighbours — stay put.
+
+   Near-duplicate literals were collapsed into one triple per role on the way
+   in: cyan-500 into cyan-400, emerald-500 into emerald-400, and the two
+   softer reds that are not the E-stop into --err-rgb. At the alphas in use
+   those pairs were indistinguishable, and carrying two shades of one intent
+   through two themes was not worth it. The .dir-* legend chips picked up the
+   same collapse, which incidentally fixed a real drift: they were labelling
+   the taxel direction colors with a shade the data never used.
+
+   Light is "warm paper" — an off-white ground, white panels raised on it,
+   ink-dark type, and accents darkened until each clears 4.5:1 against the
+   page. It is not a numeric inversion of the dark theme. Panels lift on
+   paper as they lift on glass, but borders and hovers go *darker* rather
+   than lighter, which is the whole job of --overlay-rgb.
+
+   palette.ts mirrors these values for the taxel SVGs, the three.js scene and
+   the uPlot charts, none of which CSS can reach. Change one, change the
+   other. */
+
 :root {
+  color-scheme: dark;
+
   --bg: #1a1c2a;
-  --panel: rgba(255, 255, 255, 0.03);
-  --panel-strong: rgba(255, 255, 255, 0.04);
-  --panel-border: rgba(255, 255, 255, 0.06);
-  --panel-border-strong: rgba(255, 255, 255, 0.08);
+  --panel: rgb(255 255 255 / 0.03);
+  --panel-strong: rgb(255 255 255 / 0.04);
+  --panel-border: rgb(255 255 255 / 0.06);
+  --panel-border-strong: rgb(255 255 255 / 0.08);
   --text: #dfe3e8;
   --text-bright: #fff;
   --muted: #9faab9;
@@ -20,8 +51,90 @@
   --warn: #c8a870;
   --err: #d4878a;
   --purple: #a78bfa;
+
+  /* Tint sources for every wash, border and glow above. */
+  --overlay-rgb: 255 255 255;
+  --accent-rgb: 34 211 238;
+  --ok-rgb: 52 211 153;
+  --warn-rgb: 200 160 80;
+  --err-rgb: 200 100 100;
+  --purple-rgb: 167 139 250;
+
+  /* E-stop. Louder than --err on purpose: it is the one control that must
+     never be mistaken for a neighbour. Its alphas are tokens too, because
+     the light theme fills it on hover instead of deepening a wash. */
+  --danger-rgb: 220 60 60;
+  --danger-bright: #ff7a7a;
+  --danger-solid: #ff5c5c;
+  --estop-border: rgb(255 122 122 / 0.6);
+  --estop-bg-a: 0.14;
+  --estop-bg-hover-a: 0.3;
+  --estop-bg-active-a: 0.5;
+  --estop-hover-text: #fff;
+
+  /* Surfaces with no semantic token behind them. */
+  --pop-bg: #232637;
+  --pop-shadow-color: rgb(0 0 0 / 0.5);
+  --taxel-tile: #000;
   --taxel-idle: #1a1a1a;
+  --letterbox: #000;
+  --selection-text: #fff;
+
   --font: 'Space Mono', monospace;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #f6f5f1;
+  /* Lighter than the page, not darker: on paper the raised surface is the
+     whiter one. Left translucent so the backdrop blur still has work to do. */
+  --panel: rgb(255 255 255 / 0.75);
+  --panel-strong: rgb(255 255 255 / 0.92);
+  --panel-border: rgb(43 38 28 / 0.13);
+  --panel-border-strong: rgb(43 38 28 / 0.22);
+  --text: #26241d;
+  --text-bright: #100f0b;
+  /* 8.7:1, 6.3:1 and 4.5:1 against --bg. Stepped by contrast rather than by
+     eye — --dimmer carries 9px timestamps and meta labels, and is exactly
+     the step that slips under AA when it is chosen for looks. */
+  --muted: #494434;
+  --dim: #605a49;
+  --dimmer: #787060;
+  --accent: #0f6f78;
+  --ok: #3f6212;
+  --warn: #a16207;
+  --err: #b3261e;
+  --purple: #6b21a8;
+
+  /* Ink, not light: every hover and hairline built on --overlay-rgb now
+     darkens its surface instead of lifting it. */
+  --overlay-rgb: 43 38 28;
+  --accent-rgb: 15 111 120;
+  --ok-rgb: 63 98 18;
+  --warn-rgb: 161 98 7;
+  --err-rgb: 179 38 30;
+  --purple-rgb: 107 33 168;
+
+  --danger-rgb: 179 38 30;
+  --danger-bright: #b3261e;
+  --danger-solid: #dc2626;
+  --estop-border: rgb(179 38 30 / 0.65);
+  /* At rest, a pale chip with dark red type. On hover it fills solid rather
+     than deepening the wash, which on paper would only ever reach pink. */
+  --estop-bg-a: 0.1;
+  --estop-bg-hover-a: 0.9;
+  --estop-bg-active-a: 1;
+  --estop-hover-text: #fff;
+
+  --pop-bg: #fffefb;
+  --pop-shadow-color: rgb(43 38 28 / 0.18);
+  --taxel-tile: #fff;
+  --taxel-idle: #eae7df;
+  /* Letterboxing stays near-black in both themes: it frames a camera image,
+     and a white letterbox reads as a broken frame rather than a light one. */
+  --letterbox: #26241d;
+  --selection-text: #100f0b;
 }
 
 * {
@@ -39,8 +152,8 @@ body {
 }
 
 ::selection {
-  background: rgba(34, 211, 238, 0.25);
-  color: #fff;
+  background: rgb(var(--accent-rgb) / 0.25);
+  color: var(--selection-text);
 }
 
 .container {
@@ -118,14 +231,14 @@ header h1 {
 }
 
 .btn-primary {
-  background: rgba(34, 211, 238, 0.12);
+  background: rgb(var(--accent-rgb) / 0.12);
   color: var(--accent);
-  border-color: rgba(34, 211, 238, 0.25);
+  border-color: rgb(var(--accent-rgb) / 0.25);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: rgba(34, 211, 238, 0.2);
-  border-color: rgba(34, 211, 238, 0.4);
+  background: rgb(var(--accent-rgb) / 0.2);
+  border-color: rgb(var(--accent-rgb) / 0.4);
 }
 
 .btn-secondary {
@@ -135,52 +248,52 @@ header h1 {
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgb(var(--overlay-rgb) / 0.08);
   color: var(--text);
 }
 
 .btn-info {
-  background: rgba(16, 185, 129, 0.12);
+  background: rgb(var(--ok-rgb) / 0.12);
   color: var(--ok);
-  border-color: rgba(16, 185, 129, 0.25);
+  border-color: rgb(var(--ok-rgb) / 0.25);
 }
 
 .btn-info:hover:not(:disabled) {
-  background: rgba(16, 185, 129, 0.2);
-  border-color: rgba(16, 185, 129, 0.4);
+  background: rgb(var(--ok-rgb) / 0.2);
+  border-color: rgb(var(--ok-rgb) / 0.4);
 }
 
 .btn-danger {
-  background: rgba(200, 100, 100, 0.1);
+  background: rgb(var(--err-rgb) / 0.1);
   color: var(--err);
-  border-color: rgba(200, 100, 100, 0.2);
+  border-color: rgb(var(--err-rgb) / 0.2);
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: rgba(200, 100, 100, 0.18);
-  border-color: rgba(200, 100, 100, 0.35);
+  background: rgb(var(--err-rgb) / 0.18);
+  border-color: rgb(var(--err-rgb) / 0.35);
 }
 
 .btn-scan {
-  background: rgba(139, 92, 246, 0.12);
+  background: rgb(var(--purple-rgb) / 0.12);
   color: var(--purple);
-  border-color: rgba(139, 92, 246, 0.25);
+  border-color: rgb(var(--purple-rgb) / 0.25);
   font-size: 10px;
   padding: 5px 8px;
 }
 
 .btn-scan:hover:not(:disabled) {
-  background: rgba(139, 92, 246, 0.2);
-  border-color: rgba(139, 92, 246, 0.4);
+  background: rgb(var(--purple-rgb) / 0.2);
+  border-color: rgb(var(--purple-rgb) / 0.4);
 }
 
 /* --- E-stop --- */
 
 .btn-estop {
   padding: 7px 14px;
-  background: rgba(220, 60, 60, 0.14);
-  color: #ff7a7a;
-  border: 1px solid rgba(255, 122, 122, 0.6);
+  background: rgb(var(--danger-rgb) / var(--estop-bg-a));
+  color: var(--danger-bright);
+  border: 1px solid var(--estop-border);
   border-radius: 0;
   font-family: var(--font);
   font-size: 11px;
@@ -192,14 +305,14 @@ header h1 {
 }
 
 .btn-estop:hover:not(:disabled) {
-  background: rgba(220, 60, 60, 0.3);
-  border-color: #ff7a7a;
-  color: #fff;
+  background: rgb(var(--danger-rgb) / var(--estop-bg-hover-a));
+  border-color: var(--danger-bright);
+  color: var(--estop-hover-text);
 }
 
 .btn-estop:active:not(:disabled) {
-  background: rgba(220, 60, 60, 0.5);
-  color: #fff;
+  background: rgb(var(--danger-rgb) / var(--estop-bg-active-a));
+  color: var(--estop-hover-text);
 }
 
 .btn-estop:disabled {
@@ -218,21 +331,21 @@ header h1 {
 }
 
 .status-indicator.connected {
-  background: rgba(16, 185, 129, 0.12);
+  background: rgb(var(--ok-rgb) / 0.12);
   color: var(--ok);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  border: 1px solid rgb(var(--ok-rgb) / 0.2);
 }
 
 .status-indicator.disconnected {
-  background: rgba(200, 100, 100, 0.1);
+  background: rgb(var(--err-rgb) / 0.1);
   color: var(--err);
-  border: 1px solid rgba(200, 100, 100, 0.15);
+  border: 1px solid rgb(var(--err-rgb) / 0.15);
 }
 
 .status-indicator.busy {
-  background: rgba(200, 160, 80, 0.1);
+  background: rgb(var(--warn-rgb) / 0.1);
   color: var(--warn);
-  border: 1px solid rgba(200, 160, 80, 0.2);
+  border: 1px solid rgb(var(--warn-rgb) / 0.2);
   animation: pulse 1.2s ease-in-out infinite;
 }
 
@@ -242,9 +355,9 @@ header h1 {
 }
 
 .status-indicator.maintenance {
-  background: rgba(200, 160, 80, 0.12);
+  background: rgb(var(--warn-rgb) / 0.12);
   color: var(--warn);
-  border: 1px solid rgba(200, 160, 80, 0.3);
+  border: 1px solid rgb(var(--warn-rgb) / 0.3);
 }
 
 .capability-badge {
@@ -258,23 +371,23 @@ header h1 {
 }
 
 .capability-badge.on {
-  background: rgba(34, 211, 238, 0.08);
+  background: rgb(var(--accent-rgb) / 0.08);
   color: var(--accent);
-  border-color: rgba(34, 211, 238, 0.15);
+  border-color: rgb(var(--accent-rgb) / 0.15);
 }
 
 .capability-badge.warn {
-  background: rgba(200, 160, 80, 0.1);
+  background: rgb(var(--warn-rgb) / 0.1);
   color: var(--warn);
-  border-color: rgba(200, 160, 80, 0.2);
+  border-color: rgb(var(--warn-rgb) / 0.2);
 }
 
 /* Not a released orca_core. Deliberately louder than the neutral badges: it
    is the one thing that explains otherwise inexplicable hand behaviour. */
 .capability-badge.dev-build {
-  background: rgba(200, 160, 80, 0.14);
+  background: rgb(var(--warn-rgb) / 0.14);
   color: var(--warn);
-  border-color: rgba(200, 160, 80, 0.35);
+  border-color: rgb(var(--warn-rgb) / 0.35);
 }
 
 .rate-meters {
@@ -312,13 +425,41 @@ header h1 {
 }
 
 .view-tab:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgb(var(--overlay-rgb) / 0.04);
   color: var(--muted);
 }
 
 .view-tab.active {
-  background: rgba(34, 211, 238, 0.1);
+  background: rgb(var(--accent-rgb) / 0.1);
   color: var(--accent);
+}
+
+/* --- Theme toggle --- */
+
+.theme-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 0;
+  color: var(--dim);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.theme-toggle:hover {
+  background: rgb(var(--overlay-rgb) / 0.05);
+  border-color: rgb(var(--accent-rgb) / 0.35);
+  color: var(--accent);
+}
+
+.theme-toggle svg {
+  display: block;
+  width: 14px;
+  height: 14px;
 }
 
 /* --- Panels --- */
@@ -383,12 +524,12 @@ header h1 {
 }
 
 .toggle-label:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgb(var(--overlay-rgb) / 0.04);
   color: var(--muted);
 }
 
 .toggle-label:has(input:checked) {
-  background: rgba(34, 211, 238, 0.1);
+  background: rgb(var(--accent-rgb) / 0.1);
   color: var(--accent);
 }
 
@@ -420,7 +561,7 @@ header h1 {
 
 .toolbar select:focus,
 .toolbar input[type='number']:focus {
-  border-color: rgba(34, 211, 238, 0.3);
+  border-color: rgb(var(--accent-rgb) / 0.3);
 }
 
 .toolbar input[type='number'] {
@@ -475,8 +616,8 @@ header h1 {
 }
 
 .sensor-card:hover {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
+  border-color: rgb(var(--overlay-rgb) / 0.12);
+  background: rgb(var(--overlay-rgb) / 0.05);
 }
 
 .sensor-name {
@@ -515,7 +656,7 @@ header h1 {
 }
 
 .taxel-finger {
-  background: #000000;
+  background: var(--taxel-tile);
   border: 1px solid var(--panel-border);
   border-radius: 0;
   padding: 10px;
@@ -562,7 +703,7 @@ header h1 {
 }
 
 .force-visualization {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgb(var(--overlay-rgb) / 0.02);
   border: 1px solid var(--panel-border);
   border-radius: 0;
   padding: 16px;
@@ -633,16 +774,16 @@ header h1 {
   border: 1px solid;
 }
 
-.dir-right { background: rgba(200, 100, 100, 0.1); color: #d4878a; border-color: rgba(200, 100, 100, 0.2); }
-.dir-left { background: rgba(6, 182, 212, 0.12); color: #22d3ee; border-color: rgba(6, 182, 212, 0.2); }
-.dir-up { background: rgba(16, 185, 129, 0.12); color: #34d399; border-color: rgba(16, 185, 129, 0.2); }
-.dir-down { background: rgba(200, 160, 80, 0.12); color: #c8a870; border-color: rgba(200, 160, 80, 0.2); }
+.dir-right { background: rgb(var(--err-rgb) / 0.1); color: var(--err); border-color: rgb(var(--err-rgb) / 0.2); }
+.dir-left { background: rgb(var(--accent-rgb) / 0.12); color: var(--accent); border-color: rgb(var(--accent-rgb) / 0.2); }
+.dir-up { background: rgb(var(--ok-rgb) / 0.12); color: var(--ok); border-color: rgb(var(--ok-rgb) / 0.2); }
+.dir-down { background: rgb(var(--warn-rgb) / 0.12); color: var(--warn); border-color: rgb(var(--warn-rgb) / 0.2); }
 
 /* --- Error banner --- */
 
 .error-panel {
-  background: rgba(200, 100, 100, 0.08);
-  border: 1px solid rgba(200, 100, 100, 0.2);
+  background: rgb(var(--err-rgb) / 0.08);
+  border: 1px solid rgb(var(--err-rgb) / 0.2);
   border-radius: 0;
   padding: 10px;
   margin-bottom: 12px;
@@ -661,8 +802,8 @@ header h1 {
 /* --- Maintenance banner --- */
 
 .maintenance-banner {
-  background: rgba(200, 160, 80, 0.08);
-  border: 1px solid rgba(200, 160, 80, 0.25);
+  background: rgb(var(--warn-rgb) / 0.08);
+  border: 1px solid rgb(var(--warn-rgb) / 0.25);
   border-radius: 0;
   color: var(--warn);
   padding: 8px 12px;
@@ -677,7 +818,7 @@ header h1 {
 .banner-cta {
   margin-left: 10px;
   padding: 2px 8px;
-  border: 1px solid rgba(200, 160, 80, 0.45);
+  border: 1px solid rgb(var(--warn-rgb) / 0.45);
   border-radius: 0;
   background: transparent;
   color: var(--warn);
@@ -690,7 +831,7 @@ header h1 {
 }
 
 .banner-cta:hover {
-  background: rgba(200, 160, 80, 0.16);
+  background: rgb(var(--warn-rgb) / 0.16);
   color: var(--text-bright);
 }
 
@@ -899,8 +1040,8 @@ header h1 {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  background: rgba(167, 139, 250, 0.06);
-  border: 1px solid rgba(167, 139, 250, 0.35);
+  background: rgb(var(--purple-rgb) / 0.06);
+  border: 1px solid rgb(var(--purple-rgb) / 0.35);
   border-radius: 0;
   padding: 6px 12px;
   margin-bottom: 12px;
@@ -908,8 +1049,8 @@ header h1 {
 }
 
 .transport-bar.error {
-  background: rgba(200, 100, 100, 0.08);
-  border-color: rgba(200, 100, 100, 0.4);
+  background: rgb(var(--err-rgb) / 0.08);
+  border-color: rgb(var(--err-rgb) / 0.4);
 }
 
 .transport-bar.error .transport-kind,
@@ -918,8 +1059,8 @@ header h1 {
 }
 
 .transport-bar.done {
-  background: rgba(52, 211, 153, 0.05);
-  border-color: rgba(52, 211, 153, 0.3);
+  background: rgb(var(--ok-rgb) / 0.05);
+  border-color: rgb(var(--ok-rgb) / 0.3);
 }
 
 .transport-bar.done .transport-kind {
@@ -938,7 +1079,7 @@ header h1 {
 }
 
 .transport-kind.rec {
-  color: #ff7a7a;
+  color: var(--danger-bright);
 }
 
 .transport-phase {
@@ -975,7 +1116,7 @@ header h1 {
   flex: 1;
   min-width: 120px;
   height: 4px;
-  background: rgba(255, 255, 255, 0.07);
+  background: rgb(var(--overlay-rgb) / 0.07);
 }
 
 .transport-progress-fill {
@@ -1003,7 +1144,7 @@ header h1 {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #ff5c5c;
+  background: var(--danger-solid);
   display: inline-block;
   animation: rec-pulse 1.1s ease-in-out infinite;
 }
@@ -1036,7 +1177,7 @@ header h1 {
 }
 
 .note-label {
-  border-bottom: 1px dotted rgba(255, 255, 255, 0.28);
+  border-bottom: 1px dotted rgb(var(--overlay-rgb) / 0.28);
 }
 
 .note-trigger.note-title {
@@ -1053,7 +1194,7 @@ header h1 {
 
 .note-trigger:hover .note-label,
 .note-trigger:focus-visible .note-label {
-  border-bottom-color: rgba(34, 211, 238, 0.6);
+  border-bottom-color: rgb(var(--accent-rgb) / 0.6);
 }
 
 .note-marker {
@@ -1079,9 +1220,9 @@ header h1 {
   width: 340px;
   max-width: calc(100vw - 48px);
   padding: 9px 11px;
-  border: 1px solid rgba(34, 211, 238, 0.35);
-  background: #232637;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgb(var(--accent-rgb) / 0.35);
+  background: var(--pop-bg);
+  box-shadow: 0 8px 24px var(--pop-shadow-color);
   font-size: 10px;
   font-weight: 400;
   line-height: 1.6;
@@ -1169,8 +1310,8 @@ header h1 {
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: var(--accent);
-  border: 1px solid rgba(34, 211, 238, 0.35);
-  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid rgb(var(--accent-rgb) / 0.35);
+  background: rgb(var(--accent-rgb) / 0.08);
 }
 
 /* Instructional body copy — bigger and lighter than .setup-card-hint, which
@@ -1241,7 +1382,7 @@ header h1 {
   font-size: 9px;
   font-weight: 700;
   color: var(--accent);
-  border: 1px solid rgba(34, 211, 238, 0.3);
+  border: 1px solid rgb(var(--accent-rgb) / 0.3);
 }
 
 .setup-step-title {
@@ -1275,14 +1416,14 @@ header h1 {
   font-size: 10px;
   line-height: 1.5;
   color: var(--warn);
-  border: 1px solid rgba(200, 168, 112, 0.25);
-  background: rgba(200, 168, 112, 0.06);
+  border: 1px solid rgb(var(--warn-rgb) / 0.25);
+  background: rgb(var(--warn-rgb) / 0.06);
 }
 
 .setup-note.accent {
   color: var(--accent);
-  border-color: rgba(34, 211, 238, 0.3);
-  background: rgba(34, 211, 238, 0.07);
+  border-color: rgb(var(--accent-rgb) / 0.3);
+  background: rgb(var(--accent-rgb) / 0.07);
 }
 
 /* Do this now: the hold, and the between-rounds gate. */
@@ -1293,8 +1434,8 @@ header h1 {
   flex-direction: column;
   gap: 8px;
   padding: 10px;
-  border: 1px solid rgba(34, 211, 238, 0.35);
-  background: rgba(34, 211, 238, 0.07);
+  border: 1px solid rgb(var(--accent-rgb) / 0.35);
+  background: rgb(var(--accent-rgb) / 0.07);
 }
 
 .setup-callout-title {
@@ -1445,7 +1586,7 @@ header h1 {
 .setup-progress {
   align-self: stretch;
   height: 4px;
-  background: rgba(255, 255, 255, 0.07);
+  background: rgb(var(--overlay-rgb) / 0.07);
 }
 
 .setup-progress-fill {
@@ -1504,13 +1645,13 @@ header h1 {
 
 .phase-step.done {
   color: var(--ok);
-  border-color: rgba(52, 211, 153, 0.3);
+  border-color: rgb(var(--ok-rgb) / 0.3);
 }
 
 .phase-step.active {
   color: var(--accent);
-  border-color: rgba(34, 211, 238, 0.4);
-  background: rgba(34, 211, 238, 0.08);
+  border-color: rgb(var(--accent-rgb) / 0.4);
+  background: rgb(var(--accent-rgb) / 0.08);
   animation: pulse 1.4s ease-in-out infinite;
 }
 
@@ -1534,12 +1675,12 @@ header h1 {
 }
 
 .finger-chip:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgb(var(--overlay-rgb) / 0.05);
   color: var(--muted);
 }
 
 .finger-chip.open {
-  border-color: rgba(34, 211, 238, 0.35);
+  border-color: rgb(var(--accent-rgb) / 0.35);
   color: var(--accent);
 }
 
@@ -1734,8 +1875,8 @@ header h1 {
 }
 
 .pose-tile:hover:not(:disabled) {
-  border-color: rgba(34, 211, 238, 0.35);
-  background: rgba(34, 211, 238, 0.06);
+  border-color: rgb(var(--accent-rgb) / 0.35);
+  background: rgb(var(--accent-rgb) / 0.06);
   color: var(--text-bright);
 }
 
@@ -1766,13 +1907,13 @@ header h1 {
 
 .pose-tile.capture {
   border-style: dashed;
-  border-color: rgba(34, 211, 238, 0.25);
+  border-color: rgb(var(--accent-rgb) / 0.25);
   background: transparent;
   color: var(--accent);
 }
 
 .pose-tile.capture:hover {
-  background: rgba(34, 211, 238, 0.05);
+  background: rgb(var(--accent-rgb) / 0.05);
 }
 
 .pose-tile.capture-form {
@@ -1793,7 +1934,7 @@ header h1 {
 }
 
 .pose-tile.capture-form input[type='text']:focus {
-  border-color: rgba(34, 211, 238, 0.4);
+  border-color: rgb(var(--accent-rgb) / 0.4);
 }
 
 .capture-form-actions {
@@ -1888,7 +2029,7 @@ header h1 {
 
 .source-badge.core {
   color: var(--purple);
-  border-color: rgba(167, 139, 250, 0.3);
+  border-color: rgb(var(--purple-rgb) / 0.3);
 }
 
 .traj-table {
@@ -1996,7 +2137,7 @@ header h1 {
 
 .record-name:focus,
 .record-freq input[type='number']:focus {
-  border-color: rgba(34, 211, 238, 0.4);
+  border-color: rgb(var(--accent-rgb) / 0.4);
 }
 
 .record-note {
@@ -2072,7 +2213,7 @@ header h1 {
 .teleop-gate-feature {
   border: 1px solid var(--panel-border);
   border-left: 2px solid var(--panel-border-strong);
-  background: rgba(255, 255, 255, 0.02);
+  background: rgb(var(--overlay-rgb) / 0.02);
   padding: 9px 11px;
   display: flex;
   flex-direction: column;
@@ -2143,7 +2284,7 @@ header h1 {
 
 .teleop-source-tile {
   font-family: var(--font);
-  background: rgba(255, 255, 255, 0.02);
+  background: rgb(var(--overlay-rgb) / 0.02);
   border: 1px solid var(--panel-border);
   padding: 10px 12px;
   cursor: pointer;
@@ -2161,7 +2302,7 @@ header h1 {
 
 .teleop-source-tile.selected {
   border-color: var(--accent);
-  background: rgba(34, 211, 238, 0.07);
+  background: rgb(var(--accent-rgb) / 0.07);
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
@@ -2241,7 +2382,7 @@ header h1 {
 }
 
 .tracking-dot.lost {
-  background: #ff5c5c;
+  background: var(--danger-solid);
   animation: rec-pulse 1.1s ease-in-out infinite;
 }
 
@@ -2281,7 +2422,7 @@ header h1 {
   max-width: 720px;
   display: block;
   border: 1px solid var(--panel-border);
-  background: #000;
+  background: var(--letterbox);
 }
 
 .teleop-preview-waiting {
@@ -2307,8 +2448,8 @@ header h1 {
 /* Engaged teleop: accent the strip — this session owns the hand. */
 .transport-bar.teleop-engaged {
   border-left: 3px solid var(--accent);
-  background: rgba(34, 211, 238, 0.05);
-  border-color: rgba(34, 211, 238, 0.35);
+  background: rgb(var(--accent-rgb) / 0.05);
+  border-color: rgb(var(--accent-rgb) / 0.35);
 }
 
 /* ----- motor chain (Motors tab) ----- */
@@ -2329,7 +2470,7 @@ header h1 {
   min-width: 46px;
   padding: 6px 6px;
   border: 1px solid var(--panel-border);
-  background: rgba(255, 255, 255, 0.02);
+  background: rgb(var(--overlay-rgb) / 0.02);
   color: var(--dimmer);
 }
 
@@ -2345,20 +2486,20 @@ header h1 {
 .chain-node.configured {
   border-color: var(--ok);
   color: var(--ok);
-  background: rgba(52, 211, 153, 0.06);
+  background: rgb(var(--ok-rgb) / 0.06);
 }
 
 .chain-node.expected {
   border-color: var(--accent);
   color: var(--accent);
-  background: rgba(34, 211, 238, 0.08);
+  background: rgb(var(--accent-rgb) / 0.08);
   animation: pulse 1.4s ease-in-out infinite;
 }
 
 .chain-node.invalid {
   border-color: var(--err);
   color: var(--err);
-  background: rgba(212, 135, 138, 0.08);
+  background: rgb(var(--err-rgb) / 0.08);
 }
 
 .chain-node.reset {
@@ -2394,20 +2535,20 @@ header h1 {
   font-size: 11px;
   color: var(--accent);
   padding: 8px 10px;
-  border: 1px solid rgba(34, 211, 238, 0.35);
-  background: rgba(34, 211, 238, 0.05);
+  border: 1px solid rgb(var(--accent-rgb) / 0.35);
+  background: rgb(var(--accent-rgb) / 0.05);
 }
 
 .chain-instruction.done {
   color: var(--ok);
-  border-color: rgba(52, 211, 153, 0.35);
-  background: rgba(52, 211, 153, 0.05);
+  border-color: rgb(var(--ok-rgb) / 0.35);
+  background: rgb(var(--ok-rgb) / 0.05);
 }
 
 .chain-instruction.error {
   color: var(--err);
-  border-color: rgba(212, 135, 138, 0.4);
-  background: rgba(200, 100, 100, 0.06);
+  border-color: rgb(var(--err-rgb) / 0.4);
+  background: rgb(var(--err-rgb) / 0.06);
 }
 
 /* Filesystem path entry (teleop install destination). */
@@ -2423,7 +2564,7 @@ header h1 {
 }
 
 .path-input:focus {
-  border-color: rgba(34, 211, 238, 0.4);
+  border-color: rgb(var(--accent-rgb) / 0.4);
 }
 
 .path-input:disabled {
@@ -2436,8 +2577,8 @@ header h1 {
   gap: 8px;
   flex-wrap: wrap;
   padding: 8px 10px;
-  border: 1px solid rgba(212, 135, 138, 0.5);
-  background: rgba(200, 100, 100, 0.07);
+  border: 1px solid rgb(var(--err-rgb) / 0.5);
+  background: rgb(var(--err-rgb) / 0.07);
 }
 
 .chain-confirm-text {

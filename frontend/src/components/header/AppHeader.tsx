@@ -6,6 +6,7 @@ import type { HandState } from '../../api/types'
 import type { ViewName } from '../../state/appStore'
 import { useAppStore } from '../../state/appStore'
 import { EStopButton } from './EStopButton'
+import { ThemeToggle } from './ThemeToggle'
 
 const STATE_CLASS: Record<HandState, string> = {
   connected: 'connected',
@@ -94,6 +95,7 @@ export function AppHeader() {
           </button>
         ))}
       </nav>
+      <ThemeToggle />
       <EStopButton />
     </header>
   )

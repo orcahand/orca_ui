@@ -6,7 +6,7 @@
 import { useRef } from 'react'
 import type { JointInfo } from '../../api/types'
 import { useStreamFrame } from '../../hooks/useStreamFrame'
-import { COLORS } from '../../theme/tokens'
+import { usePalette } from '../../theme/themeStore'
 
 const W = 100 // viewBox width units
 const ERROR_WARN_DEG = 3
@@ -16,6 +16,7 @@ const STALE_MS = 500
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
 export function RomBarGauge({ joint }: { joint: JointInfo }) {
+  const { gauge, accent, warn, err } = usePalette()
   const [min, max] = joint.rom
   const span = max - min
   // Encoder present but unusable (no anchor) or excluded from the feedback
@@ -43,15 +44,15 @@ export function RomBarGauge({ joint }: { joint: JointInfo }) {
       fill.setAttribute('width', Math.max(width, 0.001).toFixed(2))
 
       const target = frames.joints.target[joint.id]
-      let color: string = COLORS.accent
+      let color: string = accent
       if (target !== undefined) {
         const error = Math.abs(measured - target)
         color =
           error < ERROR_WARN_DEG
-            ? COLORS.accent
+            ? accent
             : error < ERROR_BAD_DEG
-              ? COLORS.warn
-              : COLORS.err
+              ? warn
+              : err
       }
       fill.setAttribute('fill', color)
     }
@@ -112,18 +113,18 @@ export function RomBarGauge({ joint }: { joint: JointInfo }) {
           y={2}
           width={W}
           height={10}
-          fill={degraded ? 'rgba(212,135,138,0.12)' : 'rgba(255,255,255,0.04)'}
-          stroke={degraded ? COLORS.err : 'rgba(255,255,255,0.08)'}
+          fill={degraded ? gauge.trackDegraded : gauge.track}
+          stroke={degraded ? err : gauge.border}
           strokeWidth={degraded ? 0.8 : 0.4}
         />
         <rect ref={fillRef} x={zeroFrac * W} y={2} width={0.001} height={10}
-              fill={COLORS.accent} opacity={0.55} />
+              fill={accent} opacity={0.55} />
         <line
           x1={zeroFrac * W}
           x2={zeroFrac * W}
           y1={2}
           y2={12}
-          stroke="#5f718b"
+          stroke={gauge.zero}
           strokeWidth={0.7}
         />
         <line
@@ -132,7 +133,7 @@ export function RomBarGauge({ joint }: { joint: JointInfo }) {
           x2={zeroFrac * W}
           y1={0}
           y2={14}
-          stroke="#dfe3e8"
+          stroke={gauge.target}
           strokeWidth={0.9}
           visibility="hidden"
         />

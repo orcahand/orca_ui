@@ -110,10 +110,14 @@ export function setSkinTone(robot: THREE.Object3D, tone: SkinTone): void {
   })
 }
 
-export interface GhostOptions {
-  color?: number
-  opacity?: number
-  emissiveIntensity?: number
+/** Exactly the shape the palette stores per theme for each ghost. */
+export interface GhostAppearance {
+  color: number
+  opacity: number
+  emissiveIntensity: number
+}
+
+export interface GhostOptions extends Partial<GhostAppearance> {
   // Link names whose meshes are dropped from the ghost (static links like
   // the tower would just z-fight with the solid hand's identical geometry).
   hideLinks?: string[]
@@ -163,6 +167,34 @@ export function makeGhost(
     mesh.renderOrder = 10
   })
   return ghost
+}
+
+/**
+ * Re-tint an existing ghost in place, for a theme change. A pale slate ghost
+ * reads against a dark viewport and disappears against paper — and vanishing
+ * exactly where it leaves the hand defeats the point of drawing it, since
+ * the deviation is the whole signal.
+ *
+ * makeGhost gives every mesh the same material instance, so the Set is
+ * really a formality — it just keeps this honest if that ever stops being
+ * true.
+ */
+export function setGhostAppearance(
+  ghost: THREE.Object3D,
+  { color, opacity, emissiveIntensity }: GhostAppearance,
+): void {
+  const seen = new Set<THREE.Material>()
+  ghost.traverse((object) => {
+    const mesh = object as THREE.Mesh
+    if (!mesh.isMesh) return
+    const material = mesh.material as THREE.MeshStandardMaterial
+    if (!material || seen.has(material)) return
+    seen.add(material)
+    material.color.set(color)
+    material.opacity = opacity
+    material.emissive.set(emissiveIntensity > 0 ? color : 0x000000)
+    material.emissiveIntensity = emissiveIntensity
+  })
 }
 
 // Nearest URDF link up the parent chain — links nest through joints, so a
