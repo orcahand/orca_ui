@@ -15,6 +15,7 @@
 
 import * as THREE from 'three'
 import type { URDFRobot } from 'urdf-loader'
+import { markOverlay } from './loadHandRobot'
 import { palette } from '../../theme/palette'
 import type { Palette } from '../../theme/palette'
 
@@ -64,6 +65,7 @@ export class JointGlowLayer {
         color: this.low,
       })
       const mesh = new THREE.Mesh(this.geometry, material)
+      markOverlay(mesh) // or setSkinTone swaps the material out from under us
       // Torus lies in XY (normal +Z); align the normal with the joint axis.
       const axis = new THREE.Vector3().copy(joint.axis as THREE.Vector3).normalize()
       mesh.quaternion.setFromUnitVectors(zAxis, axis)

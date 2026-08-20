@@ -17,8 +17,8 @@ function fail(error: unknown) {
 const RATCHET = (
   <>
     With the ratchet, turn the top spool of each motor clockwise until the
-    tendon feels firm — you should hear it click. A little give is fine;
-    over-tightening makes the hand worse, not better.
+    tendon feels firm. A little give is fine; over-tightening makes the hand
+    worse, not better.
   </>
 )
 

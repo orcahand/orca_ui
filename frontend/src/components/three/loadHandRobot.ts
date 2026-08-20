@@ -74,6 +74,34 @@ const BLACK_FRAME: [r: number, g: number, b: number] = [0.1, 0.104, 0.115]
 
 export type SkinTone = 'white' | 'black'
 
+/**
+ * Marks an object (and its subtree) as an overlay rather than hand geometry.
+ *
+ * The force-arrow and joint-glow layers parent themselves to the robot's
+ * links so they inherit the kinematics — which also puts them in reach of
+ * robot.traverse(). setSkinTone was repainting them as black plastic: the
+ * arrows kept their instanceColor but had material.color driven to
+ * BLACK_FRAME, so every arrow rendered at a tenth of its intended
+ * brightness, and the glow rings had their material swapped outright, which
+ * silently disconnected the error ramp JointGlowLayer was still writing to
+ * the original. Only the resultant arrow escaped, because ArrowHelper
+ * re-sets material.color on every frame.
+ */
+export function markOverlay(object: THREE.Object3D): void {
+  object.userData.orcaOverlay = true
+}
+
+/** Walks the hand's own meshes, stopping at any overlay subtree. */
+function eachHandMesh(
+  root: THREE.Object3D,
+  visit: (mesh: THREE.Mesh) => void,
+): void {
+  if (root.userData.orcaOverlay) return
+  const mesh = root as THREE.Mesh
+  if (mesh.isMesh) visit(mesh)
+  for (const child of root.children) eachHandMesh(child, visit)
+}
+
 // Both materials per mesh, so toggling back and forth doesn't clone a new
 // one each time. Off to the side rather than in mesh.userData, which
 // Object3D.clone() deep-copies through JSON — makeGhost would serialize the
@@ -84,9 +112,7 @@ const skinMaterials = new WeakMap<
 >()
 
 export function setSkinTone(robot: THREE.Object3D, tone: SkinTone): void {
-  robot.traverse((object) => {
-    const mesh = object as THREE.Mesh
-    if (!mesh.isMesh) return
+  eachHandMesh(robot, (mesh) => {
     let pair = skinMaterials.get(mesh)
     if (!pair) {
       const isSkin = SKIN_MESH.test(mesh.name)

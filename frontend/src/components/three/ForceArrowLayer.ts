@@ -15,6 +15,7 @@ import type { URDFRobot } from 'urdf-loader'
 import type { Finger, TaxelGeometry, Vec3 } from '../../api/types'
 import type { FingertipEntry, SensorMounts } from '../../api/rest'
 import type { ArrowColorScheme } from '../../state/appStore'
+import { markOverlay } from './loadHandRobot'
 import { MAX_FORCE_SCALE, maxTaxelForce } from '../../theme/tokens'
 import { getArrowColor2D } from '../tactile/taxelRender'
 
@@ -69,6 +70,9 @@ export class ForceArrowLayer {
 
       const group = new THREE.Group()
       group.name = `sensor-frame-${finger}`
+      // Parented to a link for the kinematics, but not part of the hand:
+      // keeps setSkinTone from repainting the arrows as black plastic.
+      markOverlay(group)
       group.matrixAutoUpdate = false
       // Row-major 4x4 from the backend; Matrix4.set takes row-major args.
       const rows = mount.matrix

@@ -162,8 +162,7 @@ export function CalibrateCard() {
         <>
           <HoverNote label="When to run it">
             After tensioning, after a lot of use, or when poses come out short.
-            It takes a few minutes; stopping part-way keeps the joints it has
-            already finished.
+            Stopping part-way keeps the joints it has already finished.
           </HoverNote>
           {afterTension && (
             <div className="setup-note accent">

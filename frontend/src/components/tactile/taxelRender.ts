@@ -177,13 +177,18 @@ function renderArrow(
   entry.line.setAttribute('x2', String(endX))
   entry.line.setAttribute('y2', String(endY))
   entry.line.setAttribute('stroke', color)
-  entry.line.setAttribute(
-    'stroke-width',
-    String((2 + normalized * 2.5) * settings.thicknessMult),
-  )
+  const strokeWidth = (2 + normalized * 2.5) * settings.thicknessMult
+  entry.line.setAttribute('stroke-width', String(strokeWidth))
 
-  if (arrowLength > 4) {
-    const headLength = (3 + normalized * 3) * settings.thicknessMult
+  // The head is sized off the shaft, not off its own independent ramp. The
+  // old constants gave a head barely 1.5x the shaft across at the default
+  // thickness, so an arrow read as a plain line and its direction had to be
+  // inferred from which end was which. 2.8x the stroke length puts the head
+  // ~3.2x the shaft across, which is the usual proportion for an arrowhead.
+  // Clamped so a short arrow gets a small dart rather than becoming all head.
+  const headLength = Math.min(strokeWidth * 2.8, arrowLength * 0.55)
+
+  if (headLength > 1) {
     const headAngle = 0.6 // rad, ~35 deg
     const head1X = endX - Math.cos(angle - headAngle) * headLength
     const head1Y = endY - Math.sin(angle - headAngle) * headLength
