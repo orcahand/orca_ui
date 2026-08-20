@@ -9,6 +9,7 @@ to match this repo's sync-test convention.
 """
 
 import asyncio
+import functools
 import json
 import socket
 import threading
@@ -316,11 +317,11 @@ def test_telemetry_snapshot_one_value_per_topic(mcp, backend_url):
 
 def test_telemetry_window_sampling(mcp):
     out = _call(mcp, "orca_read_telemetry", topics=["joints.measured"],
-                duration_s=1.0, sample_hz=10)
+                duration_s=0.4, sample_hz=10)
     samples = out["topics"]["joints.measured"]["samples"]
     # Upper bound is the sample budget; the lower bound is 2 because the
     # change filter collapses a still hand to just the bracketing frames.
-    assert 2 <= len(samples) <= 11
+    assert 2 <= len(samples) <= 5
     assert all("t" in s and "angles" in s["data"] for s in samples)
     assert samples[0]["t"] < samples[-1]["t"]
 
@@ -400,10 +401,17 @@ def test_telemetry_unknown_topic_lists_valid(backend_url):
             "orca_read_telemetry", {"topics": ["joints.bogus"]}))
 
 
-def test_telemetry_missing_topic_times_out_gracefully(mcp):
+def test_telemetry_missing_topic_times_out_gracefully(mcp, monkeypatch):
+    """A topic nobody publishes (teleop is off) must come back as missing
+    rather than hanging the agent's tool call. The bound is what matters, not
+    its size, so shorten it rather than sit out the 2 s production default."""
+    from orca_ui.mcp import telemetry as tel
+
+    monkeypatch.setattr(tel, "ws_snapshot",
+                        functools.partial(tel.ws_snapshot, snapshot_timeout=0.3))
     start = time.time()
     out = _call(mcp, "orca_read_telemetry", topics=["teleop.targets"])
-    assert time.time() - start < 6.0
+    assert time.time() - start < 3.0
     assert out["missing"] == ["teleop.targets"]
     assert out["topics"]["teleop.targets"] is None
 

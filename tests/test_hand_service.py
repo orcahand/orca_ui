@@ -143,10 +143,8 @@ def test_gains_reject_joints_outside_the_loop(service):
 
 
 def test_stats_shape(service):
-    time.sleep(0.3)
-    stats = service.stats()
-    assert stats["loop"]["cycles_ok"] > 0
-    assert stats["encoder"]["frames_ok"] > 0
+    assert _wait_for(lambda: service.stats()["loop"]["cycles_ok"] > 0
+                     and service.stats()["encoder"]["frames_ok"] > 0), service.stats()
 
 
 def test_wrist_is_measured_and_follows_commands(service):
@@ -248,6 +246,18 @@ def test_missing_anchor_is_reported_with_a_recalibration_hint(service):
 
 
 # ----- calibration prompts ---------------------------------------------------------------
+#
+# _calibration_state never touches self, so these drive it on an unstarted
+# service: no mock hand, no supervisor threads, no connect wait.
+
+
+@pytest.fixture(scope="module")
+def calibration_state():
+    """``_calibration_state`` bound to a service that was never started."""
+    settings = UiSettings(config_path=materialize_mock_model(), mock=True,
+                          open_browser=False)
+    return HandService(settings, publish_status=lambda _: None,
+                       publish_error=lambda _: None)._calibration_state
 
 
 class _FakeHand:
@@ -267,47 +277,50 @@ class _FakeSession:
         self.caps = type("Caps", (), {"motors": True})()
 
 
-def _calibration(service, *, calibrated, anchors, encoder_backed=("index_mcp", "wrist")):
+def _calibration(calibration_state, *, calibrated, anchors,
+                 encoder_backed=("index_mcp", "wrist")):
     joints = ["index_mcp", "wrist"]
     session = _FakeSession(_FakeHand(calibrated, joints, dict.fromkeys(anchors)))
-    return service._calibration_state(session, set(encoder_backed), set(anchors))
+    return calibration_state(session, set(encoder_backed), set(anchors))
 
 
-def test_fully_uncalibrated_hand_asks_to_be_calibrated(service):
+def test_fully_uncalibrated_hand_asks_to_be_calibrated(calibration_state):
     """The worst case used to report hint=None: the connect ladder has already
     dropped joint sensing and nothing on screen said why."""
-    state = _calibration(service, calibrated=False, anchors=())
+    state = _calibration(calibration_state, calibrated=False, anchors=())
     assert state["motors"] is False
     assert state["needs_calibration"] is True
     assert "not calibrated" in state["hint"]
     assert "Calibrate" in state["hint"]
 
 
-def test_missing_anchors_still_name_the_joints(service):
-    state = _calibration(service, calibrated=True, anchors=("index_mcp",))
+def test_missing_anchors_still_name_the_joints(calibration_state):
+    state = _calibration(calibration_state, calibrated=True, anchors=("index_mcp",))
     assert state["needs_calibration"] is True
     assert state["missing_anchors"] == ["wrist"]
     assert "wrist" in state["hint"]
     assert state["joint_feedback"] is False
 
 
-def test_calibrated_hand_asks_for_nothing(service):
-    state = _calibration(service, calibrated=True, anchors=("index_mcp", "wrist"))
+def test_calibrated_hand_asks_for_nothing(calibration_state):
+    state = _calibration(calibration_state, calibrated=True,
+                         anchors=("index_mcp", "wrist"))
     assert state["needs_calibration"] is False
     assert state["hint"] is None
     assert state["joint_feedback"] is True
 
 
-def test_uncalibrated_hand_without_encoders_does_not_mention_anchors(service):
-    state = _calibration(service, calibrated=False, anchors=(), encoder_backed=())
+def test_uncalibrated_hand_without_encoders_does_not_mention_anchors(calibration_state):
+    state = _calibration(calibration_state, calibrated=False, anchors=(),
+                         encoder_backed=())
     assert state["needs_calibration"] is True
     assert "anchor" not in state["hint"]
 
 
-def test_no_motor_bus_asks_for_nothing(service):
+def test_no_motor_bus_asks_for_nothing(calibration_state):
     """Calibration needs motors; prompting a motorless session is noise."""
     session = _FakeSession(_FakeHand(False, ["index_mcp"], {}))
     session.caps = type("Caps", (), {"motors": False})()
-    state = service._calibration_state(session, {"index_mcp"}, set())
+    state = calibration_state(session, {"index_mcp"}, set())
     assert state["needs_calibration"] is False
     assert state["hint"] is None

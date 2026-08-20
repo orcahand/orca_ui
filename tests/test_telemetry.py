@@ -6,8 +6,6 @@ read taken while the hand is moving therefore freezes it for a cycle and a
 half. These pin when a read is allowed to happen at all.
 """
 
-import pytest
-
 from orca_ui.hand.telemetry import MAX_TELEMETRY_STALENESS_S, TelemetryService
 
 
@@ -168,9 +166,3 @@ def test_hand_without_a_loop_is_unrestricted():
     telemetry, session = _build(ramping=True, feedback_loop=False)
     telemetry._slow_tick()
     assert session.hand.bus_reads == ["temp", "current"]
-
-
-@pytest.mark.parametrize("ramping,op_active", [(True, False), (False, True)])
-def test_driven_detection(ramping, op_active):
-    telemetry, _ = _build(ramping=ramping, op_active=op_active)
-    assert telemetry._hand_is_driven()

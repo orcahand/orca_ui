@@ -157,20 +157,18 @@ def test_tactile_zero_persists_offsets(client):
     assert tactile.taxel_noise_gates is None
 
 
-def test_gains_endpoint_updates_control_state(client):
-    response = client.post("/api/control/gains",
-                           json={"kp": 1.5, "ki": 8.0,
-                                 "correction_max_deg": 45.0})
-    assert response.status_code == 200
-    assert response.json()["control"]["gains"]["kp"] == 1.5
-
-
 def test_per_joint_gains_endpoints(client):
     listing = client.get("/api/control/gains").json()
     tunable = [entry["joint"] for entry in listing["joints"]]
     assert "wrist" in tunable  # the wrist is a loop joint like any other
     assert not any(entry["modified"] for entry in listing["joints"])
     joint = tunable[0]
+
+    # Uniform gains: no "joints" key sets every loop joint at once.
+    uniform = client.post("/api/control/gains",
+                          json={"kp": 1.5, "ki": 8.0, "correction_max_deg": 45.0})
+    assert uniform.status_code == 200
+    assert uniform.json()["control"]["gains"]["kp"] == 1.5
 
     response = client.post("/api/control/gains",
                            json={"kp": 3.0, "ki": 2.0,
@@ -196,14 +194,12 @@ def test_per_joint_gains_endpoints(client):
             == listing["config_gains"])
 
 
-def test_model_metadata_hints_when_bundle_missing(client):
+def test_model_metadata_serves_the_committed_bundle(client):
+    """The bundle under orca_ui/models/hand_v2 is committed, so this is the
+    only outcome; a 404 here means the asset went missing from the package."""
     response = client.get("/api/model/metadata")
-    # Bundle may or may not be built at this point in history; both are valid,
-    # but a missing bundle must return the build hint, not a blank 500.
-    if response.status_code == 404:
-        assert "build_hand_bundle" in response.json()["detail"]
-    else:
-        assert response.json()["urdf_url"].endswith("hand.urdf")
+    assert response.status_code == 200, response.text
+    assert response.json()["urdf_url"].endswith("hand.urdf")
 
 
 def test_mock_joint_sweep_endpoint(client):
@@ -211,7 +207,6 @@ def test_mock_joint_sweep_endpoint(client):
                            json={"joint": "index_mcp", "period_s": 0.5})
     assert response.status_code == 200
     assert response.json()["sweeping"] == "index_mcp"
-    time.sleep(0.4)
 
     def moved():
         measured = client.app.state.service.session.measured_joints() or {}

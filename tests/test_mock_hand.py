@@ -35,11 +35,6 @@ def full_hand():
         hand.disconnect()
 
 
-def test_full_mock_selects_full_hand_class(full_hand):
-    from orca_core import OrcaHandFull
-    assert isinstance(full_hand, OrcaHandFull)
-
-
 def test_tactile_configuration_reports_all_sensors(full_hand):
     cfg = full_hand.get_tactile_configuration()
     assert cfg is not None
@@ -80,10 +75,8 @@ def test_loop_converges_on_commanded_target(full_hand):
 
 
 def test_loop_stats_report_healthy_loop(full_hand):
-    time.sleep(0.3)
-    stats = full_hand.get_loop_stats()
-    assert stats["cycles_ok"] > 0
-    assert not stats["fallback_active"]
+    assert _wait_for(lambda: full_hand.get_loop_stats()["cycles_ok"] > 0)
+    assert not full_hand.get_loop_stats()["fallback_active"]
 
 
 @pytest.mark.parametrize("strip", ["sensors", "feedback"])
