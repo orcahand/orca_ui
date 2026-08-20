@@ -72,6 +72,13 @@ const SKIN_MESH = /skin/i
 const BLACK_SKIN: [r: number, g: number, b: number] = [0.06, 0.062, 0.068]
 const BLACK_FRAME: [r: number, g: number, b: number] = [0.1, 0.104, 0.115]
 
+/**
+ * The material makeGhost created for each ghost. Kept off to the side for the
+ * same reason as skinMaterials: Object3D.clone() deep-copies userData through
+ * JSON, so a material stashed there would not survive a clone.
+ */
+const ghostMaterials = new WeakMap<THREE.Object3D, THREE.MeshStandardMaterial>()
+
 export type SkinTone = 'white' | 'black'
 
 /**
@@ -185,13 +192,17 @@ export function makeGhost(
   ghost.traverse((object) => {
     const mesh = object as THREE.Mesh
     if (!mesh.isMesh) return
-    if (hidden.size > 0 && hidden.has(owningLinkName(mesh))) {
-      mesh.visible = false
-      return
-    }
+    // Every ghost mesh takes the ghost material, hidden ones included.
+    // Object3D.clone() copies material by *reference*, so a mesh skipped here
+    // would keep pointing at the real hand's material — and anything that
+    // then edited "the ghost's" materials would be editing the hand's.
     mesh.material = material
     mesh.renderOrder = 10
+    if (hidden.size > 0 && hidden.has(owningLinkName(mesh))) {
+      mesh.visible = false
+    }
   })
+  ghostMaterials.set(ghost, material)
   return ghost
 }
 
@@ -209,18 +220,18 @@ export function setGhostAppearance(
   ghost: THREE.Object3D,
   { color, opacity, emissiveIntensity }: GhostAppearance,
 ): void {
-  const seen = new Set<THREE.Material>()
-  ghost.traverse((object) => {
-    const mesh = object as THREE.Mesh
-    if (!mesh.isMesh) return
-    const material = mesh.material as THREE.MeshStandardMaterial
-    if (!material || seen.has(material)) return
-    seen.add(material)
-    material.color.set(color)
-    material.opacity = opacity
-    material.emissive.set(emissiveIntensity > 0 ? color : 0x000000)
-    material.emissiveIntensity = emissiveIntensity
-  })
+  // Edits the one material makeGhost built, looked up by identity rather
+  // than found by walking the ghost. Traversing repainted whatever material
+  // each mesh happened to hold, which on a hand whose skin is left as the
+  // stock white — i.e. any hand without tactile sensors — reached straight
+  // through the clone into the real hand and turned its forearm and tower
+  // into translucent accent-coloured ghosts.
+  const material = ghostMaterials.get(ghost)
+  if (!material) return
+  material.color.set(color)
+  material.opacity = opacity
+  material.emissive.set(emissiveIntensity > 0 ? color : 0x000000)
+  material.emissiveIntensity = emissiveIntensity
 }
 
 // Nearest URDF link up the parent chain — links nest through joints, so a
