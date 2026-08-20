@@ -128,6 +128,10 @@ export function renderTaxelFrame(
   }
 }
 
+// Half-angle of the arrowhead, in radians (~34°). The shaft's end is derived
+// from it, so the two cannot drift apart.
+const HEAD_ANGLE = 0.6
+
 export function hideArrow(entry: ArrowPoolEntry | undefined): void {
   if (entry && entry.group.getAttribute('visibility') !== 'hidden') {
     entry.group.setAttribute('visibility', 'hidden')
@@ -171,14 +175,7 @@ function renderArrow(
   const endY = cy + Math.sin(angle) * arrowLength
   const color = getArrowColor2D(settings.colorScheme, normalized)
 
-  entry.group.setAttribute('visibility', 'visible')
-  entry.line.setAttribute('x1', String(cx))
-  entry.line.setAttribute('y1', String(cy))
-  entry.line.setAttribute('x2', String(endX))
-  entry.line.setAttribute('y2', String(endY))
-  entry.line.setAttribute('stroke', color)
   const strokeWidth = (2 + normalized * 2.5) * settings.thicknessMult
-  entry.line.setAttribute('stroke-width', String(strokeWidth))
 
   // The head is sized off the shaft, not off its own independent ramp. The
   // old constants gave a head barely 1.5x the shaft across at the default
@@ -187,13 +184,31 @@ function renderArrow(
   // ~3.2x the shaft across, which is the usual proportion for an arrowhead.
   // Clamped so a short arrow gets a small dart rather than becoming all head.
   const headLength = Math.min(strokeWidth * 2.8, arrowLength * 0.55)
+  const drawHead = headLength > 1
 
-  if (headLength > 1) {
-    const headAngle = 0.6 // rad, ~35 deg
-    const head1X = endX - Math.cos(angle - headAngle) * headLength
-    const head1Y = endY - Math.sin(angle - headAngle) * headLength
-    const head2X = endX - Math.cos(angle + headAngle) * headLength
-    const head2Y = endY - Math.sin(angle + headAngle) * headLength
+  // The shaft stops at the *base* of the head, not at its tip. It used to run
+  // the full length, and the round linecap then pushed a half-round bulge of
+  // strokeWidth/2 out through the point of the triangle — which is the stub
+  // that appeared to poke past every arrowhead. Ending at the base also means
+  // the cap is swallowed by the head instead of fighting it, and the small
+  // forward bulge conveniently covers the seam.
+  const shaftBack = drawHead ? headLength * Math.cos(HEAD_ANGLE) : 0
+  const shaftX = endX - Math.cos(angle) * shaftBack
+  const shaftY = endY - Math.sin(angle) * shaftBack
+
+  entry.group.setAttribute('visibility', 'visible')
+  entry.line.setAttribute('x1', String(cx))
+  entry.line.setAttribute('y1', String(cy))
+  entry.line.setAttribute('x2', String(shaftX))
+  entry.line.setAttribute('y2', String(shaftY))
+  entry.line.setAttribute('stroke', color)
+  entry.line.setAttribute('stroke-width', String(strokeWidth))
+
+  if (drawHead) {
+    const head1X = endX - Math.cos(angle - HEAD_ANGLE) * headLength
+    const head1Y = endY - Math.sin(angle - HEAD_ANGLE) * headLength
+    const head2X = endX - Math.cos(angle + HEAD_ANGLE) * headLength
+    const head2Y = endY - Math.sin(angle + HEAD_ANGLE) * headLength
     entry.head.setAttribute(
       'points',
       `${endX},${endY} ${head1X},${head1Y} ${head2X},${head2Y}`,
