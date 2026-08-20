@@ -15,6 +15,7 @@ import type { URDFRobot } from 'urdf-loader'
 import type { Finger, TaxelGeometry, Vec3 } from '../../api/types'
 import type { FingertipEntry, SensorMounts } from '../../api/rest'
 import type { ArrowColorScheme } from '../../state/appStore'
+import { markOverlay } from './loadHandRobot'
 import { MAX_FORCE_SCALE, maxTaxelForce } from '../../theme/tokens'
 import { getArrowColor2D } from '../tactile/taxelRender'
 
@@ -69,6 +70,9 @@ export class ForceArrowLayer {
 
       const group = new THREE.Group()
       group.name = `sensor-frame-${finger}`
+      // Parented to a link for the kinematics, but not part of the hand:
+      // keeps setSkinTone from repainting the arrows as black plastic.
+      markOverlay(group)
       group.matrixAutoUpdate = false
       // Row-major 4x4 from the backend; Matrix4.set takes row-major args.
       const rows = mount.matrix
@@ -93,8 +97,16 @@ export class ForceArrowLayer {
       group.add(resultant)
 
       const count = Math.max(taxelPositions.length, 1)
-      const shaftMaterial = new THREE.MeshBasicMaterial()
-      const headMaterial = new THREE.MeshBasicMaterial()
+      // toneMapped: false, as THREE.ArrowHelper already does for the
+      // resultant below. R3F's Canvas turns on ACES filmic tone mapping,
+      // which is meant for scene radiance and crushes saturated primaries —
+      // it was taking the heat ramp's full-scale red down to a near-black
+      // maroon. These arrows are an instrument reading, not lit geometry:
+      // the colour that comes out of getArrowColor2D is the colour that has
+      // to reach the screen, or the same force reads as one colour here, a
+      // brighter one on the resultant arrow, and a third in the 2D taxel map.
+      const shaftMaterial = new THREE.MeshBasicMaterial({ toneMapped: false })
+      const headMaterial = new THREE.MeshBasicMaterial({ toneMapped: false })
       const shafts = new THREE.InstancedMesh(shaftGeometry, shaftMaterial, count)
       const heads = new THREE.InstancedMesh(headGeometry, headMaterial, count)
       shafts.instanceMatrix.setUsage(THREE.DynamicDrawUsage)

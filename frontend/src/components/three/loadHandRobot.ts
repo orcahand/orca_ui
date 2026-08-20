@@ -74,6 +74,34 @@ const BLACK_FRAME: [r: number, g: number, b: number] = [0.1, 0.104, 0.115]
 
 export type SkinTone = 'white' | 'black'
 
+/**
+ * Marks an object (and its subtree) as an overlay rather than hand geometry.
+ *
+ * The force-arrow and joint-glow layers parent themselves to the robot's
+ * links so they inherit the kinematics — which also puts them in reach of
+ * robot.traverse(). setSkinTone was repainting them as black plastic: the
+ * arrows kept their instanceColor but had material.color driven to
+ * BLACK_FRAME, so every arrow rendered at a tenth of its intended
+ * brightness, and the glow rings had their material swapped outright, which
+ * silently disconnected the error ramp JointGlowLayer was still writing to
+ * the original. Only the resultant arrow escaped, because ArrowHelper
+ * re-sets material.color on every frame.
+ */
+export function markOverlay(object: THREE.Object3D): void {
+  object.userData.orcaOverlay = true
+}
+
+/** Walks the hand's own meshes, stopping at any overlay subtree. */
+function eachHandMesh(
+  root: THREE.Object3D,
+  visit: (mesh: THREE.Mesh) => void,
+): void {
+  if (root.userData.orcaOverlay) return
+  const mesh = root as THREE.Mesh
+  if (mesh.isMesh) visit(mesh)
+  for (const child of root.children) eachHandMesh(child, visit)
+}
+
 // Both materials per mesh, so toggling back and forth doesn't clone a new
 // one each time. Off to the side rather than in mesh.userData, which
 // Object3D.clone() deep-copies through JSON — makeGhost would serialize the
@@ -84,9 +112,7 @@ const skinMaterials = new WeakMap<
 >()
 
 export function setSkinTone(robot: THREE.Object3D, tone: SkinTone): void {
-  robot.traverse((object) => {
-    const mesh = object as THREE.Mesh
-    if (!mesh.isMesh) return
+  eachHandMesh(robot, (mesh) => {
     let pair = skinMaterials.get(mesh)
     if (!pair) {
       const isSkin = SKIN_MESH.test(mesh.name)
@@ -110,10 +136,14 @@ export function setSkinTone(robot: THREE.Object3D, tone: SkinTone): void {
   })
 }
 
-export interface GhostOptions {
-  color?: number
-  opacity?: number
-  emissiveIntensity?: number
+/** Exactly the shape the palette stores per theme for each ghost. */
+export interface GhostAppearance {
+  color: number
+  opacity: number
+  emissiveIntensity: number
+}
+
+export interface GhostOptions extends Partial<GhostAppearance> {
   // Link names whose meshes are dropped from the ghost (static links like
   // the tower would just z-fight with the solid hand's identical geometry).
   hideLinks?: string[]
@@ -163,6 +193,34 @@ export function makeGhost(
     mesh.renderOrder = 10
   })
   return ghost
+}
+
+/**
+ * Re-tint an existing ghost in place, for a theme change. A pale slate ghost
+ * reads against a dark viewport and disappears against paper — and vanishing
+ * exactly where it leaves the hand defeats the point of drawing it, since
+ * the deviation is the whole signal.
+ *
+ * makeGhost gives every mesh the same material instance, so the Set is
+ * really a formality — it just keeps this honest if that ever stops being
+ * true.
+ */
+export function setGhostAppearance(
+  ghost: THREE.Object3D,
+  { color, opacity, emissiveIntensity }: GhostAppearance,
+): void {
+  const seen = new Set<THREE.Material>()
+  ghost.traverse((object) => {
+    const mesh = object as THREE.Mesh
+    if (!mesh.isMesh) return
+    const material = mesh.material as THREE.MeshStandardMaterial
+    if (!material || seen.has(material)) return
+    seen.add(material)
+    material.color.set(color)
+    material.opacity = opacity
+    material.emissive.set(emissiveIntensity > 0 ? color : 0x000000)
+    material.emissiveIntensity = emissiveIntensity
+  })
 }
 
 // Nearest URDF link up the parent chain — links nest through joints, so a

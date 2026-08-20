@@ -137,9 +137,8 @@ export function FullSetupCard() {
               <SetupStep n={1} title="You tension the tendons">
                 The motors wind the tendons in and hold them there. With the
                 ratchet, turn the top spool of each motor clockwise until the
-                tendon feels firm — you should hear it click. A little give is
-                fine; over-tightening makes the hand worse, not better. Then
-                press Release.
+                tendon feels firm. A little give is fine; over-tightening makes
+                the hand worse, not better. Then press Release.
               </SetupStep>
               <SetupStep n={2} title="The hand calibrates itself">
                 It drives every joint to its hardstops and records the range it

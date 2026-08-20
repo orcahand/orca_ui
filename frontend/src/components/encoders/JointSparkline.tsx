@@ -8,12 +8,17 @@ import 'uplot/dist/uPlot.min.css'
 import type { JointInfo } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
 import { jointHistory } from '../../state/streamStore'
-import { COLORS } from '../../theme/tokens'
+import { usePalette } from '../../theme/themeStore'
 
 const WINDOW_S = 8
 const REDRAW_MS = 50
 
 export function JointSparkline({ joint }: { joint: JointInfo }) {
+  // uPlot bakes its colors into the config at construction, so the plot is
+  // rebuilt on a theme change rather than repainted. Theme switches are a
+  // deliberate, once-a-session act; the ring buffers outlive the plot, so the
+  // trace comes straight back with its history intact.
+  const { chart, accent, purple } = usePalette()
   const hostRef = useRef<HTMLDivElement>(null)
   const plotRef = useRef<uPlot | null>(null)
   const showTarget = useAppStore((s) => s.showSparklineTarget)
@@ -43,17 +48,17 @@ export function JointSparkline({ joint }: { joint: JointInfo }) {
         },
         axes: [
           {
-            stroke: COLORS.dimmer,
-            grid: { stroke: 'rgba(255,255,255,0.05)', width: 1 },
-            ticks: { stroke: 'rgba(255,255,255,0.08)' },
+            stroke: chart.axis,
+            grid: { stroke: chart.grid, width: 1 },
+            ticks: { stroke: chart.ticks },
             font: `9px 'Space Mono'`,
             size: 24,
             values: (_u, ticks) => ticks.map((v) => `${v.toFixed(0)}s`),
           },
           {
-            stroke: COLORS.dimmer,
-            grid: { stroke: 'rgba(255,255,255,0.05)', width: 1 },
-            ticks: { stroke: 'rgba(255,255,255,0.08)' },
+            stroke: chart.axis,
+            grid: { stroke: chart.grid, width: 1 },
+            ticks: { stroke: chart.ticks },
             font: `9px 'Space Mono'`,
             size: 36,
             values: (_u, ticks) => ticks.map((v) => `${v.toFixed(0)}°`),
@@ -61,11 +66,11 @@ export function JointSparkline({ joint }: { joint: JointInfo }) {
         ],
         series: [
           {},
-          { stroke: COLORS.accent, width: 1.25, points: { show: false } },
+          { stroke: accent, width: 1.25, points: { show: false } },
           // Commanded target: off by default (EncoderPanel toggle), solid and
           // clearly distinct from the measured trace.
           {
-            stroke: COLORS.purple,
+            stroke: purple,
             width: 1.25,
             points: { show: false },
             show: useAppStore.getState().showSparklineTarget,
@@ -112,7 +117,7 @@ export function JointSparkline({ joint }: { joint: JointInfo }) {
       plotRef.current = null
       plot.destroy()
     }
-  }, [joint])
+  }, [joint, chart, accent, purple])
 
   return <div ref={hostRef} style={{ margin: '2px 0 6px 120px' }} />
 }

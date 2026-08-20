@@ -5,6 +5,7 @@
 import { useRef } from 'react'
 import type { Finger } from '../../api/types'
 import { useStreamFrame } from '../../hooks/useStreamFrame'
+import { usePalette } from '../../theme/themeStore'
 import { MAX_FORCE_SCALE } from '../../theme/tokens'
 
 const MIN_CIRCLE_RADIUS = 2
@@ -12,6 +13,7 @@ const MAX_CIRCLE_RADIUS = 40
 const VISUALIZATION_RADIUS = 70
 
 export function ForceDial({ finger }: { finger: Finger }) {
+  const { dial } = usePalette()
   const dotRef = useRef<SVGCircleElement>(null)
   const fxRef = useRef<HTMLSpanElement>(null)
   const fyRef = useRef<HTMLSpanElement>(null)
@@ -44,7 +46,7 @@ export function ForceDial({ finger }: { finger: Finger }) {
       dot.setAttribute('cy', String(centerY - distance * Math.sin(angle)))
       dot.setAttribute('r', String(radius))
       dot.setAttribute('opacity', String(Math.min(0.3 + normalized * 0.7, 1)))
-      dot.setAttribute('fill', magnitude > 1 ? '#ef4444' : '#3b82f6')
+      dot.setAttribute('fill', magnitude > 1 ? dial.high : dial.low)
     }
 
     // Text at ~10 Hz to avoid flicker.
@@ -69,12 +71,12 @@ export function ForceDial({ finger }: { finger: Finger }) {
           cy={100}
           r={80}
           fill="none"
-          stroke="rgba(255,255,255,0.08)"
+          stroke={dial.ring}
           strokeWidth={1}
         />
-        <line x1={100} y1={20} x2={100} y2={180} stroke="rgba(255,255,255,0.05)" />
-        <line x1={20} y1={100} x2={180} y2={100} stroke="rgba(255,255,255,0.05)" />
-        <circle ref={dotRef} cx={100} cy={100} r={2} fill="#3b82f6" opacity={0.3} />
+        <line x1={100} y1={20} x2={100} y2={180} stroke={dial.cross} />
+        <line x1={20} y1={100} x2={180} y2={100} stroke={dial.cross} />
+        <circle ref={dotRef} cx={100} cy={100} r={2} fill={dial.low} opacity={0.3} />
       </svg>
       <div className="force-values">
         <div>
