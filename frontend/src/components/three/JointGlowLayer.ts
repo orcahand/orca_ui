@@ -54,6 +54,9 @@ export class JointGlowLayer {
       }
       const material = new THREE.MeshBasicMaterial({
         transparent: true,
+        // Same reason as the force arrows: the ring colour encodes tracking
+        // error, so it must not be tone mapped as if it were scene radiance.
+        toneMapped: false,
         opacity: this.glow!.idleOpacity,
         blending: BLENDING[this.glow!.blending],
         depthWrite: false,

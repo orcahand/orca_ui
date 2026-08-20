@@ -277,18 +277,31 @@ const LIGHT: Palette = {
   },
 
   arrows: {
+    // Zero sits a shade darker than the dark theme's slate sits above its
+    // ground: the taxel tile is pure white here, and the old pale end was
+    // nearly invisible on it. The top stop is ink, not black — mirroring the
+    // dark ramp, which ends near-white rather than at pure white.
     orca: [
-      [214, 210, 200],
-      [154, 148, 134],
-      [90, 86, 75],
-      [35, 33, 28],
+      [198, 194, 183],
+      [150, 144, 130],
+      [96, 92, 80],
+      [48, 45, 38],
     ],
-    intensityFrom: 84,
-    intensityTo: 4,
-    heatSatFrom: 75,
+    // The faithful mirror of dark's 15 -> 100.
+    intensityFrom: 85,
+    intensityTo: 5,
+    // Held close to the dark theme's band on purpose. Lightness is not free
+    // to move here the way it is in a single-hue ramp: pulling the whole
+    // ramp down to gain contrast on white drags the yellow band through
+    // olive and the red end to a muddy maroon, which loses both the vividness
+    // and the hue separation that make this scheme readable at a glance.
+    // Yellow is intrinsically light and simply cannot be both vivid and
+    // high-contrast on paper — so it stays vivid, and magnitude is still
+    // carried redundantly by arrow length.
+    heatSatFrom: 78,
     heatSatTo: 100,
-    heatLightFrom: 46,
-    heatLightTo: 36,
+    heatLightFrom: 52,
+    heatLightTo: 43,
   },
 
   direction: {
