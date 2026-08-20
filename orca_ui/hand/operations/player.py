@@ -43,24 +43,6 @@ DWELL_MIN_S = 0.15
 DWELL_MAX_S = 1.0
 DWELL_POLL_S = 0.05
 
-# Hold-time trim: the integral term the open-loop path has no room for.
-#
-# A joint that stops short of its goal has run its servo's inner P-term out of
-# torque against friction (current_based_position caps it), so commanding past
-# the target is what makes it push the rest of the way. Learning that only
-# while parked on a waypoint keeps it away from the streaming path entirely —
-# the frame cadence never waits on a measurement, so nothing can stutter mid
-# segment.
-#
-# The trim PERSISTS for the rest of the run rather than being released at the
-# waypoint: dropping it would step the command back by its full size at the
-# next segment's first frame, which is exactly the twitch this must not cause.
-# Bounded by TRIM_MAX_DEG, and by set_joint_positions' ROM clamp underneath it,
-# so a jammed joint cannot wind up.
-TRIM_GAIN = 0.6               # < 1: converges in ~2 steps without overshoot
-TRIM_MAX_DEG = 6.0
-TRIM_MIN_STEP_DEG = 0.2       # ignore steps too small to be worth a write
-
 
 def _require_playable(service) -> None:
     from orca_ui.hand.service import ServiceError
@@ -140,43 +122,6 @@ def _lead_in(service, joint_ids: list[str],
     if max(deltas, default=0.0) < LEAD_IN_MIN_DEG:
         return []
     return _segment_frames(start, first_row, rate_hz)
-
-
-def _with_trim(angles: dict[str, float],
-               trim: dict[str, float] | None) -> dict[str, float]:
-    """The commanded pose: the recorded one plus whatever the holds learned."""
-    if not trim:
-        return angles
-    return {joint: value + trim.get(joint, 0.0)
-            for joint, value in angles.items()}
-
-
-def _shortfall(sampled: dict, angles: dict[str, float]) -> dict[str, float]:
-    """Per-joint ``target - measured``, for joints outside the tolerance."""
-    return {joint: target - sampled[joint]
-            for joint, target in angles.items()
-            if joint in sampled
-            and abs(target - sampled[joint]) > DWELL_TOLERANCE_DEG}
-
-
-def _nudge(ctx: OpContext, angles: dict[str, float], sampled: dict,
-           trim: dict[str, float]) -> bool:
-    """Push the command past the joints that stopped short. False when there
-    is nothing left to give — every short joint is already at its clamp, so
-    the caller should stop waiting instead of burning the rest of the cap."""
-    moved = False
-    for joint, error in _shortfall(sampled, angles).items():
-        current = trim.get(joint, 0.0)
-        wanted = max(-TRIM_MAX_DEG,
-                     min(TRIM_MAX_DEG, current + TRIM_GAIN * error))
-        if abs(wanted - current) < TRIM_MIN_STEP_DEG:
-            continue
-        trim[joint] = wanted
-        moved = True
-    if moved:
-        ctx.service.set_targets(_with_trim(angles, trim),
-                                source=ControlSource.OPERATION)
-    return moved
 
 
 def _arrived(sampled: dict | None, angles: dict[str, float],
