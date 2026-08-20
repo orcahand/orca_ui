@@ -1,6 +1,7 @@
 // Trajectory library: recorded trajectories with replay (speed ×0.5/×1/×2 +
 // loop) and delete, plus the record controls (continuous/waypoints).
-// Recording needs joint encoders and disables torque for its duration
+// Recording needs a joint-angle source (encoders, or a calibrated hand's
+// motor-derived estimate) and disables torque for its duration
 // (posing the hand by hand); ending it goes through operation input — the
 // transport bar owns capture / stop & save once recording runs.
 
@@ -28,7 +29,7 @@ export function TrajectoryPanel({
   onChanged(): void
 }) {
   const replayGate = useStartGate('motors')
-  const recordGate = useStartGate('encoders')
+  const recordGate = useStartGate('joints')
   const torqueOn = useAppStore((s) => s.control?.torque_enabled ?? false)
 
   const [speeds, setSpeeds] = useState<Record<string, number>>({})

@@ -882,10 +882,11 @@ class HandService:
 
     def capture_pose(self, name: str) -> dict:
         session = self._require_session()
-        measured = session.measured_joints()
+        measured = session.sampled_joints()
         if not measured:
             raise ServiceError(
-                "no measured joint angles — capture needs encoders",
+                "no joint angles available — capture needs joint encoders, "
+                "or motors with a completed calibration",
                 status_code=409)
         angles = {j: round(float(v), 2) for j, v in measured.items()}
         self.save_pose(name, angles)

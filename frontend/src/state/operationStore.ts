@@ -99,7 +99,7 @@ export interface ControlGate {
 // Gate for operation *start* buttons (Setup cards, demo/replay/record):
 // blocked while another operation is active or a required capability is
 // missing; `reason` feeds the tooltip/label.
-export function useStartGate(requires: 'motors' | 'encoders'): {
+export function useStartGate(requires: 'motors' | 'encoders' | 'joints'): {
   blocked: boolean
   reason: string | null
 } {
@@ -122,13 +122,21 @@ export function useStartGate(requires: 'motors' | 'encoders'): {
       reason: 'teleop is engaged — disengage first',
     }
   }
-  if (!caps?.[requires]) {
+  // 'joints' = any joint-angle source: encoders, or motors (calibrated
+  // motor-derived estimate; the backend rejects uncalibrated hands).
+  const available =
+    requires === 'joints'
+      ? Boolean(caps?.encoders || caps?.motors)
+      : Boolean(caps?.[requires])
+  if (!available) {
     return {
       blocked: true,
       reason:
         requires === 'motors'
           ? 'motor bus unavailable'
-          : 'joint encoders unavailable',
+          : requires === 'joints'
+            ? 'no joint-angle source (encoders or motors)'
+            : 'joint encoders unavailable',
     }
   }
   return { blocked: false, reason: null }
