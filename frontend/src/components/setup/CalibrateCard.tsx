@@ -5,7 +5,7 @@
 
 import { useMemo, useState } from 'react'
 import { api } from '../../api/rest'
-import type { JointInfo } from '../../api/types'
+import type { HandInfo, JointInfo } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
 import {
   isOperationActive,
@@ -343,11 +343,33 @@ export function CalibrateCard() {
               return (
                 <div key={joint.id} className="joint-status-row">
                   <span>{joint.id}</span>
-                  <span
-                    className={`joint-status-mark ${mark.cls}`}
-                    title={mark.title}
-                  >
-                    {mark.text}
+                  <span style={{ display: 'inline-flex', gap: 8 }}>
+                    {joint.rom_delta != null && (
+                      <span
+                        style={{
+                          color:
+                            Math.abs(joint.rom_delta) > 4
+                              ? 'var(--warn)'
+                              : 'var(--dim)',
+                          fontSize: 10,
+                        }}
+                        title={
+                          `measured travel ${joint.rom_delta >= 0 ? 'exceeds' : 'falls short of'} ` +
+                          `the configured range by ${Math.abs(joint.rom_delta).toFixed(1)}° ` +
+                          `(measured [${joint.rom_measured?.[0].toFixed(1)}, ${joint.rom_measured?.[1].toFixed(1)}]°` +
+                          `, config [${joint.rom[0]}, ${joint.rom[1]}]°)`
+                        }
+                      >
+                        Δ {joint.rom_delta >= 0 ? '+' : ''}
+                        {joint.rom_delta.toFixed(1)}°
+                      </span>
+                    )}
+                    <span
+                      className={`joint-status-mark ${mark.cls}`}
+                      title={mark.title}
+                    >
+                      {mark.text}
+                    </span>
                   </span>
                 </div>
               )
@@ -355,6 +377,79 @@ export function CalibrateCard() {
           </div>
         )}
       </div>
+
+      <RomFrameSection handInfo={handInfo} joints={joints} />
+    </div>
+  )
+}
+
+// Optional: lay the encoder-measured travel onto the config ROM with the
+// delta split equally onto both ends, and use that frame for the joint
+// estimation — so the operator can compare it against the classic frame.
+function RomFrameSection({
+  handInfo,
+  joints,
+}: {
+  handInfo: HandInfo | null
+  joints: JointInfo[]
+}) {
+  const [busy, setBusy] = useState(false)
+  const [needReconnect, setNeedReconnect] = useState(false)
+  const romFrame = handInfo?.rom_frame ?? null
+  const measured = joints.filter((j) => j.rom_delta != null)
+  if (romFrame === null || !joints.some((j) => j.encoder_backed)) return null
+
+  const setFrame = async (centered: boolean) => {
+    setBusy(true)
+    try {
+      const result = await api.setRomFrame(centered ? 'centered' : 'anchor')
+      if (result.requires_reconnect) setNeedReconnect(true)
+      useAppStore.getState().setHandInfo(await api.handInfo())
+    } catch (error) {
+      fail(error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="setup-advanced">
+      <span className="setup-section-title">Measured range of motion</span>
+      {measured.length === 0 ? (
+        <p className="setup-copy dim">
+          No measured ranges recorded yet — run Calibrate with the joint
+          sensors on and the sweep also measures each joint's actual travel
+          (shown as Δ in the joint status above).
+        </p>
+      ) : (
+        <p className="setup-copy dim">
+          {measured.length} joint{measured.length > 1 ? 's have' : ' has'} a
+          measured range (Δ = measured minus configured travel, in the joint
+          status above).
+        </p>
+      )}
+      <label className="joint-check">
+        <input
+          type="checkbox"
+          checked={romFrame === 'centered'}
+          disabled={busy}
+          onChange={(e) => void setFrame(e.target.checked)}
+        />
+        Use the measured range, centered on the config range, for estimation
+      </label>
+      <p className="setup-option-hint">
+        On: each joint's Δ is added (or subtracted) half on each end of its
+        configured range and the joint estimation runs in that frame. Off:
+        the classic frame — the measured range is pinned to the configured
+        upper end. Toggle freely to compare which tracks the real hand
+        better.
+      </p>
+      {needReconnect && (
+        <p className="setup-option-hint" style={{ color: 'var(--warn)' }}>
+          The running feedback loop keeps its old frame until you reconnect
+          (Dashboard → Reconnect, or the Reconnect button in Motor Control).
+        </p>
+      )}
     </div>
   )
 }

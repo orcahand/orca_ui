@@ -239,6 +239,10 @@ def build_router(service: HandService) -> APIRouter:
         guard(service.set_max_current, body.ma)
         return {"ok": True, "control": service.control_state()}
 
+    @router.post("/control/rom_frame")
+    def control_rom_frame(body: schemas.RomFrameRequest):
+        return guard(service.set_rom_frame, body.mode)
+
     @router.post("/control/rebase")
     def control_rebase():
         guard(service.rebase)

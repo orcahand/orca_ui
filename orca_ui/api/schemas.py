@@ -13,6 +13,13 @@ class JointTargets(BaseModel):
     angles: dict[str, float]
 
 
+class RomFrameRequest(BaseModel):
+    """ROM frame for the joint↔motor map: "anchor" (measured travel pinned to
+    the config upper) or "centered" (measured delta split onto both ends)."""
+
+    mode: str
+
+
 class JointCalibrateRequest(BaseModel):
     """Manual joint-sensor calibration: the joint currently sits at
     ``angle_deg`` (operator-verified); re-anchor its encoder there."""

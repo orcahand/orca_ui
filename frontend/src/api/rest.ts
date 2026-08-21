@@ -116,6 +116,11 @@ export const api = {
     post('/api/control/gains/reset', { joints: joints ?? null }),
   setMaxCurrent: (ma: number) => post('/api/control/max_current', { ma }),
   rebase: () => post('/api/control/rebase'),
+  setRomFrame: (mode: 'anchor' | 'centered') =>
+    post<{ rom_frame: string; requires_reconnect: boolean }>(
+      '/api/control/rom_frame',
+      { mode },
+    ),
 
   motorsDirect: () => request<DirectMotorSnapshot>('/api/motors/direct'),
   motorsDirectMode: (enabled: boolean) =>

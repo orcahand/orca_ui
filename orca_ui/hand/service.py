@@ -190,6 +190,28 @@ class HandService:
             except Exception:
                 loop_joints = None
                 loop_skipped = set()
+        # Encoder-measured travel vs the config nominal, and which ROM frame
+        # the joint↔motor map currently runs in ("anchor" or "centered").
+        measured_roms: dict = {}
+        effective_roms: dict = {}
+        rom_frame = None
+        if session is not None:
+            try:
+                measured_roms = dict(
+                    session.hand.calibration.joint_roms_measured_dict or {})
+                effective_roms = dict(session.hand.effective_joint_roms_dict)
+                rom_frame = session.hand.rom_frame
+            except Exception:
+                measured_roms, effective_roms, rom_frame = {}, {}, None
+
+        def _rom_delta(joint: str) -> float | None:
+            measured = measured_roms.get(joint)
+            if measured is None:
+                return None
+            lower, upper = config.joint_roms_dict[joint]
+            return float(
+                (measured[1] - measured[0]) - (float(upper) - float(lower)))
+
         joints = [
             {
                 "id": joint,
@@ -197,6 +219,16 @@ class HandService:
                 # motor id from telemetry back into something a human names.
                 "motor_id": config.joint_to_motor_map.get(joint),
                 "rom": [float(v) for v in config.joint_roms_dict[joint]],
+                "rom_measured": (
+                    [float(v) for v in measured_roms[joint]]
+                    if joint in measured_roms else None
+                ),
+                "rom_delta": _rom_delta(joint),
+                "rom_effective": (
+                    [float(v) for v in effective_roms[joint]]
+                    if joint in measured_roms and joint in effective_roms
+                    else None
+                ),
                 "neutral": float(config.neutral_position.get(joint, 0.0)),
                 "encoder_backed": joint in encoder_backed,
                 "encoder_calibrated": (
@@ -215,6 +247,7 @@ class HandService:
             "model_name": model_name_of(config),
             "side": config.type,
             "mock": self.settings.mock,
+            "rom_frame": rom_frame,
             "joints": joints,
             "calibration": self._calibration_state(
                 session, encoder_backed, encoder_calibrated),
@@ -806,6 +839,26 @@ class HandService:
     def rebase(self) -> None:
         session = self._require_feedback()
         session.hand.rebase_loop()
+
+    def set_rom_frame(self, mode: str) -> dict:
+        """Switch how measured joint travel is laid onto the config ROM
+        ("anchor" = classic upper-pinned, "centered" = measured delta split
+        equally onto both ends). Applies to estimates and encoder decode
+        immediately; a running feedback loop keeps its snapshot until
+        reconnect."""
+        session = self.session
+        if session is None:
+            raise ServiceError("hand not connected", status_code=503)
+        self._require_manual_control()
+        try:
+            session.hand.set_rom_frame(mode)
+        except ValueError as e:
+            raise ServiceError(str(e))
+        logger.info("rom frame set to %s", mode)
+        return {
+            "rom_frame": mode,
+            "requires_reconnect": bool(session.caps.feedback_loop),
+        }
 
     # ----- direct motor control (advanced diagnostics) -----------------------
     #

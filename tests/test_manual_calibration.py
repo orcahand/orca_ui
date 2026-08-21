@@ -78,3 +78,23 @@ def test_calibrate_op_accepts_sensor_flag(client):
     assert _wait_for(
         lambda: (client.get("/api/operation").json()["operation"] or {})
         .get("state") == "done")
+
+
+def test_rom_frame_toggle(client):
+    info = client.get("/api/hand/info").json()
+    assert info["rom_frame"] == "anchor"
+    assert "rom_delta" in info["joints"][0]
+
+    response = client.post("/api/control/rom_frame",
+                           json={"mode": "centered"})
+    assert response.status_code == 200, response.text
+    assert response.json()["rom_frame"] == "centered"
+    assert client.get("/api/hand/info").json()["rom_frame"] == "centered"
+
+    response = client.post("/api/control/rom_frame",
+                           json={"mode": "sideways"})
+    assert response.status_code == 400
+    assert "unknown rom frame" in response.json()["detail"]
+
+    assert client.post("/api/control/rom_frame",
+                       json={"mode": "anchor"}).status_code == 200

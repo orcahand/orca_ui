@@ -43,6 +43,12 @@ export interface JointInfo {
   // Motor driving this joint, or null when the config maps none.
   motor_id: number | null
   rom: [number, number] // degrees
+  // Encoder-measured travel from the calibration sweep (anchor frame), the
+  // measured-minus-config span delta in degrees, and the ROM the joint↔motor
+  // map currently runs in. All null without a measured sweep / session.
+  rom_measured?: [number, number] | null
+  rom_delta?: number | null
+  rom_effective?: [number, number] | null
   neutral: number
   encoder_backed: boolean
   // null: unknown (no session yet) or not an encoder joint. false: the joint
@@ -131,8 +137,12 @@ export interface CoreSourceInfo {
   summary: string
 }
 
+export type RomFrame = 'anchor' | 'centered'
+
 export interface HandInfo {
   model_name: string
+  // Which ROM frame the joint↔motor map runs in; null without a session.
+  rom_frame?: RomFrame | null
   side: 'left' | 'right'
   mock: boolean
   joints: JointInfo[]
