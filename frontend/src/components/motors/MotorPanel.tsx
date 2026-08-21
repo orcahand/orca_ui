@@ -337,10 +337,13 @@ function SliderRow({
       <span style={{ width: 34, color: 'var(--dimmer)', fontSize: 9 }}>
         {hi > 0 ? `+${hi.toFixed(0)}` : hi.toFixed(0)}°
       </span>
-      <span style={{ width: 52, fontWeight: 600, color: 'var(--text)', textAlign: 'right' }}>
-        →{value >= 0 ? '+' : ''}
-        {value.toFixed(1)}°
-      </span>
+      <AngleInput
+        value={value}
+        lo={lo}
+        hi={hi}
+        disabled={disabled}
+        onCommit={(deg) => onSlide(joint, deg)}
+      />
       {calibrate && (
         <button
           className="btn btn-secondary"
@@ -370,6 +373,63 @@ function SliderRow({
       )}
       {showFeedback ? <FeedbackReadout jointId={joint.id} /> : <span style={{ width: 132 }} />}
     </div>
+  )
+}
+
+// The angle readout, editable: type a value and press Enter to command it
+// (clamped to the ROM). Shows the live slider value while not focused.
+function AngleInput({
+  value,
+  lo,
+  hi,
+  disabled,
+  onCommit,
+}: {
+  value: number
+  lo: number
+  hi: number
+  disabled: boolean
+  onCommit: (deg: number) => void
+}) {
+  const [draft, setDraft] = useState<string | null>(null)
+
+  const commit = (text: string) => {
+    const parsed = parseFloat(text)
+    if (Number.isFinite(parsed)) onCommit(clamp(parsed, lo, hi))
+    setDraft(null)
+  }
+
+  return (
+    <input
+      type="number"
+      step="any"
+      value={draft ?? value.toFixed(1)}
+      disabled={disabled}
+      title="type an angle and press Enter"
+      onFocus={(e) => {
+        setDraft(value.toFixed(1))
+        e.target.select()
+      }}
+      onChange={(e) => setDraft(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') commit((e.target as HTMLInputElement).value)
+        if (e.key === 'Escape') setDraft(null)
+      }}
+      onBlur={(e) => {
+        if (draft !== null) commit(e.target.value)
+      }}
+      style={{
+        width: 52,
+        fontWeight: 600,
+        color: 'var(--text)',
+        textAlign: 'right',
+        fontSize: 10,
+        background: 'transparent',
+        border: '1px solid var(--border, #444)',
+        borderRadius: 3,
+        padding: '1px 2px',
+      }}
+    />
   )
 }
 
