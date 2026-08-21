@@ -70,6 +70,18 @@ def run_calibrate(hand, encoder_client, ctx: OpContext,
             else:
                 ctx.log(f"encoder anchor not captured for {event['joint']}: "
                         f"{reason} — it keeps its previous anchor")
+        elif kind == "measured_rom_recorded":
+            rom = event["rom"]
+            ctx.log(f"measured ROM for {event['joint']}: "
+                    f"[{rom[0]:.1f}, {rom[1]:.1f}]° "
+                    f"(Δ {event['deviation_deg']:+.1f}° vs config)")
+        elif kind == "measured_rom_rejected":
+            ctx.log(f"measured ROM REJECTED for {event['joint']}: the "
+                    f"{event['span_deg']:.1f}° measured travel puts its lower "
+                    f"hardstop {event['deviation_deg']:+.1f}° from the config "
+                    "value — beyond the sanity limit, so the config range is "
+                    "kept and no Δ is shown. Check the joint's hardstops or "
+                    "fix its joint_roms entry in config.yaml.")
         elif kind == "wrist_skipped":
             ctx.log("wrist already calibrated (motor limits and encoder "
                     "anchor) — skipping its steps; force wrist to re-run")
