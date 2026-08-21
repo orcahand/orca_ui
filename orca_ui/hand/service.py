@@ -614,6 +614,76 @@ class HandService:
         if targets:
             self._publish_topic(T.JOINTS_TARGET, {"angles": targets})
 
+    def calibrate_joint_manual(self, joint: str, angle_deg: float) -> dict:
+        """Re-anchor one joint's encoder calibration at an operator-verified
+        angle (matched by eye against the 3D model).
+
+        Quick and per-joint: samples the encoder at the current pose and
+        rewrites only this joint's anchor. Works at any tier that can reach
+        the encoder stream — the session's own client when it has one, else a
+        temporary client on the probed encoder port (the first-time case,
+        where missing anchors kept the feedback tier from connecting).
+        """
+        session = self.session
+        if session is None:
+            raise ServiceError("hand not connected", status_code=503)
+        self._require_manual_control()
+        config = self.supervisor.config
+        if joint not in _encoder_sensed_joints(config):
+            raise ServiceError(f"{joint} has no joint encoder")
+        rom = config.joint_roms_dict.get(joint)
+        if rom and not (rom[0] <= float(angle_deg) <= rom[1]):
+            raise ServiceError(
+                f"angle {angle_deg:.1f}° is outside the ROM "
+                f"[{rom[0]}, {rom[1]}] of {joint}")
+
+        client = (session._encoder_client
+                  or getattr(session.hand, "_encoder_client", None))
+        temp_client = temp_link = None
+        if client is None:
+            from orca_ui.hand.operations import hand_ops
+
+            port = session.ports.get("encoder")
+            if not port or port == "mock":
+                raise ServiceError(
+                    "no encoder stream in this session — plug in / power the "
+                    "sensing board and reconnect", status_code=409)
+            try:
+                temp_client, temp_link = hand_ops.open_encoder_client_on_port(
+                    config, port)
+            except Exception as e:
+                raise ServiceError(f"encoder stream unavailable: {e}",
+                                   status_code=409)
+            client = temp_client
+        try:
+            anchor = session.hand.calibrate_joint_encoder_manual(
+                joint, float(angle_deg), joint_encoder_client=client)
+        except ValueError as e:
+            raise ServiceError(str(e))
+        except Exception as e:
+            # Sampling timeout / chip-flagged stream / persist failure.
+            raise ServiceError(f"manual calibration of {joint} failed: {e}",
+                               status_code=409)
+        finally:
+            if temp_client is not None:
+                from orca_ui.hand.operations import hand_ops
+
+                hand_ops.close_encoder_client(temp_client, temp_link)
+        loop_updated = bool(
+            session.caps.feedback_loop
+            and joint in (session.hand.loop_joint_names or []))
+        measured = (session.measured_joints() or {}).get(joint)
+        logger.info("manual joint calibration: %s anchored at %.2f° "
+                    "(anchor_count=%d, loop_updated=%s)",
+                    joint, angle_deg, anchor, loop_updated)
+        return {
+            "joint": joint,
+            "angle_deg": float(angle_deg),
+            "anchor_count": int(anchor),
+            "loop_updated": loop_updated,
+            "measured_deg": None if measured is None else float(measured),
+        }
+
     def go_neutral(self) -> None:
         session = self._require_torque()
         self._require_manual_control()

@@ -13,6 +13,14 @@ class JointTargets(BaseModel):
     angles: dict[str, float]
 
 
+class JointCalibrateRequest(BaseModel):
+    """Manual joint-sensor calibration: the joint currently sits at
+    ``angle_deg`` (operator-verified); re-anchor its encoder there."""
+
+    joint: str
+    angle_deg: float
+
+
 class TorqueRequest(BaseModel):
     # Reserved for future per-motor control; today torque toggles hand-wide.
     motor_ids: Optional[list[int]] = None

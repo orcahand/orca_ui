@@ -69,6 +69,17 @@ export interface CalibrationInfo {
   hint: string | null
 }
 
+// Result of a manual joint-sensor calibration (POST /api/joints/calibrate).
+export interface JointCalibrateResult {
+  joint: string
+  angle_deg: number
+  anchor_count: number
+  // The running feedback loop picked the new anchor up live; false means the
+  // joint engages closed-loop on the next reconnect.
+  loop_updated: boolean
+  measured_deg: number | null
+}
+
 // Who owns the joint-target channel. TELEOP is reserved for orca_teleop.
 export type ControlSource = 'manual' | 'operation' | 'teleop'
 

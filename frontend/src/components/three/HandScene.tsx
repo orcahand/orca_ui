@@ -192,9 +192,15 @@ function HandRig({
       // the estimate). Non-encoder hands: commanded targets win instead.
       // Composed into one pose so the adapter sees each joint once per frame;
       // two passes would fight its per-joint slack.
+      // Manual sensor calibration poses the hand from the commanded targets:
+      // the operator matches the physical hand against the commanded pose,
+      // so following the (mis-calibrated) measured angles would defeat it.
+      const manualCal = useAppStore.getState().manualCal
       rig.adapter.apply({
         ...frames.joints.estimate,
-        ...(caps.encoders ? frames.joints.measured : frames.joints.target),
+        ...(caps.encoders && !manualCal
+          ? frames.joints.measured
+          : frames.joints.target),
       })
 
       if (rig.ghost) {

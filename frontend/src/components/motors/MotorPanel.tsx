@@ -35,10 +35,14 @@ export function MotorPanel() {
   const status = useAppStore((s) => s.status)
   const control = useAppStore((s) => s.control)
   const setError = useAppStore((s) => s.setError)
+  const manualCal = useAppStore((s) => s.manualCal)
+  const setManualCal = useAppStore((s) => s.setManualCal)
   const gate = useControlGate()
 
   const [values, setValues] = useState<Record<string, number>>({})
   const [busy, setBusy] = useState(false)
+  const [calStatus, setCalStatus] = useState<Record<string, 'busy' | 'done' | 'error'>>({})
+  const [needReconnect, setNeedReconnect] = useState(false)
   const seeded = useRef(false)
   const wasLocked = useRef(false)
 
@@ -111,10 +115,50 @@ export function MotorPanel() {
   const onSlide = (joint: JointInfo, value: number) => {
     setValues((prev) => ({ ...prev, [joint.id]: value }))
     sendTarget(joint.id, value)
+    // The joint moved after being anchored — its ✓ no longer describes the
+    // current pose.
+    if (calStatus[joint.id]) {
+      setCalStatus((prev) => {
+        const next = { ...prev }
+        delete next[joint.id]
+        return next
+      })
+    }
+  }
+
+  const hasEncoderJoints = joints.some((j) => j.encoder_backed)
+
+  const calibrateJoint = async (joint: JointInfo) => {
+    const angle = values[joint.id] ?? clamp(0, joint.rom[0], joint.rom[1])
+    setCalStatus((prev) => ({ ...prev, [joint.id]: 'busy' }))
+    try {
+      const result = await api.jointCalibrate(joint.id, angle)
+      setCalStatus((prev) => ({ ...prev, [joint.id]: 'done' }))
+      if (!result.loop_updated) setNeedReconnect(true)
+      // encoder_calibrated / needs_calibration may have flipped.
+      api.handInfo().then(useAppStore.getState().setHandInfo).catch(() => undefined)
+      setError(null)
+    } catch (error) {
+      setCalStatus((prev) => ({ ...prev, [joint.id]: 'error' }))
+      setError(String((error as Error).message ?? error))
+    }
   }
 
   const toolbar = (
     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+      {hasEncoderJoints && (
+        <button
+          className={manualCal ? 'btn btn-primary' : 'btn btn-secondary'}
+          title="Manually calibrate the joint sensors: pose a joint with its
+slider until the physical hand matches the 3D model, then press Set"
+          onClick={() => {
+            setManualCal(!manualCal)
+            setCalStatus({})
+          }}
+        >
+          {manualCal ? 'Exit Sensor Cal' : 'Sensor Cal'}
+        </button>
+      )}
       {!torqueOn ? (
         <button
           className="btn btn-primary"
@@ -173,6 +217,32 @@ export function MotorPanel() {
           pose on enable
         </div>
       )}
+      {manualCal && (
+        <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 8 }}>
+          MANUAL SENSOR CALIBRATION — move a joint's slider until the physical
+          hand visually matches the 3D model, then press <strong>Set</strong>:
+          the sensor is re-anchored so its reading at this pose equals the
+          slider angle. Repeat for as many joints as you like.
+        </div>
+      )}
+      {needReconnect && (
+        <div style={{ fontSize: 10, color: 'var(--warn)', marginBottom: 8 }}>
+          anchors saved — reconnect to engage closed-loop control on the newly
+          calibrated joint(s){' '}
+          <button
+            className="btn btn-secondary"
+            style={{ marginLeft: 6 }}
+            onClick={() => {
+              setNeedReconnect(false)
+              void api.reconnect().catch((error) =>
+                setError(String((error as Error).message ?? error)),
+              )
+            }}
+          >
+            Reconnect
+          </button>
+        </div>
+      )}
       <div>
         {joints.map((joint) => (
           <SliderRow
@@ -181,7 +251,16 @@ export function MotorPanel() {
             value={values[joint.id] ?? clamp(0, joint.rom[0], joint.rom[1])}
             disabled={!torqueOn || locked || directArmed || uncalibrated}
             lockReason={sliderLockReason}
-            showFeedback={feedback && joint.encoder_backed}
+            showFeedback={(feedback || manualCal) && joint.encoder_backed}
+            calibrate={
+              manualCal && joint.encoder_backed
+                ? {
+                    status: calStatus[joint.id],
+                    disabled: !torqueOn || locked || directArmed || uncalibrated,
+                    onCalibrate: () => void calibrateJoint(joint),
+                  }
+                : undefined
+            }
             onSlide={onSlide}
           />
         ))}
@@ -197,6 +276,7 @@ function SliderRow({
   disabled,
   lockReason,
   showFeedback,
+  calibrate,
   onSlide,
 }: {
   joint: JointInfo
@@ -204,6 +284,11 @@ function SliderRow({
   disabled: boolean
   lockReason?: string
   showFeedback: boolean
+  calibrate?: {
+    status?: 'busy' | 'done' | 'error'
+    disabled: boolean
+    onCalibrate: () => void
+  }
   onSlide: (joint: JointInfo, value: number) => void
 }) {
   const [lo, hi] = joint.rom
@@ -244,6 +329,33 @@ function SliderRow({
         →{value >= 0 ? '+' : ''}
         {value.toFixed(1)}°
       </span>
+      {calibrate && (
+        <button
+          className="btn btn-secondary"
+          style={{
+            fontSize: 9,
+            padding: '1px 6px',
+            minWidth: 38,
+            color:
+              calibrate.status === 'done'
+                ? 'var(--ok, #4caf50)'
+                : calibrate.status === 'error'
+                  ? 'var(--warn)'
+                  : undefined,
+          }}
+          disabled={calibrate.disabled || calibrate.status === 'busy'}
+          title={`Re-anchor ${joint.id}'s sensor: its reading at the current pose becomes ${value.toFixed(1)}°`}
+          onClick={calibrate.onCalibrate}
+        >
+          {calibrate.status === 'busy'
+            ? '…'
+            : calibrate.status === 'done'
+              ? '✓ Set'
+              : calibrate.status === 'error'
+                ? '! Set'
+                : 'Set'}
+        </button>
+      )}
       {showFeedback ? <FeedbackReadout jointId={joint.id} /> : <span style={{ width: 132 }} />}
     </div>
   )

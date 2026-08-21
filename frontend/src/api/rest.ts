@@ -4,6 +4,7 @@ import type {
   DemoEntry,
   DirectMotorSnapshot,
   HandInfo,
+  JointCalibrateResult,
   ModelMetadata,
   OperationLogPayload,
   OperationSnapshot,
@@ -95,6 +96,13 @@ export const api = {
   jointsTarget: (angles: Record<string, number>) =>
     post('/api/joints/target', { angles }),
   jointsNeutral: () => post('/api/joints/neutral'),
+  // Manual joint-sensor calibration: the joint sits at angleDeg right now
+  // (operator-verified against the 3D model); re-anchor its encoder there.
+  jointCalibrate: (joint: string, angleDeg: number) =>
+    post<JointCalibrateResult>('/api/joints/calibrate', {
+      joint,
+      angle_deg: angleDeg,
+    }),
   // joints omitted = every loop-controlled joint; a joint list writes
   // exactly those and leaves the rest as they are.
   setGains: (gains: {

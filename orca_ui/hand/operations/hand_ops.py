@@ -81,7 +81,11 @@ def open_encoder_client(config, presence):
     port = getattr(getattr(presence, "sensing", None), "encoder", None)
     if not port:
         return None, None
+    return open_encoder_client_on_port(config, port)
 
+
+def open_encoder_client_on_port(config, port: str):
+    """Open a UI-owned encoder client on a known port. Returns (client, link)."""
     from orca_core.hardware.hand_serial_link import HandSerialLink
     from orca_core.hardware.joint_encoder_client import JointEncoderClient
 
@@ -98,6 +102,18 @@ def open_encoder_client(config, presence):
             pass
         raise
     return client, link
+
+
+def encoder_backed_joints(hand) -> list[str]:
+    """Joints whose angle this hand reads from a joint encoder."""
+    return list(hand._encoder_backed_joints())
+
+
+def missing_encoder_anchors(hand) -> list[str]:
+    """Encoder-backed joints without a recorded encoder anchor — nonempty
+    means the joint sensors have never been (fully) calibrated."""
+    anchored = hand.calibration.joint_encoder_calibration_dict
+    return [j for j in hand._encoder_backed_joints() if j not in anchored]
 
 
 def close_encoder_client(client, link) -> None:

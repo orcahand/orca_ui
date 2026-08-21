@@ -215,6 +215,10 @@ def build_router(service: HandService) -> APIRouter:
         guard(service.go_neutral)
         return {"ok": True}
 
+    @router.post("/joints/calibrate")
+    def joints_calibrate(body: schemas.JointCalibrateRequest):
+        return guard(service.calibrate_joint_manual, body.joint, body.angle_deg)
+
     @router.get("/control/gains")
     def control_gains_state():
         return guard(service.gains_state)

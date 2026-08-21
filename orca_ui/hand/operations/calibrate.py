@@ -35,7 +35,14 @@ def validate_calibrate_params(service, params: dict) -> dict:
     if not session.caps.motors:
         raise ServiceError("no motor bus — calibration needs motors",
                            status_code=409)
-    return {"joints": joints, "force_wrist": bool(params.get("force_wrist", False))}
+    # None = auto: run the joint-sensor (encoder anchor) pass only when a
+    # selected encoder-backed joint has no anchor yet — i.e. the first time.
+    sensors = params.get("calibrate_joint_sensors")
+    if sensors is not None and not isinstance(sensors, bool):
+        raise ServiceError("calibrate_joint_sensors must be a boolean or null")
+    return {"joints": joints,
+            "force_wrist": bool(params.get("force_wrist", False)),
+            "calibrate_joint_sensors": sensors}
 
 
 def run_calibrate(hand, encoder_client, ctx: OpContext,
@@ -121,6 +128,34 @@ class CalibrateOperation(Operation):
     def validate(cls, service, params: dict) -> dict:
         return validate_calibrate_params(service, params)
 
+    def _want_joint_sensors(self, ctx: OpContext, hand) -> bool:
+        """Whether this run also (re-)calibrates the joint sensors.
+
+        Explicit param wins; the auto default re-anchors only joints that were
+        never anchored, so a routine motor recalibration keeps the existing
+        encoder anchors untouched.
+        """
+        choice = self.params.get("calibrate_joint_sensors")
+        if choice is False:
+            ctx.log("joint sensors: keeping existing encoder anchors "
+                    "(calibrate_joint_sensors=false)")
+            return False
+        if choice is True:
+            ctx.log("joint sensors: re-anchoring during this run")
+            return True
+        missing = hand_ops.missing_encoder_anchors(hand)
+        joints = self.params.get("joints")
+        if joints is not None:
+            missing = [j for j in missing if j in joints]
+        if missing:
+            ctx.log("joint sensors: anchoring for the first time "
+                    f"({', '.join(missing)} have no anchor)")
+            return True
+        if hand_ops.encoder_backed_joints(hand):
+            ctx.log("joint sensors: already anchored — keeping existing "
+                    "anchors (enable the joint-sensor option to redo them)")
+        return False
+
     def run(self, ctx: OpContext) -> dict:
         supervisor = ctx.service.supervisor
         ctx.set_phase("acquiring", detail="taking the hand into maintenance")
@@ -134,14 +169,15 @@ class CalibrateOperation(Operation):
             hand = hand_ops.build_maintenance_hand(
                 supervisor.config.config_path, ctx.stop_event)
             self._hand = hand
-            try:
-                encoder_client, encoder_link = hand_ops.open_encoder_client(
-                    supervisor.config, lease.presence)
-            except Exception as e:
-                # Motor calibration still works without the anchor pass.
-                ctx.log(f"encoder client unavailable — skipping anchor pass: {e}")
-            if encoder_client is not None:
-                ctx.log("encoder client attached for the anchor pass")
+            if self._want_joint_sensors(ctx, hand):
+                try:
+                    encoder_client, encoder_link = hand_ops.open_encoder_client(
+                        supervisor.config, lease.presence)
+                except Exception as e:
+                    # Motor calibration still works without the anchor pass.
+                    ctx.log(f"encoder client unavailable — skipping anchor pass: {e}")
+                if encoder_client is not None:
+                    ctx.log("encoder client attached for the anchor pass")
             return run_calibrate(
                 hand, encoder_client, ctx,
                 joints=self.params["joints"],

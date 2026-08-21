@@ -89,9 +89,15 @@ export function CalibrateCard() {
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set())
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [redoWrist, setRedoWrist] = useState(false)
+  // null = untouched: follow the first-time default (calibrate the sensors
+  // only when some encoder-backed joint has no anchor yet).
+  const [jointSensors, setJointSensors] = useState<boolean | null>(null)
 
   const joints = useMemo(() => handInfo?.joints ?? [], [handInfo])
   const missingAnchors = handInfo?.calibration.missing_anchors ?? []
+  const hasEncoderJoints = joints.some((j) => j.encoder_backed)
+  const firstTimeSensors = missingAnchors.length > 0
+  const sensorsOn = jointSensors ?? firstTimeSensors
   const groups = useMemo(() => {
     const map = new Map<string, JointInfo[]>()
     for (const joint of joints) {
@@ -131,6 +137,7 @@ export function CalibrateCard() {
       .operationStart('calibrate', {
         joints: selected.size > 0 ? [...selected] : null,
         force_wrist: redoWrist || wristSelected,
+        ...(hasEncoderJoints ? { calibrate_joint_sensors: sensorsOn } : {}),
       })
       .catch(fail)
 
@@ -169,6 +176,27 @@ export function CalibrateCard() {
               You have just tensioned the hand — calibrate now so the recorded
               ranges match the new tendon lengths.
             </div>
+          )}
+          {hasEncoderJoints && (
+            <>
+              <label className="joint-check">
+                <input
+                  type="checkbox"
+                  checked={sensorsOn}
+                  onChange={(e) => setJointSensors(e.target.checked)}
+                />
+                Also calibrate the joint sensors
+              </label>
+              <p className="setup-option-hint">
+                {firstTimeSensors
+                  ? 'On because some joints have never had their sensor ' +
+                    'reference recorded — the first calibration needs it.'
+                  : 'Off by default: the sensor references survive a motor ' +
+                    'recalibration. Tick it to re-record them (e.g. after ' +
+                    're-mounting an encoder). Sliders in the 3D view offer a ' +
+                    'per-joint manual alternative (Sensor Cal).'}
+              </p>
+            </>
           )}
           <div className="setup-card-row">
             <button
