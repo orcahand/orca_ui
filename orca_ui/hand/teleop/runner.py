@@ -102,7 +102,13 @@ def resolve_command(settings) -> tuple[list[str] | None, str, str]:
                 "no_streamer_entrypoint")
     if shutil.which("uv") is None:
         return None, "uv not on PATH", "no_uv"
-    prefix = ["uv", "run", "--project", teleop_dir,
+    # --frozen: take the lock as given. Without it every launch revalidates
+    # orca_teleop's direct-URL wheels against github.com — including the manus
+    # one, which macOS never even installs — so a DNS blip kills the spawn with
+    # `uv` exit 2 before the streamer prints a line. The lock is built by the
+    # installer's `uv sync` and committed in the checkout; if one is somehow
+    # missing, uv says so instead of silently re-resolving.
+    prefix = ["uv", "run", "--project", teleop_dir, "--frozen",
               "--extra", "mediapipe", "--extra", "adaptive", STREAMER_SCRIPT]
     return prefix, f"uv run --project {teleop_dir}", "ok"
 
