@@ -45,9 +45,11 @@ interface AppState {
   view: ViewName
   tactile: TactileSettings
   scene: SceneSettings
-  // Manual joint-sensor calibration mode: the 3D hand follows the slider
-  // targets (not the encoder-measured pose) and sliders grow a Set button.
+  // Manual joint-sensor calibration mode: sliders pose ONLY the 3D model
+  // (no motor commands — the physical hand is posed by hand, torque off)
+  // and each encoder-backed slider grows a Calibrate button.
   manualCal: boolean
+  manualCalPose: Record<string, number>
   showSparklineTarget: boolean
   rates: Record<string, number>
   error: string | null
@@ -58,6 +60,7 @@ interface AppState {
   setControl(control: ControlState): void
   setView(view: ViewName): void
   setManualCal(on: boolean): void
+  setManualCalPose(joint: string, deg: number): void
   setTactile(patch: Partial<TactileSettings>): void
   setScene(patch: Partial<SceneSettings>): void
   setShowSparklineTarget(show: boolean): void
@@ -97,6 +100,7 @@ export const useAppStore = create<AppState>((set) => ({
   control: null,
   view: 'dashboard',
   manualCal: false,
+  manualCalPose: {},
   tactile: {
     displayMode: 'magnitude',
     colorScheme: 'heat',
@@ -116,7 +120,11 @@ export const useAppStore = create<AppState>((set) => ({
   setHandInfo: (info) => set({ handInfo: info, control: info.control }),
   setControl: (control) => set({ control }),
   setView: (view) => set({ view }),
-  setManualCal: (on) => set({ manualCal: on }),
+  setManualCal: (on) => set({ manualCal: on, manualCalPose: {} }),
+  setManualCalPose: (joint, deg) =>
+    set((state) => ({
+      manualCalPose: { ...state.manualCalPose, [joint]: deg },
+    })),
   setTactile: (patch) =>
     set((state) => ({ tactile: { ...state.tactile, ...patch } })),
   setScene: (patch) =>

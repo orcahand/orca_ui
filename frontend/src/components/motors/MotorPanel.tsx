@@ -114,7 +114,13 @@ export function MotorPanel() {
 
   const onSlide = (joint: JointInfo, value: number) => {
     setValues((prev) => ({ ...prev, [joint.id]: value }))
-    sendTarget(joint.id, value)
+    if (manualCal) {
+      // Sensor-cal mode never commands motors: the slider only dials the 3D
+      // model to match the physically-posed hand.
+      useAppStore.getState().setManualCalPose(joint.id, value)
+    } else {
+      sendTarget(joint.id, value)
+    }
     // The joint moved after being anchored — its ✓ no longer describes the
     // current pose.
     if (calStatus[joint.id]) {
@@ -219,10 +225,12 @@ slider until the physical hand matches the 3D model, then press Set"
       )}
       {manualCal && (
         <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 8 }}>
-          MANUAL SENSOR CALIBRATION — move a joint's slider until the physical
-          hand visually matches the 3D model, then press <strong>Set</strong>:
-          the sensor is re-anchored so its reading at this pose equals the
-          slider angle. Repeat for as many joints as you like.
+          MANUAL SENSOR CALIBRATION — pose the physical hand by hand (torque
+          can stay off; sliders only move the 3D model here, they never drive
+          the motors). Dial each joint's slider until the model matches the
+          real hand, then press <strong>Calibrate</strong>: that joint's
+          sensor is re-anchored so its reading at this pose equals the slider
+          angle. Repeat for as many joints as you like.
         </div>
       )}
       {needReconnect && (
@@ -249,14 +257,18 @@ slider until the physical hand matches the 3D model, then press Set"
             key={joint.id}
             joint={joint}
             value={values[joint.id] ?? clamp(0, joint.rom[0], joint.rom[1])}
-            disabled={!torqueOn || locked || directArmed || uncalibrated}
-            lockReason={sliderLockReason}
+            disabled={
+              manualCal
+                ? locked
+                : !torqueOn || locked || directArmed || uncalibrated
+            }
+            lockReason={manualCal ? lockReason : sliderLockReason}
             showFeedback={(feedback || manualCal) && joint.encoder_backed}
             calibrate={
               manualCal && joint.encoder_backed
                 ? {
                     status: calStatus[joint.id],
-                    disabled: !torqueOn || locked || directArmed || uncalibrated,
+                    disabled: locked,
                     onCalibrate: () => void calibrateJoint(joint),
                   }
                 : undefined
@@ -350,10 +362,10 @@ function SliderRow({
           {calibrate.status === 'busy'
             ? '…'
             : calibrate.status === 'done'
-              ? '✓ Set'
+              ? '✓ Calibrate'
               : calibrate.status === 'error'
-                ? '! Set'
-                : 'Set'}
+                ? '! Calibrate'
+                : 'Calibrate'}
         </button>
       )}
       {showFeedback ? <FeedbackReadout jointId={joint.id} /> : <span style={{ width: 132 }} />}
