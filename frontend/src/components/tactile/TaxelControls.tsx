@@ -4,7 +4,32 @@
 import { useState } from 'react'
 import { api } from '../../api/rest'
 import type { TactileMode } from '../../api/types'
+import { FINGERS } from '../../api/types'
+import type { FunSoundMode, MusicScale } from '../../state/appStore'
 import { useAppStore } from '../../state/appStore'
+import { funPlayer } from './funSounds'
+import { stringSynth } from './stringSynth'
+
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+
+const MUSIC_SCALES: { value: MusicScale; label: string }[] = [
+  { value: 'major', label: 'major' },
+  { value: 'minor', label: 'minor' },
+  { value: 'pentMajor', label: 'pent. major' },
+  { value: 'pentMinor', label: 'pent. minor' },
+  { value: 'majorChord', label: 'chord (maj)' },
+  { value: 'minorChord', label: 'chord (min)' },
+  { value: 'chromatic', label: 'chromatic' },
+]
+
+const FUN_SOUNDS: { value: FunSoundMode; label: string }[] = [
+  { value: 'off', label: 'off' },
+  { value: 'soundtrack', label: '🎵 soundtrack' },
+  { value: 'cow', label: '🐄 swiss cow' },
+  { value: 'engine', label: '🏎️ engine' },
+  { value: 'squeak', label: '🐤 rubber duck' },
+  { value: 'theremin', label: '👽 theremin' },
+]
 
 export function TaxelControls() {
   const tactile = useAppStore((s) => s.tactile)
@@ -149,6 +174,139 @@ export function TaxelControls() {
           />
           N
         </label>
+      </div>
+
+      <div className="toolbar">
+        <label className="toggle-label">
+          <input
+            type="checkbox"
+            checked={tactile.funEnabled}
+            onChange={(e) => {
+              const funEnabled = e.target.checked
+              // Create/resume the AudioContext inside the click, so the
+              // browser's autoplay policy lets sound through.
+              funPlayer.setAssignments(funEnabled ? tactile.funSounds : null)
+              setTactile({ funEnabled })
+            }}
+          />
+          🔊 fun
+        </label>
+        {tactile.funEnabled &&
+          FINGERS.map((finger) => (
+            <label
+              key={finger}
+              className="toggle-label"
+              style={{ gap: 4 }}
+              title={finger}
+            >
+              {finger.charAt(0).toUpperCase()}
+              <select
+                value={tactile.funSounds[finger]}
+                onChange={(e) => {
+                  const funSounds = {
+                    ...tactile.funSounds,
+                    [finger]: e.target.value as FunSoundMode,
+                  }
+                  funPlayer.setAssignments(funSounds)
+                  setTactile({ funSounds })
+                }}
+              >
+                {FUN_SOUNDS.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
+        <label className="toggle-label" title="fingers play strings by force (amplitude) and joint position (pitch)">
+          <input
+            type="checkbox"
+            checked={tactile.musicEnabled}
+            onChange={(e) => {
+              const musicEnabled = e.target.checked
+              // AudioContext must be created/resumed inside the click.
+              stringSynth.setEnabled(musicEnabled)
+              setTactile({ musicEnabled })
+            }}
+          />
+          🎻 music
+        </label>
+        {tactile.musicEnabled && (
+          <>
+            <label className="toggle-label" style={{ gap: 4 }} title="harmony: only these notes play">
+              <select
+                value={tactile.musicRoot}
+                onChange={(e) =>
+                  setTactile({ musicRoot: parseInt(e.target.value, 10) })
+                }
+              >
+                {NOTE_NAMES.map((name, i) => (
+                  <option key={name} value={i}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={tactile.musicScale}
+                onChange={(e) =>
+                  setTactile({ musicScale: e.target.value as MusicScale })
+                }
+              >
+                {MUSIC_SCALES.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span className="slider-control">
+              <span>vol</span>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={tactile.musicVol}
+                onChange={(e) =>
+                  setTactile({ musicVol: parseFloat(e.target.value) })
+                }
+              />
+            </span>
+          </>
+        )}
+        {(tactile.funEnabled || tactile.musicEnabled) && (
+          <>
+            <span className="slider-control" title="force where sound engages">
+              <span>on</span>
+              <input
+                type="range"
+                min={0.2}
+                max={5}
+                step={0.1}
+                value={tactile.funOnN}
+                onChange={(e) =>
+                  setTactile({ funOnN: parseFloat(e.target.value) })
+                }
+              />
+              <span>{tactile.funOnN.toFixed(1)}N</span>
+            </span>
+            <span className="slider-control" title="force for full volume/pitch">
+              <span>max</span>
+              <input
+                type="range"
+                min={2}
+                max={25}
+                step={0.5}
+                value={tactile.funFullN}
+                onChange={(e) =>
+                  setTactile({ funFullN: parseFloat(e.target.value) })
+                }
+              />
+              <span>{tactile.funFullN.toFixed(1)}N</span>
+            </span>
+          </>
+        )}
       </div>
 
       <div className="toolbar">

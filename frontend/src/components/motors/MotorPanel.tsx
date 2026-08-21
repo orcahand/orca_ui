@@ -64,9 +64,17 @@ export function MotorPanel() {
   // None and the write is dropped, so a slider move is silently a no-op.
   const uncalibrated = handInfo?.calibration.motors === false
 
+  // Latest pose the hand believes it is in (sensor-measured where available,
+  // motor estimate elsewhere) — kept fresh for the sensor-cal "match" button.
+  const believedPose = useRef<Record<string, number>>({})
+
   // Initial seed: latch the first available pose (measured, else estimate)
   // so opening the panel never yanks the hand.
   useStreamFrame((frames) => {
+    believedPose.current = {
+      ...frames.joints.estimate,
+      ...frames.joints.measured,
+    }
     if (seeded.current || !handInfo) return
     const pose = Object.keys(frames.joints.measured).length
       ? { ...frames.joints.estimate, ...frames.joints.measured }
@@ -134,6 +142,25 @@ export function MotorPanel() {
 
   const hasEncoderJoints = joints.some((j) => j.encoder_backed)
 
+  // Set every slider (and the 3D model) to the pose the hand currently
+  // believes it is in, so only the joints that are actually off need dialing.
+  const syncToBelieved = () => {
+    const pose = believedPose.current
+    const store = useAppStore.getState()
+    setValues((prev) => {
+      const next = { ...prev }
+      for (const joint of joints) {
+        const raw = pose[joint.id]
+        if (!Number.isFinite(raw)) continue
+        const v = clamp(raw, joint.rom[0], joint.rom[1])
+        next[joint.id] = v
+        store.setManualCalPose(joint.id, v)
+      }
+      return next
+    })
+    setCalStatus({})
+  }
+
   const calibrateJoint = async (joint: JointInfo) => {
     const angle = values[joint.id] ?? clamp(0, joint.rom[0], joint.rom[1])
     setCalStatus((prev) => ({ ...prev, [joint.id]: 'busy' }))
@@ -158,11 +185,25 @@ export function MotorPanel() {
           title="Manually calibrate the joint sensors: pose a joint with its
 slider until the physical hand matches the 3D model, then press Set"
           onClick={() => {
-            setManualCal(!manualCal)
+            const entering = !manualCal
+            setManualCal(entering)
             setCalStatus({})
+            // Start from the believed pose so the model doesn't jump and
+            // only the joints that are actually off need dialing.
+            if (entering) syncToBelieved()
           }}
         >
           {manualCal ? 'Exit Sensor Cal' : 'Sensor Cal'}
+        </button>
+      )}
+      {manualCal && (
+        <button
+          className="btn btn-secondary"
+          title="set every slider (and the 3D model) back to the pose the
+sensors currently report — then only dial the joints that are off"
+          onClick={syncToBelieved}
+        >
+          Match sensed pose
         </button>
       )}
       {!torqueOn ? (

@@ -4,6 +4,7 @@
 import { create } from 'zustand'
 import type {
   ControlState,
+  Finger,
   HandInfo,
   StatusSnapshot,
   TactileMode,
@@ -11,6 +12,21 @@ import type {
 
 export type TaxelDisplayMode = 'magnitude' | 'direction' | 'arrows'
 export type ArrowColorScheme = 'heat' | 'intensity' | 'orca'
+export type FunSoundMode =
+  | 'off'
+  | 'soundtrack'
+  | 'cow'
+  | 'engine'
+  | 'squeak'
+  | 'theremin'
+export type MusicScale =
+  | 'chromatic'
+  | 'major'
+  | 'minor'
+  | 'pentMajor'
+  | 'pentMinor'
+  | 'majorChord'
+  | 'minorChord'
 export type ViewName =
   | 'dashboard'
   | '3d'
@@ -26,6 +42,17 @@ export interface TactileSettings {
   threshold: number
   lengthMult: number
   thicknessMult: number
+  funEnabled: boolean
+  funSounds: Record<Finger, FunSoundMode>
+  // Dynamic range: force (N) where a sound engages / reaches full effect.
+  // Shared by fun mode and music mode.
+  funOnN: number
+  funFullN: number
+  musicEnabled: boolean
+  musicVol: number
+  // Harmony: only notes of this scale (root 0 = C ... 11 = B) are playable.
+  musicRoot: number
+  musicScale: MusicScale
 }
 
 export interface SceneSettings {
@@ -108,6 +135,20 @@ export const useAppStore = create<AppState>((set) => ({
     threshold: 0,
     lengthMult: 0.5,
     thicknessMult: 0.5,
+    funEnabled: false,
+    funSounds: {
+      thumb: 'engine',
+      index: 'soundtrack',
+      middle: 'cow',
+      ring: 'squeak',
+      pinky: 'theremin',
+    },
+    funOnN: 1,
+    funFullN: 12,
+    musicEnabled: false,
+    musicVol: 0.5,
+    musicRoot: 0,
+    musicScale: 'major',
   },
   scene: storedScene,
   showSparklineTarget:
