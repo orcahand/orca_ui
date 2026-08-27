@@ -11,6 +11,11 @@ every detection pass re-reads the side and sensing capabilities the boards
 report, so a hand that was powered off at startup — or a different hand
 plugged in later — is adopted rather than forced into the guess the CLI made
 against an empty bus.
+
+:meth:`HandSupervisor.select_model` is the other way in: a hand with no ORCA
+board to answer ``ORCA_ID?`` cannot be named by detection at all, so the
+operator names it instead and the choice is pinned exactly as ``--model``
+would have pinned it.
 """
 
 from __future__ import annotations
@@ -74,6 +79,17 @@ def model_name_of(config) -> str:
     return os.path.basename(os.path.dirname(config.config_path))
 
 
+RELEASED_MESSAGE = "disconnected on request — press Reconnect to search again"
+
+
+class HandBusyError(RuntimeError):
+    """An operation holds the hardware, so the request cannot be honoured."""
+
+
+class ModelSelectError(RuntimeError):
+    """A requested model cannot be put in force."""
+
+
 @dataclass(frozen=True)
 class MaintenanceLease:
     """Proof that the supervisor released the hardware to an operation.
@@ -132,6 +148,10 @@ class HandSupervisor(threading.Thread):
         self._in_maintenance = False
         self._maintenance_ack = threading.Event()
 
+        # Set by disconnect(): the ladder stops climbing until someone asks
+        # for the hand back.
+        self._released = False
+
     # ----- public API -------------------------------------------------------
 
     @property
@@ -156,6 +176,8 @@ class HandSupervisor(threading.Thread):
                 since=self._since,
                 model=model_name_of(config),
                 side=str(config.type),
+                model_pinned=self._model_pinned,
+                released=self._released,
             )
 
     def set_torque_flag(self, enabled: bool) -> None:
@@ -164,8 +186,101 @@ class HandSupervisor(threading.Thread):
         self._publish()
 
     def request_reconnect(self) -> None:
+        """Drop the session and redial. Also the way back from
+        :meth:`disconnect` — it lifts the hold."""
+        self._released = False
         self._teardown_session("reconnect requested")
         self._wake.set()
+
+    def disconnect(self) -> None:
+        """Close the session and stay closed until asked to reconnect.
+
+        The connect ladder is relentless by design: it exists so a hand that
+        was powered off, or briefly unplugged, comes back without anyone
+        touching the console. That is the wrong behaviour when a human wants
+        the ports *free* — to power the hand down, to move the USB cable, or
+        to run orca_core's own scripts against the same bus while the console
+        stays open. This is how they get them.
+
+        Torque goes off on the way out: closing the session disables it, and
+        a released supervisor never opens another.
+        """
+        with self._lock:
+            if self._maintenance_kind is not None or self._in_maintenance:
+                raise HandBusyError(
+                    "an operation holds the hand — stop it before "
+                    "disconnecting")
+            self._released = True
+            session, self._session = self._session, None
+            self._torque_enabled = False
+        self._set_state(HandState.DISCONNECTED, RELEASED_MESSAGE, ports={})
+        if session is not None:
+            try:
+                session.close()
+            except Exception:
+                logger.exception("session close failed on disconnect")
+        self._wake.set()
+
+    def select_model(self, model_name: str | None,
+                     model_version: str | None = None) -> str:
+        """Put a model in force by name, or (``None``) hand the choice back
+        to detection. Returns the model name now in force.
+
+        A named model is *pinned*: detection stops revising it, exactly as
+        ``--model`` does. That is the point of the call — the hands that need
+        it are the ones detection cannot name, and a guess must not be
+        allowed to overwrite the answer.
+
+        Whatever session exists was opened against the old config, so a
+        change reconnects: the joint↔motor map, gains and ROMs are installed
+        by ``connect()`` and nothing short of a fresh one replaces them.
+        Selecting the model already pinned is a no-op instead, so re-picking
+        it never costs a live hand its torque.
+        """
+        with self._lock:
+            if self._maintenance_kind is not None or self._in_maintenance:
+                raise HandBusyError(
+                    "an operation holds the hand — stop it before changing "
+                    "the model")
+            was_pinned = self._model_pinned
+
+        if model_name is None:
+            if self._settings.mock:
+                # Nothing to ask: mock mode has no bus, so its model can only
+                # ever be the one it was told to simulate.
+                raise ModelSelectError(
+                    "mock mode has no hardware to detect a model from")
+            self._model_pinned = False
+            self._model_probes_left = 0
+            logger.info("model choice handed back to detection")
+        else:
+            if model_name == self.model_name:
+                # Already the config in force. All that can be left to do is
+                # take it out of detection's hands; the session stays up.
+                if was_pinned:
+                    return self.model_name
+                self._model_pinned = True
+                self._model_probes_left = 0
+                logger.info("model %s pinned", model_name)
+                self._publish()
+                return self.model_name
+            try:
+                config = load_config(
+                    self._config_path_for(model_name, model_version))
+            except Exception as e:
+                raise ModelSelectError(
+                    f"could not load model {model_name!r}: {e}")
+            logger.info("model selected: %s (was %s)",
+                        model_name, self.model_name)
+            self._model_pinned = True
+            self._model_probes_left = 0
+            self._install_config(config)
+
+        self._teardown_session("model changed — reconnecting")
+        self._backoff = DETECT_BACKOFF_START_S
+        self._publish()
+        self._wake.set()
+        return self.model_name
 
     def enter_maintenance(self, kind: str, timeout: float = 15.0) -> MaintenanceLease:
         """Hand the hardware to an operation: the run loop tears the session
@@ -205,6 +320,21 @@ class HandSupervisor(threading.Thread):
         self._set_state(HandState.DETECTING, "maintenance finished — reconnecting")
         self._wake.set()
 
+    def _config_path_for(self, model_name: str,
+                         model_version: str | None) -> str:
+        """The config.yaml a selected model name resolves to.
+
+        The mock's own model is not one of orca_core's, so it does not
+        resolve — but it is re-materializable, which keeps it a choice after
+        switching the simulated hand to a bundled model and back.
+        """
+        from orca_ui.mock import MOCK_MODEL_NAME, materialize_mock_model
+
+        if self._settings.mock and model_name == MOCK_MODEL_NAME:
+            return materialize_mock_model()
+        return _resolve_config_path(None, model_version=model_version,
+                                    model_name=model_name)
+
     def shutdown(self) -> None:
         self._stop_event.set()
         self._wake.set()
@@ -219,6 +349,13 @@ class HandSupervisor(threading.Thread):
             if self._process_maintenance_request():
                 continue
             if self._maintenance_active():
+                self._wake.wait(timeout=1.0)
+                self._wake.clear()
+                continue
+            if self._released:
+                # Hands off: no probing, no connecting, no port opening at
+                # all — the point of the hold is that the bus is someone
+                # else's until request_reconnect() lifts it.
                 self._wake.wait(timeout=1.0)
                 self._wake.clear()
                 continue
@@ -488,14 +625,18 @@ class HandSupervisor(threading.Thread):
                              detection.model_name)
             return False
 
-        previous = self.model_name
+        logger.info("hand identifies as %s (was %s) — switching model",
+                    detection.model_name, self.model_name)
+        self._install_config(config)
+        return True
+
+    def _install_config(self, config) -> None:
+        """Put ``config`` in force and repoint everything keyed by the model."""
         with self._lock:
             self.config = config
             self._declared = declared_capabilities(
                 config, self._settings.engage_feedback,
                 motors_enabled=self._settings.motors_enabled)
-        logger.info("hand identifies as %s (was %s) — switching model",
-                    detection.model_name, previous)
         try:
             self._on_model_changed(config)
         except Exception:
@@ -503,7 +644,6 @@ class HandSupervisor(threading.Thread):
         # The model rides on the status snapshot, so the browser learns about
         # the swap even while there is still no session to connect.
         self._publish()
-        return True
 
     def _teardown_session(self, reason: str) -> None:
         with self._lock:

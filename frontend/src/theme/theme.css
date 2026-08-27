@@ -390,6 +390,76 @@ header h1 {
   border-color: rgb(var(--warn-rgb) / 0.35);
 }
 
+/* --- Link controls ---
+   Header-scale buttons: the header packs a lot into one row, so these sit a
+   size below the in-panel .btn rather than setting the row height. */
+
+.link-controls {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.link-btn {
+  padding: 3px 8px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+}
+
+/* --- Model picker ---
+   Reads as one badge-sized unit: the select carries the model name, the pin
+   marker on its right says whether hardware detection may still change it. */
+
+.model-picker {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--panel-border-strong);
+  background: var(--panel);
+}
+
+.model-select {
+  background: transparent;
+  color: var(--text-bright);
+  border: 0;
+  border-radius: 0;
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 3px 4px 3px 8px;
+  cursor: pointer;
+  outline: none;
+  max-width: 240px;
+}
+
+.model-select:focus-visible {
+  outline: 1px solid rgb(var(--accent-rgb) / 0.5);
+  outline-offset: -1px;
+}
+
+.model-select:disabled {
+  opacity: 0.4;
+  cursor: progress;
+}
+
+.model-pin {
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--dimmer);
+  border-left: 1px solid var(--panel-border-strong);
+  cursor: help;
+}
+
+/* The model was named by hand, so the console is no longer tracking whatever
+   is plugged in. Worth seeing without having to open the menu. */
+.model-pin.pinned {
+  background: rgb(var(--accent-rgb) / 0.08);
+  color: var(--accent);
+}
+
 .rate-meters {
   font-size: 9px;
   color: var(--dimmer);

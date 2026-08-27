@@ -28,6 +28,14 @@ class JointCalibrateRequest(BaseModel):
     angle_deg: float
 
 
+class ModelSelectRequest(BaseModel):
+    """Which hand config to run. ``name`` null hands the choice back to
+    hardware detection; ``version`` defaults to the model's newest."""
+
+    name: Optional[str] = None
+    version: Optional[str] = None
+
+
 class TorqueRequest(BaseModel):
     # Reserved for future per-motor control; today torque toggles hand-wide.
     motor_ids: Optional[list[int]] = None

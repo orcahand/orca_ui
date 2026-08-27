@@ -19,9 +19,15 @@ from orca_ui.core_source import resolve_cached as resolve_core_source
 from orca_ui.hand import zeroing
 from orca_ui.hand.commands import CommandWorker
 from orca_ui.hand.presets import BUILTIN_POSES, BUILTIN_SEQUENCES
+from orca_ui.hand.models import ModelEntry, available_models, describe
 from orca_ui.hand.sessions import HandSession
 from orca_ui.hand.states import ControlSource
-from orca_ui.hand.supervisor import HandSupervisor, model_name_of
+from orca_ui.hand.supervisor import (
+    HandBusyError,
+    HandSupervisor,
+    ModelSelectError,
+    model_name_of,
+)
 from orca_ui.library import Library, LibraryError
 from orca_ui.settings import UiSettings
 
@@ -264,6 +270,74 @@ class HandService:
                 "num_taxels": dict(tactile_config.num_taxels),
             }
         return info
+
+    def models(self) -> dict:
+        """The model menu: what can be selected, and what is selected now.
+
+        ``selected`` is the config in force whether or not it is one of the
+        listed models — ``--config`` can name a file outside the bundle, and
+        the menu must still say what the console is currently running.
+        """
+        config = self.supervisor.config
+        status = self.supervisor.status()
+        entries = [dict(entry.as_dict(), selectable=True)
+                   for entry in available_models(self.settings.model_version)]
+        if self.settings.mock:
+            # The simulated hand's own model. Not one of orca_core's, but the
+            # supervisor can re-materialize it by name, so it stays on offer
+            # after switching the mock onto a bundled model.
+            entries.insert(0, dict(self._mock_entry().as_dict(),
+                                   selectable=True))
+        selected = model_name_of(config)
+        if not any(entry["name"] == selected for entry in entries):
+            # A --config path: what is running, so the picker has to show it,
+            # but there is no model name to resolve it back from later.
+            side, tactile, encoders = describe(config.config_path)
+            entries.append(dict(ModelEntry(
+                name=selected, version="", side=side, tactile=tactile,
+                encoders=encoders, config_path=config.config_path).as_dict(),
+                selectable=False))
+        return {
+            "models": entries,
+            "selected": selected,
+            "pinned": status.model_pinned,
+            # Detection needs a bus to ask; mock mode has none, so "let the
+            # hand decide" is not on offer there.
+            "auto_available": not self.settings.mock,
+            "config_path": config.config_path,
+        }
+
+    @staticmethod
+    def _mock_entry() -> ModelEntry:
+        from orca_ui.mock import MOCK_MODEL_CONFIG, MOCK_MODEL_NAME
+
+        side, tactile, encoders = describe(MOCK_MODEL_CONFIG)
+        return ModelEntry(name=MOCK_MODEL_NAME, version="", side=side,
+                          tactile=tactile, encoders=encoders,
+                          config_path=MOCK_MODEL_CONFIG)
+
+    def select_model(self, name: str | None,
+                     version: str | None = None) -> dict:
+        """Pin the hand config by model name, or (``None``) return the choice
+        to hardware detection. Reconnects when the model actually changes."""
+        try:
+            self.supervisor.select_model(name, version)
+        except (HandBusyError, ModelSelectError) as e:
+            raise ServiceError(str(e), status_code=409)
+        return self.models()
+
+    def disconnect(self) -> dict:
+        """Close the session and hold the ports free until Reconnect."""
+        try:
+            self.supervisor.disconnect()
+        except HandBusyError as e:
+            raise ServiceError(str(e), status_code=409)
+        return self.status()
+
+    def reconnect(self) -> dict:
+        """Drop the session and redial; lifts a disconnect hold."""
+        self.supervisor.request_reconnect()
+        return self.status()
 
     def _calibration_state(self, session, encoder_backed: set,
                            encoder_calibrated: set | None) -> dict:

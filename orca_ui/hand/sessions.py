@@ -222,7 +222,7 @@ def connect_session(settings: UiSettings, config,
                                      motors_enabled=settings.motors_enabled)
 
     if settings.mock:
-        return _connect_mock(settings, declared)
+        return _connect_mock(settings, config, declared)
 
     if presence is None:
         presence = probe_hardware(config)
@@ -266,10 +266,12 @@ def _caps_from_hand(hand, declared: dict) -> Capabilities:
     )
 
 
-def _connect_mock(settings: UiSettings, declared: dict) -> HandSession:
+def _connect_mock(settings: UiSettings, config, declared: dict) -> HandSession:
     from orca_ui.mock import build_mock_hand
 
-    hand = build_mock_hand(settings.config_path,
+    # The config in force, not settings.config_path: the model can be changed
+    # from the browser, and the mock has to simulate the hand now selected.
+    hand = build_mock_hand(config.config_path,
                            engage_feedback=settings.engage_feedback)
     try:
         ok, msg = hand.connect(interactive=False)

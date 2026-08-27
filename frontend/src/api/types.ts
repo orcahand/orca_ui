@@ -36,6 +36,33 @@ export interface StatusSnapshot {
   // is plugged in, so a swapped hand shows up as a change here.
   model: string
   side: string
+  // False while the model is still detection's to revise, true once the
+  // command line or the picker named one.
+  model_pinned: boolean
+  // True while someone has taken the hardware back: the connect ladder is
+  // suspended, so `disconnected` is a resting state rather than a search.
+  released: boolean
+}
+
+export interface ModelEntry {
+  name: string
+  version: string // '' for a model outside orca_core's bundle
+  side: 'left' | 'right'
+  tactile: boolean
+  encoders: boolean
+  config_path: string
+  // False for a --config path: shown as current, but it has no model name to
+  // be selected back by.
+  selectable: boolean
+}
+
+export interface ModelsInfo {
+  models: ModelEntry[]
+  selected: string
+  pinned: boolean
+  // Detection needs a bus to ask — mock mode has none.
+  auto_available: boolean
+  config_path: string
 }
 
 export interface JointInfo {
