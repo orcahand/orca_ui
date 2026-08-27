@@ -23,9 +23,11 @@ export function DemoList({ demos }: { demos: DemoEntry[] }) {
   const torqueOn = useAppStore((s) => s.control?.torque_enabled ?? false)
   const [cycles, setCycles] = useState<Record<string, CycleChoice>>({})
 
-  const blocked = gate.blocked || !torqueOn
-  const reason =
-    gate.reason ?? (!torqueOn ? 'enable torque to play scripts' : null)
+  // No torque gate: the demo operation enables torque itself and restores
+  // it afterwards. Whatever still blocks (another operation, teleop, no
+  // motors) is named right here, not just in a tooltip.
+  const blocked = gate.blocked
+  const reason = gate.reason
 
   const play = (name: string) => {
     const choice = cycles[name] ?? '1'
@@ -40,7 +42,18 @@ export function DemoList({ demos }: { demos: DemoEntry[] }) {
         <div className="panel-empty">no movement scripts available</div>
       ) : (
         <>
-          {blocked && <div className="panel-hint">{reason}</div>}
+          {blocked ? (
+            <div className="panel-hint">
+              cannot play right now: {reason ?? 'blocked'}
+            </div>
+          ) : (
+            !torqueOn && (
+              <div className="panel-hint">
+                torque is off — a script enables it for the run and turns it
+                back off afterwards
+              </div>
+            )
+          )}
           {demos.map((demo) => (
             <div key={demo.name} className="demo-row">
               <span className="demo-name">{demo.name}</span>

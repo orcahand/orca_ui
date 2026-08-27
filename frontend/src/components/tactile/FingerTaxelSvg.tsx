@@ -9,6 +9,8 @@ import { useAppStore } from '../../state/appStore'
 import { useStreamFrame } from '../../hooks/useStreamFrame'
 import { usePalette } from '../../theme/themeStore'
 import { maxTaxelForce } from '../../theme/tokens'
+import { StatusDot } from '../common/StatusDot'
+import { tactileDiagnosis } from '../monitor/monitorShared'
 import type { ArrowPoolEntry, TaxelHandles } from './taxelRender'
 import { hideAllArrows, renderTaxelFrame } from './taxelRender'
 
@@ -45,9 +47,12 @@ function computeLayout(finger: Finger, positions: [number, number, number][]): L
 export function FingerTaxelSvg({
   finger,
   positions,
+  connected,
 }: {
   finger: Finger
   positions: [number, number, number][]
+  // Sensor state from sensors.health; undefined until the first payload.
+  connected?: boolean
 }) {
   const { taxel } = usePalette()
   const layout = useMemo(() => computeLayout(finger, positions), [finger, positions])
@@ -100,7 +105,28 @@ export function FingerTaxelSvg({
 
   return (
     <div className="taxel-finger" data-finger={finger}>
-      <div className="taxel-finger-label">
+      <div
+        className="taxel-finger-label"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 5,
+        }}
+      >
+        <StatusDot
+          on={connected}
+          title={
+            connected === undefined
+              ? undefined
+              : `${finger} sensor ${connected ? 'active' : 'not connected'} — click for details`
+          }
+          diagnosis={
+            connected === undefined
+              ? undefined
+              : tactileDiagnosis(finger, connected)
+          }
+        />
         {finger.charAt(0).toUpperCase() + finger.slice(1)}
       </div>
       <svg

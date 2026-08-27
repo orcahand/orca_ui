@@ -287,6 +287,19 @@ header h1 {
   border-color: rgb(var(--purple-rgb) / 0.4);
 }
 
+/* --- Motor panel angle readout: spinner-free number input --- */
+
+.angle-input {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.angle-input::-webkit-inner-spin-button,
+.angle-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 /* --- E-stop --- */
 
 .btn-estop {
@@ -318,6 +331,24 @@ header h1 {
 .btn-estop:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+}
+
+/* Idle alter ego of the E-stop: same footprint, ok-green, arms torque. */
+.btn-estop.btn-torque-arm {
+  background: rgb(var(--ok-rgb) / var(--estop-bg-a));
+  color: var(--ok);
+  border-color: rgb(var(--ok-rgb) / 0.6);
+}
+
+.btn-estop.btn-torque-arm:hover:not(:disabled) {
+  background: rgb(var(--ok-rgb) / var(--estop-bg-hover-a));
+  border-color: var(--ok);
+  color: var(--estop-hover-text);
+}
+
+.btn-estop.btn-torque-arm:active:not(:disabled) {
+  background: rgb(var(--ok-rgb) / var(--estop-bg-active-a));
+  color: var(--estop-hover-text);
 }
 
 /* --- Status indicator + badges --- */

@@ -73,8 +73,9 @@ export function PosesView() {
   )
 }
 
-// Torque toggle for the whole tab — pose apply, replay, and demo all need
-// torque already on (mirrors MotorPanel's enable/disable pair).
+// Torque toggle for the whole tab — pose apply and replay need torque
+// already on (mirrors MotorPanel's enable/disable pair). Movement scripts
+// are the exception: they enable torque themselves and restore it after.
 function TorqueToolbar() {
   const torqueOn = useAppStore((s) => s.control?.torque_enabled ?? false)
   const motors = useAppStore((s) => s.status?.capabilities?.motors ?? false)
@@ -117,8 +118,8 @@ function TorqueToolbar() {
         {torqueOn ? 'Disable Torque' : 'Enable Torque'}
       </button>
       <span className="poses-toolbar-hint">
-        pose apply, replay and demos need torque on — it is never enabled
-        automatically
+        pose apply and replay need torque on — never enabled automatically;
+        movement scripts enable it for the run and put it back
       </span>
     </div>
   )

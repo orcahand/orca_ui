@@ -7,7 +7,7 @@
 // naming the owner. The current ceiling is the exception — see
 // MaxCurrentControl.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { api } from '../../api/rest'
 import type { JointInfo } from '../../api/types'
 import { useStreamFrame } from '../../hooks/useStreamFrame'
@@ -19,6 +19,25 @@ import { DirectMotorPanel } from './DirectMotorPanel'
 import { MaxCurrentControl } from './MaxCurrentControl'
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
+
+const GROUP_ORDER = ['wrist', 'thumb', 'index', 'middle', 'ring', 'pinky']
+
+function groupOf(jointId: string): string {
+  const prefix = jointId.split('_')[0]
+  return GROUP_ORDER.includes(prefix) ? prefix : 'other'
+}
+
+// One shared template so every row's columns align and nothing shifts when
+// readouts change: dot · name · lo · slider · hi · angle · [calibrate] · feedback
+const rowGrid = (calCol: boolean): CSSProperties => ({
+  display: 'grid',
+  gridTemplateColumns: `7px 84px 30px 1fr 30px 56px${calCol ? ' 78px' : ''} 132px`,
+  gap: 6,
+  alignItems: 'center',
+  padding: '2px 0',
+  fontSize: 10,
+  fontVariantNumeric: 'tabular-nums',
+})
 
 function seedFromPose(
   joints: JointInfo[],
@@ -43,6 +62,10 @@ export function MotorPanel() {
   const gate = useControlGate()
 
   const [values, setValues] = useState<Record<string, number>>({})
+  // Motor ids answering on the bus, from the 1 Hz motors.telemetry payload
+  // (null until the first read) — the electrical monitor's presence dots.
+  const [answering, setAnswering] = useState<Set<number> | null>(null)
+  const lastAnswering = useRef('')
   const [busy, setBusy] = useState(false)
   const [calStatus, setCalStatus] = useState<Record<string, 'busy' | 'done' | 'error'>>({})
   const [needReconnect, setNeedReconnect] = useState(false)
@@ -59,6 +82,14 @@ export function MotorPanel() {
 
   const caps = status?.capabilities
   const torqueOn = control?.torque_enabled ?? false
+
+  // Re-seed on any torque enable, not just our own button (header/MCP too):
+  // the hand may have been posed limp, so latched sliders are stale.
+  const wasTorqueOn = useRef(torqueOn)
+  useEffect(() => {
+    if (torqueOn && !wasTorqueOn.current) seeded.current = false
+    wasTorqueOn.current = torqueOn
+  }, [torqueOn])
   const feedback = caps?.feedback_loop ?? false
   const locked = !gate.manualAllowed
   const lockReason = gate.reason ?? undefined
@@ -74,6 +105,17 @@ export function MotorPanel() {
   // Initial seed: latch the first available pose (measured, else estimate)
   // so opening the panel never yanks the hand.
   useStreamFrame((frames) => {
+    const ids = [
+      ...new Set([
+        ...Object.keys(frames.motors.temps),
+        ...Object.keys(frames.motors.currents),
+      ]),
+    ].sort()
+    const json = JSON.stringify(ids)
+    if (json !== lastAnswering.current) {
+      lastAnswering.current = json
+      setAnswering(ids.length ? new Set(ids.map(Number)) : null)
+    }
     believedPose.current = {
       ...frames.joints.estimate,
       ...frames.joints.measured,
@@ -145,6 +187,13 @@ export function MotorPanel() {
 
   const hasEncoderJoints = joints.some((j) => j.encoder_backed)
 
+  const groups = new Map<string, JointInfo[]>()
+  for (const joint of joints) {
+    const group = groupOf(joint.id)
+    if (!groups.has(group)) groups.set(group, [])
+    groups.get(group)!.push(joint)
+  }
+
   // Set every slider (and the 3D model) to the pose the hand currently
   // believes it is in, so only the joints that are actually off need dialing.
   const syncToBelieved = () => {
@@ -209,9 +258,11 @@ sensors currently report — then only dial the joints that are off"
           Match sensed pose
         </button>
       )}
+      {/* Fixed width: "Enable"/"Disable" swap must not shift the toolbar. */}
       {!torqueOn ? (
         <button
           className="btn btn-primary"
+          style={{ minWidth: 104 }}
           disabled={busy || locked}
           title={lockReason}
           onClick={() => void enableTorque()}
@@ -221,6 +272,7 @@ sensors currently report — then only dial the joints that are off"
       ) : (
         <button
           className="btn btn-danger"
+          style={{ minWidth: 104 }}
           disabled={locked}
           title={lockReason}
           onClick={() => void disableTorque()}
@@ -297,29 +349,51 @@ sensors currently report — then only dial the joints that are off"
       )}
       <MaxCurrentControl />
       <div>
-        {joints.map((joint) => (
-          <SliderRow
-            key={joint.id}
-            joint={joint}
-            value={values[joint.id] ?? clamp(0, joint.rom[0], joint.rom[1])}
-            disabled={
-              manualCal
-                ? locked
-                : !torqueOn || locked || directArmed || uncalibrated
-            }
-            lockReason={manualCal ? lockReason : sliderLockReason}
-            showFeedback={(feedback || manualCal) && joint.encoder_backed}
-            calibrate={
-              manualCal && joint.encoder_backed
-                ? {
-                    status: calStatus[joint.id],
-                    disabled: locked,
-                    onCalibrate: () => void calibrateJoint(joint),
-                  }
-                : undefined
-            }
-            onSlide={onSlide}
-          />
+        {[...GROUP_ORDER, 'other'].filter((g) => groups.has(g)).map((group) => (
+          <div key={group} style={{ marginBottom: 8 }}>
+            <div
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                color: 'var(--dimmer)',
+                textTransform: 'uppercase',
+                letterSpacing: 1,
+                padding: '4px 0 2px',
+              }}
+            >
+              {group}
+            </div>
+            {groups.get(group)!.map((joint) => (
+              <SliderRow
+                key={joint.id}
+                joint={joint}
+                calCol={manualCal}
+                motorPresent={
+                  answering !== null && joint.motor_id !== null
+                    ? answering.has(joint.motor_id)
+                    : undefined
+                }
+                value={values[joint.id] ?? clamp(0, joint.rom[0], joint.rom[1])}
+                disabled={
+                  manualCal
+                    ? locked
+                    : !torqueOn || locked || directArmed || uncalibrated
+                }
+                lockReason={manualCal ? lockReason : sliderLockReason}
+                showFeedback={(feedback || manualCal) && joint.encoder_backed}
+                calibrate={
+                  manualCal && joint.encoder_backed
+                    ? {
+                        status: calStatus[joint.id],
+                        disabled: locked,
+                        onCalibrate: () => void calibrateJoint(joint),
+                      }
+                    : undefined
+                }
+                onSlide={onSlide}
+              />
+            ))}
+          </div>
         ))}
       </div>
       <DirectMotorPanel torqueOn={torqueOn} locked={locked} forceOpen={uncalibrated} />
@@ -329,6 +403,8 @@ sensors currently report — then only dial the joints that are off"
 
 function SliderRow({
   joint,
+  calCol,
+  motorPresent,
   value,
   disabled,
   lockReason,
@@ -337,6 +413,12 @@ function SliderRow({
   onSlide,
 }: {
   joint: JointInfo
+  // Reserve the calibrate column (sensor-cal mode) so encoder and
+  // non-encoder rows keep identical columns.
+  calCol: boolean
+  // Electrical-monitor presence: does this joint's motor answer on the bus?
+  // undefined = no telemetry yet (or no motor mapped) — draw nothing.
+  motorPresent?: boolean
   value: number
   disabled: boolean
   lockReason?: string
@@ -350,21 +432,40 @@ function SliderRow({
 }) {
   const [lo, hi] = joint.rom
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: '3px 0',
-        fontSize: 10,
-        opacity: disabled ? 0.55 : 1,
-      }}
-    >
-      <span style={{ width: 84, textAlign: 'right', color: 'var(--text)' }}>
+    <div style={{ ...rowGrid(calCol), opacity: disabled ? 0.55 : 1 }}>
+      <span
+        title={
+          motorPresent === undefined
+            ? undefined
+            : motorPresent
+              ? `motor #${joint.motor_id} answering`
+              : `motor #${joint.motor_id} not answering on the bus`
+        }
+        style={{
+          width: 7,
+          height: 7,
+          borderRadius: '50%',
+          background:
+            motorPresent === undefined
+              ? 'transparent'
+              : motorPresent
+                ? 'var(--ok)'
+                : 'var(--err)',
+          cursor: motorPresent === undefined ? undefined : 'help',
+        }}
+      />
+      <span
+        style={{
+          textAlign: 'right',
+          color: 'var(--text)',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}
+      >
         {joint.id}
       </span>
-      <span style={{ width: 30, color: 'var(--dimmer)', fontSize: 9, textAlign: 'right' }}>
-        {lo.toFixed(0)}°
+      <span style={{ color: 'var(--dimmer)', fontSize: 9, textAlign: 'right' }}>
+        {lo.toFixed(0)}
       </span>
       <input
         type="range"
@@ -377,10 +478,15 @@ function SliderRow({
         disabled={disabled}
         title={lockReason}
         onChange={(e) => onSlide(joint, parseFloat(e.target.value))}
-        style={{ flex: 1, height: 3, accentColor: 'var(--accent)', cursor: 'pointer' }}
+        style={{
+          width: '100%',
+          height: 3,
+          accentColor: 'var(--accent)',
+          cursor: 'pointer',
+        }}
       />
-      <span style={{ width: 34, color: 'var(--dimmer)', fontSize: 9 }}>
-        {hi > 0 ? `+${hi.toFixed(0)}` : hi.toFixed(0)}°
+      <span style={{ color: 'var(--dimmer)', fontSize: 9 }}>
+        {hi > 0 ? `+${hi.toFixed(0)}` : hi.toFixed(0)}
       </span>
       <AngleInput
         value={value}
@@ -389,34 +495,37 @@ function SliderRow({
         disabled={disabled}
         onCommit={(deg) => onSlide(joint, deg)}
       />
-      {calibrate && (
-        <button
-          className="btn btn-secondary"
-          style={{
-            fontSize: 9,
-            padding: '1px 6px',
-            minWidth: 38,
-            color:
-              calibrate.status === 'done'
-                ? 'var(--ok, #4caf50)'
+      {calCol &&
+        (calibrate ? (
+          <button
+            className="btn btn-secondary"
+            style={{
+              fontSize: 9,
+              padding: '1px 4px',
+              width: '100%',
+              color:
+                calibrate.status === 'done'
+                  ? 'var(--ok, #4caf50)'
+                  : calibrate.status === 'error'
+                    ? 'var(--warn)'
+                    : undefined,
+            }}
+            disabled={calibrate.disabled || calibrate.status === 'busy'}
+            title={`Re-anchor ${joint.id}'s sensor: its reading at the current pose becomes ${value.toFixed(1)}°`}
+            onClick={calibrate.onCalibrate}
+          >
+            {calibrate.status === 'busy'
+              ? '… Calibrate'
+              : calibrate.status === 'done'
+                ? '✓ Calibrate'
                 : calibrate.status === 'error'
-                  ? 'var(--warn)'
-                  : undefined,
-          }}
-          disabled={calibrate.disabled || calibrate.status === 'busy'}
-          title={`Re-anchor ${joint.id}'s sensor: its reading at the current pose becomes ${value.toFixed(1)}°`}
-          onClick={calibrate.onCalibrate}
-        >
-          {calibrate.status === 'busy'
-            ? '…'
-            : calibrate.status === 'done'
-              ? '✓ Calibrate'
-              : calibrate.status === 'error'
-                ? '! Calibrate'
-                : 'Calibrate'}
-        </button>
-      )}
-      {showFeedback ? <FeedbackReadout jointId={joint.id} /> : <span style={{ width: 132 }} />}
+                  ? '! Calibrate'
+                  : 'Calibrate'}
+          </button>
+        ) : (
+          <span />
+        ))}
+      {showFeedback ? <FeedbackReadout jointId={joint.id} /> : <span />}
     </div>
   )
 }
@@ -447,6 +556,7 @@ function AngleInput({
   return (
     <input
       type="number"
+      className="angle-input"
       step="any"
       value={draft ?? value.toFixed(1)}
       disabled={disabled}
@@ -464,15 +574,17 @@ function AngleInput({
         if (draft !== null) commit(e.target.value)
       }}
       style={{
-        width: 52,
+        width: '100%',
         fontWeight: 600,
         color: 'var(--text)',
         textAlign: 'right',
         fontSize: 10,
+        fontVariantNumeric: 'tabular-nums',
         background: 'transparent',
         border: '1px solid var(--border, #444)',
         borderRadius: 3,
-        padding: '1px 2px',
+        padding: '1px 4px',
+        fontFamily: 'var(--font)',
       }}
     />
   )
@@ -498,7 +610,14 @@ function FeedbackReadout({ jointId }: { jointId: string }) {
   })
 
   return (
-    <span style={{ width: 132, display: 'inline-flex', gap: 6, fontSize: 9 }}>
+    <span
+      style={{
+        display: 'inline-flex',
+        gap: 6,
+        fontSize: 9,
+        fontVariantNumeric: 'tabular-nums',
+      }}
+    >
       <span ref={measRef} style={{ color: 'var(--dim)', width: 64 }}>
         meas --
       </span>

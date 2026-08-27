@@ -77,8 +77,9 @@ def create_app(settings: UiSettings) -> FastAPI:
     app.state.operations = operations
     app.state.teleop = teleop
     app.state.teleop_installer = installer
+    app.state.telemetry = telemetry
 
-    app.include_router(build_rest_router(service))
+    app.include_router(build_rest_router(service, telemetry))
     app.include_router(build_assets_router(service))
     app.include_router(build_ws_router(service, hub))
     if teleop is not None:

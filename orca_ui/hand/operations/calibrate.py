@@ -10,8 +10,48 @@ tension + calibrate rounds under one lease.
 
 from __future__ import annotations
 
+import time
+from datetime import datetime, timezone
+
+from orca_ui.hand import calibration_log
 from orca_ui.hand.operations import hand_ops
 from orca_ui.hand.operations.base import OpContext, Operation
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+
+
+def _magnets(event: dict) -> str:
+    """Hardstop magnet counts, when the event carries them."""
+    flex, extend = event.get("flex_count"), event.get("extend_count")
+    if flex is None or extend is None:
+        return ""
+    return f" · magnets flex@{flex} extend@{extend}"
+
+
+# Floor for per-run calibration-current overrides: below this the motors
+# stall on cable friction before ever reaching a hardstop, and the sweep
+# records false limits. The ceiling is the config's max_current.
+MIN_CALIBRATION_CURRENT_MA = 50
+
+
+def _current_override(params: dict, key: str, config) -> int | None:
+    from orca_ui.hand.service import ServiceError
+
+    value = params.get(key)
+    if value is None:
+        return None
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        raise ServiceError(f"{key} must be a whole number of mA")
+    ceiling = int(getattr(config, "max_current", 0) or 0) or 2000
+    if not MIN_CALIBRATION_CURRENT_MA <= value <= ceiling:
+        raise ServiceError(
+            f"{key} must be {MIN_CALIBRATION_CURRENT_MA}..{ceiling} mA "
+            "(the configured max_current caps it)")
+    return value
 
 
 def validate_calibrate_params(service, params: dict) -> dict:
@@ -42,16 +82,28 @@ def validate_calibrate_params(service, params: dict) -> dict:
         raise ServiceError("calibrate_joint_sensors must be a boolean or null")
     return {"joints": joints,
             "force_wrist": bool(params.get("force_wrist", False)),
-            "calibrate_joint_sensors": sensors}
+            "calibrate_joint_sensors": sensors,
+            # Per-run current overrides; None = the config.yaml values.
+            "calibration_current":
+                _current_override(params, "calibration_current", config),
+            "wrist_calibration_current":
+                _current_override(params, "wrist_calibration_current", config)}
 
 
 def run_calibrate(hand, encoder_client, ctx: OpContext,
                   joints: list[str] | None, force_wrist: bool) -> dict:
-    """Blocking calibration with progress mapped onto the op snapshot."""
+    """Blocking calibration with progress mapped onto the op snapshot.
+
+    Every progress event is also archived (with a timestamp) to the
+    calibration history next to calibration.yaml, so hardstop magnet
+    positions can be compared across runs for drift.
+    """
     progress = {"steps_done": 0, "total": 0, "joints_calibrated": [],
                 "anchors_recorded": [], "anchors_dead": []}
+    events: list[dict] = []
 
     def on_event(event: dict) -> None:
+        events.append({"t": round(time.time(), 3), **event})
         kind = event.get("event")
         if kind == "encoder_anchor_recorded":
             progress["anchors_recorded"].append(event["joint"])
@@ -74,14 +126,16 @@ def run_calibrate(hand, encoder_client, ctx: OpContext,
             rom = event["rom"]
             ctx.log(f"measured ROM for {event['joint']}: "
                     f"[{rom[0]:.1f}, {rom[1]:.1f}]° "
-                    f"(Δ {event['deviation_deg']:+.1f}° vs config)")
+                    f"(Δ {event['deviation_deg']:+.1f}° vs config)"
+                    f"{_magnets(event)}")
         elif kind == "measured_rom_rejected":
             ctx.log(f"measured ROM REJECTED for {event['joint']}: the "
                     f"{event['span_deg']:.1f}° measured travel puts its lower "
                     f"hardstop {event['deviation_deg']:+.1f}° from the config "
                     "value — beyond the sanity limit, so the config range is "
-                    "kept and no Δ is shown. Check the joint's hardstops or "
-                    "fix its joint_roms entry in config.yaml.")
+                    "kept and its Δ is shown as rejected. Check the joint's "
+                    "hardstops or fix its joint_roms entry in config.yaml."
+                    f"{_magnets(event)}")
         elif kind == "wrist_skipped":
             ctx.log("wrist already calibrated (motor limits and encoder "
                     "anchor) — skipping its steps; force wrist to re-run")
@@ -112,13 +166,32 @@ def run_calibrate(hand, encoder_client, ctx: OpContext,
     # calibrate() clears orca_core's stop event at entry: a stop that landed
     # while we were connecting would be swallowed. Check ours first.
     ctx.check_stop()
-    hand_ops.calibrate(
-        hand,
-        joints=joints,
-        force_wrist=force_wrist,
-        joint_encoder_client=encoder_client,
-        progress_callback=on_event,
-    )
+    started_at = _now_iso()
+    error: str | None = None
+    try:
+        hand_ops.calibrate(
+            hand,
+            joints=joints,
+            force_wrist=force_wrist,
+            joint_encoder_client=encoder_client,
+            progress_callback=on_event,
+        )
+    except BaseException as e:
+        error = str(e) or type(e).__name__
+        raise
+    finally:
+        path = calibration_log.append_run(hand.config.calibration_path, {
+            "started_at": started_at,
+            "finished_at": _now_iso(),
+            "joints": joints,
+            "force_wrist": force_wrist,
+            "anchor_pass": encoder_client is not None,
+            "completed": error is None,
+            "error": error,
+            "events": events,
+        })
+        if path is not None:
+            ctx.log(f"calibration events archived to {path}")
     ctx.check_stop()
     return {
         "steps_done": progress["steps_done"],
@@ -178,9 +251,20 @@ class CalibrateOperation(Operation):
         try:
             ctx.check_stop()
             ctx.set_phase("connecting", detail="opening motor-only connection")
+            overrides = {
+                key: self.params[key]
+                for key in ("calibration_current", "wrist_calibration_current")
+                if self.params.get(key) is not None
+            }
             hand = hand_ops.build_maintenance_hand(
-                supervisor.config.config_path, ctx.stop_event)
+                supervisor.config.config_path, ctx.stop_event,
+                config_overrides=overrides or None)
             self._hand = hand
+            for key, value in overrides.items():
+                default = getattr(supervisor.config, key, None)
+                ctx.log(f"{key} for this run: {value} mA"
+                        + (f" (config default: {default} mA)"
+                           if default is not None else ""))
             if self._want_joint_sensors(ctx, hand):
                 try:
                     encoder_client, encoder_link = hand_ops.open_encoder_client(

@@ -26,7 +26,9 @@ class UiSettings:
     mock: bool = False
     engage_feedback: bool = True
     motors_enabled: bool = True
-    host: str = "127.0.0.1"
+    # 0.0.0.0: reachable from the network (LAN, Tailscale). The UI can move
+    # motors — bind 127.0.0.1 on untrusted networks.
+    host: str = "0.0.0.0"
     port: int = 5001
     open_browser: bool = True
     # Pose/trajectory library root; None -> ~/.orca_ui/library. Recordings and

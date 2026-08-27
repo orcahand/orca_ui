@@ -273,6 +273,34 @@ def test_replay_rejects_bad_speed_and_missing_file(client):
         "name": "missing"}}).status_code == 404
 
 
+def test_replay_fast_speed_strides_frames(client):
+    # 150 frames @ 50 Hz played at x8 = 400 Hz raw; the player strides the
+    # recording down to MAX_STREAM_HZ instead of submitting every frame.
+    _synthetic_trajectory(client, frames=150, freq=50.0)
+    client.post("/api/torque/enable")
+    assert client.post("/api/operation/replay/start", json={"params": {
+        "name": "synth", "speed": 8.0}}).status_code == 200
+    snapshot = _wait_op_state(client, "done")
+    # Reported frame count stays the recording's, and the wall-clock speed
+    # is honored (3 s of motion at x8 = 0.375 s of playback).
+    assert snapshot["result"]["frames"] == 150
+    assert snapshot["result"]["duration_s"] == pytest.approx(0.375)
+
+    service = client.app.state.service
+
+    def reached_end():
+        measured = service.session.measured_joints() or {}
+        return abs(measured.get("index_mcp", 1e9) - 30.0) < 6.0
+    assert _wait_for(reached_end), "fast replay did not reach the last frame"
+
+
+def test_decimate_keeps_holds_and_last_frame():
+    frames = [[float(i)] for i in range(10)]
+    kept, holds = player._decimate(frames, {3, 7}, 4)
+    assert kept == [[0.0], [3.0], [4.0], [7.0], [8.0], [9.0]]
+    assert [kept[i] for i in holds] == [[3.0], [7.0]]
+
+
 def test_replay_rejects_joint_order_mismatch(client):
     service = client.app.state.service
     joint_ids = list(reversed(_joint_ids(client)))
@@ -323,6 +351,117 @@ def _waypoint_trajectory(client, name, waypoints):
         "waypoints": waypoints,
     })
     return joint_ids
+
+
+def test_motor_waypoint_record_and_stepped_replay(client):
+    # Record raw motor positions per capture.
+    client.post("/api/operation/record/start", json={"params": {
+        "mode": "motor_waypoints", "name": "raw"}})
+    _wait_op_state(client, "awaiting_input")
+    for _ in range(2):
+        assert client.post("/api/operation/input",
+                           json={"value": "Capture"}).status_code == 200
+        _wait_op_state(client, "awaiting_input")
+    client.post("/api/operation/input", json={"value": "Stop & save"})
+    snapshot = _wait_op_state(client, "done")
+    assert snapshot["result"]["type"] == "motor_waypoints"
+    assert snapshot["result"]["frames"] == 2
+
+    data = client.get("/api/trajectories/raw").json()
+    assert data["metadata"]["motor_ids"]
+    assert len(data["waypoints"][0]) == len(data["metadata"]["motor_ids"])
+
+    # Replay as direct motor stepping, zero interpolation, at 2x.
+    client.post("/api/torque/enable")
+    response = client.post("/api/operation/replay/start", json={"params": {
+        "name": "raw", "speed": 2.0, "interp_steps": 0}})
+    assert response.status_code == 200
+    snapshot = _wait_op_state(client, "done", timeout=30.0)
+    assert snapshot["result"]["cycles"] == 1
+    # The direct-motor fence is released afterwards: joint targets work.
+    assert client.post("/api/joints/target",
+                       json={"angles": {"index_mcp": 0.0}}).status_code == 200
+
+
+def test_joint_waypoints_translate_to_motor(client):
+    joint_ids = _waypoint_trajectory(client, "jw", [
+        [5.0] * len(_joint_ids(client)),
+        [10.0] * len(_joint_ids(client)),
+    ])
+    response = client.post("/api/trajectories/jw/to_motor", json={})
+    assert response.status_code == 200
+    assert response.json()["name"] == "jw_motor"
+    data = client.get("/api/trajectories/jw_motor").json()
+    assert data["metadata"]["type"] == "motor_waypoints"
+    assert data["metadata"]["translated_from"] == "jw"
+    assert len(data["waypoints"]) == 2
+    assert len(joint_ids) > 0
+
+    # Continuous recordings cannot be translated.
+    _synthetic_trajectory(client, name="cont2")
+    assert client.post("/api/trajectories/cont2/to_motor",
+                       json={}).status_code == 409
+
+
+def test_joint_waypoint_replay_with_interp_steps(client):
+    _waypoint_trajectory(client, "stepped", [
+        [2.0] * len(_joint_ids(client)),
+        [12.0] * len(_joint_ids(client)),
+    ])
+    client.post("/api/torque/enable")
+    response = client.post("/api/operation/replay/start", json={"params": {
+        "name": "stepped", "interp_steps": 3, "speed": 8.0}})
+    assert response.status_code == 200
+    _wait_op_state(client, "done", timeout=30.0)
+
+    # interp_steps is a waypoint concept; continuous recordings refuse it.
+    _synthetic_trajectory(client, name="cont3")
+    assert client.post("/api/operation/replay/start", json={"params": {
+        "name": "cont3", "interp_steps": 2}}).status_code == 400
+
+
+def test_waypoint_editor_get_update_and_save_as(client):
+    joint_ids = _waypoint_trajectory(client, "editme", [
+        [0.0] * len(_joint_ids(client)),
+        [5.0] * len(_joint_ids(client)),
+    ])
+    idx = joint_ids.index("index_mcp")
+
+    data = client.get("/api/trajectories/editme").json()
+    assert data["metadata"]["type"] == "discrete_waypoints"
+    assert len(data["waypoints"]) == 2
+
+    # Edit one joint of step 2; out-of-ROM values are clamped, not rejected.
+    edited = [list(row) for row in data["waypoints"]]
+    edited[1][idx] = 42.0
+    edited[0][idx] = 99999.0
+    response = client.put("/api/trajectories/editme",
+                          json={"waypoints": edited})
+    assert response.status_code == 200
+    saved = client.get("/api/trajectories/editme").json()
+    assert saved["waypoints"][1][idx] == 42.0
+    rom_hi = max(saved["waypoints"][0][idx] for _ in [0])
+    assert rom_hi < 99999.0
+    assert saved["metadata"]["edited_at"]
+
+    # save_as writes a copy and leaves the original alone.
+    response = client.put("/api/trajectories/editme", json={
+        "waypoints": edited, "save_as": "editme_v2"})
+    assert response.status_code == 200
+    assert response.json()["name"] == "editme_v2"
+    names = [t["name"] for t in
+             client.get("/api/trajectories").json()["trajectories"]]
+    assert "editme" in names and "editme_v2" in names
+    # ...but not over an existing name.
+    assert client.put("/api/trajectories/editme", json={
+        "waypoints": edited, "save_as": "editme_v2"}).status_code == 409
+
+    # Malformed rows and continuous recordings are rejected.
+    assert client.put("/api/trajectories/editme", json={
+        "waypoints": [[1.0]]}).status_code == 400
+    _synthetic_trajectory(client, name="cont")
+    assert client.put("/api/trajectories/cont", json={
+        "waypoints": edited}).status_code == 409
 
 
 def _segment_frames(travel_deg):
@@ -467,6 +606,33 @@ def test_demo_plays_builtin_sequence(client):
     assert response.status_code == 200
     snapshot = _wait_op_state(client, "done", timeout=30.0)
     assert snapshot["result"]["frames"] > 0
+
+
+def test_demo_auto_enables_and_restores_torque(client):
+    # Scripts always run: torque off is no blocker — the demo enables it for
+    # the run and, because it was off before, turns it back off afterwards.
+    assert client.get("/api/status").json()["torque_enabled"] is False
+    response = client.post("/api/operation/demo/start",
+                           json={"params": {"name": "open_close"}})
+    assert response.status_code == 200
+    assert _wait_for(
+        lambda: client.get("/api/status").json()["torque_enabled"])
+    _wait_op_state(client, "done", timeout=30.0)
+    assert _wait_for(
+        lambda: client.get("/api/status").json()["torque_enabled"] is False)
+
+    log = client.get("/api/operation/log").json()
+    assert any("enabling it for the script" in e["line"]
+               for e in log["lines"])
+    assert any("torque back off" in e["line"] for e in log["lines"])
+
+
+def test_demo_keeps_torque_that_was_already_on(client):
+    client.post("/api/torque/enable")
+    client.post("/api/operation/demo/start",
+                json={"params": {"name": "open_close"}})
+    _wait_op_state(client, "done", timeout=30.0)
+    assert client.get("/api/status").json()["torque_enabled"] is True
 
 
 def test_demo_unknown_name_404(client):

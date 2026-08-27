@@ -24,7 +24,16 @@ JOINTS_TARGET = "joints.target"
 JOINTS_CORRECTION = "joints.correction"
 
 MOTORS_TELEMETRY = "motors.telemetry"
+# Per-motor fault table: bus-error counters (parsed from orca_core's motor
+# client logs) and command adherence (target vs sampled pose, stall
+# durations). 1 Hz from telemetry's slow tick; counters reset per session.
+MOTORS_FAULTS = "motors.faults"
 STATS = "stats"
+
+# Electrical bring-up monitor: per-joint encoder health verdicts, tactile
+# connection state, and sensing-link counters (browser twin of orca_core's
+# scripts/monitor_sensors.py). 1 Hz, assembled by telemetry's slow tick.
+SENSORS_HEALTH = "sensors.health"
 
 # Teleoperation. teleop.targets streams the retargeter's (clamped) output in
 # preview AND engaged — the 3D ghost renders raw intent while joints.target
@@ -48,7 +57,7 @@ ALL_TOPICS = [
     OPERATION_STATE, OPERATION_LOG,
     TACTILE_FORCES, TACTILE_TAXELS,
     JOINTS_MEASURED, JOINTS_ESTIMATE, JOINTS_TARGET, JOINTS_CORRECTION,
-    MOTORS_TELEMETRY, STATS,
+    MOTORS_TELEMETRY, MOTORS_FAULTS, STATS, SENSORS_HEALTH,
     TELEOP_STATE, TELEOP_TARGETS, TELEOP_LOG, TELEOP_PREVIEW,
     TELEOP_INSTALL, TELEOP_INSTALL_LOG,
 ]

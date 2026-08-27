@@ -37,6 +37,47 @@ export interface HandAssets {
   taxelGeometry: TaxelGeometry | null
 }
 
+// The last orbit pose, persisted so a tab switch (the canvas unmounts) or a
+// full restart comes back to the view the user left, not the default
+// framing. Keyed per hand side — left and right hands frame differently.
+const CAMERA_KEY = 'orca-ui.camera3d.v1'
+
+interface SavedCamera {
+  position: [number, number, number]
+  target: [number, number, number]
+}
+
+function loadSavedCamera(side: string): SavedCamera | null {
+  try {
+    const raw = localStorage.getItem(`${CAMERA_KEY}.${side}`)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as SavedCamera
+    const isVec = (a: unknown): a is [number, number, number] =>
+      Array.isArray(a) && a.length === 3 && a.every((n) => Number.isFinite(n))
+    return isVec(parsed.position) && isVec(parsed.target) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function saveCamera(
+  side: string,
+  position: THREE.Vector3,
+  target: THREE.Vector3,
+): void {
+  try {
+    localStorage.setItem(
+      `${CAMERA_KEY}.${side}`,
+      JSON.stringify({
+        position: [position.x, position.y, position.z],
+        target: [target.x, target.y, target.z],
+      }),
+    )
+  } catch {
+    // Private-mode / storage-disabled: the pose just doesn't persist.
+  }
+}
+
 interface Rig {
   robot: URDFRobot
   ghost: URDFRobot | null
@@ -64,7 +105,12 @@ function HandRig({
   caps: Capabilities
 }) {
   const invalidate = useThree((s) => s.invalidate)
-  const controls = useThree((s) => s.controls) as { target: THREE.Vector3; update: () => void } | null
+  const controls = useThree((s) => s.controls) as {
+    target: THREE.Vector3
+    update: () => void
+    addEventListener: (type: string, listener: () => void) => void
+    removeEventListener: (type: string, listener: () => void) => void
+  } | null
   const [rig, setRig] = useState<Rig | null>(null)
 
   useEffect(() => {
@@ -139,13 +185,26 @@ function HandRig({
     invalidate()
   }, [rig, sceneColors, invalidate])
 
-  // Frame the camera on the hand once it exists: fit the whole model with a
-  // margin, looking down from a 3/4 angle.
+  // Frame the camera on the hand once it exists: the saved orbit pose when
+  // one exists (tab switches and restarts return to where the user left the
+  // view), otherwise fit the whole model with a margin from a 3/4 angle.
   const camera = useThree((s) => s.camera)
   useEffect(() => {
     if (!rig || !controls) return
     const sphere = rig.bounds
     const persp = camera as THREE.PerspectiveCamera
+    const saved = loadSavedCamera(assets.metadata.side)
+    if (saved) {
+      persp.position.fromArray(saved.position)
+      controls.target.fromArray(saved.target)
+      const range = persp.position.distanceTo(controls.target)
+      persp.near = range / 100
+      persp.far = range * 50
+      persp.updateProjectionMatrix()
+      controls.update()
+      invalidate()
+      return
+    }
     const fovRad = (persp.fov * Math.PI) / 180
     const distance = (sphere.radius / Math.tan(fovRad / 2)) * 1.15
     // View from the thumb's side of the hand (so the thumb is never hidden
@@ -179,7 +238,17 @@ function HandRig({
     controls.target.copy(sphere.center)
     controls.update()
     invalidate()
-  }, [rig, controls, camera, invalidate])
+  }, [rig, controls, camera, invalidate, assets.metadata.side])
+
+  // Persist the orbit pose. OrbitControls fires 'end' when a drag or wheel
+  // interaction finishes — cheap enough to write through every time.
+  useEffect(() => {
+    if (!controls) return
+    const side = assets.metadata.side
+    const save = () => saveCamera(side, camera.position, controls.target)
+    controls.addEventListener('end', save)
+    return () => controls.removeEventListener('end', save)
+  }, [controls, camera, assets.metadata.side])
 
   // Pose + overlay updates from the stream (outside React).
   useEffect(() => {
@@ -316,6 +385,7 @@ export function HandScene({
   caps: Capabilities
 }) {
   const { scene } = usePalette()
+  const lockView = useAppStore((s) => s.scene.lockView)
   return (
     <Canvas
       frameloop="demand"
@@ -337,7 +407,7 @@ export function HandScene({
         fadeDistance={0.9}
         infiniteGrid
       />
-      <OrbitControls makeDefault enableDamping={false} />
+      <OrbitControls makeDefault enableDamping={false} enabled={!lockView} />
       <HandRig assets={assets} joints={joints} caps={caps} />
     </Canvas>
   )

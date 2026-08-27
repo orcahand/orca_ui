@@ -43,6 +43,16 @@ export function SceneControls() {
 
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div className="toolbar">
+        <label className="toggle-label" title="freeze the camera: orbit, pan and zoom are ignored until unlocked">
+          <input
+            type="checkbox"
+            checked={scene.lockView}
+            onChange={(e) => setScene({ lockView: e.target.checked })}
+          />
+          lock view
+        </label>
+      </div>
       {anyToggle && (
         <div className="toolbar">
           {showGhost && (

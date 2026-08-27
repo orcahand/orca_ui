@@ -1,6 +1,7 @@
 // Console header: brand lockup, model picker, status pill, the link controls
 // (disconnect / reconnect), the view tabs, and the E-stop hard right.
-// Capability badges + Hz meters live in the Motors tab.
+// Capability badges + Hz meters live in the Motors tab. The 3D scene lives
+// on the Dashboard, so there is no 3D tab.
 
 import type { HandState } from '../../api/types'
 import type { ViewName } from '../../state/appStore'
@@ -32,11 +33,11 @@ const STATE_LABEL: Record<HandState, string> = {
 
 const TABS: { id: ViewName; label: string }[] = [
   { id: 'dashboard', label: 'Dashboard' },
-  { id: '3d', label: '3D' },
   { id: 'poses', label: 'Poses' },
   { id: 'teleop', label: 'Teleop' },
   { id: 'setup', label: 'Setup' },
   { id: 'motors', label: 'Motors' },
+  { id: 'stats', label: 'Stats' },
 ]
 
 export function AppHeader() {
@@ -45,13 +46,6 @@ export function AppHeader() {
   const wsConnected = useAppStore((s) => s.wsConnected)
   const view = useAppStore((s) => s.view)
   const setView = useAppStore((s) => s.setView)
-
-  // A sensorless hand has nothing to chart, so the Dashboard tab disappears
-  // and the 3D view becomes the front page (App.tsx redirects the view).
-  // While capabilities are unknown (no session yet) the tab stays visible.
-  const caps = status?.capabilities
-  const hasSensors = !caps || caps.tactile || caps.encoders
-  const tabs = hasSensors ? TABS : TABS.filter((tab) => tab.id !== 'dashboard')
 
   const state: HandState = !wsConnected
     ? 'disconnected'
@@ -83,7 +77,7 @@ export function AppHeader() {
       <LinkControls />
       <div className="header-spacer" />
       <nav className="view-tabs">
-        {tabs.map((tab) => (
+        {TABS.map((tab) => (
           <button
             key={tab.id}
             className={`view-tab ${view === tab.id ? 'active' : ''}`}

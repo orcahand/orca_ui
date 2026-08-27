@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { useEffect } from 'react'
 import { api } from './api/rest'
 import { startStreamClient } from './api/streamClient'
 import { BootHero } from './components/BootHero'
@@ -11,15 +11,9 @@ import { DashboardView } from './components/views/DashboardView'
 import { MotorsView } from './components/views/MotorsView'
 import { PosesView } from './components/views/PosesView'
 import { SetupView } from './components/views/SetupView'
+import { StatsView } from './components/views/StatsView'
 import { TeleopView } from './components/views/TeleopView'
 import { useAppStore } from './state/appStore'
-
-// three.js only loads when the 3D tab first opens.
-const ThreeDView = lazy(() =>
-  import('./components/views/ThreeDView').then((m) => ({
-    default: m.ThreeDView,
-  })),
-)
 
 // Pre-session states show the boot hero. Maintenance/reconnecting/degraded
 // keep the normal views — a session exists (or existed moments ago).
@@ -29,23 +23,12 @@ export default function App() {
   const view = useAppStore((s) => s.view)
   const wsConnected = useAppStore((s) => s.wsConnected)
   const handState = useAppStore((s) => s.status?.state ?? null)
-  const caps = useAppStore((s) => s.status?.capabilities ?? null)
 
   useEffect(() => {
     startStreamClient()
     api.status().then(useAppStore.getState().setStatus).catch(() => undefined)
     api.handInfo().then(useAppStore.getState().setHandInfo).catch(() => undefined)
   }, [])
-
-  // A sensorless hand has no Dashboard (AppHeader hides the tab); the 3D
-  // view is its front page. Runs on every caps update so it also covers a
-  // reconnect that swaps a sensored hand for a sensorless one.
-  const sensorless = caps !== null && !caps.tactile && !caps.encoders
-  useEffect(() => {
-    if (sensorless && useAppStore.getState().view === 'dashboard') {
-      useAppStore.getState().setView('3d')
-    }
-  }, [sensorless])
 
   const booting =
     !wsConnected || handState === null || BOOT_STATES.has(handState)
@@ -57,38 +40,35 @@ export default function App() {
       <ErrorBanner />
       {booting ? (
         // Some tabs stay reachable while the backend is up but no hand
-        // session exists: Teleop (test a camera/glove against the 3D ghost)
-        // and Motors (chain configuration happens at ASSEMBLY time, when
-        // there is no connectable hand at all). Hardware actions remain
-        // backend-gated.
-        wsConnected && (view === 'teleop' || view === 'motors') ? (
+        // session exists: Teleop (test a camera/glove against the 3D ghost),
+        // Motors (chain configuration happens at ASSEMBLY time, when there
+        // is no connectable hand at all) and Stats (lifetime usage history
+        // is persisted — readable with the hand unplugged). Hardware actions
+        // remain backend-gated.
+        wsConnected &&
+        (view === 'teleop' || view === 'motors' || view === 'stats') ? (
           <>
             {view === 'teleop' && <TeleopView />}
             {view === 'motors' && <MotorsView />}
+            {view === 'stats' && <StatsView />}
           </>
         ) : (
           <BootHero />
         )
       ) : (
         <>
-          {(view === 'dashboard' || view === '3d' || view === 'poses') && (
+          {(view === 'dashboard' || view === 'poses') && (
             <>
               <MaintenanceBanner />
               <CalibrationBanner />
             </>
           )}
           {view === 'dashboard' && <DashboardView />}
-          {view === '3d' && (
-            <Suspense
-              fallback={<div className="detecting-card">loading 3D view…</div>}
-            >
-              <ThreeDView />
-            </Suspense>
-          )}
           {view === 'poses' && <PosesView />}
           {view === 'teleop' && <TeleopView />}
           {view === 'setup' && <SetupView />}
           {view === 'motors' && <MotorsView />}
+          {view === 'stats' && <StatsView />}
         </>
       )}
     </div>

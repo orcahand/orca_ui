@@ -166,3 +166,72 @@ def test_hand_without_a_loop_is_unrestricted():
     telemetry, session = _build(ramping=True, feedback_loop=False)
     telemetry._slow_tick()
     assert session.hand.bus_reads == ["temp", "current"]
+
+
+# ----- measured-stream fallback for unhealthy encoders ---------------------------
+
+
+from orca_ui.hand.telemetry import ENCODER_RESTORE_WINDOWS  # noqa: E402
+from orca_ui.streaming import topics as T  # noqa: E402
+
+
+class _PayloadHub:
+    def __init__(self):
+        self.published: list[tuple[str, dict]] = []
+
+    def publish(self, topic, payload):
+        self.published.append((topic, payload))
+
+
+def _health(verdict, joint="index_mcp"):
+    return {"encoders": {"joints": {joint: {"verdict": verdict,
+                                            "reason": "test"}}}}
+
+
+def test_encoder_suppression_fast_to_condemn_slow_to_forgive():
+    telemetry, _ = _build()
+    telemetry._update_encoder_suppression(_health("parity"))
+    assert "index_mcp" in telemetry._enc_suppressed
+
+    # Clean windows one short of the threshold: still suppressed (flapping
+    # must not leak noise bursts).
+    for _ in range(ENCODER_RESTORE_WINDOWS - 1):
+        telemetry._update_encoder_suppression(_health("live"))
+        assert "index_mcp" in telemetry._enc_suppressed
+
+    # A relapse resets the streak entirely.
+    telemetry._update_encoder_suppression(_health("parity"))
+    for _ in range(ENCODER_RESTORE_WINDOWS - 1):
+        telemetry._update_encoder_suppression(_health("live"))
+        assert "index_mcp" in telemetry._enc_suppressed
+
+    telemetry._update_encoder_suppression(_health("live"))
+    assert telemetry._enc_suppressed == {}
+
+
+def test_suppression_annotates_health_and_filters_measured():
+    session = _Session()
+    hub = _PayloadHub()
+    telemetry = TelemetryService(_Service(session), hub, _Settings())
+
+    payload = _health("chip error")
+    telemetry._update_encoder_suppression(payload)
+    assert payload["encoders"]["suppressed"] == {
+        "index_mcp": "chip error: test"}
+
+    # The fast tick drops the distrusted joint from the measured publish and
+    # names it, so clients delete their stale copy and fall back.
+    telemetry._fast_tick()
+    measured = [p for t, p in hub.published if t == T.JOINTS_MEASURED]
+    assert measured and measured[-1]["angles"] == {}
+    assert measured[-1]["suppressed"] == ["index_mcp"]
+
+
+def test_healthy_encoders_publish_measured_untouched():
+    session = _Session()
+    hub = _PayloadHub()
+    telemetry = TelemetryService(_Service(session), hub, _Settings())
+    telemetry._fast_tick()
+    measured = [p for t, p in hub.published if t == T.JOINTS_MEASURED]
+    assert measured and measured[-1]["angles"] == {"index_mcp": 10.0}
+    assert "suppressed" not in measured[-1]

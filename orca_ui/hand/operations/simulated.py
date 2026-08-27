@@ -9,11 +9,24 @@ MAINTENANCE → reconnect) is exercised end-to-end.
 
 from __future__ import annotations
 
+import time
+
+from orca_ui.hand import calibration_log
 from orca_ui.hand.operations.base import OpContext, Operation
-from orca_ui.hand.operations.calibrate import validate_calibrate_params
+from orca_ui.hand.operations.calibrate import _now_iso, validate_calibrate_params
 from orca_ui.hand.operations.tension import RELEASE_PROMPT, validate_tension_params
 
 DEFAULT_STEP_S = 0.3
+_SIM_COUNTS_PER_REV = 16384
+_SIM_LSB_DEG = 360.0 / _SIM_COUNTS_PER_REV
+
+
+def _sim_count(joint: str) -> int:
+    """Deterministic fake magnet count — stable across runs (zero drift)."""
+    value = 7919
+    for ch in joint:
+        value = (value * 131 + ord(ch)) % _SIM_COUNTS_PER_REV
+    return value
 
 
 def _sim_step_duration(params: dict) -> float:
@@ -42,30 +55,83 @@ def _calibration_steps(config, joints: list[str] | None) -> list[dict]:
 
 def simulate_calibration(ctx: OpContext, config, joints: list[str] | None,
                          step_s: float, phase: str = "calibrating",
-                         detail_prefix: str = "") -> dict:
-    """Lease-free simulated calibration body (shared with the sim wizard)."""
+                         detail_prefix: str = "",
+                         force_wrist: bool = False) -> dict:
+    """Lease-free simulated calibration body (shared with the sim wizard).
+
+    Mirrors the real run's event stream — including synthetic (drift-free)
+    hardstop magnet counts for encoder-backed joints — and archives it to the
+    calibration history, so the mock exercises the same log the hardware
+    writes.
+    """
+    from orca_ui.hand.service import _encoder_sensed_joints
+
     steps = _calibration_steps(config, joints)
     total = len(steps)
     involved = sorted({j for step in steps for j in step})
+    encoder_backed = set(_encoder_sensed_joints(config))
+    events: list[dict] = []
+
+    def record(kind: str, **fields) -> None:
+        events.append({"t": round(time.time(), 3), "event": kind, **fields})
+
     ctx.set_phase(phase, progress=0.0,
                   detail=f"{detail_prefix}{total} steps")
     ctx.log(f"calibration started: {total} steps ({', '.join(involved)})")
+    record("calibration_started", steps=total, joints=involved)
 
+    started_at = _now_iso()
     directions_seen: dict[str, set] = {}
     calibrated: list[str] = []
-    for index, step in enumerate(steps):
-        step_joints = ", ".join(f"{j} {d}" for j, d in step.items())
-        ctx.set_detail(f"{detail_prefix}step {index + 1}/{total}: {step_joints}")
-        ctx.log(f"step {index + 1}/{total}: {step_joints}")
-        ctx.sleep(step_s)
-        for joint, direction in step.items():
-            seen = directions_seen.setdefault(joint, set())
-            seen.add(direction)
-            if seen == {"flex", "extend"}:
-                calibrated.append(joint)
-                ctx.log(f"joint calibrated: {joint} (ratio 0.0500)")
-        ctx.set_progress((index + 1) / max(total, 1))
-    ctx.log("calibration complete")
+    try:
+        for index, step in enumerate(steps):
+            step_joints = ", ".join(f"{j} {d}" for j, d in step.items())
+            ctx.set_detail(
+                f"{detail_prefix}step {index + 1}/{total}: {step_joints}")
+            ctx.log(f"step {index + 1}/{total}: {step_joints}")
+            record("step_started", index=index, total=total,
+                   joints=dict(step))
+            ctx.sleep(step_s)
+            for joint, direction in step.items():
+                seen = directions_seen.setdefault(joint, set())
+                seen.add(direction)
+                if seen == {"flex", "extend"}:
+                    calibrated.append(joint)
+                    ctx.log(f"joint calibrated: {joint} (ratio 0.0500)")
+                    record("joint_calibrated", joint=joint, ratio=0.05)
+                    if joint in encoder_backed:
+                        lower, upper = config.joint_roms_dict[joint]
+                        flex = _sim_count(joint)
+                        span = round((float(upper) - float(lower))
+                                     / _SIM_LSB_DEG)
+                        extend = (flex - span) % _SIM_COUNTS_PER_REV
+                        record("encoder_anchor_recorded", joint=joint,
+                               anchor_count=flex,
+                               anchor_angle_deg=float(upper))
+                        record("measured_rom_recorded", joint=joint,
+                               rom=[float(lower), float(upper)],
+                               deviation_deg=0.0,
+                               flex_count=flex, extend_count=extend)
+                        ctx.log(f"measured ROM for {joint}: "
+                                f"[{lower:.1f}, {upper:.1f}]° (Δ +0.0° vs "
+                                f"config) · magnets flex@{flex} "
+                                f"extend@{extend}")
+            ctx.set_progress((index + 1) / max(total, 1))
+        ctx.log("calibration complete")
+        record("calibration_done")
+    finally:
+        calibration_log.append_run(config.calibration_path, {
+            "started_at": started_at,
+            "finished_at": _now_iso(),
+            "joints": joints,
+            "force_wrist": force_wrist,
+            "anchor_pass": bool(encoder_backed),
+            "completed": len(calibrated) > 0 and events[-1].get("event")
+            == "calibration_done",
+            "error": None,
+            "simulated": True,
+            "events": events,
+        })
     return {
         "steps_done": total,
         "joints_calibrated": calibrated,
@@ -114,7 +180,8 @@ class SimulatedCalibrateOperation(Operation):
             ctx.sleep(self.params["step_duration_s"])
             return simulate_calibration(
                 ctx, supervisor.config, self.params["joints"],
-                self.params["step_duration_s"])
+                self.params["step_duration_s"],
+                force_wrist=self.params["force_wrist"])
         finally:
             supervisor.exit_maintenance()
 
