@@ -5,9 +5,12 @@ import { useEffect, useState } from 'react'
 import { api } from '../../api/rest'
 import type { Finger, TaxelGeometry } from '../../api/types'
 import { FINGERS } from '../../api/types'
+import { useSensorsHealth } from '../../hooks/useSensorsHealth'
 import { useStreamFrame } from '../../hooks/useStreamFrame'
 import { useAppStore } from '../../state/appStore'
 import { Panel } from '../common/Panel'
+import { StatusDot } from '../common/StatusDot'
+import { tactileDiagnosis } from '../monitor/monitorShared'
 import { FingerTaxelSvg } from './FingerTaxelSvg'
 import { ForceDial } from './ForceDial'
 import { funPlayer } from './funSounds'
@@ -29,6 +32,7 @@ export function TactilePanel() {
     musicScale,
   } = useAppStore((s) => s.tactile)
   const mode = control?.tactile_mode ?? 'combined'
+  const tacHealth = useSensorsHealth()?.tactile ?? null
 
   useEffect(() => {
     api.taxelGeometry().then(setGeometry).catch(() => setGeometry(null))
@@ -83,8 +87,62 @@ export function TactilePanel() {
   const showTaxels = mode === 'taxels' || mode === 'combined'
   const showForces = mode === 'resultant' || mode === 'combined'
 
+  const connected = tacHealth
+    ? Object.values(tacHealth.fingers).filter((f) => f.connected).length
+    : null
+
+  const toolbar = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      {tacHealth && (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+          {FINGERS.map((finger) => {
+            const info = tacHealth.fingers[finger]
+            const on = info?.connected ?? false
+            return (
+              <span
+                key={finger}
+                title={`${finger}: ${on ? `active, ${info.taxels} taxels` : 'not connected'} — click for details`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3,
+                }}
+              >
+                <StatusDot
+                  on={on}
+                  diagnosis={tactileDiagnosis(finger, on, info.taxels)}
+                />
+                <span
+                  style={{
+                    fontSize: 9,
+                    color: on ? 'var(--dim)' : 'var(--dimmer)',
+                  }}
+                >
+                  {finger.charAt(0).toUpperCase()}
+                </span>
+              </span>
+            )
+          })}
+          <span
+            style={{
+              fontSize: 9,
+              color:
+                connected === FINGERS.length ? 'var(--dim)' : 'var(--warn)',
+            }}
+          >
+            {connected}/{FINGERS.length} · {tacHealth.hz.toFixed(0)} Hz
+            {tacHealth.stream_rearms
+              ? ` · ${tacHealth.stream_rearms} rearms`
+              : ''}
+          </span>
+        </span>
+      )}
+      <TaxelControls />
+    </div>
+  )
+
   return (
-    <Panel title="Tactile Sensors" toolbar={<TaxelControls />}>
+    <Panel title="Tactile Sensors" toolbar={toolbar}>
       {showTaxels && geometry && (
         <div className="taxels-container">
           {FINGERS.map((finger: Finger) => {
@@ -95,6 +153,7 @@ export function TactilePanel() {
                 key={finger}
                 finger={finger}
                 positions={fingerGeometry.positions}
+                connected={tacHealth?.fingers[finger]?.connected}
               />
             )
           })}
@@ -103,7 +162,11 @@ export function TactilePanel() {
       {showForces && (
         <div className="forces-container" style={{ marginTop: showTaxels ? 10 : 0 }}>
           {FINGERS.map((finger) => (
-            <ForceDial key={finger} finger={finger} />
+            <ForceDial
+              key={finger}
+              finger={finger}
+              connected={tacHealth?.fingers[finger]?.connected}
+            />
           ))}
         </div>
       )}

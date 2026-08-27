@@ -3,9 +3,9 @@
 // expand (same prefix grouping as EncoderPanel) to per-joint checkboxes.
 // Also summarizes the per-joint calibration status from hand info.
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../../api/rest'
-import type { HandInfo, JointInfo } from '../../api/types'
+import type { CalibrationRun, HandInfo, JointInfo } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
 import {
   isOperationActive,
@@ -86,12 +86,62 @@ export function CalibrateCard() {
 
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
+  const [runs, setRuns] = useState<CalibrationRun[]>([])
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set())
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [redoWrist, setRedoWrist] = useState(false)
   // null = untouched: follow the first-time default (calibrate the sensors
   // only when some encoder-backed joint has no anchor yet).
   const [jointSensors, setJointSensors] = useState<boolean | null>(null)
+  // Per-run calibration-current overrides; empty = the config.yaml value.
+  const [calCurrentDraft, setCalCurrentDraft] = useState('')
+  const [wristCurrentDraft, setWristCurrentDraft] = useState('')
+
+  // Calibration history: fetched once, then again after each finished
+  // calibrate run (the run just appended a record).
+  const handledCalRun = useRef<string | null>(null)
+  useEffect(() => {
+    api
+      .calibrationHistory()
+      .then((r) => setRuns(r.runs))
+      .catch(() => undefined)
+  }, [])
+  useEffect(() => {
+    if (
+      operation?.kind === 'calibrate' &&
+      !isOperationActive(operation) &&
+      handledCalRun.current !== operation.run_id
+    ) {
+      handledCalRun.current = operation.run_id
+      api
+        .calibrationHistory()
+        .then((r) => setRuns(r.runs))
+        .catch(() => undefined)
+    }
+  }, [operation])
+
+  // Latest rejected measured-ROM per joint, from the history — surfaced
+  // where an accepted Δ is missing so no joint's delta is silently hidden.
+  const rejectedRoms = useMemo(() => {
+    const map = new Map<
+      string,
+      { deltaDeg: number; spanDeg: number; when: string }
+    >()
+    for (const run of runs) {
+      for (const event of run.events) {
+        if (event.event !== 'measured_rom_rejected' || !event.joint) continue
+        if (!map.has(event.joint))
+          map.set(event.joint, {
+            // deviation_deg is at the lower hardstop; the Δ shown in the
+            // joint status is measured minus configured travel = its negation.
+            deltaDeg: -(event.deviation_deg ?? 0),
+            spanDeg: event.span_deg ?? 0,
+            when: run.finished_at,
+          })
+      }
+    }
+    return map
+  }, [runs])
 
   const joints = useMemo(() => handInfo?.joints ?? [], [handInfo])
   const missingAnchors = handInfo?.calibration.missing_anchors ?? []
@@ -112,6 +162,23 @@ export function CalibrateCard() {
 
   const needing = joints.filter((j) => statusMark(j).cls === 'bad')
   const hasWrist = joints.some((j) => j.id === 'wrist')
+
+  // Mirrors the backend bounds: 50 mA floor (below it the sweep stalls on
+  // friction and records false limits), configured max_current ceiling.
+  const maxCurrent = handInfo?.control.max_current ?? 2000
+  const calDefault = handInfo?.calibration.calibration_current ?? null
+  const wristDefault = handInfo?.calibration.wrist_calibration_current ?? null
+  const parseCurrent = (
+    draft: string,
+  ): { value: number | null; valid: boolean } => {
+    if (draft.trim() === '') return { value: null, valid: true }
+    const value = parseInt(draft, 10)
+    const valid = Number.isFinite(value) && value >= 50 && value <= maxCurrent
+    return { value: valid ? value : null, valid }
+  }
+  const calCurrent = parseCurrent(calCurrentDraft)
+  const wristCurrent = parseCurrent(wristCurrentDraft)
+  const currentsValid = calCurrent.valid && wristCurrent.valid
   // Picking the wrist by hand is the explicit ask to re-run it — without the
   // force flag an already-calibrated wrist is skipped and the run does nothing.
   const wristSelected = selected.has('wrist')
@@ -138,6 +205,12 @@ export function CalibrateCard() {
         joints: selected.size > 0 ? [...selected] : null,
         force_wrist: redoWrist || wristSelected,
         ...(hasEncoderJoints ? { calibrate_joint_sensors: sensorsOn } : {}),
+        ...(calCurrent.value !== null && calCurrent.value !== calDefault
+          ? { calibration_current: calCurrent.value }
+          : {}),
+        ...(wristCurrent.value !== null && wristCurrent.value !== wristDefault
+          ? { wrist_calibration_current: wristCurrent.value }
+          : {}),
       })
       .catch(fail)
 
@@ -201,8 +274,13 @@ export function CalibrateCard() {
           <div className="setup-card-row">
             <button
               className="btn btn-primary"
-              disabled={gate.blocked}
-              title={gate.reason ?? undefined}
+              disabled={gate.blocked || !currentsValid}
+              title={
+                gate.reason ??
+                (!currentsValid
+                  ? `calibration current must be 50..${maxCurrent} mA`
+                  : undefined)
+              }
               onClick={start}
             >
               {selected.size > 0
@@ -314,6 +392,97 @@ export function CalibrateCard() {
                     </p>
                   </>
                 )}
+                <span className="setup-section-title">Calibration current</span>
+                <p className="setup-copy dim">
+                  How hard the motors press into the hardstops during the
+                  sweep. Lower is gentler on tendons and hardstops; too low
+                  stalls on friction before the true stop and records a short
+                  range. Applies to this run only — edit calibration_current
+                  in config.yaml to make it permanent.
+                </p>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 14,
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    fontSize: 10,
+                  }}
+                >
+                  <label
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5,
+                    }}
+                  >
+                    <span style={{ color: 'var(--dim)' }}>fingers</span>
+                    <input
+                      type="number"
+                      min={50}
+                      max={maxCurrent}
+                      step={10}
+                      value={calCurrentDraft}
+                      placeholder={calDefault !== null ? String(calDefault) : ''}
+                      onChange={(e) => setCalCurrentDraft(e.target.value)}
+                      style={{
+                        width: 62,
+                        borderColor: calCurrent.valid
+                          ? undefined
+                          : 'var(--err)',
+                      }}
+                    />
+                    <span style={{ color: 'var(--dim)' }}>mA</span>
+                  </label>
+                  {hasWrist && (
+                    <label
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                      }}
+                    >
+                      <span style={{ color: 'var(--dim)' }}>wrist</span>
+                      <input
+                        type="number"
+                        min={50}
+                        max={maxCurrent}
+                        step={10}
+                        value={wristCurrentDraft}
+                        placeholder={
+                          wristDefault !== null ? String(wristDefault) : ''
+                        }
+                        onChange={(e) => setWristCurrentDraft(e.target.value)}
+                        style={{
+                          width: 62,
+                          borderColor: wristCurrent.valid
+                            ? undefined
+                            : 'var(--err)',
+                        }}
+                      />
+                      <span style={{ color: 'var(--dim)' }}>mA</span>
+                    </label>
+                  )}
+                  {(calCurrentDraft || wristCurrentDraft) && (
+                    <button
+                      className="setup-clear"
+                      onClick={() => {
+                        setCalCurrentDraft('')
+                        setWristCurrentDraft('')
+                      }}
+                    >
+                      use config defaults
+                    </button>
+                  )}
+                </div>
+                {!currentsValid && (
+                  <p
+                    className="setup-option-hint"
+                    style={{ color: 'var(--err)' }}
+                  >
+                    50..{maxCurrent} mA (the configured max_current caps it)
+                  </p>
+                )}
               </>
             )}
           </div>
@@ -344,7 +513,7 @@ export function CalibrateCard() {
                 <div key={joint.id} className="joint-status-row">
                   <span>{joint.id}</span>
                   <span style={{ display: 'inline-flex', gap: 8 }}>
-                    {joint.rom_delta != null && (
+                    {joint.rom_delta != null ? (
                       <span
                         style={{
                           color:
@@ -363,7 +532,34 @@ export function CalibrateCard() {
                         Δ {joint.rom_delta >= 0 ? '+' : ''}
                         {joint.rom_delta.toFixed(1)}°
                       </span>
-                    )}
+                    ) : rejectedRoms.has(joint.id) ? (
+                      <span
+                        style={{ color: 'var(--err)', fontSize: 10 }}
+                        title={
+                          `the last sweep measured ${rejectedRoms.get(joint.id)!.spanDeg.toFixed(1)}° of travel — ` +
+                          `${Math.abs(rejectedRoms.get(joint.id)!.deltaDeg).toFixed(1)}° ` +
+                          `${rejectedRoms.get(joint.id)!.deltaDeg >= 0 ? 'more' : 'less'} than the configured range, ` +
+                          'beyond the ±8° sanity limit, so the measurement was rejected and the config range kept ' +
+                          `(${rejectedRoms.get(joint.id)!.when}). ` +
+                          'Check the hardstops and the joint_roms config entry, then recalibrate.'
+                        }
+                      >
+                        Δ {rejectedRoms.get(joint.id)!.deltaDeg >= 0 ? '+' : ''}
+                        {rejectedRoms.get(joint.id)!.deltaDeg.toFixed(1)}°
+                        {' rejected'}
+                      </span>
+                    ) : joint.encoder_backed ? (
+                      <span
+                        style={{ color: 'var(--dimmer)', fontSize: 10 }}
+                        title={
+                          'no measured range recorded for this joint — the last sweep either predates ' +
+                          'measured-ROM support or rejected the measurement before history logging existed. ' +
+                          'Run Calibrate with the joint sensors on to measure it.'
+                        }
+                      >
+                        Δ —
+                      </span>
+                    ) : null}
                     <span
                       className={`joint-status-mark ${mark.cls}`}
                       title={mark.title}
@@ -378,6 +574,8 @@ export function CalibrateCard() {
         )}
       </div>
 
+      {/* The calibration log (with the hardstop chart) lives on the Stats
+          view; the fetched runs still feed the joint-status deltas above. */}
       <RomFrameSection handInfo={handInfo} joints={joints} />
     </div>
   )

@@ -11,6 +11,8 @@ import logging
 import threading
 from typing import Callable
 
+import numpy as np
+
 from orca_core import JointGains
 
 from pathlib import Path
@@ -36,6 +38,13 @@ TACTILE_MODES = {
 # Direct motor moves are clamped to this distance from the current position
 # per command — sliders nudge, they don't teleport.
 MAX_DIRECT_MOTOR_STEP_RAD = 0.8
+
+# One-shot moves (apply pose, go neutral): distance-scaled glide instead of a
+# fixed duration, so a far target never starts at whip speed.
+_MOVE_SPEED_DEG_S = 90.0
+_MOVE_STEP_S = 0.02
+_MOVE_MIN_S = 0.5
+_MOVE_MAX_S = 3.0
 
 # Dynamixel X-series Hardware Error Status bits. Any latched bit makes the
 # motor refuse to energize until rebooted. The UI decodes the bits to human-readable names for display.
@@ -277,9 +286,18 @@ class HandService:
         connect ladder has already dropped to a non-feedback tier by then, so
         joint sensing is gone from the UI with no other explanation.
         """
+        config = self.supervisor.config
         state: dict = {"motors": None, "joint_feedback": None,
                        "missing_anchors": [], "needs_calibration": False,
-                       "hint": None}
+                       "hint": None,
+                       # config.yaml defaults for the sweep's hardstop
+                       # current — what a per-run override replaces.
+                       "calibration_current":
+                           int(getattr(config, "calibration_current", 0))
+                           or None,
+                       "wrist_calibration_current":
+                           int(getattr(config, "wrist_calibration_current", 0))
+                           or None}
         if session is None or not session.caps.motors:
             return state
         try:
@@ -569,9 +587,13 @@ class HandService:
         from orca_ui.streaming import topics as T
         self._publish_topic(T.CONTROL_STATE, self.control_state())
 
-    def enable_torque(self) -> dict:
+    def enable_torque(self, *, from_operation: bool = False) -> dict:
+        """``from_operation`` skips the manual-control gate: the running
+        operation owns the control source, so a demo enabling torque for
+        itself is not a second client fighting the owner."""
         session = self._require_motors()
-        self._require_manual_control()
+        if not from_operation:
+            self._require_manual_control()
         if session.caps.feedback_loop:
             # Re-anchor first so enabling torque never lurches toward a stale
             # target (the hand may have been posed by hand while limp).
@@ -720,13 +742,29 @@ class HandService:
     def go_neutral(self) -> None:
         session = self._require_torque()
         self._require_manual_control()
-        self.worker.submit_op(session.hand.set_neutral_position)
+        neutral = {j: float(v)
+                   for j, v in session.hand.config.neutral_position.items()}
+        num_steps = self._move_steps(session, neutral)
+        self.worker.submit_op(
+            lambda: session.hand.set_neutral_position(
+                num_steps=num_steps, step_size=_MOVE_STEP_S))
         with self._state_lock:
-            self._targets.update({
-                j: float(v)
-                for j, v in session.hand.config.neutral_position.items()
-            })
+            self._targets.update(neutral)
         self._publish_targets()
+
+    def _move_steps(self, session, target: dict[str, float]) -> int:
+        """Interpolation step count for a one-shot move, scaled to the
+        distance so a far pose glides instead of snapping: the fixed-duration
+        default turns a 90° travel into a tendon-whipping start."""
+        try:
+            current = session.sampled_joints() or {}
+        except Exception:
+            current = {}
+        jump = max((abs(v - current[j]) for j, v in target.items()
+                    if j in current), default=0.0)
+        duration = min(_MOVE_MAX_S,
+                       max(_MOVE_MIN_S, jump / _MOVE_SPEED_DEG_S))
+        return max(1, round(duration / _MOVE_STEP_S))
 
     # ----- feedback-loop gains -------------------------------------------------
     #
@@ -910,9 +948,13 @@ class HandService:
             ],
         }
 
-    def set_direct_motor_mode(self, enabled: bool) -> dict:
+    def set_direct_motor_mode(self, enabled: bool, *,
+                              from_operation: bool = False) -> dict:
+        """``from_operation`` skips the manual-control gate: a motor-space
+        replay owns the control source and arms/disarms around its run."""
         session = self._require_motors()
-        self._require_manual_control()
+        if not from_operation:
+            self._require_manual_control()
         if not enabled:
             self._exit_direct_motor_mode()
             return {"direct_mode": False}
@@ -967,7 +1009,9 @@ class HandService:
                 f"refusing a {abs(position - current):.2f} rad move — direct "
                 f"moves are capped at {MAX_DIRECT_MOTOR_STEP_RAD} rad from "
                 "the current position")
-        hand.write_motor_pos([motor_id], [position])
+        # The hardware motor client divides positions by its scale — needs
+        # an array, not a list.
+        hand.write_motor_pos([motor_id], np.asarray([position]))
         return {"id": motor_id, "position": position, "previous": current}
 
     # ----- poses & demos -------------------------------------------------------
@@ -1033,9 +1077,10 @@ class HandService:
             raise ServiceError(f"no pose named {name!r}", status_code=404)
         if not angles:
             raise ServiceError(f"pose {name!r} is empty")
+        num_steps = self._move_steps(session, angles)
         self.worker.submit_op(
             lambda: session.hand.set_joint_positions(
-                angles, num_steps=25, step_size=0.02))
+                angles, num_steps=num_steps, step_size=_MOVE_STEP_S))
         with self._state_lock:
             self._targets.update(angles)
         self._publish_targets()

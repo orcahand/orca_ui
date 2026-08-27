@@ -45,6 +45,12 @@ PERIOD_SMOOTHING = 0.3
 # instead of parked on its target. Costs this many frames of lag instead of one.
 RAMP_SLACK = 1.5
 
+# Speed cap for the ramp: a lone large jump (typed angle, slider grab far from
+# the pose, MCP set_joints) would otherwise ramp over one command gap — tens of
+# milliseconds — and whip the tendons. Continuous streams move a fraction of a
+# degree per frame, so the cap only stretches genuine jumps.
+MAX_TARGET_SPEED_DEG_S = 120.0
+
 
 class CommandWorker(threading.Thread):
     def __init__(
@@ -69,6 +75,9 @@ class CommandWorker(threading.Thread):
         self._commanded_at = 0.0
         self._period = DEFAULT_COMMAND_PERIOD_S
         self._period_seeded = False
+        # Duration of the active ramp: the measured command gap, stretched
+        # when the jump is too large for MAX_TARGET_SPEED_DEG_S.
+        self._span = DEFAULT_COMMAND_PERIOD_S * RAMP_SLACK
         # Last value actually written per joint — where the next ramp for that
         # joint starts. Only joints under an active ramp are ever written, so
         # this never resurrects a stale target for a joint nobody commanded.
@@ -85,6 +94,13 @@ class CommandWorker(threading.Thread):
                 "command_period_ms": round(self._period * 1000, 2),
                 "ramping": bool(self._to),
             }
+
+    def applied_targets(self) -> dict[str, float]:
+        """Last pose actually written per joint — the reference the fault
+        monitor compares the sampled pose against. Ramp destinations still in
+        flight are deliberately absent until written."""
+        with self._lock:
+            return dict(self._applied)
 
     def submit_targets(self, angles: dict[str, float]) -> None:
         now = self._clock()
@@ -110,6 +126,10 @@ class CommandWorker(threading.Thread):
                     joint, self._applied.get(joint, value))
                 self._to[joint] = value
             self._commanded_at = now
+            jump = max((abs(self._to[j] - self._from[j]) for j in angles),
+                       default=0.0)
+            self._span = max(self._period * RAMP_SLACK,
+                             jump / MAX_TARGET_SPEED_DEG_S)
         self._wake.set()
 
     def submit_op(self, op: Callable[[], None]) -> None:
@@ -132,6 +152,7 @@ class CommandWorker(threading.Thread):
             self._commanded_at = 0.0
             self._period = DEFAULT_COMMAND_PERIOD_S
             self._period_seeded = False
+            self._span = DEFAULT_COMMAND_PERIOD_S * RAMP_SLACK
 
     def shutdown(self) -> None:
         self._stop_event.set()
@@ -145,7 +166,7 @@ class CommandWorker(threading.Thread):
         the lock."""
         if not self._to:
             return {}
-        span = self._period * RAMP_SLACK
+        span = self._span
         if span <= 0.0:
             return dict(self._to)
         # Clamped both ways: the caller samples the clock before taking the

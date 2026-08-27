@@ -1,12 +1,64 @@
 // Joint-encoder panel: ROM bar gauges grouped by finger, per-joint
-// expandable sparklines (collapsed by default, persisted).
+// expandable sparklines (collapsed by default, persisted), with the
+// electrical monitor's health verdict fused in as a dot per joint.
 
 import { useState } from 'react'
-import type { JointInfo } from '../../api/types'
+import type { EncoderJointHealth, JointInfo } from '../../api/types'
+import { useSensorsHealth } from '../../hooks/useSensorsHealth'
 import { useAppStore } from '../../state/appStore'
+import { Diagnosable } from '../common/Diagnosable'
 import { Panel } from '../common/Panel'
+import { encoderDiagnosis, VERDICT_COLOR } from '../monitor/monitorShared'
 import { JointSparkline } from './JointSparkline'
 import { RomBarGauge } from './RomBarGauge'
+
+// Windowed health verdict from sensors.health (1 Hz): green = live frames,
+// amber = parity errors, red = chip angle error, grey = no chip answering.
+// A suppressed sensor (distrusted, measured stream dropped) stays amber
+// even while its windows read clean. Clickable — the popover says what is
+// wrong and what to check.
+function VerdictDot({
+  joint,
+  health,
+  suppressedReason,
+  restoreAfterS,
+}: {
+  joint: string
+  health: EncoderJointHealth | undefined
+  suppressedReason?: string | null
+  restoreAfterS?: number
+}) {
+  if (!health) return null
+  const suppressed = suppressedReason != null
+  return (
+    <Diagnosable
+      diagnoses={[
+        encoderDiagnosis(joint, health, suppressedReason, restoreAfterS),
+      ]}
+      label={`diagnose ${joint} joint sensor`}
+    >
+      <span
+        title={
+          suppressed
+            ? 'sensor distrusted — using the motor estimate; click for details'
+            : health.reason === 'ok'
+              ? 'encoder live — click for details'
+              : `${health.verdict}: ${health.reason} — click for details`
+        }
+        style={{
+          width: 7,
+          height: 7,
+          borderRadius: '50%',
+          background: suppressed
+            ? 'var(--warn)'
+            : (VERDICT_COLOR[health.verdict] ?? 'var(--dimmer)'),
+          flexShrink: 0,
+          display: 'inline-block',
+        }}
+      />
+    </Diagnosable>
+  )
+}
 
 const GROUP_ORDER = ['wrist', 'thumb', 'index', 'middle', 'ring', 'pinky']
 
@@ -27,6 +79,7 @@ export function EncoderPanel() {
   const handInfo = useAppStore((s) => s.handInfo)
   const showTarget = useAppStore((s) => s.showSparklineTarget)
   const setShowTarget = useAppStore((s) => s.setShowSparklineTarget)
+  const encHealth = useSensorsHealth()?.encoders ?? null
   const [expanded, setExpanded] = useState<Set<string>>(loadExpanded)
 
   if (!handInfo) return null
@@ -52,6 +105,21 @@ export function EncoderPanel() {
 
   const toolbar = (
     <div className="toolbar">
+      {encHealth && (
+        <span
+          title="encoder slots streaming healthy frames (all slots, including
+joints not listed below) · stream rate"
+          style={{
+            fontSize: 9,
+            color:
+              encHealth.live === encHealth.total ? 'var(--dim)' : 'var(--warn)',
+            marginRight: 8,
+            cursor: 'help',
+          }}
+        >
+          {encHealth.live}/{encHealth.total} live · {encHealth.hz.toFixed(0)} Hz
+        </span>
+      )}
       <label
         className="toggle-label"
         title="overlay the commanded target (purple) on expanded history charts"
@@ -85,6 +153,12 @@ export function EncoderPanel() {
           {groups.get(group)!.map((joint) => (
             <div key={joint.id}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <VerdictDot
+                  joint={joint.id}
+                  health={encHealth?.joints[joint.id]}
+                  suppressedReason={encHealth?.suppressed?.[joint.id] ?? null}
+                  restoreAfterS={encHealth?.restore_after_s}
+                />
                 <button
                   onClick={() => toggle(joint.id)}
                   title="toggle history"

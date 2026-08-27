@@ -638,27 +638,35 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
                         "trajectory name (record); required for those "
                         "kinds")] = None,
         speed: Annotated[float, Field(
-            description="replay only; one of 0.5, 1.0, 2.0",
-            json_schema_extra={"enum": [0.5, 1.0, 2.0]})] = 1.0,
+            description="replay only; one of 0.5, 1.0, 2.0, 4.0, 8.0",
+            json_schema_extra={"enum": [0.5, 1.0, 2.0, 4.0, 8.0]})] = 1.0,
         loop: Annotated[bool, Field(
             description="replay/demo: run until stopped — prefer cycles for "
                         "unattended runs")] = False,
         cycles: Annotated[int, Field(ge=1, le=10,
                                      description="demo only")] = 1,
-        mode: Annotated[Literal["continuous", "waypoints"], Field(
-            description="record only")] = "continuous",
+        mode: Annotated[Literal["continuous", "waypoints",
+                                "motor_waypoints"], Field(
+            description="record only; motor_waypoints captures RAW motor "
+                        "positions (replays as direct motor stepping, "
+                        "calibrated hands only)")] = "continuous",
         frequency: Annotated[float, Field(ge=1, le=60,
                                           description="record only, Hz")] = 50.0,
         joints: Annotated[list[str] | None, Field(
             description="calibrate only: subset of joints (null = all)")]
         = None,
+        move_motors: Annotated[bool, Field(
+            description="tension only: false skips the winding motion and "
+                        "goes straight to the hold (the --no-move-motors "
+                        "flow)")] = True,
         confirm: Annotated[bool, Field(
             description="required for calibrate/tension on real hardware; "
                         "ignored on mock")] = False,
     ) -> dict:
         """Start a long-running operation; returns a snapshot immediately —
         then poll/wait with orca_get_operation(wait_s=...). One operation at
-        a time; needs manual control (replay/demo also need torque).
+        a time; needs manual control (replay also needs torque; demo enables
+        torque itself and, if it was off before, disables it afterwards).
 
         record: DISABLES torque and takes control; a human physically poses
         the hand. Finish with orca_send_operation_input(value='save') to
@@ -671,10 +679,10 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
             raise BackendError(
                 f"kind '{kind}' requires name= (orca_list_library shows "
                 "trajectories and demos)")
-        if kind == "replay" and speed not in (0.5, 1.0, 2.0):
+        if kind == "replay" and speed not in (0.5, 1.0, 2.0, 4.0, 8.0):
             raise BackendError(
                 f"speed={speed} is not supported — the backend accepts "
-                "exactly 0.5, 1.0, or 2.0")
+                "exactly 0.5, 1.0, 2.0, 4.0, or 8.0")
         if kind == "calibrate":
             gate = await confirm_gate(state, confirm, CALIBRATE_WHAT)
         elif kind == "tension":
@@ -690,6 +698,8 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
             params = {"name": name, "mode": mode, "frequency": frequency}
         elif kind == "calibrate" and joints:
             params = {"joints": joints}
+        elif kind == "tension":
+            params = {"move_motors": move_motors}
         snap = (await backend.post(f"/api/operation/{kind}/start",
                                    {"params": params})).get("operation")
         payload: dict = {"ok": True, "operation": snap}

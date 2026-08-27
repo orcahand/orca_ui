@@ -93,6 +93,43 @@ def test_simulated_calibrate_full_run(client):
     _wait_reconnected(client)
 
 
+def test_calibrate_appends_history_with_magnet_counts(client):
+    assert client.get("/api/calibration/history").json()["runs"] == []
+    client.post("/api/operation/calibrate/start", json={"params": FAST})
+    _wait_op_state(client, "done", timeout=20.0)
+    _wait_reconnected(client)
+
+    runs = client.get("/api/calibration/history").json()["runs"]
+    assert len(runs) == 1
+    run = runs[0]
+    assert run["completed"] is True
+    assert run["joints"] is None
+    kinds = {e["event"] for e in run["events"]}
+    assert "calibration_started" in kinds
+    assert "calibration_done" in kinds
+
+    # Encoder-backed joints carry the magnet counts sampled at both
+    # hardstops — the drift-tracking payload.
+    roms = [e for e in run["events"] if e["event"] == "measured_rom_recorded"]
+    assert roms, "no measured_rom_recorded events archived"
+    for event in roms:
+        assert 0 <= event["flex_count"] < 16384
+        assert 0 <= event["extend_count"] < 16384
+
+    # A second run appends (newest first) and the fake magnets are stable:
+    # zero drift between runs.
+    client.post("/api/operation/calibrate/start", json={"params": FAST})
+    _wait_op_state(client, "done", timeout=20.0)
+    _wait_reconnected(client)
+    runs = client.get("/api/calibration/history").json()["runs"]
+    assert len(runs) == 2
+    first = {e["joint"]: e for e in roms}
+    for event in runs[0]["events"]:
+        if event["event"] != "measured_rom_recorded":
+            continue
+        assert event["flex_count"] == first[event["joint"]]["flex_count"]
+
+
 def test_simulated_calibrate_subset(client):
     response = client.post(
         "/api/operation/calibrate/start",
@@ -113,6 +150,44 @@ def test_calibrate_unknown_joint_rejected(client):
     assert _state(client) == "connected"   # nothing was scheduled
 
 
+def test_calibrate_current_override_accepted(client):
+    response = client.post(
+        "/api/operation/calibrate/start",
+        json={"params": {**FAST, "calibration_current": 150,
+                         "wrist_calibration_current": 80}})
+    assert response.status_code == 200
+    snapshot = _wait_op_state(client, "done", timeout=20.0)
+    assert snapshot["params"]["calibration_current"] == 150
+    assert snapshot["params"]["wrist_calibration_current"] == 80
+    _wait_reconnected(client)
+
+
+def test_calibrate_current_override_bounds(client):
+    # Below the 50 mA floor: the sweep would stall on friction.
+    response = client.post(
+        "/api/operation/calibrate/start",
+        json={"params": {"calibration_current": 20}})
+    assert response.status_code == 400
+    assert "50" in response.json()["detail"]
+    # Above the configured max_current ceiling.
+    response = client.post(
+        "/api/operation/calibrate/start",
+        json={"params": {"calibration_current": 100000}})
+    assert response.status_code == 400
+    # Not a number.
+    response = client.post(
+        "/api/operation/calibrate/start",
+        json={"params": {"calibration_current": "lots"}})
+    assert response.status_code == 400
+    assert _state(client) == "connected"   # nothing was scheduled
+
+
+def test_hand_info_carries_calibration_current_defaults(client):
+    calibration = client.get("/api/hand/info").json()["calibration"]
+    assert calibration["calibration_current"] > 0
+    assert calibration["wrist_calibration_current"] > 0
+
+
 def test_simulated_tension_hold_release(client):
     client.post("/api/operation/tension/start", json={"params": FAST})
     snapshot = _wait_op_state(client, "awaiting_input")
@@ -125,6 +200,22 @@ def test_simulated_tension_hold_release(client):
     snapshot = _wait_op_state(client, "done")
     assert snapshot["result"] == {"released": True}
     assert snapshot["phase"] == "released"
+    _wait_reconnected(client)
+
+
+def test_tension_without_motor_movement_goes_straight_to_hold(client):
+    # The --no-move-motors flow: no winding/ramp phases, just the stall-hold.
+    client.post("/api/operation/tension/start",
+                json={"params": {**FAST, "move_motors": False}})
+    snapshot = _wait_op_state(client, "awaiting_input")
+    assert snapshot["phase"] == "holding"
+
+    log = client.get("/api/operation/log").json()
+    assert not any("winding" in e["line"] for e in log["lines"])
+
+    client.post("/api/operation/input", json={"value": "Release"})
+    snapshot = _wait_op_state(client, "done")
+    assert snapshot["result"] == {"released": True}
     _wait_reconnected(client)
 
 

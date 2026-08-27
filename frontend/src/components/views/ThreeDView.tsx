@@ -1,4 +1,6 @@
-// 3D view: URDF hand scene + the same motor panel as the dashboard.
+// The dashboard's 3D block: URDF hand scene with the motor panel beside it.
+// Not a tab of its own — DashboardView lazy-loads it so three.js stays out
+// of the shell bundle.
 
 import { useEffect, useState } from 'react'
 import { api } from '../../api/rest'
@@ -79,7 +81,11 @@ export function ThreeDView() {
         title={`3D View · ${assets.metadata.side} hand`}
         toolbar={<SceneControls />}
       >
-        <div style={{ height: 'calc(100vh - 240px)', minHeight: 480 }}>
+        {/* Capped: the health strip above and the encoder/tactile panels
+            below must stay reachable without a marathon scroll. */}
+        <div
+          style={{ height: 'min(calc(100vh - 320px), 620px)', minHeight: 420 }}
+        >
           <HandScene assets={assets} joints={handInfo.joints} caps={caps} />
         </div>
       </Panel>

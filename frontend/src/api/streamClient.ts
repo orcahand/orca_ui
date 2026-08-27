@@ -13,8 +13,10 @@ import {
 import { api } from './rest'
 import type {
   ControlState,
+  MotorsFaults,
   OperationLogPayload,
   OperationSnapshot,
+  SensorsHealth,
   ServerMessage,
   StatusSnapshot,
   TeleopInstallState,
@@ -137,6 +139,56 @@ async function resyncControlPlanes(): Promise<void> {
   }
 }
 
+// Event-log entries for measured-stream fallback transitions: which joint
+// sensor went bad (and why), and when its measured tracking came back.
+let lastSuppressed: Record<string, string> = {}
+function logSuppressionChanges(health: SensorsHealth): void {
+  const suppressed = health.encoders?.suppressed ?? {}
+  const push = useEventLogStore.getState().pushEvent
+  for (const [joint, reason] of Object.entries(suppressed)) {
+    if (!(joint in lastSuppressed)) {
+      push(
+        'error',
+        `${joint} joint sensor unhealthy (${reason}) — measured stream ` +
+          'dropped; 3D model and joint displays fall back to the motor ' +
+          'estimate',
+      )
+    }
+  }
+  for (const joint of Object.keys(lastSuppressed)) {
+    if (!(joint in suppressed)) {
+      push(
+        'status',
+        `${joint} joint sensor reads clean again — measured tracking restored`,
+      )
+    }
+  }
+  lastSuppressed = suppressed
+}
+
+// Event-log entries for adherence transitions: which motor stopped following
+// its commanded target, and when it recovered.
+let lastStalled: Record<string, boolean> = {}
+function logFaultChanges(faults: MotorsFaults): void {
+  const push = useEventLogStore.getState().pushEvent
+  const next: Record<string, boolean> = {}
+  for (const [id, motor] of Object.entries(faults.motors)) {
+    const stalled = motor.tracking !== null && !motor.tracking.following
+    next[id] = stalled
+    const label = `motor ${id}${motor.joint ? ` (${motor.joint})` : ''}`
+    if (stalled && !lastStalled[id]) {
+      push(
+        'error',
+        `${label} is not following its command — off by ` +
+          `${motor.tracking!.deviation_deg?.toFixed(1) ?? '?'}°`,
+      )
+    } else if (!stalled && lastStalled[id]) {
+      push('status', `${label} is following its command again`)
+    }
+  }
+  lastStalled = next
+}
+
 function dispatch(message: ServerMessage): void {
   const { type, data, t } = message
   counters[type] = (counters[type] ?? 0) + 1
@@ -145,6 +197,12 @@ function dispatch(message: ServerMessage): void {
     case TOPICS.jointsMeasured: {
       const angles = data.angles as Record<string, number>
       Object.assign(latest.joints.measured, angles)
+      // Joints with a distrusted encoder are dropped server-side; delete
+      // any stale value we still hold so the estimate fallback actually
+      // takes over instead of a frozen last-noisy reading.
+      for (const joint of (data.suppressed as string[] | undefined) ?? []) {
+        delete latest.joints.measured[joint]
+      }
       latest.joints.tMeasured = t ?? Date.now()
       pushMeasuredHistory(angles, latest.joints.tMeasured)
       markDirty()
@@ -176,12 +234,28 @@ function dispatch(message: ServerMessage): void {
     case TOPICS.motorsTelemetry:
       latest.motors.temps = data.temps as Record<string, number>
       latest.motors.currents = data.currents as Record<string, number>
+      latest.motors.maxTempC =
+        (data.max_temp_c as number | undefined) ?? latest.motors.maxTempC
       markDirty()
       break
+    case TOPICS.motorsFaults: {
+      const faults = data as unknown as MotorsFaults
+      logFaultChanges(faults)
+      latest.motors.faults = faults
+      markDirty()
+      break
+    }
     case TOPICS.stats:
       latest.stats = data
       markDirty()
       break
+    case TOPICS.sensorsHealth: {
+      const health = data as unknown as SensorsHealth
+      logSuppressionChanges(health)
+      latest.health = health
+      markDirty()
+      break
+    }
     case TOPICS.status: {
       const status = data as unknown as StatusSnapshot
       const { status: previous, handInfo } = useAppStore.getState()

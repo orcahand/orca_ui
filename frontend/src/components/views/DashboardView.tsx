@@ -1,12 +1,20 @@
-// Capability-driven dashboard: tactile full-width, encoders + motors beneath.
-// Pre-session states never reach here — App renders the BootHero instead.
+// The one main view: electrical health strip, then the 3D scene with the
+// motor controls beside it (the only Motor Control panel — the old separate
+// 3D tab is merged in here), encoders, and the tactile sensors at the
+// bottom. Pre-session states never reach here — App renders the BootHero.
 
+import { lazy, Suspense } from 'react'
 import { useAppStore } from '../../state/appStore'
 import { EncoderPanel } from '../encoders/EncoderPanel'
 import { EncoderUnavailableCard } from '../encoders/EncoderUnavailableCard'
-import { MotorPanel } from '../motors/MotorPanel'
+import { HealthSummary } from '../monitor/HealthSummary'
 import { TactilePanel } from '../tactile/TactilePanel'
 import { TeleopStatusCard } from '../teleop/TeleopStatusCard'
+
+// three.js only loads when the dashboard first renders, not with the shell.
+const SceneBlock = lazy(() =>
+  import('./ThreeDView').then((m) => ({ default: m.ThreeDView })),
+)
 
 export function DashboardView() {
   const status = useAppStore((s) => s.status)
@@ -16,35 +24,25 @@ export function DashboardView() {
   // the view says why; there's nothing live to draw.
   if (!caps) return null
 
-  // A declared-but-missing encoder tier still occupies its column — the
-  // placeholder explains the absence in situ rather than leaving a gap.
+  // A declared-but-missing encoder tier still gets a card — the placeholder
+  // explains the absence in situ rather than leaving a gap.
   const encoderSlot = caps.encoders || Boolean(caps.declared.encoders)
-  const twoColumns = encoderSlot && caps.motors
 
   return (
     <>
       <TeleopStatusCard />
-      {caps.tactile && <TactilePanel />}
-      <div
-        style={
-          twoColumns
-            ? {
-                display: 'grid',
-                gridTemplateColumns:
-                  'repeat(auto-fit, minmax(480px, 1fr))',
-                gap: 12,
-                alignItems: 'start',
-              }
-            : undefined
-        }
+      <HealthSummary />
+      <Suspense
+        fallback={<div className="detecting-card">loading 3D view…</div>}
       >
-        {caps.encoders ? (
-          <EncoderPanel />
-        ) : (
-          encoderSlot && <EncoderUnavailableCard />
-        )}
-        {caps.motors && <MotorPanel />}
-      </div>
+        <SceneBlock />
+      </Suspense>
+      {caps.encoders ? (
+        <EncoderPanel />
+      ) : (
+        encoderSlot && <EncoderUnavailableCard />
+      )}
+      {caps.tactile && <TactilePanel />}
     </>
   )
 }

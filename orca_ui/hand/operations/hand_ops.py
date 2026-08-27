@@ -38,16 +38,28 @@ def request_stop(hand) -> None:
 
 
 def build_maintenance_hand(config_path: str, stop_event: threading.Event,
-                           retry_s: float = 2.0):
+                           retry_s: float = 2.0,
+                           config_overrides: "dict | None" = None):
     """Fresh motor-only OrcaHand for a maintenance operation.
 
     Always the plain class — never the feedback subclass, whose 100 Hz loop
     refuses to calibrate. Port-open is retried briefly to absorb the OS
     serial release latency after the supervisor closed the session.
+
+    ``config_overrides`` swaps individual config fields for this hand only
+    (e.g. a gentler ``calibration_current``) — config.yaml is untouched.
     """
+    import dataclasses
+
     from orca_core import OrcaHand
 
     hand = OrcaHand(config_path=config_path)
+    if config_overrides:
+        # The config is a frozen dataclass: replace it wholesale before
+        # connect, and re-validate so an inconsistent override (e.g. a
+        # calibration current above max_current) fails here, not mid-sweep.
+        hand.config = dataclasses.replace(hand.config, **config_overrides)
+        hand.config.validate()
     deadline = time.monotonic() + retry_s
     last_message = ""
     while True:

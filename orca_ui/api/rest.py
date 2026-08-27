@@ -10,7 +10,7 @@ from orca_ui.hand.service import HandService, ServiceError
 from orca_ui.hand.taxel_geometry import get_taxel_geometry
 
 
-def build_router(service: HandService) -> APIRouter:
+def build_router(service: HandService, telemetry=None) -> APIRouter:
     router = APIRouter(prefix="/api")
 
     def guard(fn, *args, **kwargs):
@@ -32,6 +32,74 @@ def build_router(service: HandService) -> APIRouter:
     @router.get("/stats")
     def stats():
         return service.stats()
+
+    @router.get("/calibration/history")
+    def calibration_history():
+        from orca_ui.hand.calibration_log import read_runs
+        config = service.supervisor.config
+        path = getattr(config, "calibration_path", None)
+        # Current sensor frame (anchor count, polarity, anchor pose) per
+        # joint, so the browser can decode each run's raw hardstop magnet
+        # counts into today's angles — the un-homed view that shows magnet
+        # slip between sweeps.
+        frame: dict = {}
+        try:
+            from orca_core.calibration import CalibrationResult
+            from orca_core.hardware.sensing.constants import (
+                joint_encoder_polarity_for_side,
+            )
+            cal = CalibrationResult.from_calibration_path(
+                path, list(config.motor_ids))
+            polarity = joint_encoder_polarity_for_side(str(config.type))
+            for joint, jec in cal.joint_encoder_calibration_dict.items():
+                rom = config.joint_roms_dict.get(joint)
+                pol = polarity.get(joint)
+                if rom is None or pol is None or \
+                        jec.enc_at_anchor_count is None:
+                    continue
+                frame[joint] = {
+                    "anchor_count": int(jec.enc_at_anchor_count),
+                    "polarity": int(pol),
+                    "anchor_angle_deg": float(rom[1]),
+                }
+        except Exception:
+            pass  # sensors absent / no calibration yet: runs still served
+        return {"runs": read_runs(path) if path else [], "frame": frame}
+
+    # ----- usage stats -----------------------------------------------------
+
+    def _usage_tracker():
+        tracker = telemetry.usage_tracker() if telemetry is not None else None
+        if tracker is None:
+            raise HTTPException(status_code=503,
+                                detail="usage stats unavailable")
+        return tracker
+
+    @router.get("/usage/stats")
+    def usage_stats():
+        return _usage_tracker().snapshot()
+
+    @router.post("/usage/session")
+    def usage_new_session(body: schemas.UsageSessionBody | None = None):
+        label = body.label if body is not None else None
+        return {"ok": True, "id": _usage_tracker().new_session(label)}
+
+    @router.put("/usage/session/{session_id}")
+    def usage_rename_session(session_id: str, body: schemas.UsageSessionBody):
+        if not _usage_tracker().rename_session(session_id, body.label or ""):
+            raise HTTPException(status_code=404, detail="no such session")
+        return {"ok": True}
+
+    @router.delete("/usage/session/{session_id}")
+    def usage_delete_session(session_id: str):
+        if not _usage_tracker().delete_session(session_id):
+            raise HTTPException(status_code=404, detail="no such session")
+        return {"ok": True}
+
+    @router.post("/usage/reset")
+    def usage_reset():
+        _usage_tracker().reset()
+        return {"ok": True}
 
     @router.get("/ports")
     def ports():
@@ -289,6 +357,124 @@ def build_router(service: HandService) -> APIRouter:
     @router.get("/trajectories")
     def trajectories_list():
         return {"trajectories": service.library.list_trajectories()}
+
+    def _library_call(fn, *args, **kwargs):
+        from orca_ui.library import LibraryError
+        try:
+            return fn(*args, **kwargs)
+        except LibraryError as e:
+            raise ServiceError(str(e), status_code=e.status_code)
+
+    @router.get("/trajectories/{name}")
+    def trajectory_get(name: str):
+        return guard(_library_call, service.library.load_trajectory, name)
+
+    @router.put("/trajectories/{name}")
+    def trajectory_update(name: str, body: schemas.TrajectoryUpdateRequest):
+        # Waypoint editor save: replace the waypoints of an existing
+        # waypoint recording (optionally under a new name), each angle
+        # clamped to its joint's ROM. Continuous recordings are sampled
+        # motion — there is no meaningful per-frame hand edit.
+        def apply():
+            from datetime import datetime, timezone
+
+            from orca_ui.library import WAYPOINTS
+
+            data = _library_call(service.library.load_trajectory, name)
+            meta = data.get("metadata") or {}
+            if meta.get("type") != WAYPOINTS:
+                raise ServiceError(
+                    "only waypoint recordings are editable — continuous "
+                    "recordings are sampled motion", status_code=409)
+            joint_ids = list(meta.get("joint_ids")
+                             or service.supervisor.config.joint_ids)
+            if not body.waypoints:
+                raise ServiceError("a trajectory needs at least one waypoint")
+            roms = service.supervisor.config.joint_roms_dict
+            clean = []
+            for index, waypoint in enumerate(body.waypoints):
+                if len(waypoint) != len(joint_ids):
+                    raise ServiceError(
+                        f"waypoint {index + 1}: expected {len(joint_ids)} "
+                        f"joint values, got {len(waypoint)}")
+                row = []
+                for joint, value in zip(joint_ids, waypoint):
+                    angle = float(value)
+                    rom = roms.get(joint)
+                    if rom is not None:
+                        angle = min(max(angle, float(rom[0])), float(rom[1]))
+                    row.append(round(angle, 3))
+                clean.append(row)
+            data["waypoints"] = clean
+            meta["edited_at"] = datetime.now(
+                timezone.utc).astimezone().isoformat(timespec="seconds")
+            data["metadata"] = meta
+            target = body.save_as or name
+            _library_call(service.library.save_trajectory, target, data,
+                          overwrite=target == name)
+            return {"ok": True, "name": target, "frames": len(clean)}
+
+        return guard(apply)
+
+    @router.post("/trajectories/{name}/to_motor")
+    def trajectory_to_motor(name: str,
+                            body: schemas.TrajectoryToMotorRequest):
+        # Translate a joint-space waypoint recording into raw motor
+        # positions via the calibrated joint↔motor map. Refused without a
+        # completed calibration — the map does not exist without one.
+        def convert():
+            import time as _time
+
+            from orca_ui.library import MOTOR_WAYPOINTS, WAYPOINTS
+
+            session = service.session
+            if session is None:
+                raise ServiceError("hand not connected", status_code=503)
+            hand = session.hand
+            if not getattr(hand, "calibrated", False):
+                raise ServiceError(
+                    "joint→motor translation needs a calibrated hand — "
+                    "calibrate first", status_code=409)
+            data = _library_call(service.library.load_trajectory, name)
+            meta = data.get("metadata") or {}
+            if meta.get("type") != WAYPOINTS:
+                raise ServiceError(
+                    "only joint waypoint recordings can be translated to "
+                    "motor space", status_code=409)
+            config = service.supervisor.config
+            joint_ids = list(meta.get("joint_ids") or config.joint_ids)
+            motor_ids = [int(m) for m in config.motor_ids]
+            rows = []
+            for index, waypoint in enumerate(data.get("waypoints") or []):
+                pose = {j: float(v) for j, v in zip(joint_ids, waypoint)
+                        if v is not None}
+                motor_pos = hand._joint_to_motor_pos(pose)
+                row = []
+                for idx, motor_id in enumerate(motor_ids):
+                    value = motor_pos[idx]
+                    if value is None:
+                        raise ServiceError(
+                            f"waypoint {index + 1}: motor {motor_id} has no "
+                            "calibrated joint↔motor mapping — recalibrate "
+                            "that joint first", status_code=409)
+                    row.append(round(float(value), 5))
+                rows.append(row)
+            if not rows:
+                raise ServiceError("trajectory contains no waypoints")
+            target = body.save_as or f"{name}_motor"
+            _library_call(service.library.save_trajectory, target, {
+                "metadata": {
+                    "type": MOTOR_WAYPOINTS,
+                    "motor_ids": motor_ids,
+                    "hand_type": config.type,
+                    "created_at": _time.strftime("%Y%m%d_%H%M%S"),
+                    "translated_from": name,
+                },
+                "waypoints": rows,
+            })
+            return {"ok": True, "name": target, "frames": len(rows)}
+
+        return guard(convert)
 
     @router.delete("/trajectories/{name}")
     def trajectory_delete(name: str):

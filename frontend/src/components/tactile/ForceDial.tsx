@@ -7,12 +7,21 @@ import type { Finger } from '../../api/types'
 import { useStreamFrame } from '../../hooks/useStreamFrame'
 import { usePalette } from '../../theme/themeStore'
 import { MAX_FORCE_SCALE } from '../../theme/tokens'
+import { StatusDot } from '../common/StatusDot'
+import { tactileDiagnosis } from '../monitor/monitorShared'
 
 const MIN_CIRCLE_RADIUS = 2
 const MAX_CIRCLE_RADIUS = 40
 const VISUALIZATION_RADIUS = 70
 
-export function ForceDial({ finger }: { finger: Finger }) {
+export function ForceDial({
+  finger,
+  connected,
+}: {
+  finger: Finger
+  // Sensor state from sensors.health; undefined until the first payload.
+  connected?: boolean
+}) {
   const { dial } = usePalette()
   const dotRef = useRef<SVGCircleElement>(null)
   const fxRef = useRef<HTMLSpanElement>(null)
@@ -62,7 +71,28 @@ export function ForceDial({ finger }: { finger: Finger }) {
 
   return (
     <div className="force-visualization">
-      <div className="force-label">
+      <div
+        className="force-label"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 5,
+        }}
+      >
+        <StatusDot
+          on={connected}
+          title={
+            connected === undefined
+              ? undefined
+              : `${finger} sensor ${connected ? 'active' : 'not connected'} — click for details`
+          }
+          diagnosis={
+            connected === undefined
+              ? undefined
+              : tactileDiagnosis(finger, connected)
+          }
+        />
         {finger.charAt(0).toUpperCase() + finger.slice(1)}
       </div>
       <svg className="force-arrow" viewBox="0 0 200 200">

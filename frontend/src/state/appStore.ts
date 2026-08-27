@@ -29,11 +29,11 @@ export type MusicScale =
   | 'minorChord'
 export type ViewName =
   | 'dashboard'
-  | '3d'
   | 'poses'
   | 'teleop'
   | 'setup'
   | 'motors'
+  | 'stats'
 
 export interface TactileSettings {
   displayMode: TaxelDisplayMode
@@ -62,6 +62,8 @@ export interface SceneSettings {
   jointGlow: boolean
   // Accent-colored ghost posed from the live teleop retargeter output.
   teleopGhost: boolean
+  // Freeze the camera: orbit/pan/zoom are ignored until unlocked.
+  lockView: boolean
 }
 
 interface AppState {
@@ -102,6 +104,7 @@ const SCENE_DEFAULTS: SceneSettings = {
   forceTaxels: true,
   jointGlow: false,
   teleopGhost: true,
+  lockView: false,
 }
 
 // Bumped when a default changes: stored settings win over defaults, so a new

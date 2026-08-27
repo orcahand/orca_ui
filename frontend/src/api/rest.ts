@@ -1,6 +1,8 @@
 // Thin fetch wrappers over the REST API. Errors carry the backend's detail.
 
 import type {
+  CalibrationRun,
+  SensorFrameEntry,
   DemoEntry,
   DirectMotorSnapshot,
   HandInfo,
@@ -19,7 +21,9 @@ import type {
   TeleopSnapshot,
   TeleopSourceId,
   TeleopSourcesInfo,
+  TrajectoryData,
   TrajectoryEntry,
+  UsageSnapshot,
 } from './types'
 
 export class ApiError extends Error {
@@ -68,6 +72,21 @@ function del<T>(path: string): Promise<T> {
 export const api = {
   status: () => request<StatusSnapshot>('/api/status'),
   handInfo: () => request<HandInfo>('/api/hand/info'),
+  calibrationHistory: () =>
+    request<{
+      runs: CalibrationRun[]
+      frame?: Record<string, SensorFrameEntry>
+    }>('/api/calibration/history'),
+  usageStats: () => request<UsageSnapshot>('/api/usage/stats'),
+  usageNewSession: (label?: string) =>
+    post<{ ok: boolean; id: string }>('/api/usage/session', { label }),
+  usageRenameSession: (id: string, label: string) =>
+    put<{ ok: boolean }>(`/api/usage/session/${encodeURIComponent(id)}`, {
+      label,
+    }),
+  usageDeleteSession: (id: string) =>
+    del<{ ok: boolean }>(`/api/usage/session/${encodeURIComponent(id)}`),
+  usageReset: () => post<{ ok: boolean }>('/api/usage/reset'),
   stats: () => request<Stats>('/api/stats'),
   ports: () => request<PortInfo[]>('/api/ports'),
   taxelGeometry: () => request<TaxelGeometry>('/api/tactile/geometry'),
@@ -149,6 +168,18 @@ export const api = {
 
   trajectories: () =>
     request<{ trajectories: TrajectoryEntry[] }>('/api/trajectories'),
+  trajectoryGet: (name: string) =>
+    request<TrajectoryData>(`/api/trajectories/${encodeURIComponent(name)}`),
+  trajectoryUpdate: (name: string, waypoints: number[][], saveAs?: string) =>
+    put<{ ok: boolean; name: string; frames: number }>(
+      `/api/trajectories/${encodeURIComponent(name)}`,
+      { waypoints, save_as: saveAs ?? null },
+    ),
+  trajectoryToMotor: (name: string, saveAs?: string) =>
+    post<{ ok: boolean; name: string; frames: number }>(
+      `/api/trajectories/${encodeURIComponent(name)}/to_motor`,
+      { save_as: saveAs ?? null },
+    ),
   trajectoryDelete: (name: string) =>
     del<{ ok: boolean }>(`/api/trajectories/${encodeURIComponent(name)}`),
   demos: () => request<{ demos: DemoEntry[] }>('/api/demos'),

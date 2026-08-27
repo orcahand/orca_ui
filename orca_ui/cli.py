@@ -45,10 +45,12 @@ def parse_args(argv=None) -> argparse.Namespace:
                              "only (tactile / joint-encoder viewing, no control). "
                              "Useful when motors are unpowered or the motor "
                              "stack is being worked on.")
-    parser.add_argument("--host", type=str, default="127.0.0.1",
-                        help="Bind address (default: 127.0.0.1). This UI can move "
-                             "motors, so exposing it on the LAN is opt-in via "
-                             "--host 0.0.0.0.")
+    parser.add_argument("--host", type=str, default="0.0.0.0",
+                        help="Bind address (default: 0.0.0.0 — reachable from "
+                             "the network and over Tailscale). This UI can "
+                             "move motors: anyone who can reach the port can "
+                             "drive the hand, so restrict with "
+                             "--host 127.0.0.1 on untrusted networks.")
     parser.add_argument("--port", type=int, default=5001,
                         help="HTTP port (default: 5001).")
     parser.add_argument("--no-browser", action="store_true",
@@ -149,6 +151,29 @@ def build_settings(argv=None) -> UiSettings:
     )
 
 
+def _reachable_ips() -> list[str]:
+    """Non-loopback IPv4s this machine is reachable on, without extra deps:
+    the source address of a routed UDP socket, probed once toward the
+    internet (LAN address) and once toward Tailscale's resolver (tailnet
+    address, when Tailscale is up). Nothing is actually sent."""
+    import socket
+
+    ips: list[str] = []
+    for probe in ("8.8.8.8", "100.100.100.100"):
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                sock.connect((probe, 53))
+                ip = sock.getsockname()[0]
+            finally:
+                sock.close()
+            if ip and not ip.startswith("127.") and ip not in ips:
+                ips.append(ip)
+        except OSError:
+            continue
+    return ips
+
+
 def main(argv=None) -> None:
     import uvicorn
     from orca_ui.console import install_stdout_dedupe
@@ -165,8 +190,18 @@ def main(argv=None) -> None:
     core = resolve_core_source()
     rule = "─" * 62
     provisional = "" if settings.model_pinned else "  (re-detected while running)"
+    exposed = settings.host not in ("127.0.0.1", "localhost", "::1")
+    network = ""
+    if exposed:
+        urls = " · ".join(
+            f"http://{ip}:{settings.port}" for ip in _reachable_ips())
+        if urls:
+            network = f"  network   {urls}\n"
+        network += ("  caution   exposed beyond localhost — anyone who can "
+                    "reach the port can move the hand\n")
     print(f"\n{rule}\n"
           f"  ORCA UI   http://localhost:{settings.port}\n"
+          f"{network}"
           f"  config    {settings.config_path}{provisional}\n"
           f"  mode      {mode}\n"
           f"  core      {core.summary()}\n"

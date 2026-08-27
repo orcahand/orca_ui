@@ -121,3 +121,27 @@ class TeleopConfigRequest(BaseModel):
     keys are filtered by the manager)."""
 
     config: dict = Field(default_factory=dict)
+
+
+class UsageSessionBody(BaseModel):
+    """Create or rename a usage-stats session; label is optional cosmetics."""
+
+    label: Optional[str] = Field(default=None, max_length=64)
+
+
+class TrajectoryUpdateRequest(BaseModel):
+    """Waypoint-editor save: full replacement waypoint list (row order =
+    the recording's joint_ids). ``save_as`` writes a copy under a new name
+    instead of overwriting."""
+
+    waypoints: list[list[float]]
+    save_as: Optional[str] = Field(default=None, max_length=64,
+                                   pattern=r"^[A-Za-z0-9_\-]+$")
+
+
+class TrajectoryToMotorRequest(BaseModel):
+    """Translate a joint waypoint recording to motor space; ``save_as``
+    names the copy (default: <name>_motor)."""
+
+    save_as: Optional[str] = Field(default=None, max_length=64,
+                                   pattern=r"^[A-Za-z0-9_\-]+$")

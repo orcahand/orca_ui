@@ -3,6 +3,7 @@
 // awaiting_input options (Release) take over the card as the hold callout —
 // that hold is the only moment the user has to do something with their hands.
 
+import { useState } from 'react'
 import { api } from '../../api/rest'
 import { useAppStore } from '../../state/appStore'
 import {
@@ -21,6 +22,9 @@ function fail(error: unknown) {
 export function TensionCard() {
   const gate = useStartGate('motors')
   const operation = useOperationStore((s) => s.operation)
+  // Hold-only mode (the CLI's --no-move-motors): skip the winding motion
+  // and go straight to the stall-hold for manual spool work.
+  const [moveMotors, setMoveMotors] = useState(true)
   const active =
     operation !== null &&
     operation.kind === 'tension' &&
@@ -29,7 +33,9 @@ export function TensionCard() {
       : null
 
   const start = () =>
-    void api.operationStart('tension', { move_motors: true }).catch(fail)
+    void api
+      .operationStart('tension', { move_motors: moveMotors })
+      .catch(fail)
 
   const awaiting = active?.state === 'awaiting_input' ? active.awaiting : null
 
@@ -42,7 +48,10 @@ export function TensionCard() {
       </p>
       {active ? (
         <>
-          <PhaseStepper current={active.phase} />
+          <PhaseStepper
+            current={active.phase}
+            phases={moveMotors ? PHASES : ['holding', 'released']}
+          />
           {awaiting ? (
             <TensionHoldCallout options={awaiting.options} />
           ) : (
@@ -60,6 +69,22 @@ export function TensionCard() {
           <div className="setup-note">
             Always calibrate afterwards — tensioning changes the tendon lengths.
           </div>
+          <label className="joint-check">
+            <input
+              type="checkbox"
+              checked={!moveMotors}
+              onChange={(e) => setMoveMotors(!e.target.checked)}
+            />
+            Hold only — skip the winding motion
+          </label>
+          <p className="setup-option-hint">
+            {moveMotors
+              ? 'The motors first wind the tendons taut, then hold. Tick to ' +
+                'go straight to the hold with no motor movement at all ' +
+                '(the CLI’s --no-move-motors).'
+              : 'No movement: the motors stall-hold right where the hand ' +
+                'is, and you tension the spools against that.'}
+          </p>
           <div>
             <button
               className="btn btn-primary"
@@ -79,12 +104,19 @@ export function TensionCard() {
   )
 }
 
-function PhaseStepper({ current }: { current: string | null }) {
+function PhaseStepper({
+  current,
+  phases = PHASES,
+}: {
+  current: string | null
+  // Hold-only runs skip winding/ramp entirely.
+  phases?: string[]
+}) {
   // acquiring/connecting precede the stepper phases: index -1 = all pending.
-  const index = current ? PHASES.indexOf(current) : -1
+  const index = current ? phases.indexOf(current) : -1
   return (
     <div className="phase-stepper">
-      {PHASES.map((phase, i) => (
+      {phases.map((phase, i) => (
         <span
           key={phase}
           className={`phase-step${

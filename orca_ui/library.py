@@ -19,6 +19,10 @@ NAME_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 
 CONTINUOUS = "continuous"
 WAYPOINTS = "discrete_waypoints"
+# Raw motor-space waypoints (radians, metadata.motor_ids order). Replayed as
+# direct motor stepping; only meaningful under the calibration they were
+# recorded/converted with.
+MOTOR_WAYPOINTS = "motor_waypoints"
 
 
 class LibraryError(ValueError):

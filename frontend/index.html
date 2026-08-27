@@ -7,8 +7,8 @@
     <script>
       // Resolve the theme before the first paint, or the page flashes the
       // wrong one while the bundle loads. Deliberately duplicates the rule in
-      // src/theme/themeStore.ts — a stored choice wins, otherwise the OS
-      // decides — because that module cannot run early enough to matter.
+      // src/theme/themeStore.ts — a stored choice wins, otherwise light —
+      // because that module cannot run early enough to matter.
       // Keep the two in step; the store re-applies the same answer on boot.
       (function () {
         var theme
@@ -16,15 +16,9 @@
           var stored = localStorage.getItem('orca-ui.theme')
           if (stored === 'dark' || stored === 'light') theme = stored
         } catch (e) {
-          /* storage disabled: fall through to the OS preference */
+          /* storage disabled: fall through to the default */
         }
-        if (!theme) {
-          theme =
-            window.matchMedia &&
-            window.matchMedia('(prefers-color-scheme: light)').matches
-              ? 'light'
-              : 'dark'
-        }
+        if (!theme) theme = 'light'
         var root = document.documentElement
         root.dataset.theme = theme
         root.style.colorScheme = theme
