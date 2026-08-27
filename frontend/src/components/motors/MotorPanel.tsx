@@ -1,9 +1,11 @@
 // Motor control with scripts/slider_joint.py parity: per-joint sliders
 // seeded from the current pose (on mount and on every torque enable, never
 // rewritten from the stream afterwards), torque enable/disable, neutral,
-// and for feedback hands live meas/trim readouts. Everything is gated on
-// the control-source owner: while an operation (or maintenance) owns the
-// hand, manual commands are disabled with a tooltip naming the owner.
+// the motor current ceiling, and for feedback hands live meas/trim readouts.
+// Everything is gated on the control-source owner: while an operation (or
+// maintenance) owns the hand, manual commands are disabled with a tooltip
+// naming the owner. The current ceiling is the exception — see
+// MaxCurrentControl.
 
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../../api/rest'
@@ -14,6 +16,7 @@ import { sendTarget } from '../../state/commandBus'
 import { useControlGate } from '../../state/operationStore'
 import { Panel } from '../common/Panel'
 import { DirectMotorPanel } from './DirectMotorPanel'
+import { MaxCurrentControl } from './MaxCurrentControl'
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
@@ -292,6 +295,7 @@ sensors currently report — then only dial the joints that are off"
           </button>
         </div>
       )}
+      <MaxCurrentControl />
       <div>
         {joints.map((joint) => (
           <SliderRow

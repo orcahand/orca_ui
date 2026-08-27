@@ -144,6 +144,9 @@ class HandService:
             on_error=self._publish_error,
         )
         self._max_current = int(self.supervisor.config.max_current)
+        # What config.yaml asked for — the value "default" restores to, kept
+        # separately because set_max_current overwrites the live one.
+        self._config_max_current = self._max_current
 
         self._library_root = (
             Path(settings.library_dir) if settings.library_dir
@@ -404,6 +407,11 @@ class HandService:
             return {
                 "torque_enabled": self.supervisor.status().torque_enabled,
                 "max_current": self._max_current,
+                # config.yaml's ceiling — what the dashboard's "default"
+                # button returns to (mirrors config_gains below).
+                "config_max_current": self._config_max_current,
+                # Lowest ceiling orca_core accepts (see max_current_floor).
+                "max_current_floor": self.max_current_floor(),
                 # The one gain set every loop joint shares, or null when the
                 # joints are tuned individually.
                 "gains": _uniform_gains(joint_gains),
@@ -452,6 +460,7 @@ class HandService:
         everything keyed by model; the browser refetches ``/hand/info`` off
         the model field in the status stream."""
         self._max_current = int(config.max_current)
+        self._config_max_current = self._max_current
         # Poses and recordings are per-model — a left hand's library must not
         # follow the right hand that replaced it.
         self.library = Library(self._library_root, model_name_of(config))
@@ -899,15 +908,35 @@ class HandService:
                                  if joint not in controlled],
         }
 
+    def max_current_floor(self) -> int:
+        """Lowest ceiling orca_core will accept: its config validation refuses
+        a max_current below the calibration current (calibration would then
+        stall against its own limit). Published so the UI's control can stop
+        at the floor instead of learning about it from a failed write."""
+        return int(getattr(self.supervisor.config, "calibration_current", 0) or 0)
+
     def set_max_current(self, ma: int) -> None:
         import dataclasses
 
         session = self._require_motors()
+        ma = int(ma)
+        # Validate BEFORE the hardware write. The config replace below runs
+        # orca_core's validation, and letting it raise afterwards would leave
+        # the motors on the new ceiling with the config and our own snapshot
+        # still on the old one.
+        floor = self.max_current_floor()
+        if ma < floor:
+            raise ServiceError(
+                f"max current must be at least the calibration current "
+                f"({floor} mA) — a lower ceiling would stall calibration")
+        try:
+            config = dataclasses.replace(session.hand.config, max_current=ma)
+        except Exception as e:
+            raise ServiceError(f"hand config rejected {ma} mA: {e}")
         session.hand.set_max_current(ma)
-        session.hand.config = dataclasses.replace(session.hand.config,
-                                                  max_current=ma)
+        session.hand.config = config
         with self._state_lock:
-            self._max_current = int(ma)
+            self._max_current = ma
         self._publish_control_state()
 
     def rebase(self) -> None:

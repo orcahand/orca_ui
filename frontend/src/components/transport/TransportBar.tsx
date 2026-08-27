@@ -111,6 +111,9 @@ function OperationBar() {
   if (operation.kind === 'record') {
     return <RecordBar operation={operation} />
   }
+  if (operation.kind === 'stress_test') {
+    return <StressBar operation={operation} />
+  }
   return <MaintenanceBar operation={operation} />
 }
 
@@ -219,6 +222,51 @@ function RecordBar({ operation }: { operation: OperationSnapshot }) {
         )}
         {/* No plain stop: /api/operation/stop ABORTS a recording without
             saving — ending a record is an input, never a stop. */}
+      </div>
+    </div>
+  )
+}
+
+// ----- stress test -----------------------------------------------------------
+
+// Same controls as playback (pause / resume / stop) — a stress run is long
+// and pausing it mid-cycle is how you go and look at something. The count
+// comes from the op's detail line ("cycle 3/20 → max").
+function StressBar({ operation }: { operation: OperationSnapshot }) {
+  const joints = (operation.params.joints as string[] | undefined) ?? []
+  const paused = operation.state === 'paused'
+  const stopping = operation.state === 'stopping'
+
+  return (
+    <div className="transport-bar">
+      <span className="transport-kind">▲▼ stress test</span>
+      <span className="transport-detail">
+        {joints.length} joint{joints.length === 1 ? '' : 's'}
+        {operation.params.loop ? ' · nonstop' : ''}
+      </span>
+      {paused && <span className="transport-paused">paused</span>}
+      <ProgressTrack progress={operation.progress} />
+      <span className="transport-time">{operation.detail}</span>
+      <div className="transport-controls">
+        {paused ? (
+          <button
+            className="btn btn-primary"
+            title="resume the stress test"
+            onClick={() => void api.operationResume().catch(fail)}
+          >
+            ▶
+          </button>
+        ) : (
+          <button
+            className="btn btn-secondary"
+            disabled={stopping}
+            title="pause the stress test"
+            onClick={() => void api.operationPause().catch(fail)}
+          >
+            ⏸
+          </button>
+        )}
+        <StopButton stopping={stopping} />
       </div>
     </div>
   )

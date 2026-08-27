@@ -1,10 +1,11 @@
 // Feedback-loop tuning: a hand-wide Kp / Ki / correction_max row (applies to
-// every loop joint) + max_current with Apply and Rebase, plus a per-joint
-// table showing the gains the controller is actually running. Joints the loop
-// doesn't control have no PI channel — gains never apply to them, so they're
-// listed as open-loop rather than made editable.
+// every loop joint) + max_current with Apply and Rebase (the ceiling also has
+// a standalone control on the dashboard, which this field tracks), plus a
+// per-joint table showing the gains the controller is actually running. Joints
+// the loop doesn't control have no PI channel — gains never apply to them, so
+// they're listed as open-loop rather than made editable.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../../api/rest'
 import type { JointGains } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
@@ -71,9 +72,20 @@ export function TuningPanel() {
       // control.gains is null when the joints carry different gains — the
       // hand-wide fields then start blank rather than claiming a value.
       setHandWide(control.gains ? toEdit(control.gains) : EMPTY_EDIT)
-      setMaxCurrent(String(control.max_current))
     }
   }, [control, handWide])
+
+  // The ceiling is also settable from the dashboard's Motor Control panel, so
+  // follow it whenever the backend's value actually changes — a field left
+  // showing the old number would push it back on the next Apply.
+  const liveMaxCurrent = control?.max_current
+  const seenMaxCurrent = useRef<number | null>(null)
+  useEffect(() => {
+    if (liveMaxCurrent === undefined) return
+    if (seenMaxCurrent.current === liveMaxCurrent) return
+    seenMaxCurrent.current = liveMaxCurrent
+    setMaxCurrent(String(liveMaxCurrent))
+  }, [liveMaxCurrent])
 
   const live = control?.joint_gains ?? {}
   const configGains = control?.config_gains ?? {}

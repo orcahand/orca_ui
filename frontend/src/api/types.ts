@@ -125,6 +125,12 @@ export interface JointGains {
 export interface ControlState {
   torque_enabled: boolean
   max_current: number
+  // config.yaml's ceiling — what the Motor Control "default" button
+  // restores. Unchanged by set_max_current (mirrors config_gains).
+  config_max_current: number
+  // Lowest ceiling orca_core accepts (the hand's calibration current); a
+  // write below it is a 400, so the control stops here.
+  max_current_floor: number
   // The one gain set every loop joint shares, or null when they differ.
   gains: JointGains | null
   // Live gains per loop-controlled joint, read back from the controller.
@@ -240,6 +246,32 @@ export interface MotorChainExtra {
   target_baud: number
   chain: MotorChainSlot[]
   resets: number[]
+}
+
+// ----- stress_test operation extra (orca_ui/hand/operations/stress.py) -------
+
+export interface StressJointReach {
+  id: string
+  // Commanded extremes in degrees (config ROM, less the safety margin).
+  target: [number, number]
+  commanded_span_deg: number
+  // Settled position at each extreme, null until both ends have been
+  // sampled — or for the whole run on a hand with no joint-angle source.
+  reached: [number, number] | null
+  span_deg: number | null
+  // Commanded travel minus achieved travel: grows as a tendon stretches.
+  span_shortfall_deg: number | null
+  worst_shortfall_deg: number | null
+}
+
+export interface StressTestExtra {
+  cycle: number
+  cycles: number
+  loop: boolean
+  // False when the hand has no joint-angle source — the run still happens,
+  // it just cannot report how far the joints got.
+  measured: boolean
+  joints: StressJointReach[]
 }
 
 export interface OperationLogLine {

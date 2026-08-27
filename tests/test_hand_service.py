@@ -91,11 +91,15 @@ def test_unknown_joint_rejected(service):
 
 
 def test_gains_and_mode_roundtrip(service):
+    config_max_current = service.control_state()["config_max_current"]
     service.set_gains(kp=2.0, ki=6.0, correction_max_deg=30.0)
     service.set_max_current(400)
     state = service.control_state()
     assert state["gains"]["kp"] == 2.0
     assert state["max_current"] == 400
+    # config.yaml's ceiling is what the UI's "default" button restores, so
+    # setting the live one must not move it.
+    assert state["config_max_current"] == config_max_current
 
     service.set_tactile_mode("taxels")
     assert service.tactile_mode == "taxels"
@@ -106,6 +110,28 @@ def test_gains_and_mode_roundtrip(service):
 
     assert _wait_for(has_taxels)
 
+
+
+def test_max_current_floor_is_the_calibration_current(service):
+    """orca_core refuses a ceiling below the calibration current. The floor is
+    published so the UI can stop there, and a write below it is rejected
+    BEFORE the hardware is touched — a half-applied ceiling would leave the
+    motors and the config disagreeing."""
+    state = service.control_state()
+    floor = state["max_current_floor"]
+    assert floor == service.supervisor.config.calibration_current
+    assert state["max_current"] >= floor
+
+    before = service.control_state()["max_current"]
+    with pytest.raises(ServiceError) as excinfo:
+        service.set_max_current(floor - 1)
+    assert str(floor) in str(excinfo.value)
+    # Nothing moved: not our snapshot, not the hand's config.
+    assert service.control_state()["max_current"] == before
+    assert service.session.hand.config.max_current == before
+
+    service.set_max_current(floor)
+    assert service.control_state()["max_current"] == floor
 
 def test_per_joint_gains_are_read_back_from_the_controller(service):
     loop_joints = service.session.hand.loop_joint_names
