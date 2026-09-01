@@ -159,3 +159,34 @@ export function motorDiagnosis(
         ],
   }
 }
+
+// Thermal thresholds as a fraction of the motor family's rated max operating
+// temperature, matching MotorHealthPanel's bar colours.
+export const TEMP_WARN_FRACTION = 0.7
+export const TEMP_ERR_FRACTION = 0.9
+
+export function thermalDiagnosis(
+  motorId: string,
+  joint: string | null,
+  tempC: number,
+  maxTempC: number,
+): Diagnosis {
+  const pct = Math.round((100 * tempC) / maxTempC)
+  const hot = tempC >= maxTempC * TEMP_ERR_FRACTION
+  return {
+    subject: `motor ${motorId}${joint ? ` (${joint})` : ''}`,
+    state: `${tempC.toFixed(0)} °C — ${pct}% of the ${maxTempC.toFixed(0)} °C rated max`,
+    ok: false,
+    checks: hot
+      ? [
+          'at the rated max the motor latches an overheating error and stops applying torque',
+          'it keeps answering the bus and still acknowledges torque enable, so it looks alive while it does nothing',
+          'stop driving it and let it cool; a power cycle clears the latch once cool',
+          'a joint that stalls before its hardstop heats fastest — all the current becomes heat',
+        ]
+      : [
+          'running warm; sustained load will reach the latch threshold',
+          'lower max current, or give the hand idle time between runs',
+        ],
+  }
+}

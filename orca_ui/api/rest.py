@@ -341,6 +341,11 @@ def build_router(service: HandService, telemetry=None) -> APIRouter:
 
     # ----- direct motor control (advanced diagnostics) ---------------------------
 
+    @router.post("/motors/{motor_id}/reboot")
+    def motor_reboot(motor_id: int):
+        """Clear a latched hardware error. Comes back with torque off."""
+        return guard(service.reboot_motor, motor_id)
+
     @router.get("/motors/direct")
     def motors_direct_snapshot():
         return guard(service.motor_snapshot)

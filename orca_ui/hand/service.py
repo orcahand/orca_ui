@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from typing import Callable
 
 import numpy as np
@@ -21,6 +22,7 @@ from orca_ui.core_source import resolve_cached as resolve_core_source
 from orca_ui.hand import zeroing
 from orca_ui.hand.commands import CommandWorker
 from orca_ui.hand.presets import BUILTIN_POSES, BUILTIN_SEQUENCES
+from orca_ui.hand.faults import classify_hw_error
 from orca_ui.hand.models import ModelEntry, available_models, describe
 from orca_ui.hand.sessions import HandSession
 from orca_ui.hand.states import ControlSource
@@ -44,6 +46,10 @@ TACTILE_MODES = {
 # Direct motor moves are clamped to this distance from the current position
 # per command — sliders nudge, they don't teleport.
 MAX_DIRECT_MOTOR_STEP_RAD = 0.8
+
+# Dynamixel firmware restart: the motor is off the bus until it finishes,
+# so a read-back any sooner just times out and looks like a failed reboot.
+MOTOR_REBOOT_SETTLE_S = 0.5
 
 # One-shot moves (apply pose, go neutral): distance-scaled glide instead of a
 # fixed duration, so a far target never starts at whip speed.
@@ -137,6 +143,7 @@ class HandService:
         self._sweeper = None             # mock-only dev sweeper, for estop
         self._teleop_manager = None      # attached post-construction (server.py)
         self._teleop_installer = None    # ditto; exists even with teleop off
+        self._telemetry = None           # attached in server.py
         # Gains connect() installed from config.yaml — what "reset" restores.
         # Live gains are read back from the controller, never shadowed here.
         self._config_gains: dict[str, dict] = {}
@@ -589,6 +596,9 @@ class HandService:
 
     def attach_operation_manager(self, manager) -> None:
         self._operation_manager = manager
+
+    def attach_telemetry(self, telemetry) -> None:
+        self._telemetry = telemetry
 
     def attach_sweeper(self, sweeper) -> None:
         self._sweeper = sweeper
@@ -1049,6 +1059,66 @@ class HandService:
                 }
                 for mid in hand.config.motor_ids
             ],
+        }
+
+    def reboot_motor(self, motor_id: int) -> dict:
+        """Clear a motor's latched hardware error with a Protocol 2.0 reboot.
+
+        The only way back from a latched Hardware Error Status short of
+        power-cycling the hand: the motor keeps answering the bus and keeps
+        acknowledging torque enable, but its power stage stays inhibited
+        until it is rebooted. Comes back with torque off, and torque is not
+        re-enabled here — if the fault is a supply or wiring one it latches
+        again on the next command, and that should happen under a deliberate
+        torque enable rather than silently inside a recovery call.
+        """
+        from contextlib import nullcontext
+
+        session = self._require_motors()
+        hand = session.hand
+        motor_id = int(motor_id)
+        if motor_id not in set(hand.config.motor_ids):
+            raise ServiceError(f"unknown motor {motor_id}", status_code=404)
+
+        client = getattr(hand, "_motor_client", None)
+        reboot = getattr(client, "reboot_motor", None)
+        if reboot is None:
+            raise ServiceError("this motor family has no reboot instruction",
+                               status_code=501)
+
+        fence = getattr(hand, "_loop_writes_paused", None)
+        with (fence() if fence is not None else nullcontext()):
+            try:
+                reboot(motor_id)
+            except Exception as e:
+                raise ServiceError(f"reboot failed: {e}", status_code=502)
+            # The motor is off the bus for a moment while its firmware
+            # restarts; read back only after it can answer again.
+            time.sleep(MOTOR_REBOOT_SETTLE_S)
+            read_error = getattr(client, "read_hardware_error", None)
+            error = None
+            if read_error is not None:
+                try:
+                    error = read_error(motor_id)
+                except Exception:
+                    error = None
+
+        flags = _decode_hw_error(error)
+        joint = hand.config.motor_to_joint_dict.get(motor_id)
+        info = classify_hw_error(flags, motor=motor_id, joint=joint)
+        # Drop the cached latch so the dashboard updates on this reply rather
+        # than waiting out the next sweep.
+        telemetry = getattr(self, "_telemetry", None)
+        forget = getattr(telemetry, "forget_hw_error", None)
+        if forget is not None:
+            forget(motor_id)
+        return {
+            "motor": motor_id,
+            "joint": joint,
+            "cleared": not flags,
+            "hw_error": error,
+            "hw_error_flags": flags,
+            "info": info,
         }
 
     def set_direct_motor_mode(self, enabled: bool, *,

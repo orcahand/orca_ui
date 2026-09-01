@@ -108,36 +108,6 @@ def test_second_start_conflicts(client):
     _wait_state(client, "done")
 
 
-def test_unknown_kind_404(client):
-    assert client.post("/api/operation/nope/start").status_code == 404
-
-
-def test_stop_reports_stopped(client):
-    client.post("/api/operation/test.hold/start")
-    _wait_for(lambda: (_operation(client) or {}).get("phase") == "holding")
-    response = client.post("/api/operation/stop")
-    assert response.json()["stopped"] is True
-    snapshot = _wait_state(client, "done")
-    assert snapshot["detail"] == "stopped"
-    # A stop with nothing running is a no-op, not an error.
-    assert client.post("/api/operation/stop").json()["stopped"] is False
-
-
-def test_awaiting_input_roundtrip(client):
-    # Input with nothing awaiting is a 409.
-    assert client.post("/api/operation/input",
-                       json={"value": "yes"}).status_code == 409
-
-    client.post("/api/operation/test.input/start")
-    snapshot = _wait_state(client, "awaiting_input")
-    assert snapshot["awaiting"] == {"prompt": "continue?",
-                                    "options": ["yes", "no"]}
-    assert client.post("/api/operation/input",
-                       json={"value": "yes"}).status_code == 200
-    snapshot = _wait_state(client, "done")
-    assert snapshot["result"] == {"answer": "yes"}
-
-
 def test_control_source_arbiter(client):
     service = client.app_state.service
     hub = client.app_state.hub

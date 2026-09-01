@@ -24,11 +24,13 @@ import { HoverNote } from '../common/HoverNote'
 import { Panel } from '../common/Panel'
 
 const GROUP_ORDER = ['wrist', 'thumb', 'index', 'middle', 'ring', 'pinky']
-const SPEEDS = [0.5, 1, 2]
-// Mirrors stress.py: MAX_CYCLES / MAX_HOLD_S / MAX_MARGIN_DEG.
-const MAX_CYCLES = 1000
+const SPEEDS = [0.5, 1, 2, 4, 8]
+// Mirrors stress.py: MAX_CYCLES / MAX_HOLD_S / MAX_MARGIN_DEG, and the
+// player's MAX_INTERP_STEPS.
+const MAX_CYCLES = 100_000_000
 const MAX_HOLD_S = 5
 const MAX_MARGIN_DEG = 15
+const MAX_STEPS = 200
 // Missing travel above this flags the joint as worth a look — roughly the
 // player's arrival tolerance doubled, so ordinary tracking lag stays quiet.
 const SHORTFALL_WARN_DEG = 3
@@ -63,6 +65,14 @@ export function StressTestPanel() {
   const [speed, setSpeed] = useState(1)
   const [holdS, setHoldS] = useState(0.25)
   const [marginDeg, setMarginDeg] = useState(0)
+  const [thumbOpposed, setThumbOpposed] = useState(true)
+  // Park every unpicked joint fully outwards for the run, optionally leaving
+  // the abduction joints out of that hold.
+  const [holdRest, setHoldRest] = useState(false)
+  const [freezeAbduction, setFreezeAbduction] = useState(false)
+  // Interpolation steps per leg, as typed. '' = the cruise-speed glide;
+  // 0 = one command straight to the extreme, at motor speed.
+  const [steps, setSteps] = useState('')
 
   // A joint with no motor cannot be driven anywhere — the backend rejects
   // those, so they never make it into the picker.
@@ -97,14 +107,22 @@ export function StressTestPanel() {
       ? operation
       : null
 
-  const blocked = gate.blocked || !torqueOn || selected.size === 0
+  // '' = glide at cruise speed; a number = that many waypoints per leg,
+  // 0 meaning a single command to the extreme.
+  const stepsTyped = steps.trim() !== ''
+  const parsedSteps = stepsTyped ? parseInt(steps, 10) : null
+  const stepsOk = parsedSteps === null || Number.isFinite(parsedSteps)
+  const blocked =
+    gate.blocked || !torqueOn || selected.size === 0 || !stepsOk
   const reason = gate.blocked
     ? gate.reason
     : !torqueOn
       ? 'enable torque to run a stress test'
       : selected.size === 0
         ? 'pick at least one joint'
-        : null
+        : !stepsOk
+          ? 'steps must be a whole number (or blank to glide)'
+          : null
 
   const toggleGroup = (group: string) =>
     setOpenGroups((prev) => {
@@ -124,7 +142,7 @@ export function StressTestPanel() {
 
   // Chip click opens the group; the chip's own tick box takes/releases every
   // joint in it, which is how you pick a whole finger in one action.
-  const toggleWholeGroup = (group: string, groupJoints: JointInfo[]) =>
+  const toggleWholeGroup = (groupJoints: JointInfo[]) =>
     setSelected((prev) => {
       const next = new Set(prev)
       const allOn = groupJoints.every((j) => next.has(j.id))
@@ -143,7 +161,13 @@ export function StressTestPanel() {
         speed,
         hold_s: holdS,
         margin_deg: marginDeg,
+        thumb_opposed: thumbOpposed,
+        hold_rest: holdRest,
+        freeze_abduction: freezeAbduction,
         ...(loop ? { loop: true } : { cycles }),
+        ...(parsedSteps !== null && Number.isFinite(parsedSteps)
+          ? { interp_steps: clamp(parsedSteps, 0, MAX_STEPS) }
+          : {}),
       })
       .catch(fail)
   }
@@ -156,7 +180,10 @@ export function StressTestPanel() {
         Drives the joints you pick from one end of their range to the other,
         over and over, holding at each end until the hand gets there. Use it
         to work a repaired tendon or to check cable integrity — the report
-        below shows how much travel each joint is still managing.
+        below shows how much travel each joint is still managing. The thumb
+        runs in counter-phase: it opens as the fingers close. Joints you did
+        not pick are left alone, or held fully outwards for the whole run if
+        you tick <em>hold rest open</em>.
       </p>
       <HoverNote label="Before you start">
         The hand moves to its hardstops at full travel and keeps going until
@@ -189,7 +216,7 @@ export function StressTestPanel() {
                           count > 0 && count < groupJoints.length
                       }
                     }}
-                    onChange={() => toggleWholeGroup(group, groupJoints)}
+                    onChange={() => toggleWholeGroup(groupJoints)}
                   />
                   <button
                     className={`finger-chip${
@@ -305,6 +332,63 @@ export function StressTestPanel() {
               />
               °
             </label>
+            <label className="stress-field">
+              steps
+              <input
+                type="number"
+                min={0}
+                max={MAX_STEPS}
+                placeholder="glide"
+                title={
+                  'waypoints between the two extremes — 0 sends one command ' +
+                  'straight to the extreme and the motors run the whole ' +
+                  'range at their own speed; blank keeps the smooth ' +
+                  'cruise-speed glide'
+                }
+                value={steps}
+                onChange={(e) => setSteps(e.target.value)}
+              />
+            </label>
+            <label className="toggle-label">
+              <input
+                type="checkbox"
+                checked={thumbOpposed}
+                onChange={(e) => setThumbOpposed(e.target.checked)}
+              />
+              thumb opposed
+            </label>
+            <label
+              className="toggle-label"
+              title={
+                'park every joint you did not pick at its outward limit and ' +
+                'hold it there — the rest of the hand stays splayed clear ' +
+                'of the joints being cycled instead of drifting'
+              }
+            >
+              <input
+                type="checkbox"
+                checked={holdRest}
+                onChange={(e) => setHoldRest(e.target.checked)}
+              />
+              hold rest open
+            </label>
+            <label
+              className="toggle-label"
+              title={
+                holdRest
+                  ? 'leave the abduction joints out of that hold, so they ' +
+                    'stay where they are instead of fanning out'
+                  : 'only applies while the rest of the hand is held open'
+              }
+            >
+              <input
+                type="checkbox"
+                disabled={!holdRest}
+                checked={freezeAbduction}
+                onChange={(e) => setFreezeAbduction(e.target.checked)}
+              />
+              freeze abduction
+            </label>
             <button
               className="btn btn-danger"
               disabled={blocked}
@@ -317,7 +401,20 @@ export function StressTestPanel() {
               {reason ??
                 `${selected.size} joint${selected.size > 1 ? 's' : ''} · ` +
                   `${loop ? 'nonstop' : `${cycles} cycles`}` +
-                  (marginDeg > 0 ? ` · ${marginDeg}° off each hardstop` : '')}
+                  (marginDeg > 0 ? ` · ${marginDeg}° off each hardstop` : '') +
+                  ` · ${
+                    parsedSteps === null
+                      ? 'gliding'
+                      : parsedSteps <= 0
+                        ? 'straight to each extreme at motor speed'
+                        : `${parsedSteps} steps per leg`
+                  }` +
+                  (thumbOpposed ? ' · thumb opposed' : '') +
+                  (holdRest
+                    ? ` · rest held open${
+                        freezeAbduction ? ', abduction frozen' : ''
+                      }`
+                    : '')}
             </span>
           </div>
         </>

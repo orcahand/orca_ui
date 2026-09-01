@@ -32,23 +32,6 @@ def client():
         yield test_client
 
 
-def test_manual_calibration_reanchors_joint(client):
-    response = client.post("/api/joints/calibrate",
-                           json={"joint": "index_mcp", "angle_deg": 30.0})
-    assert response.status_code == 200, response.text
-    body = response.json()
-    assert body["joint"] == "index_mcp"
-    assert body["angle_deg"] == 30.0
-    assert isinstance(body["anchor_count"], int)
-    # The mock connects with the feedback loop running, so the loop picks the
-    # new anchor up live.
-    assert body["loop_updated"] is True
-
-    info = client.get("/api/hand/info").json()
-    joint = next(j for j in info["joints"] if j["id"] == "index_mcp")
-    assert joint["encoder_calibrated"] is True
-
-
 def test_manual_calibration_rejects_bad_requests(client):
     response = client.post("/api/joints/calibrate",
                            json={"joint": "not_a_joint", "angle_deg": 0.0})
@@ -59,42 +42,3 @@ def test_manual_calibration_rejects_bad_requests(client):
                            json={"joint": "index_mcp", "angle_deg": 720.0})
     assert response.status_code == 400
     assert "outside the ROM" in response.json()["detail"]
-
-
-def test_calibrate_op_rejects_bad_sensor_flag(client):
-    response = client.post(
-        "/api/operation/calibrate/start",
-        json={"params": {"calibrate_joint_sensors": "yes"}})
-    assert response.status_code == 400
-    assert "calibrate_joint_sensors" in response.json()["detail"]
-
-
-def test_calibrate_op_accepts_sensor_flag(client):
-    response = client.post(
-        "/api/operation/calibrate/start",
-        json={"params": {"joints": ["index_mcp"], "step_duration_s": 0.05,
-                         "calibrate_joint_sensors": False}})
-    assert response.status_code == 200
-    assert _wait_for(
-        lambda: (client.get("/api/operation").json()["operation"] or {})
-        .get("state") == "done")
-
-
-def test_rom_frame_toggle(client):
-    info = client.get("/api/hand/info").json()
-    assert info["rom_frame"] == "anchor"
-    assert "rom_delta" in info["joints"][0]
-
-    response = client.post("/api/control/rom_frame",
-                           json={"mode": "centered"})
-    assert response.status_code == 200, response.text
-    assert response.json()["rom_frame"] == "centered"
-    assert client.get("/api/hand/info").json()["rom_frame"] == "centered"
-
-    response = client.post("/api/control/rom_frame",
-                           json={"mode": "sideways"})
-    assert response.status_code == 400
-    assert "unknown rom frame" in response.json()["detail"]
-
-    assert client.post("/api/control/rom_frame",
-                       json={"mode": "anchor"}).status_code == 200

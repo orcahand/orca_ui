@@ -148,6 +148,8 @@ def calibrate(
     force_wrist: bool,
     joint_encoder_client,
     progress_callback: Callable[[dict], None],
+    manual: bool = False,
+    prompt_callback: Callable[[dict], str] | None = None,
 ) -> None:
     """Blocking calibration on the calling thread; interrupt via request_stop."""
     hand.calibrate(
@@ -156,6 +158,8 @@ def calibrate(
         joints=joints,
         joint_encoder_client=joint_encoder_client,
         progress_callback=progress_callback,
+        manual=manual,
+        prompt_callback=prompt_callback,
     )
 
 

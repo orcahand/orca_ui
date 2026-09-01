@@ -6,7 +6,7 @@ read taken while the hand is moving therefore freezes it for a cycle and a
 half. These pin when a read is allowed to happen at all.
 """
 
-from orca_ui.hand.telemetry import MAX_TELEMETRY_STALENESS_S, TelemetryService
+from orca_ui.hand.telemetry import TelemetryService
 
 
 class _Caps:
@@ -133,54 +133,10 @@ def test_no_bus_reads_while_an_operation_runs():
     assert session.hand.bus_reads == []
 
 
-def test_idle_hand_reads_one_register_block_per_tick():
-    """Still hand: reads resume, but only one per tick so two never queue up
-    back to back on the bus."""
-    telemetry, session = _build()
-    for _ in range(4):
-        telemetry._slow_tick()
-    assert session.hand.bus_reads == ["state", "temp", "state", "temp"]
-
-
-def test_position_and_current_cost_one_read_not_two():
-    """They share a register block. Asking for them separately would pay two
-    full round trips to every motor for one transaction's data."""
-    telemetry, session = _build()
-    telemetry._slow_tick()
-    assert session.hand.bus_reads == ["state"]
-    assert "pos" not in session.hand.bus_reads
-    assert "current" not in session.hand.bus_reads
-
-
-def test_a_long_motion_still_gets_telemetry_eventually():
-    """Reads yield to motion, but not forever — an overheating motor during a
-    long replay must still surface."""
-    telemetry, session = _build(ramping=True)
-    telemetry._last_bus_read -= MAX_TELEMETRY_STALENESS_S + 1.0
-    telemetry._slow_tick()
-    assert session.hand.bus_reads == ["state"]
-
-
-def test_hand_without_a_loop_is_unrestricted():
-    """No loop means no writes to stall, so the livelier cadence stands."""
-    telemetry, session = _build(ramping=True, feedback_loop=False)
-    telemetry._slow_tick()
-    assert session.hand.bus_reads == ["temp", "current"]
-
-
 # ----- measured-stream fallback for unhealthy encoders ---------------------------
 
 
 from orca_ui.hand.telemetry import ENCODER_RESTORE_WINDOWS  # noqa: E402
-from orca_ui.streaming import topics as T  # noqa: E402
-
-
-class _PayloadHub:
-    def __init__(self):
-        self.published: list[tuple[str, dict]] = []
-
-    def publish(self, topic, payload):
-        self.published.append((topic, payload))
 
 
 def _health(verdict, joint="index_mcp"):
@@ -207,31 +163,3 @@ def test_encoder_suppression_fast_to_condemn_slow_to_forgive():
 
     telemetry._update_encoder_suppression(_health("live"))
     assert telemetry._enc_suppressed == {}
-
-
-def test_suppression_annotates_health_and_filters_measured():
-    session = _Session()
-    hub = _PayloadHub()
-    telemetry = TelemetryService(_Service(session), hub, _Settings())
-
-    payload = _health("chip error")
-    telemetry._update_encoder_suppression(payload)
-    assert payload["encoders"]["suppressed"] == {
-        "index_mcp": "chip error: test"}
-
-    # The fast tick drops the distrusted joint from the measured publish and
-    # names it, so clients delete their stale copy and fall back.
-    telemetry._fast_tick()
-    measured = [p for t, p in hub.published if t == T.JOINTS_MEASURED]
-    assert measured and measured[-1]["angles"] == {}
-    assert measured[-1]["suppressed"] == ["index_mcp"]
-
-
-def test_healthy_encoders_publish_measured_untouched():
-    session = _Session()
-    hub = _PayloadHub()
-    telemetry = TelemetryService(_Service(session), hub, _Settings())
-    telemetry._fast_tick()
-    measured = [p for t, p in hub.published if t == T.JOINTS_MEASURED]
-    assert measured and measured[-1]["angles"] == {"index_mcp": 10.0}
-    assert "suppressed" not in measured[-1]

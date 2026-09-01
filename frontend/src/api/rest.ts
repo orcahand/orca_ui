@@ -95,6 +95,15 @@ export const api = {
   // Closes the session and holds the ports free; only reconnect() lifts it.
   disconnect: () => post<{ status: StatusSnapshot }>('/api/disconnect'),
 
+  // Clears a latched hardware error. The motor returns with torque off.
+  rebootMotor: (id: number) =>
+    post<{
+      motor: number
+      joint: string | null
+      cleared: boolean
+      hw_error_flags: string[] | null
+    }>(`/api/motors/${id}/reboot`),
+
   models: () => request<ModelsInfo>('/api/models'),
   // name null hands the choice back to hardware detection.
   selectModel: (name: string | null, version?: string | null) =>

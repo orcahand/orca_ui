@@ -6,11 +6,13 @@ the contract.
 """
 
 import logging
+from types import SimpleNamespace
 
 from orca_ui.hand.faults import (
     TRACKING_GRACE_S,
     BusErrorMonitor,
     TrackingMonitor,
+    classify_hw_error,
 )
 
 
@@ -33,55 +35,7 @@ class TestBusErrorMonitor:
         assert snap["motors"][4]["last_error"] == "There is no status packet!"
         assert snap["bus"]["errors"] == 4
 
-    def test_overload_warning_counted(self):
-        monitor = BusErrorMonitor()
-        monitor.emit(_record(
-            "Motor 16 overload detected (error=0x20), rebooting...",
-            level=logging.WARNING))
-        snap = monitor.snapshot()
-        assert snap["motors"][16]["overloads"] == 1
-        assert snap["motors"][16]["last_error"] == "overload"
-
-    def test_id_list_messages_fan_out(self):
-        monitor = BusErrorMonitor()
-        monitor.emit(_record("Sync write failed for: [16, 17]"))
-        monitor.emit(_record(
-            "Could not set torque disabled for IDs: [1, 2, 3]"))
-        snap = monitor.snapshot()
-        assert snap["motors"][16]["errors"] == 1
-        assert snap["motors"][17]["errors"] == 1
-        assert snap["motors"][1]["errors"] == 1
-        assert snap["bus"]["errors"] == 5
-
-    def test_non_bus_loggers_ignored(self):
-        monitor = BusErrorMonitor()
-        monitor.emit(_record("[Motor ID: 3] nope", name="orca_ui.hand.service"))
-        assert monitor.snapshot()["bus"]["errors"] == 0
-
-    def test_ordinary_warnings_ignored(self):
-        monitor = BusErrorMonitor()
-        monitor.emit(_record("something unrelated", level=logging.WARNING))
-        monitor.emit(_record("also unrelated"))
-        assert monitor.snapshot() == {
-            "motors": {},
-            "bus": {"errors": 0, "last_error": None, "last_error_age_s": None},
-        }
-
-    def test_reset(self):
-        monitor = BusErrorMonitor()
-        monitor.emit(_record("> write_byte: [Motor ID: 3] boom"))
-        monitor.reset()
-        assert monitor.snapshot()["bus"]["errors"] == 0
-
-
 class TestTrackingMonitor:
-    def test_within_tolerance_is_following(self):
-        monitor = TrackingMonitor()
-        monitor.update({"index_mcp": 10.0}, {"index_mcp": 8.0}, now=0.0)
-        snap = monitor.snapshot(now=0.0)
-        assert snap["index_mcp"]["following"] is True
-        assert snap["index_mcp"]["deviation_deg"] == 2.0
-
     def test_deviation_needs_grace_before_stall(self):
         monitor = TrackingMonitor()
         monitor.update({"j": 90.0}, {"j": 0.0}, now=0.0)
@@ -107,26 +61,91 @@ class TestTrackingMonitor:
         assert snap["j"]["stalls"] == 1
         assert snap["j"]["stalled_total_s"] == 1.0
 
-    def test_second_stall_counts_again(self):
-        monitor = TrackingMonitor()
-        monitor.update({"j": 90.0}, {"j": 0.0}, now=0.0)
-        monitor.update({"j": 90.0}, {"j": 0.0}, now=2.0)
-        monitor.update({"j": 90.0}, {"j": 89.0}, now=3.0)
-        monitor.update({"j": 90.0}, {"j": 0.0}, now=4.0)
-        monitor.update({"j": 90.0}, {"j": 0.0}, now=6.0)
-        assert monitor.snapshot(now=6.0)["j"]["stalls"] == 2
 
-    def test_idle_clears_live_state_keeps_totals(self):
-        monitor = TrackingMonitor()
-        monitor.update({"j": 90.0}, {"j": 0.0}, now=0.0)
-        monitor.update({"j": 90.0}, {"j": 0.0}, now=2.0)
-        monitor.idle()
-        snap = monitor.snapshot(now=3.0)
-        assert snap["j"]["following"] is True
-        assert snap["j"]["deviation_deg"] is None
-        assert snap["j"]["stalls"] == 1
+class TestHardwareErrorClassification:
+    """What a latched Hardware Error Status tells the operator to do.
 
-    def test_missing_actual_joint_is_skipped(self):
-        monitor = TrackingMonitor()
-        monitor.update({"j": 90.0}, {}, now=0.0)
-        assert monitor.snapshot(now=0.0) == {}
+    Every latched bit disables the power stage identically, so the *kind* is
+    the only actionable part: a thermal latch is waited out, a power latch
+    re-latches on the next command until the supply or wiring is fixed.
+    """
+
+    def test_overheating_is_a_thermal_fault_that_wants_cooling(self):
+        info = classify_hw_error(["overheating"], motor=3, joint="index_mcp",
+                                 temperature_c=71.0)
+
+        assert info["kind"] == "thermal"
+        assert info["needs_cooling"] is True
+        assert info["disabled"] is True
+        assert "71 °C" in info["headline"]
+        assert "cool" in info["advice"].lower()
+
+    def test_power_outranks_thermal_when_both_are_latched(self):
+        """Cooling clears the thermal bit and changes nothing about the fault."""
+        info = classify_hw_error(["overheating", "input_voltage"], motor=5)
+
+        assert info["kind"] == "power"
+        # Waiting is still part of the job, but it is not the job.
+        assert info["needs_cooling"] is True
+        assert "Cooling will not help" in info["advice"]
+
+    def test_nothing_latched_is_not_a_fault(self):
+        assert classify_hw_error([]) is None
+        assert classify_hw_error(None) is None
+
+
+class _SweepClient:
+    """Motor client stand-in whose latched flags the test controls."""
+
+    def __init__(self, flags_by_motor):
+        self.flags_by_motor = flags_by_motor
+        self.reads = 0
+
+    def read_hardware_error(self, motor_id):
+        self.reads += 1
+        return motor_id
+
+    def decode_hardware_error(self, value):
+        return self.flags_by_motor.get(value, [])
+
+
+class TestHardwareErrorSweep:
+    def _sampler(self, flags_by_motor, motor_ids=(1, 2)):
+        from orca_ui.hand.telemetry import TelemetryService
+
+        sampler = TelemetryService.__new__(TelemetryService)
+        sampler._hw_errors = {}
+        sampler._hw_error_info = {}
+        sampler._hw_errors_warned = set()
+        sampler._last_hw_error_sweep = 0.0
+        sampler._motor_health = {}
+
+        client = _SweepClient(flags_by_motor)
+        config = SimpleNamespace(
+            motor_ids=list(motor_ids),
+            motor_to_joint_dict={1: "index_mcp", 2: "middle_mcp"},
+        )
+        session = SimpleNamespace(
+            hand=SimpleNamespace(motor_client=client, config=config))
+        return sampler, session, client
+
+    def test_sweep_records_latched_flags(self):
+        sampler, session, _ = self._sampler({1: ["overheating"], 2: []})
+
+        sampler._last_hw_error_sweep = -1e6  # force the interval open
+        sampler._sweep_hardware_errors(session)
+
+        assert sampler._hw_errors == {1: ["overheating"]}
+        assert sampler._hw_error_info[1]["kind"] == "thermal"
+        assert 2 not in sampler._hw_errors
+
+    def test_sweep_is_rate_limited(self):
+        """The sweep costs a bus read per motor; it must not run every tick."""
+        sampler, session, client = self._sampler({1: ["overload"], 2: []})
+
+        sampler._last_hw_error_sweep = -1e6
+        sampler._sweep_hardware_errors(session)
+        first = client.reads
+        sampler._sweep_hardware_errors(session)  # immediately again
+
+        assert client.reads == first

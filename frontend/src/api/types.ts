@@ -415,6 +415,23 @@ export interface MotorTracking {
   stalled_total_s: number // cumulative not-following time this session
 }
 
+// A latched Hardware Error Status, classified by what to do about it. Every
+// latched bit disables the motor identically (it answers the bus and ACKs
+// torque enable, but never energizes) — `kind` is what separates a fault you
+// wait out from one you go and fix.
+export type HwErrorKind = 'thermal' | 'power' | 'load' | 'encoder' | 'unknown'
+
+export interface HwErrorInfo {
+  flags: string[]
+  kind: HwErrorKind
+  disabled: boolean // always true today; the motor will not move until reboot
+  needs_cooling: boolean // separate from kind: a motor can latch both
+  temperature_c: number | null
+  headline: string
+  advice: string
+  disabled_note: string
+}
+
 export interface MotorFaultEntry {
   joint: string | null
   errors: number // failed bus transactions this session
@@ -422,6 +439,9 @@ export interface MotorFaultEntry {
   last_error: string | null
   last_error_age_s: number | null
   tracking: MotorTracking | null
+  hw_error_flags?: string[]
+  // null when nothing is latched.
+  hw_error?: HwErrorInfo | null
 }
 
 export interface MotorsFaults {
@@ -546,6 +566,25 @@ export interface Stats {
     stream_rearms: number
   } | null
   encoder: { frames_ok: number; last_freshness_ms: number } | null
+}
+
+// Something the operator has to act on, surfaced on the run's `extra` while
+// it goes and kept on its result. One entry per joint per kind.
+export interface CalibrationProblem {
+  kind: 'no_motion' | 'travel' | 'rejected' | 'timeout' | 'faulted'
+  joint: string
+  severity: 'error' | 'warn'
+  headline: string
+  advice: string
+  motor?: number
+  direction?: string
+  moved_deg?: number
+  travel_deg?: number
+  expected_deg?: number
+  flags?: string[]
+  temperature_c?: number | null
+  fault_kind?: string
+  needs_cooling?: boolean
 }
 
 // ----- calibration history --------------------------------------------------

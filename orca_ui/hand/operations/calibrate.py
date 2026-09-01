@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 
 from orca_ui.hand import calibration_log
 from orca_ui.hand.operations import hand_ops
+from orca_ui.hand.faults import classify_hw_error
 from orca_ui.hand.operations.base import OpContext, Operation
 
 
@@ -82,6 +83,10 @@ def validate_calibrate_params(service, params: dict) -> dict:
         raise ServiceError("calibrate_joint_sensors must be a boolean or null")
     return {"joints": joints,
             "force_wrist": bool(params.get("force_wrist", False)),
+            # Hands-on capture: torque stays off and the operator holds each
+            # joint on its hardstop. The only path for a joint whose motor
+            # cannot reach its own stop.
+            "manual": bool(params.get("manual", False)),
             "calibrate_joint_sensors": sensors,
             # Per-run current overrides; None = the config.yaml values.
             "calibration_current":
@@ -91,7 +96,8 @@ def validate_calibrate_params(service, params: dict) -> dict:
 
 
 def run_calibrate(hand, encoder_client, ctx: OpContext,
-                  joints: list[str] | None, force_wrist: bool) -> dict:
+                  joints: list[str] | None, force_wrist: bool,
+                  manual: bool = False) -> dict:
     """Blocking calibration with progress mapped onto the op snapshot.
 
     Every progress event is also archived (with a timestamp) to the
@@ -101,6 +107,24 @@ def run_calibrate(hand, encoder_client, ctx: OpContext,
     progress = {"steps_done": 0, "total": 0, "joints_calibrated": [],
                 "anchors_recorded": [], "anchors_dead": []}
     events: list[dict] = []
+    # Anything the operator has to act on, surfaced on the snapshot as it
+    # happens rather than only in the log: a joint whose motor never moved
+    # scrolls past in milliseconds otherwise.
+    problems: list[dict] = []
+
+    def problem(kind: str, joint: str, severity: str, headline: str,
+                advice: str, **fields) -> None:
+        entry = {"kind": kind, "joint": joint, "severity": severity,
+                 "headline": headline, "advice": advice, **fields}
+        # One entry per joint per kind: a re-run of the same step replaces it.
+        for index, existing in enumerate(problems):
+            if existing["joint"] == joint and existing["kind"] == kind:
+                problems[index] = entry
+                break
+        else:
+            problems.append(entry)
+        ctx.set_extra({"problems": list(problems)})
+        ctx.log(f"{'ERROR' if severity == 'error' else 'WARNING'}: {headline}")
 
     def on_event(event: dict) -> None:
         events.append({"t": round(time.time(), 3), **event})
@@ -136,6 +160,72 @@ def run_calibrate(hand, encoder_client, ctx: OpContext,
                     "kept and its Δ is shown as rejected. Check the joint's "
                     "hardstops or fix its joint_roms entry in config.yaml."
                     f"{_magnets(event)}")
+        elif kind == "sweep_no_motion":
+            problem(
+                "no_motion", event["joint"], "error",
+                f"{event['joint']} did not move during its "
+                f"{event['direction']} sweep "
+                f"({event['moved_deg']:.1f}° of motor travel)",
+                "Its recorded hardstop is just where the joint was resting. "
+                "Check the tendon is connected, that nothing blocks the "
+                "joint, and that the motor is not latched off.",
+                motor=event["motor"], direction=event["direction"],
+                moved_deg=event["moved_deg"])
+        elif kind == "travel_checked" and not event["within_margin"]:
+            short = event["travel_deg"] < event["expected_deg"]
+            pct = abs(event["deviation"]) * 100
+            problem(
+                "travel", event["joint"], "warn",
+                f"{event['joint']} swept {event['travel_deg']:.1f}° of "
+                f"motor travel, {pct:.0f}% "
+                f"{'short of' if short else 'past'} its "
+                f"{event['expected_deg']:.1f}° baseline",
+                "The range recorded for this joint is too small, so every "
+                "angle derived from it is wrong. Re-tension the tendon and "
+                "calibrate this joint again."
+                if short else
+                "More travel than the baseline allows: check the tendon for "
+                "slip, or re-measure the baseline with measure_travel.py.",
+                motor=event["motor"], travel_deg=event["travel_deg"],
+                expected_deg=event["expected_deg"])
+        elif kind == "limits_rejected":
+            problem(
+                "rejected", event["joint"], "error",
+                f"{event['joint']} was not calibrated: its two hardstops came "
+                f"out {event['travel_deg']:.1f}° apart",
+                "Two limits this close are not two hardstops. The joint keeps "
+                "the calibration it already had.",
+                motor=event["motor"], travel_deg=event["travel_deg"])
+        elif kind == "drive_step_timeout":
+            problem(
+                "timeout", event["joint"], "error",
+                f"{event['joint']} never settled onto a hardstop",
+                "It kept moving until the step gave up — a disconnected "
+                "tendon spins freely. No limit was recorded for that end.",
+                motor=event["motor"])
+        elif kind == "manual_capture_skipped":
+            ctx.log(f"skipped {event['joint']} {event['direction']} — no "
+                    "limit recorded for that end")
+        elif kind == "motor_faulted":
+            temp = event.get("temperature_c")
+            flags = event.get("flags") or []
+            progress.setdefault("faulted_motors", []).append(event["joint"])
+            # Advice per fault kind: "let it cool" is right for a thermal
+            # latch and actively misleading for an electrical one.
+            info = classify_hw_error(
+                flags or ["unknown"], motor=event["motor"],
+                joint=event["joint"], temperature_c=temp)
+            problem(
+                "faulted", event["joint"], "error",
+                info["headline"],
+                f"{info['disabled_note']} {info['advice']} Its steps were "
+                "skipped, so it keeps its previous calibration.",
+                motor=event["motor"], flags=flags,
+                temperature_c=temp, fault_kind=info["kind"],
+                needs_cooling=info["needs_cooling"])
+            ctx.log(f"MOTOR FAULT: {info['headline']}. "
+                    f"{info['disabled_note']} {info['advice']} Its steps are "
+                    "skipped, so it keeps its previous calibration.")
         elif kind == "wrist_skipped":
             ctx.log("wrist already calibrated (motor limits and encoder "
                     "anchor) — skipping its steps; force wrist to re-run")
@@ -163,6 +253,23 @@ def run_calibrate(hand, encoder_client, ctx: OpContext,
         elif kind == "calibration_aborted":
             ctx.log("calibration aborted — completed steps are persisted")
 
+    def on_prompt(request: dict) -> str:
+        """Park the op in awaiting_input until the operator answers."""
+        joint, direction = request["joint"], request["direction"]
+        end = "closed" if direction == "flex" else "open"
+        answer = ctx.wait_input(
+            f"Move {joint} all the way {end} ({direction}) by hand, hold it "
+            f"against the stop, then record.",
+            ["record", "skip", "abort"])
+        if answer == "record":
+            ctx.log(f"recording {joint} {direction} limit")
+        return answer
+
+    if manual:
+        ctx.log("MANUAL calibration: torque stays off for the whole run. "
+                "Move each joint to the end it names, hold it against the "
+                "hardstop, and press record.")
+
     # calibrate() clears orca_core's stop event at entry: a stop that landed
     # while we were connecting would be swallowed. Check ours first.
     ctx.check_stop()
@@ -175,6 +282,8 @@ def run_calibrate(hand, encoder_client, ctx: OpContext,
             force_wrist=force_wrist,
             joint_encoder_client=encoder_client,
             progress_callback=on_event,
+            manual=manual,
+            prompt_callback=on_prompt if manual else None,
         )
     except BaseException as e:
         error = str(e) or type(e).__name__
@@ -185,6 +294,8 @@ def run_calibrate(hand, encoder_client, ctx: OpContext,
             "finished_at": _now_iso(),
             "joints": joints,
             "force_wrist": force_wrist,
+            "manual": manual,
+            "problems": problems,
             "anchor_pass": encoder_client is not None,
             "completed": error is None,
             "error": error,
@@ -194,6 +305,7 @@ def run_calibrate(hand, encoder_client, ctx: OpContext,
             ctx.log(f"calibration events archived to {path}")
     ctx.check_stop()
     return {
+        "problems": problems,
         "steps_done": progress["steps_done"],
         "joints_calibrated": progress["joints_calibrated"],
         "anchors_recorded": progress["anchors_recorded"],
@@ -278,6 +390,7 @@ class CalibrateOperation(Operation):
                 hand, encoder_client, ctx,
                 joints=self.params["joints"],
                 force_wrist=self.params["force_wrist"],
+                manual=self.params["manual"],
             )
         finally:
             self._hand = None

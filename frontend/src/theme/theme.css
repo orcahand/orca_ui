@@ -421,6 +421,19 @@ header h1 {
   border-color: rgb(var(--warn-rgb) / 0.35);
 }
 
+.fault-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.reboot-btn {
+  padding: 1px 5px;
+  font-size: 9px;
+  letter-spacing: 0.4px;
+}
+
 /* --- Link controls ---
    Header-scale buttons: the header packs a lot into one row, so these sit a
    size below the in-panel .btn rather than setting the row height. */
@@ -1519,6 +1532,65 @@ header h1 {
   color: var(--warn);
   border: 1px solid rgb(var(--warn-rgb) / 0.25);
   background: rgb(var(--warn-rgb) / 0.06);
+}
+
+/* Calibration alerts: what the run found that the operator must act on. */
+.setup-alert {
+  align-self: stretch;
+  max-width: 760px;
+  padding: 8px 10px;
+  border: 1px solid rgb(var(--warn-rgb) / 0.3);
+  background: rgb(var(--warn-rgb) / 0.06);
+}
+
+.setup-alert.error {
+  border-color: rgb(var(--err-rgb) / 0.35);
+  background: rgb(var(--err-rgb) / 0.07);
+}
+
+.setup-alert-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--warn);
+}
+
+.setup-alert.error .setup-alert-title {
+  color: var(--err);
+}
+
+.setup-alert-list {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.setup-alert-list li {
+  display: grid;
+  grid-template-columns: 8px 1fr;
+  gap: 2px 7px;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.setup-alert-dot {
+  width: 6px;
+  height: 6px;
+  margin-top: 5px;
+  border-radius: 50%;
+}
+
+.setup-alert-headline {
+  color: var(--text);
+}
+
+.setup-alert-advice {
+  grid-column: 2;
+  color: var(--dim);
 }
 
 .setup-note.accent {

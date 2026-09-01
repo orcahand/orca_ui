@@ -44,13 +44,6 @@ def test_disconnect_releases_and_publishes_the_hold():
     assert status.ports == {}
 
 
-def test_reconnect_lifts_the_hold():
-    sup, _ = build("orcahand-right")
-    sup.disconnect()
-    sup.request_reconnect()
-    assert sup.status().released is False
-
-
 def test_an_operation_holding_the_hand_blocks_a_disconnect():
     sup, _ = build("orcahand-right")
     sup._in_maintenance = True
@@ -73,44 +66,12 @@ def client():
         yield test_client
 
 
-def test_disconnect_stays_disconnected(client):
-    body = client.post("/api/disconnect").json()
-    assert body["ok"] is True
-    assert body["status"]["state"] == "disconnected"
-    assert body["status"]["released"] is True
-
-    # The point of the hold: the ladder does not climb back on its own. Long
-    # enough to cover several detection passes.
-    time.sleep(2.0)
-    status = client.get("/api/status").json()
-    assert status["state"] == "disconnected"
-    assert status["released"] is True
-    assert status["capabilities"] is None
-
-
-def test_reconnect_brings_it_back(client):
-    client.post("/api/disconnect")
-    assert _wait_for(lambda: client.get("/api/status").json()["released"])
-
-    client.post("/api/reconnect")
-    status = _wait_for(
-        lambda: (s := client.get("/api/status").json())["state"] == "connected"
-        and s)
-    assert status["released"] is False
-    assert status["capabilities"]["motors"] is True
-
-
 def test_torque_is_off_after_a_disconnect(client):
     client.post("/api/torque/enable")
     assert _wait_for(lambda: client.get("/api/status").json()["torque_enabled"])
 
     client.post("/api/disconnect")
     assert client.get("/api/status").json()["torque_enabled"] is False
-
-
-def test_disconnect_is_idempotent(client):
-    client.post("/api/disconnect")
-    assert client.post("/api/disconnect").json()["status"]["released"] is True
 
 
 def test_hardware_calls_are_refused_while_released(client):

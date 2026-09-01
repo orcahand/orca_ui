@@ -181,7 +181,8 @@ function PlaybackBar({ operation }: { operation: OperationSnapshot }) {
 function RecordBar({ operation }: { operation: OperationSnapshot }) {
   const mode = String(operation.params.mode ?? 'continuous')
   const frequency = operation.params.frequency
-  const waypoints = mode === 'waypoints'
+  // Both waypoint modes park in awaiting_input between captures.
+  const waypoints = mode === 'waypoints' || mode === 'motor_waypoints'
   const awaiting =
     operation.state === 'awaiting_input' ? operation.awaiting : null
 
@@ -191,7 +192,7 @@ function RecordBar({ operation }: { operation: OperationSnapshot }) {
         <span className="rec-dot" /> REC
       </span>
       <span className="transport-detail">
-        {mode}
+        {mode.replace('_', ' ')}
         {!waypoints && frequency != null ? ` @ ${frequency}Hz` : ''}
         {awaiting
           ? ` · ${awaiting.prompt}`
