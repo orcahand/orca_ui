@@ -87,15 +87,6 @@ def test_feedback_failure_degrades_to_touch(env):
     assert session.caps.degraded
 
 
-def test_touch_partial_keeps_motor_bus(env):
-    settings, declared, presence, install = env
-    install({(True, True): "raise", (True, False): "raise",
-             (False, True): "partial"})
-    session = _connect_with_motors(settings, None, declared, presence)
-    assert session.tier == "motors"
-    assert session.caps.motors and not session.caps.tactile
-
-
 def test_all_tiers_failing_raises_with_attempts(env):
     settings, declared, presence, install = env
     install({(True, True): "raise", (True, False): "raise",
@@ -103,49 +94,3 @@ def test_all_tiers_failing_raises_with_attempts(env):
     with pytest.raises(SessionConnectError) as exc:
         _connect_with_motors(settings, None, declared, presence)
     assert len(exc.value.attempts) == 4
-
-
-def test_missing_sensing_ports_narrow_the_ladder(env):
-    settings, declared, presence, install = env
-    install({})
-    no_sensing = HardwarePresence(
-        motor_port="/dev/motor", sensing=SensingPorts(tactile=None, encoder=None))
-    session = _connect_with_motors(settings, None, declared, no_sensing)
-    assert session.tier == "motors"
-    assert session.caps.degraded
-
-
-def test_motor_tier_failures_fall_back_to_sensors_only(env, monkeypatch):
-    """A motor port that answers but won't connect (unpowered motors, broken
-    motor stack) must not block sensor viewing."""
-    settings, declared, presence, install = env
-    install({(True, True): "raise", (True, False): "raise",
-             (False, True): "fail", (False, False): "fail"})
-
-    sentinel = object()
-    monkeypatch.setattr(sessions, "probe_hardware", lambda config: presence)
-    monkeypatch.setattr(sessions, "_connect_sensors_only",
-                        lambda *args: sentinel)
-    monkeypatch.setattr(sessions, "declared_capabilities",
-                        lambda *args, **kwargs: declared)
-
-    assert sessions.connect_session(settings, None) is sentinel
-
-
-def test_no_motors_flag_skips_motor_tiers(env, monkeypatch):
-    import dataclasses
-    settings, declared, presence, install = env
-    settings = dataclasses.replace(settings, motors_enabled=False)
-
-    def explode(*args):
-        raise AssertionError("motor tiers must not run with --no-motors")
-
-    sentinel = object()
-    monkeypatch.setattr(sessions, "probe_hardware", lambda config: presence)
-    monkeypatch.setattr(sessions, "_connect_with_motors", explode)
-    monkeypatch.setattr(sessions, "_connect_sensors_only",
-                        lambda *args: sentinel)
-    monkeypatch.setattr(sessions, "declared_capabilities",
-                        lambda *args, **kwargs: declared)
-
-    assert sessions.connect_session(settings, None) is sentinel

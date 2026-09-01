@@ -41,6 +41,11 @@ git add orca_ui/webui
 The pre-commit hook stops you committing frontend sources without a rebuilt
 bundle.
 
+Everything static the UI serves has to live in `frontend/public/` — the build
+runs with `emptyOutDir`, so a file that exists only in `orca_ui/webui/` is
+deleted by the next `npm run build` and nobody notices until the feature that
+needed it goes quiet. (The fun-sound mp3s were in exactly that state.)
+
 ## Working against an unreleased orca_core
 
 The console talks to the hand through

@@ -1,6 +1,7 @@
-// Poses tab: preset pose grid, movement scripts (demos), and the trajectory
-// library with record/replay. Apply/replay/demo need torque, which is never
-// auto-enabled — the tab toolbar hosts a torque toggle for convenience.
+// Poses tab: preset pose grid, movement scripts (demos), the trajectory
+// library with record/replay, and the cable-integrity stress test. Everything
+// that moves the hand needs torque, which is never auto-enabled — the tab
+// toolbar hosts a torque toggle for convenience.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../../api/rest'
@@ -9,6 +10,7 @@ import { useAppStore } from '../../state/appStore'
 import { useControlGate, useOperationStore } from '../../state/operationStore'
 import { DemoList } from '../poses/DemoList'
 import { PoseGrid } from '../poses/PoseGrid'
+import { StressTestPanel } from '../poses/StressTestPanel'
 import { TrajectoryPanel } from '../poses/TrajectoryPanel'
 
 function fail(error: unknown) {
@@ -66,6 +68,7 @@ export function PosesView() {
         trajectories={trajectories}
         onChanged={refreshTrajectories}
       />
+      <StressTestPanel />
     </>
   )
 }

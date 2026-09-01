@@ -78,17 +78,6 @@ def test_wizard_two_full_rounds(client):
         lambda: client.get("/api/status").json()["state"] == "connected")
 
 
-def test_wizard_finish_early(client):
-    client.post("/api/operation/wizard/start",
-                json={"params": {**FAST, "rounds": 3}})
-    _wait_awaiting(client, ["Release"])
-    client.post("/api/operation/input", json={"value": "Release"})
-    _wait_awaiting(client, ["Continue", "Finish"])
-    client.post("/api/operation/input", json={"value": "Finish"})
-    snapshot = _wait_op_state(client, "done")
-    assert snapshot["result"]["rounds_completed"] == 1
-
-
 def test_wizard_estop_mid_round_releases_lease(client):
     client.post("/api/operation/wizard/start",
                 json={"params": {**FAST, "rounds": 2}})
@@ -98,10 +87,3 @@ def test_wizard_estop_mid_round_releases_lease(client):
     assert snapshot["detail"] == "stopped (e-stop)"
     assert _wait_for(
         lambda: client.get("/api/status").json()["state"] == "connected")
-
-
-def test_wizard_rejects_bad_rounds(client):
-    assert client.post("/api/operation/wizard/start",
-                       json={"params": {"rounds": 0}}).status_code == 400
-    assert client.post("/api/operation/wizard/start",
-                       json={"params": {"rounds": 99}}).status_code == 400

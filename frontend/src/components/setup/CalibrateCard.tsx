@@ -5,7 +5,13 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../../api/rest'
-import type { CalibrationRun, HandInfo, JointInfo } from '../../api/types'
+import type {
+  CalibrationProblem,
+  CalibrationRun,
+  HandInfo,
+  JointInfo,
+  OperationSnapshot,
+} from '../../api/types'
 import { useAppStore } from '../../state/appStore'
 import {
   isOperationActive,
@@ -15,6 +21,57 @@ import {
 import { HoverNote } from '../common/HoverNote'
 
 const GROUP_ORDER = ['wrist', 'thumb', 'index', 'middle', 'ring', 'pinky']
+
+// Live on `extra` while the run goes, then on its result — whichever the
+// snapshot currently carries.
+function problemsOf(
+  operation: OperationSnapshot | null,
+): CalibrationProblem[] {
+  if (operation === null || operation.kind !== 'calibrate') return []
+  const live = operation.extra?.problems
+  if (Array.isArray(live)) return live as CalibrationProblem[]
+  const finished = operation.result?.problems
+  return Array.isArray(finished) ? (finished as CalibrationProblem[]) : []
+}
+
+// Problems the run found, live while it runs and kept on the finished
+// snapshot. A joint whose motor never moved finishes its step in
+// milliseconds, so the log alone scrolls straight past it.
+function CalibrationAlerts({
+  problems,
+  running,
+}: {
+  problems: CalibrationProblem[]
+  running: boolean
+}) {
+  if (problems.length === 0) return null
+  const errors = problems.filter((p) => p.severity === 'error').length
+  return (
+    <div className={`setup-alert ${errors > 0 ? 'error' : 'warn'}`}>
+      <div className="setup-alert-title">
+        {errors > 0 ? '⚠ ' : ''}
+        {problems.length} joint{problems.length === 1 ? '' : 's'} need
+        {problems.length === 1 ? 's' : ''} attention
+        {running ? ' so far' : ''}
+      </div>
+      <ul className="setup-alert-list">
+        {problems.map((problem) => (
+          <li key={`${problem.joint}:${problem.kind}`}>
+            <span
+              className="setup-alert-dot"
+              style={{
+                background:
+                  problem.severity === 'error' ? 'var(--err)' : 'var(--warn)',
+              }}
+            />
+            <span className="setup-alert-headline">{problem.headline}</span>
+            <span className="setup-alert-advice">{problem.advice}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
 
 function groupOf(jointId: string): string {
   const prefix = jointId.split('_')[0]
@@ -77,6 +134,8 @@ export function CalibrateCard() {
     isOperationActive(operation)
       ? operation
       : null
+  const problems = problemsOf(operation)
+
   // Tensioning invalidates the recorded ranges, so a finished tension run is
   // a standing instruction to calibrate until some other operation replaces it.
   const afterTension =
@@ -90,6 +149,7 @@ export function CalibrateCard() {
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set())
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [redoWrist, setRedoWrist] = useState(false)
+  const [manual, setManual] = useState(false)
   // null = untouched: follow the first-time default (calibrate the sensors
   // only when some encoder-backed joint has no anchor yet).
   const [jointSensors, setJointSensors] = useState<boolean | null>(null)
@@ -204,6 +264,7 @@ export function CalibrateCard() {
       .operationStart('calibrate', {
         joints: selected.size > 0 ? [...selected] : null,
         force_wrist: redoWrist || wristSelected,
+        ...(manual ? { manual: true } : {}),
         ...(hasEncoderJoints ? { calibrate_joint_sensors: sensorsOn } : {}),
         ...(calCurrent.value !== null && calCurrent.value !== calDefault
           ? { calibration_current: calCurrent.value }
@@ -218,8 +279,11 @@ export function CalibrateCard() {
     <div className="setup-card">
       <div className="setup-card-title">Calibrate</div>
       <p className="setup-copy">
-        The hand drives every joint to its hardstops on its own and records the
-        range it can reach. Keep clear while it runs.
+        {manual
+          ? 'Torque stays off. You move each joint to the end it names, hold ' +
+            'it against the hardstop, and press record.'
+          : 'The hand drives every joint to its hardstops on its own and ' +
+            'records the range it can reach. Keep clear while it runs.'}
       </p>
       {active ? (
         <>
@@ -237,9 +301,11 @@ export function CalibrateCard() {
               />
             </div>
           )}
+          <CalibrationAlerts problems={problems} running />
         </>
       ) : (
         <>
+          <CalibrationAlerts problems={problems} running={false} />
           <HoverNote label="When to run it">
             After tensioning, after a lot of use, or when poses come out short.
             Stopping part-way keeps the joints it has already finished.
@@ -271,6 +337,23 @@ export function CalibrateCard() {
               </p>
             </>
           )}
+          <label className="joint-check">
+            <input
+              type="checkbox"
+              checked={manual}
+              onChange={(e) => setManual(e.target.checked)}
+            />
+            Manual calibration (move the joints by hand)
+          </label>
+          <p className="setup-option-hint">
+            {manual
+              ? 'The motors are never driven: each limit is the position you ' +
+                'hold the joint at. Use this for a joint whose motor cannot ' +
+                'reach its own hardstop — a stalling tendon, or a motor that ' +
+                'has latched off.'
+              : 'Off: the motors drive themselves onto the hardstops. Turn it ' +
+                'on when a joint will not reach its stop under its own power.'}
+          </p>
           <div className="setup-card-row">
             <button
               className="btn btn-primary"
@@ -283,9 +366,10 @@ export function CalibrateCard() {
               }
               onClick={start}
             >
-              {selected.size > 0
-                ? `Calibrate ${selected.size} selected`
-                : 'Calibrate every joint'}
+              {(manual ? 'Calibrate by hand: ' : 'Calibrate ') +
+                (selected.size > 0
+                  ? `${selected.size} selected`
+                  : 'every joint')}
             </button>
             {selected.size > 0 && (
               <button

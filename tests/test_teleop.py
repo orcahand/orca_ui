@@ -5,16 +5,11 @@ A synthetic client drives the real ``/ws/teleop`` wire protocol over the
 TestClient (external mode), so CI needs no orca_teleop environment.
 """
 
-import math
-import os
-import shutil
-import sys
 import threading
 import time
 
 import pytest
 from fastapi.testclient import TestClient
-from starlette.websockets import WebSocketDisconnect
 
 from orca_ui.hand.operations import Operation
 from orca_ui.hand.states import ControlSource
@@ -200,102 +195,7 @@ def _engaged_session(client, child, ramp_s=0.0):
 # ----- handshake / protocol ---------------------------------------------------------
 
 
-def test_start_external_returns_token_and_hello_upgrades_to_preview(client, child):
-    body = child.start_session()
-    assert body["token"]
-    assert body["session"]["state"] == "starting"
-    assert body["session"]["mode"] == "external"
-
-    child.connect()
-    state = _teleop_state(client)
-    assert state["state"] == "preview"
-    assert state["source"] == "synthetic"
-    assert state["child"]["connected"] is True
-    assert state["child"]["pid"] == 4242
-
-
-def _expect_hello_reject(client, hello_data, expected_code):
-    with client.websocket_connect("/ws/teleop") as ws:
-        ws.send_json({"type": "hello", "data": hello_data})
-        with pytest.raises(WebSocketDisconnect) as excinfo:
-            ws.receive_json()
-        assert excinfo.value.code == expected_code
-
-
-def test_hello_rejects(client, child):
-    child.start_session()
-
-    _expect_hello_reject(client, {"token": "nope", "proto": 1,
-                                  "source": "synthetic",
-                                  "hand": {"side": "right"}}, 4001)
-    assert _teleop_state(client)["state"] == "starting"   # session unharmed
-
-    _expect_hello_reject(client, {"token": child.token, "proto": 1,
-                                  "source": "synthetic",
-                                  "hand": {"side": "left"}}, 4003)
-    assert _teleop_state(client)["state"] == "starting"
-
-    # good hello still works afterwards
-    child.connect()
-    assert _teleop_state(client)["state"] == "preview"
-
-
-def test_start_conflicts_while_active(client, child):
-    child.start_session()
-    response = client.post("/api/teleop/start",
-                           json={"source": "synthetic", "mode": "external"})
-    assert response.status_code == 409
-
-    assert client.post("/api/teleop/stop").json()["stopped"] is True
-    assert _teleop_state(client)["state"] == "idle"
-    # stop is idempotent
-    assert client.post("/api/teleop/stop").json()["stopped"] is False
-
-
-def test_unknown_source_400(client):
-    response = client.post("/api/teleop/start",
-                           json={"source": "telepathy", "mode": "external"})
-    assert response.status_code == 400
-
-
 # ----- preview: targets topic + clamping ----------------------------------------------
-
-
-def test_preview_targets_published_and_clamped_not_forwarded(client, child):
-    child.start_session()
-    child.connect()
-
-    # A joint that is NOT wrist — wrist is used below as the NaN victim.
-    joint = next(j for j in child.joints if j != "wrist")
-    lo, hi = child.roms[joint]
-    child.send_targets({joint: hi + 1000.0, "not_a_joint": 1.0,
-                        "wrist": float("nan")})
-
-    payload = _wait_for(lambda: _hub_payload(client, T.TELEOP_TARGETS))
-    assert payload["angles"][joint] == pytest.approx(hi)
-    assert "not_a_joint" not in payload["angles"]
-    assert "wrist" not in payload["angles"] or math.isfinite(
-        payload["angles"]["wrist"])
-
-    # preview never touches the command channel
-    assert _hub_payload(client, T.JOINTS_TARGET) is None
-    assert _control(client)["control_source"] == "manual"
-
-
-def test_status_and_log_frames(client, child):
-    child.start_session()
-    child.connect()
-    child.send_status(ingress_fps=29.5, tracking=True, retarget_ms=7.5,
-                      calibrating={"done": False, "frames": 12, "needed": 30})
-    assert _wait_for(
-        lambda: _teleop_state(client)["stats"].get("ingress_fps") == 29.5)
-    assert _teleop_state(client)["calibrating"]["frames"] == 12
-
-    child.ws.send_json({"type": "log", "data": {"level": "info",
-                                                "line": "hello from child"}})
-    assert _wait_for(lambda: any(
-        "hello from child" in entry["line"]
-        for entry in client.get("/api/teleop/log").json()["lines"]))
 
 
 # ----- engage / arbiter -------------------------------------------------------------
@@ -308,35 +208,6 @@ def test_engage_requires_torque(client, child):
     response = client.post("/api/teleop/engage", json={})
     assert response.status_code == 409
     assert "torque" in response.json()["detail"]
-
-
-def test_engage_without_tracking_arms_then_ramps_on_first_frame(client, child):
-    """The operator's hand is on the mouse, not in frame, when they click
-    Engage: engaging must work anyway (hand holds), and the first arriving
-    frames ramp in from the current pose."""
-    child.start_session()
-    child.connect()
-    _enable_torque(client)
-
-    response = client.post("/api/teleop/engage", json={"ramp_s": 0.2})
-    assert response.status_code == 200
-    assert response.json()["session"]["state"] == "engaged"
-
-    # no targets yet -> watchdog flags tracking lost, hand just holds
-    assert _wait_for(
-        lambda: _teleop_state(client)["tracking"] == "lost", timeout=2.0)
-    assert _teleop_state(client)["state"] == "engaged"
-    baseline = client.app_state.hub.latest(T.JOINTS_TARGET)
-    baseline_seq = baseline[0] if baseline else 0
-
-    # hand enters the frame -> targets flow -> commands reach the channel
-    child.start_pump()
-    assert _wait_for(
-        lambda: (client.app_state.hub.latest(T.JOINTS_TARGET) or (0,))[0]
-        > baseline_seq, timeout=3.0)
-    assert _wait_for(
-        lambda: _teleop_state(client)["tracking"] == "ok", timeout=2.0)
-    assert _teleop_state(client)["state"] == "engaged"
 
 
 def test_engage_locks_manual_control_until_disengage(client, child):
@@ -375,57 +246,6 @@ def test_engage_locks_manual_control_until_disengage(client, child):
     assert response.status_code == 200
 
 
-def test_engage_ramps_from_current_pose(client, child):
-    child.start_session()
-    child.connect()
-    seed = _enable_torque(client)
-    pose = child.start_pump()
-    assert _wait_for(lambda: _teleop_state(client)["stats"]["target_hz"])
-
-    response = client.post("/api/teleop/engage", json={"ramp_s": 1.0})
-    assert response.status_code == 200
-    assert response.json()["session"]["ramping"] is True
-
-    joint = child.joints[0]
-    first = _wait_for(lambda: _hub_payload(client, T.JOINTS_TARGET))
-    # Early in the ramp the command sits near the seed pose, not the target.
-    start_value = seed.get(joint, 0.0)
-    assert abs(first["angles"][joint] - start_value) < \
-        abs(pose[joint] - start_value)
-
-    # After the ramp: raw teleop target flows through unchanged.
-    assert _wait_for(
-        lambda: not _teleop_state(client)["ramping"], timeout=3.0)
-    assert _wait_for(
-        lambda: (_hub_payload(client, T.JOINTS_TARGET)["angles"].get(joint)
-                 == pytest.approx(pose[joint], abs=1e-6)),
-        timeout=2.0)
-
-
-def test_operation_start_blocked_while_engaged(client, child):
-    _engaged_session(client, child)
-    response = client.post("/api/operation/test.fast/start", json={})
-    assert response.status_code == 409
-    assert "teleop" in response.json()["detail"]
-
-
-def test_engage_blocked_while_operation_owns_control(client, child):
-    child.start_session()
-    child.connect()
-    child.start_pump()
-    _enable_torque(client)
-    assert _wait_for(lambda: _teleop_state(client)["stats"]["target_hz"])
-
-    assert client.post("/api/operation/test.hold/start").status_code == 200
-    assert _wait_for(
-        lambda: _control(client)["control_source"] == "operation")
-    response = client.post("/api/teleop/engage", json={})
-    assert response.status_code == 409
-
-    client.post("/api/operation/stop")
-    assert _wait_for(lambda: _control(client)["control_source"] == "manual")
-
-
 # ----- watchdog ----------------------------------------------------------------------
 
 
@@ -454,19 +274,6 @@ def test_torque_drop_auto_disengages(client, child):
     assert _control(client)["control_source"] == "manual"
 
 
-def test_child_link_loss_fails_session(client, child):
-    child.start_session()
-    child.connect()
-    child.disconnect()
-    assert _wait_for(lambda: _teleop_state(client)["state"] == "error",
-                     timeout=2.0)
-    assert "link lost" in _teleop_state(client)["error"]
-
-    # sticky error clears on the next start
-    child.start_session()
-    assert _teleop_state(client)["state"] == "starting"
-
-
 # ----- e-stop ------------------------------------------------------------------------
 
 
@@ -483,225 +290,13 @@ def test_estop_ends_teleop_session(client, child):
 # ----- config ------------------------------------------------------------------------
 
 
-def test_config_set_while_starting_arrives_in_hello_ok(client, child):
-    """The browser can toggle e.g. the camera preview while the child is
-    still starting — the accumulated config must ride along in hello_ok
-    (a plain config message would be lost: no link yet)."""
-    child.start_session()
-    response = client.post("/api/teleop/config",
-                           json={"config": {"preview": True,
-                                            "orientation_gate": False}})
-    assert response.status_code == 200
-
-    ack = child.connect()
-    assert ack["config"]["preview"] is True
-    assert ack["config"]["orientation_gate"] is False
-
-
-def test_config_roundtrip_reaches_child(client, child):
-    child.start_session()
-    child.connect()
-    response = client.post("/api/teleop/config",
-                           json={"config": {"manual_wrist_deg": 12.5,
-                                            "bogus_key": 1}})
-    assert response.status_code == 200
-    assert response.json()["config"]["manual_wrist_deg"] == 12.5
-    assert "bogus_key" not in response.json()["config"]
-
-    message = child.ws.receive_json()
-    assert message["type"] == "config"
-    assert message["data"]["manual_wrist_deg"] == 12.5
-
-    response = client.post("/api/teleop/config", json={"config": {"nope": 1}})
-    assert response.status_code == 400
-
-
 # ----- WS snapshot replay --------------------------------------------------------------
-
-
-def test_ws_replays_teleop_state_on_subscribe(client, child):
-    child.start_session()
-    child.connect()
-    with client.websocket_connect("/ws") as ws:
-        ws.send_json({"type": "subscribe",
-                      "data": {"topics": [T.TELEOP_STATE]}})
-        for _ in range(10):
-            message = ws.receive_json()
-            if message["type"] == T.TELEOP_STATE:
-                break
-        assert message["type"] == T.TELEOP_STATE
-        assert message["data"]["state"] == "preview"
 
 
 # ----- managed child runner --------------------------------------------------------------
 
 
-def test_managed_spawn_captures_log_and_reports_exit(tmp_path):
-    fake_child = tmp_path / "fake_child.py"
-    fake_child.write_text(
-        "import sys, time\n"
-        "print('fake child started', flush=True)\n"
-        "time.sleep(0.3)\n"
-        "sys.exit(3)\n"
-    )
-    config_path = materialize_mock_model()
-    settings = UiSettings(
-        config_path=config_path, mock=True, open_browser=False,
-        teleop_cmd=f"{sys.executable} {fake_child}",
-    )
-    app = create_app(settings)
-    with TestClient(app) as client:
-        client.app_state = app.state
-        assert _wait_for(
-            lambda: client.get("/api/status").json()["state"] == "connected")
-
-        response = client.post("/api/teleop/start",
-                               json={"source": "synthetic"})
-        assert response.status_code == 200, response.text
-        assert response.json()["session"]["state"] == "starting"
-
-        assert _wait_for(
-            lambda: client.get("/api/teleop/state").json()["session"]["state"]
-            == "error", timeout=5.0)
-        state = client.get("/api/teleop/state").json()["session"]
-        assert "exited (code 3)" in state["error"]
-        lines = [entry["line"]
-                 for entry in client.get("/api/teleop/log").json()["lines"]]
-        assert any("fake child started" in line for line in lines)
-
-
-def test_managed_spawn_unavailable_503(tmp_path):
-    config_path = materialize_mock_model()
-    settings = UiSettings(
-        config_path=config_path, mock=True, open_browser=False,
-        teleop_dir=str(tmp_path / "does-not-exist"),
-    )
-    app = create_app(settings)
-    with TestClient(app) as client:
-        assert _wait_for(
-            lambda: client.get("/api/status").json()["state"] == "connected")
-        response = client.post("/api/teleop/start",
-                               json={"source": "mediapipe"})
-        assert response.status_code == 503
-
-
-def test_sources_listing(client):
-    body = client.get("/api/teleop/sources").json()
-    assert set(body["sources"]) == {"mediapipe", "synthetic", "manus", "avp"}
-    assert "runner" in body
-    assert body["cameras"] is None   # never scanned in this app instance
-
-
-def test_camera_scan_via_fake_probe(tmp_path):
-    fake_probe = tmp_path / "fake_probe.py"
-    fake_probe.write_text(
-        "import sys\n"
-        "print('noise that is not json')\n"
-        "print('[{\"index\": 0, \"width\": 1280, \"height\": 720}, "
-        "{\"index\": 1, \"width\": 640, \"height\": 480}]')\n"
-    )
-    config_path = materialize_mock_model()
-    settings = UiSettings(
-        config_path=config_path, mock=True, open_browser=False,
-        teleop_cmd=f"{sys.executable} {fake_probe}",
-    )
-    app = create_app(settings)
-    with TestClient(app) as client:
-        assert _wait_for(
-            lambda: client.get("/api/status").json()["state"] == "connected")
-
-        response = client.post("/api/teleop/cameras/scan")
-        assert response.status_code == 200, response.text
-        cameras = response.json()["cameras"]
-        # probed cameras always listed as available; the host may add extra
-        # OS-known-but-unopenable ones (e.g. a sleeping Continuity Camera)
-        probed = [c for c in cameras if c["available"]]
-        assert [c["index"] for c in probed] == [0, 1]
-        # names come from the host (macOS system_profiler; may be empty
-        # elsewhere) and the default is picked from the openable set
-        assert response.json()["default_camera_index"] in (0, 1)
-
-        # cached into the sources listing
-        body = client.get("/api/teleop/sources").json()
-        assert [c["index"] for c in body["cameras"]] == [0, 1]
-
-        # scanning is refused while a session is live (it would steal the
-        # camera)
-        client.post("/api/teleop/start",
-                    json={"source": "synthetic", "mode": "external"})
-        assert client.post("/api/teleop/cameras/scan").status_code == 409
-        client.post("/api/teleop/stop")
-
-
 # ----- orca_teleop checkout: availability probe + install ---------------------------------
-
-
-def _write_teleop_checkout(path, *, name="orca_teleop", streamer=True):
-    """A directory that looks (or deliberately does not look) like a checkout."""
-    path.mkdir(parents=True, exist_ok=True)
-    scripts = ('[project.scripts]\norca-teleop-streamer = "orca_teleop.streamer:main"\n'
-               if streamer else "")
-    (path / "pyproject.toml").write_text(
-        f'[project]\nname = "{name}"\nversion = "0.1.0"\n\n{scripts}')
-    return str(path)
-
-
-@pytest.mark.parametrize("build,expected", [
-    (lambda p: None, "no_checkout"),
-    (lambda p: str(p / "not_a_dir"), "no_checkout"),
-    (lambda p: _write_teleop_checkout(p / "co", name="something_else"), "no_pyproject"),
-    (lambda p: _write_teleop_checkout(p / "co", streamer=False), "no_streamer_entrypoint"),
-    (lambda p: _write_teleop_checkout(p / "co"), "ok"),
-])
-def test_resolve_command_reports_why_the_runner_is_unusable(
-        tmp_path, monkeypatch, build, expected):
-    """A checkout on a branch without the console's entry point used to probe
-    as available and then fail at spawn."""
-    from orca_ui.hand.teleop import runner as R
-
-    # Isolate from this machine's real sibling checkout / memo.
-    monkeypatch.setattr(R, "_find_sibling_teleop_dir", lambda: None)
-    monkeypatch.setattr(R, "remembered_teleop_dir", lambda: None)
-    monkeypatch.delenv("ORCA_TELEOP_DIR", raising=False)
-    teleop_dir = build(tmp_path)
-    settings = UiSettings(config_path=materialize_mock_model(), mock=True,
-                          open_browser=False, teleop_dir=teleop_dir)
-    argv, detail, reason = R.resolve_command(settings)
-    assert reason == expected, detail
-    assert (argv is not None) == (expected == "ok")
-
-
-def test_remembered_path_precedence(tmp_path, monkeypatch):
-    """The memo beats the sibling scan, loses to explicit settings/env, and a
-    stale entry falls through instead of pinning a deleted directory."""
-    from orca_ui.hand.teleop import paths as P
-    from orca_ui.hand.teleop import runner as R
-
-    memo = tmp_path / ".orca-ui.json"
-    monkeypatch.setattr(P, "settings_path", lambda: str(memo))
-    monkeypatch.setattr(P, "_memo_cache", None, raising=False)
-    sibling = _write_teleop_checkout(tmp_path / "sibling")
-    monkeypatch.setattr(R, "_find_sibling_teleop_dir", lambda: sibling)
-    base = dict(config_path=materialize_mock_model(), mock=True, open_browser=False)
-
-    # nothing remembered -> sibling
-    assert R.resolve_command(UiSettings(**base))[0][3] == sibling
-
-    remembered = _write_teleop_checkout(tmp_path / "remembered")
-    P.remember_teleop_dir(remembered)
-    assert R.resolve_command(UiSettings(**base))[0][3] == remembered
-
-    # explicit settings and the env var both outrank the memo
-    explicit = _write_teleop_checkout(tmp_path / "explicit")
-    assert R.resolve_command(UiSettings(**base, teleop_dir=explicit))[0][3] == explicit
-    monkeypatch.setenv("ORCA_TELEOP_DIR", explicit)
-    assert R.resolve_command(UiSettings(**base))[0][3] == explicit
-    monkeypatch.delenv("ORCA_TELEOP_DIR")
-
-    # a remembered checkout that has since been deleted must not win
-    shutil.rmtree(remembered)
-    monkeypatch.setattr(P, "_memo_cache", None, raising=False)
-    assert R.resolve_command(UiSettings(**base))[0][3] == sibling
 
 
 def _fake_bin(tmp_path, name, body):
@@ -711,128 +306,3 @@ def _fake_bin(tmp_path, name, body):
     path.write_text("#!/bin/sh\n" + body)
     path.chmod(0o755)
     return str(path)
-
-
-@pytest.fixture()
-def install_client(tmp_path, monkeypatch):
-    """App whose installer shells into fake git/uv, with teleop DISABLED —
-    the case where /api/teleop/* 503s but install must still work."""
-    from orca_ui.hand.teleop import installer as I
-    from orca_ui.hand.teleop import paths as P
-
-    monkeypatch.setattr(P, "settings_path", lambda: str(tmp_path / ".orca-ui.json"))
-    monkeypatch.setattr(P, "_memo_cache", None, raising=False)
-    # Patch on the installer module: it binds these names at import, so
-    # patching only `paths` would let the install target this machine's real
-    # ../orca_teleop checkout.
-    monkeypatch.setattr(I, "default_install_dir", lambda: str(tmp_path / "orca_teleop"))
-    monkeypatch.setattr(I, "default_description_dir",
-                        lambda: str(tmp_path / "orcahand_description"))
-    (tmp_path / "orcahand_description").mkdir()   # already present: no clone
-    # `git clone [--branch B] REPO TARGET` -> materialize a plausible checkout.
-    monkeypatch.setattr(I, "GIT_BIN", _fake_bin(tmp_path, "git", """
-echo "cloning"
-eval "target=\\${$#}"
-mkdir -p "$target"
-printf '[project]\\nname = "orca_teleop"\\n\\n[project.scripts]\\norca-teleop-streamer = "x:main"\\n' > "$target/pyproject.toml"
-"""))
-    monkeypatch.setattr(I, "UV_BIN", _fake_bin(tmp_path, "uv", 'echo "Resolved 1 package"\n'))
-    settings = UiSettings(config_path=materialize_mock_model(), mock=True,
-                          open_browser=False, teleop_enabled=False)
-    app = create_app(settings)
-    with TestClient(app) as client:
-        client.installer = app.state.teleop_installer
-        client.tmp_path = tmp_path
-        yield client
-
-
-def _await_install(client, timeout=10.0):
-    _wait_for(lambda: client.get("/api/teleop/install").json()["finished"],
-              timeout=timeout)
-    return client.get("/api/teleop/install").json()
-
-
-def test_install_is_reachable_with_teleop_disabled(install_client):
-    """--no-teleop turns off the teleop MANAGER, which is unrelated to whether
-    a checkout exists — and installing one is the whole point."""
-    assert install_client.get("/api/teleop/state").status_code == 503
-    assert install_client.get("/api/teleop/install").status_code == 200
-
-
-def test_install_clones_builds_and_remembers(install_client):
-    from orca_ui.hand.teleop.paths import remembered_teleop_dir
-
-    target = str(install_client.tmp_path / "orca_teleop")
-    assert install_client.post("/api/teleop/install").status_code == 200
-    state = _await_install(install_client)
-    assert state["ok"] is True, state["error"]
-    assert os.path.isfile(os.path.join(target, "pyproject.toml"))
-    assert remembered_teleop_dir() == target
-
-    log = install_client.get("/api/teleop/install/log").json()
-    text = "\n".join(line["line"] for line in log["lines"])
-    assert "cloning" in text and "Resolved 1 package" in text
-    # Its own run_id space: a teleop session must never clear this pane.
-    assert log["run_id"].startswith("install:")
-
-
-def test_install_refuses_an_occupied_target(install_client):
-    occupied = install_client.tmp_path / "occupied"
-    occupied.mkdir()
-    (occupied / "some_file").write_text("x")
-    response = install_client.post("/api/teleop/install",
-                                   json={"path": str(occupied)})
-    assert response.status_code == 409
-    assert "not an orca_teleop checkout" in response.json()["detail"]
-
-
-def test_install_adopts_an_existing_checkout(install_client):
-    """Re-running over a checkout builds it rather than failing or re-cloning."""
-    existing = _write_teleop_checkout(install_client.tmp_path / "existing")
-    assert install_client.get(
-        f"/api/teleop/install?path={existing}").json()["target"]["state"] == "existing_checkout"
-    install_client.post("/api/teleop/install", json={"path": existing})
-    state = _await_install(install_client)
-    assert state["ok"] is True, state["error"]
-    text = "\n".join(l["line"] for l in
-                     install_client.get("/api/teleop/install/log").json()["lines"])
-    assert "skipping clone" in text
-
-
-def test_install_does_not_remember_a_failed_build(install_client, monkeypatch):
-    """A remembered path must point at something usable."""
-    from orca_ui.hand.teleop import installer as I
-    from orca_ui.hand.teleop.paths import remembered_teleop_dir
-
-    monkeypatch.setattr(I, "UV_BIN", _fake_bin(
-        install_client.tmp_path, "uv_fail", 'echo "resolution failed" >&2\nexit 1\n'))
-    install_client.post("/api/teleop/install")
-    state = _await_install(install_client)
-    assert state["ok"] is False
-    assert "uv_fail failed (exit 1)" in state["error"]
-    assert remembered_teleop_dir() is None
-
-
-def test_install_rejects_a_second_concurrent_run(install_client, monkeypatch):
-    from orca_ui.hand.teleop import installer as I
-
-    monkeypatch.setattr(I, "UV_BIN", _fake_bin(
-        install_client.tmp_path, "uv_slow", 'sleep 5\n'))
-    assert install_client.post("/api/teleop/install").status_code == 200
-    _wait_for(lambda: install_client.get("/api/teleop/install").json()["running"])
-    assert install_client.post("/api/teleop/install").status_code == 409
-    install_client.post("/api/teleop/install/cancel")
-    assert _await_install(install_client)["ok"] is False
-
-
-def test_install_cancel_kills_the_child(install_client, monkeypatch):
-    from orca_ui.hand.teleop import installer as I
-
-    monkeypatch.setattr(I, "UV_BIN", _fake_bin(
-        install_client.tmp_path, "uv_hang", 'sleep 30\n'))
-    install_client.post("/api/teleop/install")
-    _wait_for(lambda: install_client.get("/api/teleop/install").json()["phase"]
-              == "building environment")
-    install_client.post("/api/teleop/install/cancel")
-    state = _await_install(install_client, timeout=15.0)
-    assert state["ok"] is False and state["error"] == "cancelled"

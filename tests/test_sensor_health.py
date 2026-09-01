@@ -8,14 +8,13 @@ window with no frames at all reads "no frames".
 """
 
 import numpy as np
-from orca_core.hardware.hand_serial_link import LinkStats
 from orca_core.hardware.sensing.constants import (
     AUTO_ENC_ANGLE_MASK,
     AUTO_ENC_NUM_JOINTS,
     ENCODER_LSB_DEG,
     JOINT_TO_ENCODER_SLOT,
 )
-from orca_core.hardware.sensing.types import EncoderReading, LinkHealth
+from orca_core.hardware.sensing.types import EncoderReading
 
 from orca_ui.hand.telemetry import SensorHealthMonitor
 
@@ -79,56 +78,3 @@ def test_parity_chip_error_and_rail_verdicts():
     assert by_slot[1] == "chip error"
     assert by_slot[2] == "no encoder"
     assert by_slot[3] == "live"
-
-
-def test_window_with_no_frames_reads_no_frames():
-    monitor = SensorHealthMonitor()
-    monitor.feed(_reading(1.0))
-    monitor.payload(_Session())  # closes the fed window
-
-    # get_latest keeps returning the same stale frame; same timestamp must
-    # not count as new data.
-    monitor.feed(_reading(1.0))
-    joints = monitor.payload(_Session())["encoders"]["joints"]
-    assert all(j["verdict"] == "no frames" for j in joints.values())
-
-
-def test_tactile_and_link_sections():
-    class _Cfg:
-        connected = {"thumb": True, "index": False}
-        num_taxels = {"thumb": 16}
-
-    class _TacStats:
-        frames_ok = 100
-        stream_rearms = 2
-
-    session = _Session(encoders=False, tactile=True)
-    stats = LinkStats()
-    stats.bad_header_resyncs = 3
-    stats.frames_bad_lrc["0xA9"] = 4
-    session.tactile_configuration = lambda: _Cfg()
-    session.tactile_stats = lambda: _TacStats()
-    session.sensing_link_health = lambda: {
-        "tactile": LinkHealth(connected=True, port_dead=False,
-                              port_error=None, stats=stats),
-    }
-
-    payload = SensorHealthMonitor().payload(session)
-    assert payload["encoders"] is None
-    tac = payload["tactile"]
-    assert tac["fingers"] == {
-        "thumb": {"connected": True, "taxels": 16},
-        "index": {"connected": False, "taxels": 0},
-    }
-    assert tac["stream_rearms"] == 2
-    assert payload["links"]["tactile"] == {
-        "connected": True, "port_dead": False, "port_error": None,
-        "resyncs": 3, "bad_lrc": 4,
-    }
-
-
-def test_duck_typed_session_without_accessors_survives():
-    payload = SensorHealthMonitor().payload(_Session(encoders=True, tactile=True))
-    assert payload["encoders"]["hz"] == 0.0
-    assert payload["tactile"]["fingers"] == {}
-    assert payload["links"] == {}

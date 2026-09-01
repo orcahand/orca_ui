@@ -36,6 +36,33 @@ export interface StatusSnapshot {
   // is plugged in, so a swapped hand shows up as a change here.
   model: string
   side: string
+  // False while the model is still detection's to revise, true once the
+  // command line or the picker named one.
+  model_pinned: boolean
+  // True while someone has taken the hardware back: the connect ladder is
+  // suspended, so `disconnected` is a resting state rather than a search.
+  released: boolean
+}
+
+export interface ModelEntry {
+  name: string
+  version: string // '' for a model outside orca_core's bundle
+  side: 'left' | 'right'
+  tactile: boolean
+  encoders: boolean
+  config_path: string
+  // False for a --config path: shown as current, but it has no model name to
+  // be selected back by.
+  selectable: boolean
+}
+
+export interface ModelsInfo {
+  models: ModelEntry[]
+  selected: string
+  pinned: boolean
+  // Detection needs a bus to ask — mock mode has none.
+  auto_available: boolean
+  config_path: string
 }
 
 export interface JointInfo {
@@ -102,6 +129,12 @@ export interface JointGains {
 export interface ControlState {
   torque_enabled: boolean
   max_current: number
+  // config.yaml's ceiling — what the Motor Control "default" button
+  // restores. Unchanged by set_max_current (mirrors config_gains).
+  config_max_current: number
+  // Lowest ceiling orca_core accepts (the hand's calibration current); a
+  // write below it is a 400, so the control stops here.
+  max_current_floor: number
   // The one gain set every loop joint shares, or null when they differ.
   gains: JointGains | null
   // Live gains per loop-controlled joint, read back from the controller.
@@ -217,6 +250,32 @@ export interface MotorChainExtra {
   target_baud: number
   chain: MotorChainSlot[]
   resets: number[]
+}
+
+// ----- stress_test operation extra (orca_ui/hand/operations/stress.py) -------
+
+export interface StressJointReach {
+  id: string
+  // Commanded extremes in degrees (config ROM, less the safety margin).
+  target: [number, number]
+  commanded_span_deg: number
+  // Settled position at each extreme, null until both ends have been
+  // sampled — or for the whole run on a hand with no joint-angle source.
+  reached: [number, number] | null
+  span_deg: number | null
+  // Commanded travel minus achieved travel: grows as a tendon stretches.
+  span_shortfall_deg: number | null
+  worst_shortfall_deg: number | null
+}
+
+export interface StressTestExtra {
+  cycle: number
+  cycles: number
+  loop: boolean
+  // False when the hand has no joint-angle source — the run still happens,
+  // it just cannot report how far the joints got.
+  measured: boolean
+  joints: StressJointReach[]
 }
 
 export interface OperationLogLine {
@@ -356,6 +415,23 @@ export interface MotorTracking {
   stalled_total_s: number // cumulative not-following time this session
 }
 
+// A latched Hardware Error Status, classified by what to do about it. Every
+// latched bit disables the motor identically (it answers the bus and ACKs
+// torque enable, but never energizes) — `kind` is what separates a fault you
+// wait out from one you go and fix.
+export type HwErrorKind = 'thermal' | 'power' | 'load' | 'encoder' | 'unknown'
+
+export interface HwErrorInfo {
+  flags: string[]
+  kind: HwErrorKind
+  disabled: boolean // always true today; the motor will not move until reboot
+  needs_cooling: boolean // separate from kind: a motor can latch both
+  temperature_c: number | null
+  headline: string
+  advice: string
+  disabled_note: string
+}
+
 export interface MotorFaultEntry {
   joint: string | null
   errors: number // failed bus transactions this session
@@ -363,6 +439,9 @@ export interface MotorFaultEntry {
   last_error: string | null
   last_error_age_s: number | null
   tracking: MotorTracking | null
+  hw_error_flags?: string[]
+  // null when nothing is latched.
+  hw_error?: HwErrorInfo | null
 }
 
 export interface MotorsFaults {
@@ -487,6 +566,25 @@ export interface Stats {
     stream_rearms: number
   } | null
   encoder: { frames_ok: number; last_freshness_ms: number } | null
+}
+
+// Something the operator has to act on, surfaced on the run's `extra` while
+// it goes and kept on its result. One entry per joint per kind.
+export interface CalibrationProblem {
+  kind: 'no_motion' | 'travel' | 'rejected' | 'timeout' | 'faulted'
+  joint: string
+  severity: 'error' | 'warn'
+  headline: string
+  advice: string
+  motor?: number
+  direction?: string
+  moved_deg?: number
+  travel_deg?: number
+  expected_deg?: number
+  flags?: string[]
+  temperature_c?: number | null
+  fault_kind?: string
+  needs_cooling?: boolean
 }
 
 // ----- calibration history --------------------------------------------------

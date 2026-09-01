@@ -81,6 +81,60 @@ function buildRows(
   }))
 }
 
+// What the operator has to DO, not which bit is set — the bit names are in
+// the tooltip. "POWER" and "HEAT" are different jobs; that is the whole point
+// of showing this separately from the temperature column.
+const HW_KIND_LABEL: Record<string, string> = {
+  power: 'POWER',
+  thermal: 'HEAT',
+  load: 'JAM',
+  encoder: 'ENCODER',
+  unknown: 'FAULT',
+}
+
+// The only way back from a latch short of power-cycling the hand. The motor
+// returns with torque off; if the underlying fault is still there it latches
+// again the next time it is driven, which is itself the useful diagnostic.
+function RebootButton({
+  id,
+  needsCooling,
+}: {
+  // Motor ids arrive as object keys, so this row carries them as strings.
+  id: string
+  needsCooling: boolean
+}) {
+  const [busy, setBusy] = useState(false)
+  const setError = useAppStore((s) => s.setError)
+  return (
+    <button
+      type="button"
+      className="btn btn-secondary reboot-btn"
+      disabled={busy}
+      title={
+        needsCooling
+          ? 'Reboot this motor. It is a heat fault — let it cool first or it latches again immediately.'
+          : 'Reboot this motor to clear the latch. It returns with torque off; if the fault persists it latches again when next driven.'
+      }
+      onClick={() => {
+        setBusy(true)
+        api
+          .rebootMotor(Number(id))
+          .then((r) => {
+            setError(
+              r.cleared
+                ? null
+                : `motor ${id} re-latched immediately: ${(r.hw_error_flags ?? []).join(' + ')} — the cause is still present`,
+            )
+          })
+          .catch((e) => setError(String((e as Error).message ?? e)))
+          .finally(() => setBusy(false))
+      }}
+    >
+      {busy ? '…' : 'reboot'}
+    </button>
+  )
+}
+
 function errorClass(faults: MotorFaultEntry | null): string {
   if (!faults) return ''
   const total = faults.errors + faults.overloads
@@ -253,6 +307,9 @@ export function MotorHealthPanel() {
               <th title="failed bus transactions + overload reboots this session">
                 ERRORS
               </th>
+              <th title="latched hardware error: the motor answers the bus but will not energize until it is rebooted">
+                FAULT
+              </th>
               <th title="is the motor actually following its commanded target?">
                 TRACK
               </th>
@@ -264,6 +321,23 @@ export function MotorHealthPanel() {
               // the joint and what to check.
               const problems: Diagnosis[] = []
               const joint = jointOfMotor.get(row.id) ?? null
+              // A latched fault comes first: the motor is not moving at all,
+              // which makes every other reading about it beside the point.
+              const hw = row.faults?.hw_error ?? null
+              if (hw) {
+                problems.push({
+                  subject: `motor ${row.id}${joint ? ` (${joint})` : ''}`,
+                  state: `${hw.headline} — ${HW_KIND_LABEL[hw.kind] ?? hw.kind}`,
+                  ok: false,
+                  checks: [
+                    hw.disabled_note,
+                    hw.advice,
+                    ...(hw.needs_cooling
+                      ? []
+                      : ['this is not a heat fault — waiting will not clear it']),
+                  ],
+                })
+              }
               if (tempClass(row.temp)) {
                 problems.push({
                   subject: `motor ${row.id}${joint ? ` (${joint})` : ''}`,
@@ -322,7 +396,7 @@ export function MotorHealthPanel() {
                     `${tracking.stalled_total_s.toFixed(0)}s total this session)`,
                   ok: false,
                   checks: [
-                    'a latched hardware error stops the motor from energizing — check the ERRORS column, toggle torque to clear it',
+                    'a latched hardware error stops the motor from energizing — see the FAULT column; only a reboot or power cycle clears it, torque toggling does not',
                     'check the tendon: slack or snapped tendons move the motor without moving the joint',
                     'check for mechanical jams or a joint blocked at its limit',
                   ],
@@ -382,6 +456,23 @@ export function MotorHealthPanel() {
                     {faults === null
                       ? '--'
                       : faults.errors + faults.overloads}
+                  </td>
+                  <td
+                    className={hw ? 'err' : ''}
+                    title={
+                      hw
+                        ? `${hw.headline}. ${hw.disabled_note} ${hw.advice}`
+                        : 'no latched hardware error'
+                    }
+                  >
+                    {hw ? (
+                      <span className="fault-cell">
+                        {HW_KIND_LABEL[hw.kind] ?? hw.kind.toUpperCase()}
+                        <RebootButton id={row.id} needsCooling={hw.needs_cooling} />
+                      </span>
+                    ) : (
+                      '--'
+                    )}
                   </td>
                   <td
                     className={trackClass(faults)}
