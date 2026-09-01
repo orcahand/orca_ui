@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from typing import Callable
 
 import numpy as np
@@ -21,9 +22,16 @@ from orca_ui.core_source import resolve_cached as resolve_core_source
 from orca_ui.hand import zeroing
 from orca_ui.hand.commands import CommandWorker
 from orca_ui.hand.presets import BUILTIN_POSES, BUILTIN_SEQUENCES
+from orca_ui.hand.faults import classify_hw_error
+from orca_ui.hand.models import ModelEntry, available_models, describe
 from orca_ui.hand.sessions import HandSession
 from orca_ui.hand.states import ControlSource
-from orca_ui.hand.supervisor import HandSupervisor, model_name_of
+from orca_ui.hand.supervisor import (
+    HandBusyError,
+    HandSupervisor,
+    ModelSelectError,
+    model_name_of,
+)
 from orca_ui.library import Library, LibraryError
 from orca_ui.settings import UiSettings
 
@@ -38,6 +46,10 @@ TACTILE_MODES = {
 # Direct motor moves are clamped to this distance from the current position
 # per command — sliders nudge, they don't teleport.
 MAX_DIRECT_MOTOR_STEP_RAD = 0.8
+
+# Dynamixel firmware restart: the motor is off the bus until it finishes,
+# so a read-back any sooner just times out and looks like a failed reboot.
+MOTOR_REBOOT_SETTLE_S = 0.5
 
 # One-shot moves (apply pose, go neutral): distance-scaled glide instead of a
 # fixed duration, so a far target never starts at whip speed.
@@ -131,6 +143,7 @@ class HandService:
         self._sweeper = None             # mock-only dev sweeper, for estop
         self._teleop_manager = None      # attached post-construction (server.py)
         self._teleop_installer = None    # ditto; exists even with teleop off
+        self._telemetry = None           # attached in server.py
         # Gains connect() installed from config.yaml — what "reset" restores.
         # Live gains are read back from the controller, never shadowed here.
         self._config_gains: dict[str, dict] = {}
@@ -147,6 +160,9 @@ class HandService:
             on_error=self._publish_error,
         )
         self._max_current = int(self.supervisor.config.max_current)
+        # What config.yaml asked for — the value "default" restores to, kept
+        # separately because set_max_current overwrites the live one.
+        self._config_max_current = self._max_current
 
         self._library_root = (
             Path(settings.library_dir) if settings.library_dir
@@ -274,6 +290,74 @@ class HandService:
             }
         return info
 
+    def models(self) -> dict:
+        """The model menu: what can be selected, and what is selected now.
+
+        ``selected`` is the config in force whether or not it is one of the
+        listed models — ``--config`` can name a file outside the bundle, and
+        the menu must still say what the console is currently running.
+        """
+        config = self.supervisor.config
+        status = self.supervisor.status()
+        entries = [dict(entry.as_dict(), selectable=True)
+                   for entry in available_models(self.settings.model_version)]
+        if self.settings.mock:
+            # The simulated hand's own model. Not one of orca_core's, but the
+            # supervisor can re-materialize it by name, so it stays on offer
+            # after switching the mock onto a bundled model.
+            entries.insert(0, dict(self._mock_entry().as_dict(),
+                                   selectable=True))
+        selected = model_name_of(config)
+        if not any(entry["name"] == selected for entry in entries):
+            # A --config path: what is running, so the picker has to show it,
+            # but there is no model name to resolve it back from later.
+            side, tactile, encoders = describe(config.config_path)
+            entries.append(dict(ModelEntry(
+                name=selected, version="", side=side, tactile=tactile,
+                encoders=encoders, config_path=config.config_path).as_dict(),
+                selectable=False))
+        return {
+            "models": entries,
+            "selected": selected,
+            "pinned": status.model_pinned,
+            # Detection needs a bus to ask; mock mode has none, so "let the
+            # hand decide" is not on offer there.
+            "auto_available": not self.settings.mock,
+            "config_path": config.config_path,
+        }
+
+    @staticmethod
+    def _mock_entry() -> ModelEntry:
+        from orca_ui.mock import MOCK_MODEL_CONFIG, MOCK_MODEL_NAME
+
+        side, tactile, encoders = describe(MOCK_MODEL_CONFIG)
+        return ModelEntry(name=MOCK_MODEL_NAME, version="", side=side,
+                          tactile=tactile, encoders=encoders,
+                          config_path=MOCK_MODEL_CONFIG)
+
+    def select_model(self, name: str | None,
+                     version: str | None = None) -> dict:
+        """Pin the hand config by model name, or (``None``) return the choice
+        to hardware detection. Reconnects when the model actually changes."""
+        try:
+            self.supervisor.select_model(name, version)
+        except (HandBusyError, ModelSelectError) as e:
+            raise ServiceError(str(e), status_code=409)
+        return self.models()
+
+    def disconnect(self) -> dict:
+        """Close the session and hold the ports free until Reconnect."""
+        try:
+            self.supervisor.disconnect()
+        except HandBusyError as e:
+            raise ServiceError(str(e), status_code=409)
+        return self.status()
+
+    def reconnect(self) -> dict:
+        """Drop the session and redial; lifts a disconnect hold."""
+        self.supervisor.request_reconnect()
+        return self.status()
+
     def _calibration_state(self, session, encoder_backed: set,
                            encoder_calibrated: set | None) -> dict:
         """Motor vs joint-feedback calibration, and what recalibrating fixes.
@@ -348,6 +432,11 @@ class HandService:
             return {
                 "torque_enabled": self.supervisor.status().torque_enabled,
                 "max_current": self._max_current,
+                # config.yaml's ceiling — what the dashboard's "default"
+                # button returns to (mirrors config_gains below).
+                "config_max_current": self._config_max_current,
+                # Lowest ceiling orca_core accepts (see max_current_floor).
+                "max_current_floor": self.max_current_floor(),
                 # The one gain set every loop joint shares, or null when the
                 # joints are tuned individually.
                 "gains": _uniform_gains(joint_gains),
@@ -396,6 +485,7 @@ class HandService:
         everything keyed by model; the browser refetches ``/hand/info`` off
         the model field in the status stream."""
         self._max_current = int(config.max_current)
+        self._config_max_current = self._max_current
         # Poses and recordings are per-model — a left hand's library must not
         # follow the right hand that replaced it.
         self.library = Library(self._library_root, model_name_of(config))
@@ -506,6 +596,9 @@ class HandService:
 
     def attach_operation_manager(self, manager) -> None:
         self._operation_manager = manager
+
+    def attach_telemetry(self, telemetry) -> None:
+        self._telemetry = telemetry
 
     def attach_sweeper(self, sweeper) -> None:
         self._sweeper = sweeper
@@ -863,15 +956,35 @@ class HandService:
                                  if joint not in controlled],
         }
 
+    def max_current_floor(self) -> int:
+        """Lowest ceiling orca_core will accept: its config validation refuses
+        a max_current below the calibration current (calibration would then
+        stall against its own limit). Published so the UI's control can stop
+        at the floor instead of learning about it from a failed write."""
+        return int(getattr(self.supervisor.config, "calibration_current", 0) or 0)
+
     def set_max_current(self, ma: int) -> None:
         import dataclasses
 
         session = self._require_motors()
+        ma = int(ma)
+        # Validate BEFORE the hardware write. The config replace below runs
+        # orca_core's validation, and letting it raise afterwards would leave
+        # the motors on the new ceiling with the config and our own snapshot
+        # still on the old one.
+        floor = self.max_current_floor()
+        if ma < floor:
+            raise ServiceError(
+                f"max current must be at least the calibration current "
+                f"({floor} mA) — a lower ceiling would stall calibration")
+        try:
+            config = dataclasses.replace(session.hand.config, max_current=ma)
+        except Exception as e:
+            raise ServiceError(f"hand config rejected {ma} mA: {e}")
         session.hand.set_max_current(ma)
-        session.hand.config = dataclasses.replace(session.hand.config,
-                                                  max_current=ma)
+        session.hand.config = config
         with self._state_lock:
-            self._max_current = int(ma)
+            self._max_current = ma
         self._publish_control_state()
 
     def rebase(self) -> None:
@@ -946,6 +1059,66 @@ class HandService:
                 }
                 for mid in hand.config.motor_ids
             ],
+        }
+
+    def reboot_motor(self, motor_id: int) -> dict:
+        """Clear a motor's latched hardware error with a Protocol 2.0 reboot.
+
+        The only way back from a latched Hardware Error Status short of
+        power-cycling the hand: the motor keeps answering the bus and keeps
+        acknowledging torque enable, but its power stage stays inhibited
+        until it is rebooted. Comes back with torque off, and torque is not
+        re-enabled here — if the fault is a supply or wiring one it latches
+        again on the next command, and that should happen under a deliberate
+        torque enable rather than silently inside a recovery call.
+        """
+        from contextlib import nullcontext
+
+        session = self._require_motors()
+        hand = session.hand
+        motor_id = int(motor_id)
+        if motor_id not in set(hand.config.motor_ids):
+            raise ServiceError(f"unknown motor {motor_id}", status_code=404)
+
+        client = getattr(hand, "_motor_client", None)
+        reboot = getattr(client, "reboot_motor", None)
+        if reboot is None:
+            raise ServiceError("this motor family has no reboot instruction",
+                               status_code=501)
+
+        fence = getattr(hand, "_loop_writes_paused", None)
+        with (fence() if fence is not None else nullcontext()):
+            try:
+                reboot(motor_id)
+            except Exception as e:
+                raise ServiceError(f"reboot failed: {e}", status_code=502)
+            # The motor is off the bus for a moment while its firmware
+            # restarts; read back only after it can answer again.
+            time.sleep(MOTOR_REBOOT_SETTLE_S)
+            read_error = getattr(client, "read_hardware_error", None)
+            error = None
+            if read_error is not None:
+                try:
+                    error = read_error(motor_id)
+                except Exception:
+                    error = None
+
+        flags = _decode_hw_error(error)
+        joint = hand.config.motor_to_joint_dict.get(motor_id)
+        info = classify_hw_error(flags, motor=motor_id, joint=joint)
+        # Drop the cached latch so the dashboard updates on this reply rather
+        # than waiting out the next sweep.
+        telemetry = getattr(self, "_telemetry", None)
+        forget = getattr(telemetry, "forget_hw_error", None)
+        if forget is not None:
+            forget(motor_id)
+        return {
+            "motor": motor_id,
+            "joint": joint,
+            "cleared": not flags,
+            "hw_error": error,
+            "hw_error_flags": flags,
+            "info": info,
         }
 
     def set_direct_motor_mode(self, enabled: bool, *,

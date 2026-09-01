@@ -31,12 +31,17 @@ MIN_SEGMENT_S = 0.3           # floor so near-identical waypoints still glide
 WAYPOINT_RATE_HZ = 100.0
 LEAD_IN_MIN_DEG = 2.0         # skip the approach glide when already at start
 PROGRESS_EVERY_S = 0.2
-MAX_LOOP_CYCLES = 1000
+MAX_LOOP_CYCLES = 100_000_000
 
 # Stepped playback ("interp_steps"): N intermediate commands per segment
 # instead of the cruise-speed glide — crisp point-to-point motion where the
-# only knob is speed. One command per INTERP_STEP_PERIOD_S at ×1.
+# pacing knobs are speed and the per-command period. One command per
+# INTERP_STEP_PERIOD_S at ×1 unless "step_period_s" overrides it — with 0
+# steps that period IS the waypoint-to-waypoint time: the motor's own
+# controller does the travelling, the period just sets the rhythm.
 INTERP_STEP_PERIOD_S = 0.1
+MIN_STEP_PERIOD_S = 0.02      # 50 Hz — the bus keeps up, anything faster is churn
+MAX_STEP_PERIOD_S = 5.0
 MAX_INTERP_STEPS = 200
 # Motor-space playback safety: no single raw command may jump a motor more
 # than this, so "no interpolation" still auto-splits violent segments; the
@@ -348,12 +353,17 @@ class ReplayOperation(Operation):
                 f"recorded for hand_type={meta.get('hand_type')}, "
                 f"connected is {config.type}")
         if traj_type == MOTOR_WAYPOINTS:
-            # Raw motor coordinates only mean anything under a completed
-            # calibration (limits + wrap offsets define the frame).
-            if not getattr(service.session.hand, "calibrated", False):
+            # Raw motor coordinates are only portable under a completed
+            # calibration (limits + wrap offsets define the frame). On the
+            # same hand in the same power cycle they are self-consistent,
+            # so an explicit override may replay them uncalibrated.
+            if not getattr(service.session.hand, "calibrated", False) and \
+                    not bool(params.get("allow_uncalibrated")):
                 raise ServiceError(
                     "motor-waypoint replay needs a calibrated hand — "
-                    "calibrate first", status_code=409)
+                    "calibrate first, or pass allow_uncalibrated if the "
+                    "recording was made on this hand in its current state",
+                    status_code=409)
             recorded_motors = [int(m) for m in (meta.get("motor_ids") or [])]
             if recorded_motors != [int(m) for m in config.motor_ids]:
                 raise ServiceError(
@@ -382,6 +392,21 @@ class ReplayOperation(Operation):
                 raise ServiceError(
                     "interp_steps applies to waypoint recordings — a "
                     "continuous recording carries its own timing")
+        step_period = params.get("step_period_s")
+        if step_period is not None:
+            step_period = float(step_period)
+            if not MIN_STEP_PERIOD_S <= step_period <= MAX_STEP_PERIOD_S:
+                raise ServiceError(
+                    f"step_period_s must be {MIN_STEP_PERIOD_S:g}.."
+                    f"{MAX_STEP_PERIOD_S:g} seconds")
+            if traj_type == CONTINUOUS:
+                raise ServiceError(
+                    "step_period_s applies to waypoint recordings — a "
+                    "continuous recording carries its own timing")
+            if traj_type == WAYPOINTS and interp_steps is None:
+                raise ServiceError(
+                    "step_period_s paces stepped playback — set interp_steps "
+                    "too (0 = straight to each waypoint)")
         frames = data.get("angles") or data.get("waypoints") or []
         if not frames:
             raise ServiceError("trajectory contains no frames")
@@ -391,6 +416,9 @@ class ReplayOperation(Operation):
             "loop": bool(params.get("loop", False)),
             "type": traj_type,
             "interp_steps": interp_steps,
+            # None = the INTERP_STEP_PERIOD_S default; only meaningful in
+            # stepped/motor playback, where it is the seconds per command.
+            "step_period_s": step_period,
         }
 
     def run(self, ctx: OpContext) -> dict:
@@ -415,9 +443,10 @@ class ReplayOperation(Operation):
                 waypoints = waypoints + [list(waypoints[0])]
             if interp_steps is not None:
                 # Stepped mode: N linear commands per segment, no holds —
-                # crisp point-to-point where the pacing is just speed.
+                # crisp point-to-point paced by speed and the step period.
                 frames = _stepped_frames(waypoints, interp_steps)
-                rate_hz = 1.0 / INTERP_STEP_PERIOD_S
+                rate_hz = 1.0 / (self.params["step_period_s"]
+                                 or INTERP_STEP_PERIOD_S)
                 holds = []
             else:
                 frames, rate_hz, holds = _interpolate(waypoints)
@@ -449,9 +478,14 @@ class ReplayOperation(Operation):
         steps = self.params.get("interp_steps") or 0
         if loop and len(waypoints) > 1:
             waypoints = waypoints + [list(waypoints[0])]
-        dt = INTERP_STEP_PERIOD_S / self.params["speed"]
+        period = self.params["step_period_s"] or INTERP_STEP_PERIOD_S
+        dt = period / self.params["speed"]
         hand = session.hand
         name = self.params["name"]
+        if not getattr(hand, "calibrated", False):
+            ctx.log("hand is NOT calibrated — replaying raw motor positions "
+                    "as recorded; only valid on the hand and power cycle "
+                    "they were captured on")
 
         service.set_direct_motor_mode(True, from_operation=True)
         try:

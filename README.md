@@ -51,6 +51,25 @@ swapping a left hand for a right one while it runs, picks the right model up
 instead of holding on to the startup guess. Name a model and that model is
 final — nothing detected overrides it.
 
+That re-reading depends on there being an OH board to ask. A hand built on
+other electronics — a legacy hand, or any hand whose motor bus is a plain
+USB adapter — never answers the handshake, so it resolves to the default
+model whatever it actually is: a left hand drives mirrored, a touch hand
+shows no taxels. The **model picker** in the header is the fix without a
+restart. Pick `orcahand-touch-left`, `orcahand-full-right` or whichever it
+really is and the console reconnects on that config; the choice is *pinned*
+exactly as `--model` pins it, so detection stops second-guessing it. The
+marker beside the picker says which is in force — `AUTO` (following the
+hardware) or `PINNED` (following you) — and the first entry in the menu,
+*auto-detect from hardware*, hands the choice back.
+
+**Disconnect** in the header closes the session, disables torque and leaves
+the serial ports free — the connect ladder stops climbing until **Reconnect**
+asks it to. Use it to power the hand down, move a USB cable, or run
+orca_core's own scripts against the same bus without closing the console.
+Reconnect works in both states: while connected it drops the session and
+redials from scratch, and while disconnected it is the way back.
+
 The header's red **E-STOP** stops whatever is running (operation, playback,
 sweep) and disables torque.
 
@@ -73,7 +92,10 @@ trajectory storage, default `~/.orca_ui/library`).
   record/replay. Record waypoints or continuous (≤60 Hz) joint streams by
   physically posing the hand (torque drops and stays off), then replay at
   ×0.5/×1/×2 with looping. Trajectory YAMLs are interchangeable with
-  orca_core's record/replay example scripts.
+  orca_core's record/replay example scripts. A **stress test** cycles any
+  set of joints hardstop to hardstop for as many cycles as you ask for and
+  reports how much travel each one is still achieving — the number that
+  shrinks as a tendon stretches.
 - **Teleop** — drive the hand with your own: webcam (MediaPipe), Manus gloves,
   Apple Vision Pro, or a synthetic waveform. Sessions start in **preview**, where
   retargeted poses render as a cyan ghost in the 3D view and the hand never

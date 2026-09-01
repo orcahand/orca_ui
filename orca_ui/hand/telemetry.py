@@ -27,11 +27,20 @@ from orca_core.hardware.sensing.constants import (
 from orca_core.hardware.sensing.health import EncoderStreamHealth
 
 from orca_ui.hand import usage_stats
-from orca_ui.hand.faults import BusErrorMonitor, TrackingMonitor
+from orca_ui.hand.faults import (
+    BusErrorMonitor,
+    TrackingMonitor,
+    classify_hw_error,
+)
 from orca_ui.streaming import topics as T
 from orca_ui.streaming.hub import StreamHub
 
 logger = logging.getLogger(__name__)
+
+# How often the latched Hardware Error Status registers are swept. One
+# single-byte read per motor, so it stays well clear of the telemetry reads it
+# shares the bus with.
+HW_ERROR_SWEEP_S = 10.0
 
 # How long motor telemetry may go unread while the hand keeps moving before a
 # read is forced through anyway.
@@ -239,6 +248,14 @@ class TelemetryService:
         self._bus_errors = BusErrorMonitor()
         self._tracking = TrackingMonitor()
         self._faults_session_key: int | None = None
+        # Latched Hardware Error Status per motor, swept rarely: a latched
+        # motor answers the bus and acks torque enable but never energizes,
+        # so nothing else in the telemetry notices it has stopped moving.
+        self._hw_errors: dict[int, list[str]] = {}
+        # Classified form of the same, keyed by motor id.
+        self._hw_error_info: dict[int, dict] = {}
+        self._hw_errors_warned: set[int] = set()
+        self._last_hw_error_sweep = 0.0
 
     def start(self) -> None:
         self._bus_errors.attach()
@@ -349,6 +366,7 @@ class TelemetryService:
             return
 
         if session.caps.motors:
+            self._sweep_hardware_errors(session)
             if not session.caps.feedback_loop:
                 self._publish_motor_health(session)
             elif not self._hand_is_driven() or self._telemetry_is_stale():
@@ -515,6 +533,60 @@ class TelemetryService:
         else:
             self._tracking.idle()
 
+    def forget_hw_error(self, motor_id: int) -> None:
+        """Drop a motor's cached latch after a reboot cleared it, so the
+        dashboard updates on the reply instead of waiting out the sweep. A
+        fault that is still there comes straight back on the next sweep."""
+        mid = int(motor_id)
+        self._hw_errors.pop(mid, None)
+        self._hw_error_info.pop(mid, None)
+        self._hw_errors_warned.discard(mid)
+
+    def _sweep_hardware_errors(self, session) -> None:
+        """Refresh the latched-error table, warning once per newly latched motor."""
+        now = time.monotonic()
+        if now - self._last_hw_error_sweep < HW_ERROR_SWEEP_S:
+            return
+        self._last_hw_error_sweep = now
+        hand = getattr(session, "hand", None)
+        client = getattr(hand, "motor_client", None)
+        read = getattr(client, "read_hardware_error", None)
+        if read is None:
+            return
+        motor_to_joint = hand.config.motor_to_joint_dict
+        found: dict[int, list[str]] = {}
+        classified: dict[int, dict] = {}
+        for mid in hand.config.motor_ids:
+            try:
+                flags = client.decode_hardware_error(read(mid))
+            except Exception:
+                continue
+            if not flags:
+                self._hw_errors_warned.discard(int(mid))
+                continue
+            info = classify_hw_error(
+                flags, motor=mid, joint=motor_to_joint.get(mid),
+                temperature_c=(self._motor_health.get("temps") or {}).get(int(mid)))
+            found[int(mid)] = flags
+            classified[int(mid)] = info
+            if int(mid) in self._hw_errors_warned:
+                continue
+            self._hw_errors_warned.add(int(mid))
+            # Advice that matches the fault: a power latch at 32 °C must not
+            # be met with "let it cool", which is what a single templated
+            # message for every bit used to say.
+            message = (
+                f"{info['headline']}: {info['disabled_note']} "
+                f"{info['advice']}"
+            )
+            logger.warning(message)
+            # orca_ui installs no log handler that prints, and a motor that
+            # has stopped moving has to reach the operator, not just the
+            # stream — same yellow the core's warnings use.
+            print(f"\033[93mWarning: {message}\033[0m")
+        self._hw_errors = found
+        self._hw_error_info = classified
+
     def _publish_motor_faults(self, session) -> None:
         if session is not None:
             key = id(session)
@@ -542,6 +614,10 @@ class TelemetryService:
             joint = motor_to_joint.get(mid)
             entry["joint"] = joint
             entry["tracking"] = tracking.get(joint) if joint else None
+            entry["hw_error_flags"] = self._hw_errors.get(mid) or []
+            # Classified: which kind of latch, and what to do about it. The
+            # dashboard needs this to tell a power latch from a hot motor.
+            entry["hw_error"] = self._hw_error_info.get(mid)
             motors[mid] = entry
         self._hub.publish(T.MOTORS_FAULTS,
                           {"motors": motors, "bus": bus["bus"]})

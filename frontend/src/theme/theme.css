@@ -421,6 +421,89 @@ header h1 {
   border-color: rgb(var(--warn-rgb) / 0.35);
 }
 
+.fault-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.reboot-btn {
+  padding: 1px 5px;
+  font-size: 9px;
+  letter-spacing: 0.4px;
+}
+
+/* --- Link controls ---
+   Header-scale buttons: the header packs a lot into one row, so these sit a
+   size below the in-panel .btn rather than setting the row height. */
+
+.link-controls {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.link-btn {
+  padding: 3px 8px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+}
+
+/* --- Model picker ---
+   Reads as one badge-sized unit: the select carries the model name, the pin
+   marker on its right says whether hardware detection may still change it. */
+
+.model-picker {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--panel-border-strong);
+  background: var(--panel);
+}
+
+.model-select {
+  background: transparent;
+  color: var(--text-bright);
+  border: 0;
+  border-radius: 0;
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 3px 4px 3px 8px;
+  cursor: pointer;
+  outline: none;
+  max-width: 240px;
+}
+
+.model-select:focus-visible {
+  outline: 1px solid rgb(var(--accent-rgb) / 0.5);
+  outline-offset: -1px;
+}
+
+.model-select:disabled {
+  opacity: 0.4;
+  cursor: progress;
+}
+
+.model-pin {
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--dimmer);
+  border-left: 1px solid var(--panel-border-strong);
+  cursor: help;
+}
+
+/* The model was named by hand, so the console is no longer tracking whatever
+   is plugged in. Worth seeing without having to open the menu. */
+.model-pin.pinned {
+  background: rgb(var(--accent-rgb) / 0.08);
+  color: var(--accent);
+}
+
 .rate-meters {
   font-size: 9px;
   color: var(--dimmer);
@@ -1451,6 +1534,65 @@ header h1 {
   background: rgb(var(--warn-rgb) / 0.06);
 }
 
+/* Calibration alerts: what the run found that the operator must act on. */
+.setup-alert {
+  align-self: stretch;
+  max-width: 760px;
+  padding: 8px 10px;
+  border: 1px solid rgb(var(--warn-rgb) / 0.3);
+  background: rgb(var(--warn-rgb) / 0.06);
+}
+
+.setup-alert.error {
+  border-color: rgb(var(--err-rgb) / 0.35);
+  background: rgb(var(--err-rgb) / 0.07);
+}
+
+.setup-alert-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--warn);
+}
+
+.setup-alert.error .setup-alert-title {
+  color: var(--err);
+}
+
+.setup-alert-list {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.setup-alert-list li {
+  display: grid;
+  grid-template-columns: 8px 1fr;
+  gap: 2px 7px;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.setup-alert-dot {
+  width: 6px;
+  height: 6px;
+  margin-top: 5px;
+  border-radius: 50%;
+}
+
+.setup-alert-headline {
+  color: var(--text);
+}
+
+.setup-alert-advice {
+  grid-column: 2;
+  color: var(--dim);
+}
+
 .setup-note.accent {
   color: var(--accent);
   border-color: rgb(var(--accent-rgb) / 0.3);
@@ -2180,6 +2322,122 @@ header h1 {
   color: var(--warn);
 }
 
+/* ----- stress test ----- */
+
+.stress-copy {
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--dim);
+  margin: 0 0 8px;
+}
+
+/* Group chip + its own "take the whole finger" tick box travel together. */
+.stress-chip-pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stress-chip-pair input[type='checkbox'] {
+  width: 11px;
+  height: 11px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.stress-rom {
+  color: var(--dimmer);
+  font-size: 9px;
+}
+
+.stress-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--panel-border);
+  padding-top: 10px;
+  margin-top: 10px;
+  font-size: 10px;
+}
+
+.stress-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--dim);
+}
+
+.stress-field input[type='number'] {
+  width: 56px;
+  background: var(--panel-strong);
+  color: var(--muted);
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 0;
+  font-size: 10px;
+  font-family: var(--font);
+  padding: 3px 6px;
+  text-align: center;
+  outline: none;
+}
+
+.stress-field input[type='number']:focus {
+  border-color: rgb(var(--accent-rgb) / 0.4);
+}
+
+.stress-field input[type='number']:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.stress-field select {
+  background: var(--panel-strong);
+  color: var(--muted);
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 0;
+  font-size: 10px;
+  font-family: var(--font);
+  padding: 2px 6px;
+  cursor: pointer;
+  outline: none;
+}
+
+.stress-note {
+  font-size: 9px;
+  color: var(--dimmer);
+}
+
+.stress-note.warn {
+  color: var(--warn);
+}
+
+.stress-running {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.stress-running-detail {
+  font-size: 10px;
+  color: var(--accent);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.stress-table {
+  margin-top: 10px;
+}
+
+.stress-missing {
+  color: var(--dim);
+}
+
+.stress-missing.warn {
+  color: var(--warn);
+}
+
 /* ----- teleoperation ----- */
 
 .teleop-grid {
@@ -2617,4 +2875,68 @@ header h1 {
   color: var(--warn);
   line-height: 1.5;
   max-width: 480px;
+}
+
+/* ----- motor current ceiling (Motor Control panel) ----- */
+
+.current-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 0 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--panel-border);
+  font-size: 10px;
+}
+
+.current-label {
+  width: 84px;
+  text-align: right;
+  color: var(--dim);
+  letter-spacing: 0.5px;
+}
+
+.current-slider {
+  flex: 1;
+  min-width: 120px;
+  max-width: 260px;
+  height: 3px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.current-input {
+  width: 58px;
+  background: var(--panel-strong);
+  color: var(--text);
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 0;
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 4px;
+  text-align: right;
+  outline: none;
+}
+
+.current-input:focus {
+  border-color: rgb(var(--accent-rgb) / 0.4);
+}
+
+.current-unit {
+  color: var(--dimmer);
+  font-size: 9px;
+}
+
+.current-default {
+  font-size: 9px;
+  padding: 2px 6px;
+}
+
+.current-note {
+  font-size: 9px;
+  color: var(--dimmer);
+  flex: 1 1 100%;
+  padding-left: 92px;
 }

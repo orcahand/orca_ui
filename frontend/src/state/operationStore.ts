@@ -20,7 +20,10 @@ export function isOperationActive(op: OperationSnapshot | null): boolean {
 
 // Wire names the UI calls something else. The guided setup run is "wizard"
 // on the API; everywhere a user can see it, it is the full setup.
-const OPERATION_LABELS: Record<string, string> = { wizard: 'full setup' }
+const OPERATION_LABELS: Record<string, string> = {
+  wizard: 'full setup',
+  stress_test: 'stress test',
+}
 
 export function operationLabel(kind: string): string {
   return OPERATION_LABELS[kind] ?? kind

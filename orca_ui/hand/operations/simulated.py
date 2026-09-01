@@ -56,7 +56,8 @@ def _calibration_steps(config, joints: list[str] | None) -> list[dict]:
 def simulate_calibration(ctx: OpContext, config, joints: list[str] | None,
                          step_s: float, phase: str = "calibrating",
                          detail_prefix: str = "",
-                         force_wrist: bool = False) -> dict:
+                         force_wrist: bool = False,
+                         manual: bool = False) -> dict:
     """Lease-free simulated calibration body (shared with the sim wizard).
 
     Mirrors the real run's event stream — including synthetic (drift-free)
@@ -75,6 +76,10 @@ def simulate_calibration(ctx: OpContext, config, joints: list[str] | None,
     def record(kind: str, **fields) -> None:
         events.append({"t": round(time.time(), 3), "event": kind, **fields})
 
+    if manual:
+        ctx.log("MANUAL calibration: torque stays off for the whole run. "
+                "Move each joint to the end it names, hold it against the "
+                "hardstop, and press record.")
     ctx.set_phase(phase, progress=0.0,
                   detail=f"{detail_prefix}{total} steps")
     ctx.log(f"calibration started: {total} steps ({', '.join(involved)})")
@@ -82,6 +87,7 @@ def simulate_calibration(ctx: OpContext, config, joints: list[str] | None,
 
     started_at = _now_iso()
     directions_seen: dict[str, set] = {}
+    skipped: dict[str, set] = {}
     calibrated: list[str] = []
     try:
         for index, step in enumerate(steps):
@@ -91,8 +97,35 @@ def simulate_calibration(ctx: OpContext, config, joints: list[str] | None,
             ctx.log(f"step {index + 1}/{total}: {step_joints}")
             record("step_started", index=index, total=total,
                    joints=dict(step))
-            ctx.sleep(step_s)
+            if manual:
+                for joint, direction in step.items():
+                    record("manual_capture_started", joint=joint,
+                           motor=config.joint_to_motor_map.get(joint),
+                           direction=direction)
+                    end = "closed" if direction == "flex" else "open"
+                    answer = ctx.wait_input(
+                        f"Move {joint} all the way {end} ({direction}) by "
+                        "hand, hold it against the stop, then record.",
+                        ["record", "skip", "abort"])
+                    if answer == "abort":
+                        ctx.log("calibration aborted — completed steps are "
+                                "persisted")
+                        record("calibration_aborted")
+                        return {"problems": [],
+                                "steps_done": index,
+                                "joints_calibrated": calibrated,
+                                "calibrated": bool(calibrated)}
+                    if answer != "record":
+                        record("manual_capture_skipped", joint=joint,
+                               direction=direction)
+                        ctx.log(f"skipped {joint} {direction} — no limit "
+                                "recorded for that end")
+                        skipped.setdefault(joint, set()).add(direction)
+            else:
+                ctx.sleep(step_s)
             for joint, direction in step.items():
+                if direction in skipped.get(joint, ()):
+                    continue
                 seen = directions_seen.setdefault(joint, set())
                 seen.add(direction)
                 if seen == {"flex", "extend"}:
@@ -133,6 +166,9 @@ def simulate_calibration(ctx: OpContext, config, joints: list[str] | None,
             "events": events,
         })
     return {
+        # Nothing goes wrong in a simulation, but the key is always present so
+        # the UI reads the same shape from a mock and from hardware.
+        "problems": [],
         "steps_done": total,
         "joints_calibrated": calibrated,
         "calibrated": True,
@@ -181,7 +217,8 @@ class SimulatedCalibrateOperation(Operation):
             return simulate_calibration(
                 ctx, supervisor.config, self.params["joints"],
                 self.params["step_duration_s"],
-                force_wrist=self.params["force_wrist"])
+                force_wrist=self.params["force_wrist"],
+                manual=self.params["manual"])
         finally:
             supervisor.exit_maintenance()
 

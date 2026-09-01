@@ -123,10 +123,33 @@ def build_router(service: HandService, telemetry=None) -> APIRouter:
         out.sort(key=lambda x: (x["kind"] is None, x["device"]))
         return out
 
+    @router.get("/models")
+    def models():
+        return service.models()
+
+    @router.post("/model/select")
+    def model_select(body: schemas.ModelSelectRequest):
+        """Pin the hand config by name (or null = back to auto-detection).
+
+        The hands that need this are the ones detection cannot name: without
+        an ORCA controller board to answer, every hand resolves to the
+        default model whatever it actually is.
+        """
+        return guard(service.select_model, body.name, body.version)
+
     @router.post("/reconnect")
     def reconnect():
-        service.supervisor.request_reconnect()
-        return {"ok": True}
+        # Also lifts a /disconnect hold — this is the way back from one.
+        return {"ok": True, "status": service.reconnect()}
+
+    @router.post("/disconnect")
+    def disconnect():
+        """Close the session and leave the ports free (torque off).
+
+        Not the same as the connect ladder losing the hand: nothing
+        reconnects until /reconnect asks it to.
+        """
+        return {"ok": True, "status": guard(service.disconnect)}
 
     # ----- operations / e-stop ----------------------------------------------------
 
@@ -317,6 +340,11 @@ def build_router(service: HandService, telemetry=None) -> APIRouter:
         return {"ok": True}
 
     # ----- direct motor control (advanced diagnostics) ---------------------------
+
+    @router.post("/motors/{motor_id}/reboot")
+    def motor_reboot(motor_id: int):
+        """Clear a latched hardware error. Comes back with torque off."""
+        return guard(service.reboot_motor, motor_id)
 
     @router.get("/motors/direct")
     def motors_direct_snapshot():

@@ -52,6 +52,7 @@ def create_app(settings: UiSettings) -> FastAPI:
     )
     service.attach_teleop_installer(installer)
     telemetry = TelemetryService(service, hub, settings)
+    service.attach_telemetry(telemetry)
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
