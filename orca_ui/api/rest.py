@@ -137,6 +137,23 @@ def build_router(service: HandService, telemetry=None) -> APIRouter:
         """
         return guard(service.select_model, body.name, body.version)
 
+    @router.get("/boards")
+    def boards():
+        """Every board on this machine and the pin in force. Probes free
+        serial ports, so it can take a moment; busy ports are listed, never
+        disturbed."""
+        return service.boards()
+
+    @router.post("/board/select")
+    def board_select(body: schemas.BoardSelectRequest):
+        """Pin this console to one board (or null = first to answer).
+
+        The reason to pin: with two consoles and two hands on one machine,
+        first-to-answer is a coin toss. A pinned console probes and opens
+        only its own board's ports.
+        """
+        return guard(service.select_board, body.device)
+
     @router.post("/reconnect")
     def reconnect():
         # Also lifts a /disconnect hold — this is the way back from one.

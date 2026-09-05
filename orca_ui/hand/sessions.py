@@ -353,6 +353,20 @@ def _connect_with_motors(settings, config, declared, presence: HardwarePresence)
     for feedback, tactile in ladder:
         tier = _tier_name(feedback, tactile)
         hand = _build_hand(settings, config, feedback, tactile)
+        if presence.motor_port and \
+                getattr(getattr(hand, "config", None), "port", None) == "auto":
+            # Discovery already resolved the motor port — scoped to the pinned
+            # board when one is pinned. Left as "auto", connect() re-resolves
+            # it machine-globally: ambiguous with two adapters attached, and
+            # with a board pinned it must not look beyond that board at all.
+            # In-memory only; persist_resolved_driver diffs against the file,
+            # so a patched port is never written back.
+            import copy
+
+            if hand.config is config:
+                # Never mutate the supervisor's shared config object.
+                hand.config = copy.copy(config)
+            object.__setattr__(hand.config, "port", presence.motor_port)
         try:
             ok, msg = hand.connect(interactive=False)
         except (JointFeedbackConnectError, RuntimeError) as e:

@@ -31,6 +31,14 @@ def parse_args(argv=None) -> argparse.Namespace:
                              "latest).")
     parser.add_argument("--side", choices=["right", "left"], default=None,
                         help="Shorthand for --model orcahand-<side>.")
+    parser.add_argument("--board", type=str, default=None, metavar="DEVICE",
+                        help="Pin the console to one board by device path "
+                             "(e.g. /dev/cu.usbmodem101 — its motor CDC, or a "
+                             "legacy motor adapter). Default: connect to the "
+                             "first board that answers. Pin it when running "
+                             "one console per hand on the same machine, so "
+                             "each keeps to its own board; also changeable "
+                             "from the header picker while running.")
     parser.add_argument("--mock", action="store_true",
                         help="Simulate the hand in-memory (motors, joint encoders, "
                              "tactile sine signals). No hardware needed. Without "
@@ -135,6 +143,7 @@ def build_settings(argv=None) -> UiSettings:
         config_path=config_path,
         model_pinned=model_pinned,
         model_version=args.model_version,
+        board=None if args.mock else args.board,
         mock=args.mock,
         engage_feedback=not args.no_feedback,
         motors_enabled=not args.no_motors,

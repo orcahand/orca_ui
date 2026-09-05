@@ -42,6 +42,10 @@ export interface StatusSnapshot {
   // True while someone has taken the hardware back: the connect ladder is
   // suspended, so `disconnected` is a resting state rather than a search.
   released: boolean
+  // Device path of the board this console is pinned to, or null for "first
+  // board to answer". Pinned means the backend never opens another board's
+  // ports — the way two consoles on one machine each keep to their own hand.
+  board_pinned: string | null
 }
 
 export interface ModelEntry {
@@ -63,6 +67,31 @@ export interface ModelsInfo {
   // Detection needs a bus to ask — mock mode has none.
   auto_available: boolean
   config_path: string
+}
+
+// One selectable board from GET /api/boards: an ORCA controller board (both
+// CDCs grouped by the identity they report) or a legacy motor adapter.
+export interface BoardEntry {
+  device: string // the pin key: motor CDC, or the adapter path
+  kind: 'oh_board' | 'motor_adapter'
+  side: 'left' | 'right' | null
+  hand_id: string | null
+  // Model the board's provisioned config declares; null when it doesn't.
+  model_name: string | null
+  ports: string[]
+  // Held open by some *other* process (e.g. a second console) — silent under
+  // probing, so side/identity are unknown.
+  busy: boolean
+  // Held by this console's own live session.
+  held_by_console: boolean
+}
+
+export interface BoardsInfo {
+  boards: BoardEntry[]
+  // Pinned device path, or null = first board to answer.
+  selected: string | null
+  // False in mock mode: no serial ports to scan or pin.
+  available: boolean
 }
 
 export interface JointInfo {

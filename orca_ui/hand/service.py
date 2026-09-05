@@ -345,6 +345,49 @@ class HandService:
             raise ServiceError(str(e), status_code=409)
         return self.models()
 
+    def boards(self) -> dict:
+        """The board menu: every board on this machine, and the pin in force.
+
+        The console's own session holds its board's ports, which probe as
+        silent — so that board is rebuilt here from what the session knows,
+        flagged ``held_by_console`` for the picker to label.
+        """
+        if self.settings.mock:
+            return {"boards": [], "selected": None, "available": False}
+        from orca_ui.hand.boards import scan_boards
+
+        status = self.supervisor.status()
+        own = {port for port in status.ports.values()
+               if port and port != "mock"}
+        entries = []
+        for board in scan_boards():
+            if own & set(board.ports):
+                continue  # rebuilt below from the live session
+            entries.append(dict(board.as_dict(), held_by_console=False))
+        if own:
+            entries.append({
+                "device": status.ports.get("motor") or sorted(own)[0],
+                "kind": "oh_board",
+                "side": status.side or None,
+                "hand_id": None,
+                "model_name": status.model,
+                "ports": sorted(own),
+                "busy": False,
+                "held_by_console": True,
+            })
+            entries.sort(key=lambda entry: entry["device"])
+        return {"boards": entries, "selected": status.board_pinned,
+                "available": True}
+
+    def select_board(self, device: str | None) -> dict:
+        """Pin the console to one board by device path, or (``None``) back
+        to first-to-answer. Reconnects when the pin actually changes."""
+        try:
+            self.supervisor.select_board(device)
+        except (HandBusyError, ModelSelectError) as e:
+            raise ServiceError(str(e), status_code=409)
+        return self.boards()
+
     def disconnect(self) -> dict:
         """Close the session and hold the ports free until Reconnect."""
         try:

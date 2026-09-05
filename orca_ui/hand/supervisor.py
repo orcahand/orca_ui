@@ -35,6 +35,7 @@ from orca_core.hand_config import (
 )
 from orca_core.utils.utils import read_yaml
 
+from orca_ui.hand.boards import detect_pinned_board
 from orca_ui.hand.detection import (
     names_a_hand,
     presence_from_detection,
@@ -124,6 +125,9 @@ class HandSupervisor(threading.Thread):
         # Mock mode has no bus to ask, so its model is its own answer.
         self._model_pinned = bool(settings.model_pinned or settings.mock)
         self._model_probes_left = 0
+        # Board pin: None = first board to answer. Read/written under the
+        # GIL only (str swap), like _model_pinned.
+        self._board_pinned: str | None = settings.board or None
 
         self._lock = threading.Lock()
         self._session: Optional[HandSession] = None
@@ -178,6 +182,7 @@ class HandSupervisor(threading.Thread):
                 side=str(config.type),
                 model_pinned=self._model_pinned,
                 released=self._released,
+                board_pinned=self._board_pinned,
             )
 
     def set_torque_flag(self, enabled: bool) -> None:
@@ -282,6 +287,36 @@ class HandSupervisor(threading.Thread):
         self._wake.set()
         return self.model_name
 
+    def select_board(self, device: str | None) -> None:
+        """Pin the console to one board by device path, or (``None``) let it
+        take the first board that answers. Reconnects on any change.
+
+        The pin is what makes two consoles on one machine deterministic:
+        a pinned supervisor probes and opens only that board's CDCs, so two
+        dashboards can never trade hands behind the operators' backs. It is
+        deliberately orthogonal to :meth:`select_model` — the pin says which
+        *hardware* is ours, the model says what to run it as.
+        """
+        if self._settings.mock:
+            raise ModelSelectError("mock mode has no boards to pin")
+        with self._lock:
+            if self._maintenance_kind is not None or self._in_maintenance:
+                raise HandBusyError(
+                    "an operation holds the hand — stop it before changing "
+                    "the board")
+            if device == self._board_pinned:
+                return
+            self._board_pinned = device
+            # Naming a board is an ask to connect to it, so it also lifts a
+            # disconnect hold — same contract as request_reconnect().
+            self._released = False
+        logger.info("board %s",
+                    f"pinned to {device}" if device else "handed back to auto")
+        self._teardown_session("board changed — reconnecting")
+        self._backoff = DETECT_BACKOFF_START_S
+        self._publish()
+        self._wake.set()
+
     def enter_maintenance(self, kind: str, timeout: float = 15.0) -> MaintenanceLease:
         """Hand the hardware to an operation: the run loop tears the session
         down, suspends health checks and reconnects, and acks. Blocks the
@@ -306,10 +341,21 @@ class HandSupervisor(threading.Thread):
         if not self._settings.mock:
             # Ports are closed now — a probe finally sees the real picture.
             try:
-                presence = probe_hardware(self.config)
+                presence = self._probe_hardware()
             except Exception:
                 logger.exception("maintenance port probe failed")
         return MaintenanceLease(kind=kind, presence=presence)
+
+    def _probe_hardware(self):
+        """Port probe for a maintenance lease, scoped to the pinned board
+        when one is pinned — an operation drives the pinned hand or nothing.
+        The global probe would happily resolve another console's hand the
+        moment its ports were free, and calibration would then drive it."""
+        if self._board_pinned:
+            return presence_from_detection(
+                self.config, detect_pinned_board(self._board_pinned),
+                fallback_motor_scan=False)
+        return probe_hardware(self.config)
 
     def exit_maintenance(self) -> None:
         """Return the hardware; the supervisor reconnects via the normal ladder."""
@@ -424,7 +470,10 @@ class HandSupervisor(threading.Thread):
         self._publish()
 
     def _try_connect(self) -> float:
-        self._set_state(HandState.DETECTING, "searching for hardware")
+        pin = self._board_pinned
+        self._set_state(HandState.DETECTING,
+                        f"searching for board {pin}" if pin
+                        else "searching for hardware")
         presence = None
         if not self._settings.mock:
             # Nothing is connected, so every port is free and this detection
@@ -432,9 +481,27 @@ class HandSupervisor(threading.Thread):
             # about which model this is. Adopting it here also means the
             # presence below is resolved against the *new* config's declared
             # capabilities, off the same probe.
-            detection = run_detection(self.config, force=not self._model_pinned)
-            self._adopt_model(detection)
-            presence = presence_from_detection(self.config, detection)
+            if pin:
+                detection = detect_pinned_board(pin)
+                if detection is None:
+                    # The pin means this board or nothing: no wider probe, no
+                    # VID fallback — just wait for it to come back.
+                    self._set_state(
+                        HandState.DETECTING,
+                        f"pinned board {pin} not answering (unplugged, "
+                        "powered off, or held by another process) — retrying")
+                    delay = self._backoff
+                    self._backoff = min(self._backoff * 1.5,
+                                        DETECT_BACKOFF_MAX_S)
+                    return delay
+                self._adopt_model(detection)
+                presence = presence_from_detection(self.config, detection,
+                                                   fallback_motor_scan=False)
+            else:
+                detection = run_detection(self.config,
+                                          force=not self._model_pinned)
+                self._adopt_model(detection)
+                presence = presence_from_detection(self.config, detection)
         try:
             session = connect_session(self._settings, self.config,
                                       presence=presence)
@@ -556,13 +623,16 @@ class HandSupervisor(threading.Thread):
         if confirming_model:
             self._model_probes_left -= 1
         try:
-            detection = run_detection(self.config, force=confirming_model)
+            pin = self._board_pinned
+            detection = (detect_pinned_board(pin) if pin
+                         else run_detection(self.config, force=confirming_model))
             if confirming_model and self._adopt_model(detection, upgrade_only=True):
                 return ("hand reports more hardware than the model declared — "
                         f"switching to {self.model_name}")
             if not session.caps.degraded:
                 return None
-            presence = presence_from_detection(self.config, detection)
+            presence = presence_from_detection(self.config, detection,
+                                               fallback_motor_scan=pin is None)
         except Exception:
             logger.exception("upgrade probe failed")
             return None

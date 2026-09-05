@@ -36,6 +36,13 @@ class ModelSelectRequest(BaseModel):
     version: Optional[str] = None
 
 
+class BoardSelectRequest(BaseModel):
+    """Which board this console owns. ``device`` null returns the choice to
+    first-to-answer; otherwise a device path from ``GET /api/boards``."""
+
+    device: Optional[str] = None
+
+
 class TorqueRequest(BaseModel):
     # Reserved for future per-motor control; today torque toggles hand-wide.
     motor_ids: Optional[list[int]] = None

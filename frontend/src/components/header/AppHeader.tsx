@@ -6,6 +6,7 @@
 import type { HandState } from '../../api/types'
 import type { ViewName } from '../../state/appStore'
 import { useAppStore } from '../../state/appStore'
+import { BoardPicker } from './BoardPicker'
 import { EStopButton } from './EStopButton'
 import { LinkControls } from './LinkControls'
 import { ModelPicker } from './ModelPicker'
@@ -62,6 +63,7 @@ export function AppHeader() {
         <span className="brand-sub">HAND CONSOLE</span>
       </h1>
       <ModelPicker />
+      <BoardPicker />
       {handInfo?.core?.development && (
         // Only shown off a release: on a dev build the hand's behaviour may
         // not match any shipped version, and that should never be a surprise.
