@@ -6,6 +6,8 @@ the contract.
 """
 
 import logging
+import time
+
 from types import SimpleNamespace
 
 from orca_ui.hand.faults import (
@@ -109,6 +111,23 @@ class _SweepClient:
         return self.flags_by_motor.get(value, [])
 
 
+class _BatchSweepClient(_SweepClient):
+    """A family that can fetch the register from every motor at once."""
+
+    def __init__(self, flags_by_motor):
+        super().__init__(flags_by_motor)
+        self.batches = 0
+        self.alerts: dict[int, int] = {}
+
+    def read_hardware_errors(self, motor_ids):
+        self.batches += 1
+        return {int(mid): int(mid) for mid in motor_ids}
+
+    def take_hardware_alerts(self):
+        alerts, self.alerts = self.alerts, {}
+        return alerts
+
+
 class TestHardwareErrorSweep:
     def _sampler(self, flags_by_motor, motor_ids=(1, 2)):
         from orca_ui.hand.telemetry import TelemetryService
@@ -129,6 +148,44 @@ class TestHardwareErrorSweep:
             hand=SimpleNamespace(motor_client=client, config=config))
         return sampler, session, client
 
+    def test_sweep_uses_one_transaction_where_the_family_offers_it(self):
+        """Seventeen single-byte reads block the bus seventeen times over; the
+        same information comes back in one."""
+        sampler, session, _ = self._sampler({1: ["overload"], 2: []})
+        client = _BatchSweepClient({1: ["overload"], 2: []})
+        session.hand.motor_client = client
+
+        sampler._last_hw_error_sweep = -1e6
+        sampler._sweep_hardware_errors(session)
+
+        assert client.batches == 1
+        assert client.reads == 0
+        assert sampler._hw_errors == {1: ["overload"]}
+
+    def test_an_alert_seen_on_a_read_sweeps_before_the_interval_is_up(self):
+        """The error byte rides along on every read for free. A motor that
+        faults mid-interval is confirmed on the next tick, not up to 10s later."""
+        sampler, session, _ = self._sampler({1: ["overload"], 2: []})
+        client = _BatchSweepClient({1: ["overload"], 2: []})
+        client.alerts = {1: 0x80}
+        session.hand.motor_client = client
+
+        sampler._last_hw_error_sweep = time.monotonic()  # interval wide open
+        sampler._sweep_hardware_errors(session)
+
+        assert client.batches == 1
+        assert sampler._hw_errors == {1: ["overload"]}
+
+    def test_a_quiet_bus_still_waits_out_the_interval(self):
+        sampler, session, _ = self._sampler({1: ["overload"], 2: []})
+        client = _BatchSweepClient({1: ["overload"], 2: []})
+        session.hand.motor_client = client
+
+        sampler._last_hw_error_sweep = time.monotonic()
+        sampler._sweep_hardware_errors(session)
+
+        assert client.batches == 0
+
     def test_sweep_records_latched_flags(self):
         sampler, session, _ = self._sampler({1: ["overheating"], 2: []})
 
@@ -140,7 +197,7 @@ class TestHardwareErrorSweep:
         assert 2 not in sampler._hw_errors
 
     def test_sweep_is_rate_limited(self):
-        """The sweep costs a bus read per motor; it must not run every tick."""
+        """The sweep holds the bus for a full transaction; not every tick."""
         sampler, session, client = self._sampler({1: ["overload"], 2: []})
 
         sampler._last_hw_error_sweep = -1e6

@@ -1112,6 +1112,29 @@ header h1 {
   font-weight: 700;
 }
 
+/* Active-issue list above the motor grid: one row per problem, left aligned
+   because it reads as prose rather than as columns of numbers. */
+
+.motor-issues {
+  max-width: 760px;
+}
+
+.motor-issues th,
+.motor-issues td {
+  text-align: left;
+}
+
+.motor-issues td:first-child,
+.motor-issues th:first-child {
+  width: 12px;
+  padding-right: 0;
+}
+
+.motor-issues td.motor-issue-detail {
+  color: var(--muted);
+  font-size: 10px;
+}
+
 /* --- Event log --- */
 
 .event-log {

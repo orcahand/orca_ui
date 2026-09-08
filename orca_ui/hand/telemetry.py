@@ -38,9 +38,15 @@ from orca_ui.streaming.hub import StreamHub
 logger = logging.getLogger(__name__)
 
 # How often the latched Hardware Error Status registers are swept. One
-# single-byte read per motor, so it stays well clear of the telemetry reads it
-# shares the bus with.
+# transaction where the motor family can read the register from every motor at
+# once, one read per motor otherwise.
 HW_ERROR_SWEEP_S = 10.0
+
+# Minimum gap between motor-bus telemetry reads on a hand with no joint loop.
+# There is no loop to contend with, but the bus is half-duplex: every read
+# blocks commands for its whole round trip, and temperature moves over minutes,
+# so reading faster than this buys nothing.
+MOTOR_TELEMETRY_MIN_INTERVAL_S = 10.0
 
 # How long motor telemetry may go unread while the hand keeps moving before a
 # read is forced through anyway.
@@ -234,6 +240,9 @@ class TelemetryService:
         # Start the staleness window now, so a hand already moving at startup
         # isn't read immediately on a "never read" technicality.
         self._last_bus_read = time.monotonic()
+        # Negative infinity so the first slow tick publishes straight away:
+        # the panel should not sit empty for a whole interval after connect.
+        self._last_motor_telemetry = float("-inf")
         self._motor_health: dict[str, dict] = {"temps": {}, "currents": {}}
         self._sensor_health = SensorHealthMonitor()
         self._usage: usage_stats.JointUsageTracker | None = None
@@ -368,7 +377,9 @@ class TelemetryService:
         if session.caps.motors:
             self._sweep_hardware_errors(session)
             if not session.caps.feedback_loop:
-                self._publish_motor_health(session)
+                if self._motor_telemetry_is_due():
+                    self._last_motor_telemetry = time.monotonic()
+                    self._publish_motor_health(session)
             elif not self._hand_is_driven() or self._telemetry_is_stale():
                 self._bus_read_tick(session)
 
@@ -427,8 +438,8 @@ class TelemetryService:
 
     # ----- motor-bus reads -----------------------------------------------------
     #
-    # A bulk read holds the bus for a round trip per motor (~15 ms for 17), so
-    # one landing mid-motion freezes the hand for more than a loop cycle.
+    # A group read holds the bus for a round trip per motor, so one landing
+    # mid-motion freezes the hand for more than a loop cycle.
 
     def _hand_is_driven(self) -> bool:
         """True while something is actively commanding motion."""
@@ -442,6 +453,11 @@ class TelemetryService:
             return bool(manager and manager.active())
         except Exception:
             return False
+
+    def _motor_telemetry_is_due(self) -> bool:
+        """True once the loopless hand's telemetry has aged out its rate limit."""
+        return ((time.monotonic() - self._last_motor_telemetry)
+                >= MOTOR_TELEMETRY_MIN_INTERVAL_S)
 
     def _telemetry_is_stale(self) -> bool:
         """True once telemetry is old enough to be worth one hitch, so a long
@@ -544,21 +560,25 @@ class TelemetryService:
 
     def _sweep_hardware_errors(self, session) -> None:
         """Refresh the latched-error table, warning once per newly latched motor."""
-        now = time.monotonic()
-        if now - self._last_hw_error_sweep < HW_ERROR_SWEEP_S:
-            return
-        self._last_hw_error_sweep = now
         hand = getattr(session, "hand", None)
         client = getattr(hand, "motor_client", None)
-        read = getattr(client, "read_hardware_error", None)
-        if read is None:
+        # Free: the reads that already happened carried each motor's error
+        # byte. A motor that faulted since the last sweep is confirmed on the
+        # next tick rather than waiting out the interval.
+        alerted = self._drain_alerts(client)
+        now = time.monotonic()
+        if not alerted and now - self._last_hw_error_sweep < HW_ERROR_SWEEP_S:
+            return
+        self._last_hw_error_sweep = now
+        raw = self._read_hardware_errors(client, hand)
+        if raw is None:
             return
         motor_to_joint = hand.config.motor_to_joint_dict
         found: dict[int, list[str]] = {}
         classified: dict[int, dict] = {}
         for mid in hand.config.motor_ids:
             try:
-                flags = client.decode_hardware_error(read(mid))
+                flags = client.decode_hardware_error(raw[int(mid)])
             except Exception:
                 continue
             if not flags:
@@ -586,6 +606,37 @@ class TelemetryService:
             print(f"\033[93mWarning: {message}\033[0m")
         self._hw_errors = found
         self._hw_error_info = classified
+
+    @staticmethod
+    def _drain_alerts(client) -> dict:
+        """Motors whose status packets carried the Alert bit since last asked.
+
+        A hint about when to sweep, not a diagnosis: the sweep reads the error
+        register itself, and rebooting is the operator's call.
+        """
+        take = getattr(client, "take_hardware_alerts", None)
+        if take is None:
+            return {}
+        try:
+            return take() or {}
+        except Exception:
+            logger.debug("hardware-alert drain failed", exc_info=True)
+            return {}
+
+    @staticmethod
+    def _read_hardware_errors(client, hand) -> dict | None:
+        """Every motor's latched error in one transaction where the family
+        supports it, falling back to one read each. ``None`` if unreadable."""
+        read_all = getattr(client, "read_hardware_errors", None)
+        read_one = getattr(client, "read_hardware_error", None)
+        try:
+            if read_all is not None:
+                return read_all(hand.config.motor_ids)
+            if read_one is not None:
+                return {int(mid): read_one(mid) for mid in hand.config.motor_ids}
+        except Exception:
+            logger.debug("hardware-error sweep failed", exc_info=True)
+        return None
 
     def _publish_motor_faults(self, session) -> None:
         if session is not None:

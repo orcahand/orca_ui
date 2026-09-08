@@ -1,12 +1,15 @@
 """Telemetry sampler tests: what the ticks are allowed to put on the motor bus.
 
-A bulk read holds the servo bus for a round trip per motor (~15 ms on a
-17-motor hand), and the joint loop writes over that same bus every 10 ms. A
-read taken while the hand is moving therefore freezes it for a cycle and a
-half. These pin when a read is allowed to happen at all.
+A group read holds the servo bus for the whole transaction, and the joint loop
+writes over that same bus every 10 ms. A read taken while the hand is moving
+therefore freezes it for a cycle or more. These pin when a read is allowed to
+happen at all.
 """
 
-from orca_ui.hand.telemetry import TelemetryService
+from orca_ui.hand.telemetry import (
+    MOTOR_TELEMETRY_MIN_INTERVAL_S,
+    TelemetryService,
+)
 
 
 class _Caps:
@@ -131,6 +134,26 @@ def test_no_bus_reads_while_an_operation_runs():
     for _ in range(5):
         telemetry._slow_tick()
     assert session.hand.bus_reads == []
+
+
+def test_a_hand_without_a_loop_rate_limits_its_telemetry_reads():
+    """Nothing contends for the bus, but each read still blocks commands for
+    its round trip and temperature moves over minutes."""
+    telemetry, session = _build(feedback_loop=False)
+    for _ in range(5):
+        telemetry._slow_tick()
+    assert session.hand.bus_reads == ["temp", "current"]
+
+
+def test_the_loopless_read_returns_once_the_interval_has_passed():
+    telemetry, session = _build(feedback_loop=False)
+    telemetry._slow_tick()
+    session.hand.bus_reads.clear()
+
+    telemetry._last_motor_telemetry -= MOTOR_TELEMETRY_MIN_INTERVAL_S
+    telemetry._slow_tick()
+
+    assert session.hand.bus_reads == ["temp", "current"]
 
 
 # ----- measured-stream fallback for unhealthy encoders ---------------------------
