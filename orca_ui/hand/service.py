@@ -734,6 +734,11 @@ class HandService:
             # Re-anchor first so enabling torque never lurches toward a stale
             # target (the hand may have been posed by hand while limp).
             session.hand.rebase_loop()
+        # Goal Current lives in the motors' RAM, so a reboot or a power cycle
+        # drops it and the console's ceiling would be one it never applied.
+        # Written before torque so the ceiling is in place the moment the
+        # motors energize.
+        self._apply_current_ceiling(session)
         session.hand.enable_torque()
         self.supervisor.set_torque_flag(True)
         seed = self._current_pose(session)
@@ -1005,6 +1010,22 @@ class HandService:
         stall against its own limit). Published so the UI's control can stop
         at the floor instead of learning about it from a failed write."""
         return int(getattr(self.supervisor.config, "calibration_current", 0) or 0)
+
+    def _apply_current_ceiling(self, session) -> None:
+        """Push the live ceiling to the motors.
+
+        The console never calls ``init_joints``, which is what writes Goal
+        Current on the scripted paths, so without this the motors keep
+        whatever they powered up with — their Current Limit — while the panel
+        reports the configured value.
+        """
+        with self._state_lock:
+            ma = self._max_current
+        try:
+            session.hand.set_max_current(ma)
+        except Exception:
+            logger.warning("could not apply the %d mA current ceiling", ma,
+                           exc_info=True)
 
     def set_max_current(self, ma: int) -> None:
         import dataclasses

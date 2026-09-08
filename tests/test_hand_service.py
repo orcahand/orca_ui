@@ -155,3 +155,30 @@ def _calibration(calibration_state, *, calibrated, anchors,
     joints = ["index_mcp", "wrist"]
     session = _FakeSession(_FakeHand(calibrated, joints, dict.fromkeys(anchors)))
     return calibration_state(session, set(encoder_backed), set(anchors))
+
+
+def test_enabling_torque_applies_the_current_ceiling(service):
+    """The console never calls init_joints, which is what writes Goal Current
+    on the scripted paths. Without this the motors keep the ceiling they
+    powered up with while the panel reports the configured one."""
+    hand = service.supervisor.session.hand
+    applied: list[int] = []
+    hand.set_max_current = applied.append
+
+    service.enable_torque()
+
+    assert applied == [service._max_current]
+
+
+def test_a_ceiling_write_that_fails_still_lets_torque_come_on(service):
+    """A hand that will not take the ceiling is still a hand the operator has
+    to be able to energize and move out of the way."""
+    hand = service.supervisor.session.hand
+
+    def boom(_ma):
+        raise OSError("bus busy")
+
+    hand.set_max_current = boom
+
+    assert service.enable_torque()["seed"]
+    assert service.status()["torque_enabled"] is True
