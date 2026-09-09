@@ -266,15 +266,19 @@ function HandRig({
       // matches the physically-posed hand, so following the (mis-calibrated)
       // measured angles would defeat it.
       const { manualCal, manualCalPose } = useAppStore.getState()
+      // On a non-encoder hand the top layer is chosen, not merged: the
+      // commanded targets are the last thing published before torque drops,
+      // and layering them would keep masking the live estimate afterwards.
+      const store = useAppStore.getState()
+      const overlay = caps.encoders
+        ? frames.joints.measured
+        : store.control?.effective_pose_source === 'estimate'
+          ? {}
+          : frames.joints.target
       rig.adapter.apply(
         manualCal
           ? { ...frames.joints.estimate, ...manualCalPose }
-          : {
-              ...frames.joints.estimate,
-              ...(caps.encoders
-                ? frames.joints.measured
-                : frames.joints.target),
-            },
+          : { ...frames.joints.estimate, ...overlay },
       )
 
       if (rig.ghost) {

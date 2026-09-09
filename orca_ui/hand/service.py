@@ -120,6 +120,12 @@ def _encoder_sensed_joints(config) -> list[str]:
     return [joint for joint in available if joint in configured_set]
 
 
+POSE_SOURCE_AUTO = "auto"
+POSE_SOURCE_ESTIMATE = "estimate"
+POSE_SOURCE_TARGET = "target"
+POSE_SOURCES = (POSE_SOURCE_AUTO, POSE_SOURCE_ESTIMATE, POSE_SOURCE_TARGET)
+
+
 class HandService:
     def __init__(
         self,
@@ -163,6 +169,17 @@ class HandService:
         # What config.yaml asked for — the value "default" restores to, kept
         # separately because set_max_current overwrites the live one.
         self._config_max_current = self._max_current
+        # Servo gains the operator has explicitly chosen, per motor. Empty
+        # until someone sets one: gains nobody picked must not be overwritten
+        # with our idea of a default.
+        self._servo_gains: dict[int, "ServoGains"] = {}
+        # Same rule for trajectory limits: only what the operator picked.
+        self._servo_profiles: dict[int, "ServoProfile"] = {}
+        # Which stream the 3D model follows, and whether the motor estimate is
+        # polled at all. "auto" reads the motors while they are limp and stops
+        # once torque is on, so commands are not competing with reads for the
+        # bus; the two explicit modes pin it either way.
+        self._pose_source = POSE_SOURCE_AUTO
 
         self._library_root = (
             Path(settings.library_dir) if settings.library_dir
@@ -469,8 +486,38 @@ class HandService:
         except Exception:
             return {}
 
+    def effective_pose_source(self) -> str:
+        """Which stream the model should follow right now.
+
+        Derived from the torque flag every time it is asked rather than
+        latched on a transition, so anything that drops torque -- an e-stop, a
+        failed write, an operation ending -- reverts within one tick without
+        needing its own hook.
+        """
+        with self._state_lock:
+            mode = self._pose_source
+        if mode != POSE_SOURCE_AUTO:
+            return mode
+        try:
+            torqued = bool(self.supervisor.status().torque_enabled)
+        except Exception:
+            torqued = False
+        return POSE_SOURCE_TARGET if torqued else POSE_SOURCE_ESTIMATE
+
+    def set_pose_source(self, mode: str) -> dict:
+        """Pin the model to a stream, or hand it back to the torque state."""
+        if mode not in POSE_SOURCES:
+            raise ServiceError(
+                f"pose source must be one of {', '.join(POSE_SOURCES)}")
+        with self._state_lock:
+            self._pose_source = mode
+        self._publish_control_state()
+        return self.control_state()
+
     def control_state(self) -> dict:
         joint_gains = self._live_gains()
+        # Resolved outside the lock: effective_pose_source takes it too.
+        effective_source = self.effective_pose_source()
         with self._state_lock:
             return {
                 "torque_enabled": self.supervisor.status().torque_enabled,
@@ -491,6 +538,8 @@ class HandService:
                 "control_source": self._control_source.value,
                 "control_owner": self._control_owner_label,
                 "direct_motor_mode": self._direct_motor_mode,
+                "pose_source": self._pose_source,
+                "effective_pose_source": effective_source,
             }
 
     def stats(self) -> dict:
@@ -739,6 +788,8 @@ class HandService:
         # Written before torque so the ceiling is in place the moment the
         # motors energize.
         self._apply_current_ceiling(session)
+        self._apply_servo_gains(session)
+        self._apply_servo_profiles(session)
         session.hand.enable_torque()
         self.supervisor.set_torque_flag(True)
         seed = self._current_pose(session)
@@ -1026,6 +1077,117 @@ class HandService:
         except Exception:
             logger.warning("could not apply the %d mA current ceiling", ma,
                            exc_info=True)
+
+    def _apply_servo_gains(self, session) -> None:
+        """Re-apply the operator's chosen gains.
+
+        Gains are RAM registers, so a power cycle clears them and the panel
+        would otherwise report values the motors no longer hold. Untouched
+        motors are left alone.
+        """
+        with self._state_lock:
+            gains = dict(self._servo_gains)
+        if not gains:
+            return
+        try:
+            session.hand.set_servo_gains(gains)
+        except Exception:
+            logger.warning("could not apply servo gains", exc_info=True)
+
+    def _apply_servo_profiles(self, session) -> None:
+        """Re-apply the operator's chosen trajectory limits (RAM, like gains)."""
+        with self._state_lock:
+            profiles = dict(self._servo_profiles)
+        if not profiles:
+            return
+        try:
+            session.hand.set_servo_profile(profiles)
+        except Exception:
+            logger.warning("could not apply servo profiles", exc_info=True)
+
+    def read_servo_profile(self) -> dict:
+        """Read the trajectory limits off the motors, in SI units."""
+        session = self._require_motors()
+        try:
+            profiles = session.hand.get_servo_profile()
+        except Exception as e:
+            raise ServiceError(f"could not read servo profile: {e}",
+                               status_code=502)
+        return {
+            str(motor_id): (None if entry is None else {
+                "velocity_rad_s": entry.velocity_rad_s,
+                "acceleration_rad_s2": entry.acceleration_rad_s2,
+            })
+            for motor_id, entry in profiles.items()
+        }
+
+    def set_servo_profile(self, motor_id: int, fields: dict) -> dict:
+        """Write trajectory limits on one motor and read the result back."""
+        from orca_core.hardware.motor_client import ServoProfile
+
+        session = self._require_motors()
+        motor_id = int(motor_id)
+        if motor_id not in set(session.hand.config.motor_ids):
+            raise ServiceError(f"unknown motor {motor_id}", status_code=404)
+        named = {k: v for k, v in fields.items() if v is not None}
+        if not named:
+            raise ServiceError("no profile values given")
+        try:
+            session.hand.set_servo_profile({motor_id: ServoProfile(**named)})
+        except Exception as e:
+            raise ServiceError(f"profile write failed: {e}", status_code=502)
+        with self._state_lock:
+            previous = self._servo_profiles.get(motor_id)
+            merged = named if previous is None else {
+                **{k: v for k, v in previous.__dict__.items() if v is not None},
+                **named,
+            }
+            self._servo_profiles[motor_id] = ServoProfile(**merged)
+        return self.read_servo_profile()
+
+    def read_servo_gains(self) -> dict:
+        """Read the gains off the motors — hardware truth, not what was typed.
+
+        One bus transaction, so this is on-demand rather than on a timer.
+        """
+        session = self._require_motors()
+        try:
+            gains = session.hand.get_servo_gains()
+        except Exception as e:
+            raise ServiceError(f"could not read servo gains: {e}",
+                               status_code=502)
+        return {
+            str(motor_id): (None if entry is None else {
+                "kp": entry.kp, "ki": entry.ki, "kd": entry.kd,
+                "ff_1st": entry.ff_1st, "ff_2nd": entry.ff_2nd,
+            })
+            for motor_id, entry in gains.items()
+        }
+
+    def set_servo_gains(self, motor_id: int, fields: dict) -> dict:
+        """Write the named gain fields on one motor and read the result back."""
+        from orca_core.hardware.motor_client import ServoGains
+
+        session = self._require_motors()
+        motor_id = int(motor_id)
+        if motor_id not in set(session.hand.config.motor_ids):
+            raise ServiceError(f"unknown motor {motor_id}", status_code=404)
+        named = {k: v for k, v in fields.items() if v is not None}
+        if not named:
+            raise ServiceError("no gain values given")
+        entry = ServoGains(**named)
+        try:
+            session.hand.set_servo_gains({motor_id: entry})
+        except Exception as e:
+            raise ServiceError(f"gain write failed: {e}", status_code=502)
+        with self._state_lock:
+            previous = self._servo_gains.get(motor_id)
+            merged = named if previous is None else {
+                **{k: v for k, v in previous.__dict__.items() if v is not None},
+                **named,
+            }
+            self._servo_gains[motor_id] = ServoGains(**merged)
+        return self.read_servo_gains()
 
     def set_max_current(self, ma: int) -> None:
         import dataclasses

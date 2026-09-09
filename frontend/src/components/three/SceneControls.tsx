@@ -3,8 +3,61 @@
 
 import { useState } from 'react'
 import { api } from '../../api/rest'
+import type { PoseSource } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
 import { isTeleopActive, useTeleopStore } from '../../state/teleopStore'
+
+// Which stream poses the model. "auto" is what you want almost always: the
+// motors are polled while limp and left alone once torque is on, so reads stop
+// competing with commands for a half-duplex bus. The pins exist for the two
+// cases auto cannot serve -- watching real motion during a commanded move, and
+// checking the commanded pose on a hand that cannot be read.
+function PoseSourceControl() {
+  const control = useAppStore((s) => s.control)
+  const motors = useAppStore((s) => s.status?.capabilities?.motors ?? false)
+  const encoders = useAppStore((s) => s.status?.capabilities?.encoders ?? false)
+  const setError = useAppStore((s) => s.setError)
+  const [busy, setBusy] = useState(false)
+
+  // Encoder hands pose from measured angles; there is no choice to make.
+  if (!motors || encoders || !control) return null
+
+  const mode = control.pose_source
+  const set = (next: PoseSource) => {
+    setBusy(true)
+    api
+      .setPoseSource(next)
+      .then(() => setError(null))
+      .catch((e) => setError(String((e as Error).message ?? e)))
+      .finally(() => setBusy(false))
+  }
+  const pin = (target: PoseSource, label: string, title: string) => (
+    <label className="toggle-label" title={title}>
+      <input
+        type="checkbox"
+        checked={mode === target}
+        disabled={busy}
+        onChange={(e) => set(e.target.checked ? target : 'auto')}
+      />
+      {label}
+    </label>
+  )
+
+  return (
+    <div className="toolbar">
+      <span style={{ fontSize: 10, color: 'var(--dim)' }}>
+        pose: {mode === 'auto' ? `auto (${control.effective_pose_source})` : mode}
+      </span>
+      {pin('estimate', 'always motor estimate',
+           'Keep reading the motors even while torqued. Shows real motion ' +
+           'rather than the command, at the cost of bus reads competing with ' +
+           'the commands being streamed.')}
+      {pin('target', 'always commanded',
+           'Never read the motors. Shows what was commanded, which cannot ' +
+           'reveal tracking error — but costs no bus traffic.')}
+    </div>
+  )
+}
 
 export function SceneControls() {
   const scene = useAppStore((s) => s.scene)
@@ -53,6 +106,7 @@ export function SceneControls() {
           lock view
         </label>
       </div>
+      <PoseSourceControl />
       {anyToggle && (
         <div className="toolbar">
           {showGhost && (

@@ -26,6 +26,12 @@ import type {
   TrajectoryData,
   TrajectoryEntry,
   UsageSnapshot,
+  ServoGains,
+  PoseSource,
+  ServoGainsMap,
+  ServoProfile,
+  ServoProfileMap,
+  ControlState,
 } from './types'
 
 export class ApiError extends Error {
@@ -105,6 +111,19 @@ export const api = {
       hw_error_flags: string[] | null
     }>(`/api/motors/${id}/reboot`),
 
+  // Read straight off the motors: gains are RAM and a power cycle clears
+  // them, so what was last typed is not evidence of what they hold.
+  servoGains: () =>
+    request<{ gains: ServoGainsMap }>('/api/motors/gains'),
+  // Omitted fields are left alone on the motor.
+  setServoGains: (id: number, gains: Partial<ServoGains>) =>
+    post<{ gains: ServoGainsMap }>(`/api/motors/${id}/gains`, gains),
+
+  servoProfile: () =>
+    request<{ profile: ServoProfileMap }>('/api/motors/profile'),
+  setServoProfile: (id: number, profile: Partial<ServoProfile>) =>
+    post<{ profile: ServoProfileMap }>(`/api/motors/${id}/profile`, profile),
+
   // Scans free serial ports on the backend, so it can take a moment.
   boards: () => request<BoardsInfo>('/api/boards'),
   // device null hands the choice back to "first board to answer".
@@ -157,6 +176,8 @@ export const api = {
   resetGains: (joints?: string[]) =>
     post('/api/control/gains/reset', { joints: joints ?? null }),
   setMaxCurrent: (ma: number) => post('/api/control/max_current', { ma }),
+  setPoseSource: (mode: PoseSource) =>
+    post<{ control: ControlState }>('/api/control/pose_source', { mode }),
   rebase: () => post('/api/control/rebase'),
   setRomFrame: (mode: 'anchor' | 'centered') =>
     post<{ rom_frame: string; requires_reconnect: boolean }>(

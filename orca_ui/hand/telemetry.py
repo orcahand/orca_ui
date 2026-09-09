@@ -353,9 +353,13 @@ class TelemetryService:
             return
 
         # The estimate costs a bus round trip, so with a loop running it rides
-        # the slow tick instead; without one there is no motion to stall.
+        # the slow tick instead. Without one it is gated on the pose source:
+        # in "auto" that means reading the motors while they are limp and
+        # stopping once torque is on, so streamed commands are not competing
+        # with reads for a half-duplex bus.
         estimate = None
-        if session.caps.motors and not session.caps.feedback_loop:
+        if (session.caps.motors and not session.caps.feedback_loop
+                and self._estimate_is_wanted()):
             estimate = self._publish_estimate(session)
 
         if session.caps.feedback_loop:
@@ -453,6 +457,18 @@ class TelemetryService:
             return bool(manager and manager.active())
         except Exception:
             return False
+
+    def _estimate_is_wanted(self) -> bool:
+        """True while the model is following the motor estimate.
+
+        Command-adherence tracking needs the estimate too, so it goes quiet on
+        a motor-only hand whenever the estimate does; pinning the pose source
+        to "estimate" is how an operator gets it back during motion.
+        """
+        try:
+            return self._service.effective_pose_source() == "estimate"
+        except Exception:
+            return True
 
     def _motor_telemetry_is_due(self) -> bool:
         """True once the loopless hand's telemetry has aged out its rate limit."""

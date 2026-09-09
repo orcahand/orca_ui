@@ -176,6 +176,12 @@ export interface ControlState {
   control_owner: string
   // Raw motor-space control armed: loop writes paused, joint targets 409.
   direct_motor_mode: boolean
+  // Which stream the 3D model follows. "auto" tracks the torque state:
+  // motor estimate while limp (polled), commanded targets once torqued (no
+  // polling, so reads stop competing with commands for the bus).
+  pose_source: PoseSource
+  // What "auto" resolved to right now; equals pose_source when pinned.
+  effective_pose_source: 'estimate' | 'target'
 }
 
 export interface DirectMotorInfo {
@@ -472,6 +478,32 @@ export interface MotorFaultEntry {
   // null when nothing is latched.
   hw_error?: HwErrorInfo | null
 }
+
+// The servo's own position-PID and feedforward gains (X-series registers
+// 80-91). Distinct from the host outer-loop PI in the Control Loop panel:
+// these close the loop inside the motor. null when the family cannot report
+// them.
+export interface ServoGains {
+  kp: number | null
+  ki: number | null
+  kd: number | null
+  ff_1st: number | null
+  ff_2nd: number | null
+}
+
+export type ServoGainsMap = Record<string, ServoGains | null>
+
+// Trajectory limits the servo shapes its own motion with. 0 disables a limit.
+// Non-zero values rate-limit streamed targets too, not just point-to-point
+// moves — a safety property for teleop, an unwanted lag inside a tuned loop.
+export interface ServoProfile {
+  velocity_rad_s: number | null
+  acceleration_rad_s2: number | null
+}
+
+export type ServoProfileMap = Record<string, ServoProfile | null>
+
+export type PoseSource = 'auto' | 'estimate' | 'target'
 
 export interface MotorsFaults {
   motors: Record<string, MotorFaultEntry>
