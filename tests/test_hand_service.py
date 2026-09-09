@@ -182,3 +182,86 @@ def test_a_ceiling_write_that_fails_still_lets_torque_come_on(service):
 
     assert service.enable_torque()["seed"]
     assert service.status()["torque_enabled"] is True
+
+
+def test_servo_gains_round_trip(service):
+    """The panel must show what the motors hold, so a write is followed by a
+    read-back rather than echoing the request."""
+    before = service.read_servo_gains()
+    assert "1" in before and before["1"]["kp"] is not None
+
+    after = service.set_servo_gains(1, {"kp": 1234, "ki": None, "kd": None,
+                                        "ff_1st": None, "ff_2nd": None})
+    assert after["1"]["kp"] == 1234
+    # Fields not named keep their previous values.
+    assert after["1"]["kd"] == before["1"]["kd"]
+
+
+def test_enabling_torque_reapplies_only_gains_the_operator_chose(service):
+    """Gains are RAM and a power cycle clears them. Motors nobody tuned must
+    not be handed our idea of a default."""
+    applied = []
+    hand = service.supervisor.session.hand
+    hand.set_servo_gains = applied.append
+
+    service.enable_torque()
+    assert applied == []            # nothing chosen yet
+
+    hand.set_servo_gains = lambda g: None
+    service.set_servo_gains(2, {"kp": 900, "ki": None, "kd": None,
+                                "ff_1st": None, "ff_2nd": None})
+    hand.set_servo_gains = applied.append
+    service.disable_torque()
+    service.enable_torque()
+
+    assert len(applied) == 1 and set(applied[0]) == {2}
+
+
+def test_servo_profile_round_trip_and_reapply(service):
+    """Profile limits are RAM like gains, so the same rules apply: read back
+    from the motors, and re-apply only what the operator chose."""
+    before = service.read_servo_profile()
+    assert before["1"]["velocity_rad_s"] == 0.0     # factory: no profile
+
+    after = service.set_servo_profile(
+        1, {"velocity_rad_s": 2.5, "acceleration_rad_s2": None})
+    assert after["1"]["velocity_rad_s"] == 2.5
+    assert after["1"]["acceleration_rad_s2"] == 0.0  # untouched
+
+    applied = []
+    hand = service.supervisor.session.hand
+    hand.set_servo_profile = applied.append
+    service.disable_torque()
+    service.enable_torque()
+    assert len(applied) == 1 and set(applied[0]) == {1}
+
+
+def test_pose_source_auto_follows_the_torque_state(service):
+    """Derived on every read rather than latched, so anything that drops
+    torque -- e-stop included -- reverts the model within one tick."""
+    assert service.effective_pose_source() == "estimate"
+    service.enable_torque()
+    assert service.effective_pose_source() == "target"
+    service.disable_torque()
+    assert service.effective_pose_source() == "estimate"
+
+
+def test_pinned_pose_sources_ignore_torque(service):
+    service.set_pose_source("estimate")
+    service.enable_torque()
+    assert service.effective_pose_source() == "estimate"
+
+    service.set_pose_source("target")
+    service.disable_torque()
+    assert service.effective_pose_source() == "target"
+
+    service.set_pose_source("auto")
+    assert service.effective_pose_source() == "estimate"
+
+
+def test_control_state_carries_both_the_mode_and_what_it_resolved_to(service):
+    state = service.control_state()
+    assert state["pose_source"] == "auto"
+    assert state["effective_pose_source"] == "estimate"
+    with pytest.raises(ServiceError):
+        service.set_pose_source("nonsense")

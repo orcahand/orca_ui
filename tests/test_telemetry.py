@@ -186,3 +186,37 @@ def test_encoder_suppression_fast_to_condemn_slow_to_forgive():
 
     telemetry._update_encoder_suppression(_health("live"))
     assert telemetry._enc_suppressed == {}
+
+
+# ----- pose source gates the estimate read ----------------------------------
+
+
+class _PoseSourceService(_Service):
+    def __init__(self, session, source='estimate'):
+        super().__init__(session)
+        self._pose_source_value = source
+
+    def effective_pose_source(self):
+        return self._pose_source_value
+
+
+def _build_with_source(source, feedback_loop=False):
+    session = _Session(feedback_loop)
+    service = _PoseSourceService(session, source)
+    telemetry = TelemetryService(service, _Hub(), _Settings())
+    return telemetry, session
+
+
+def test_estimate_is_read_while_the_model_follows_it():
+    telemetry, session = _build_with_source('estimate')
+    telemetry._mid_tick()
+    assert session.hand.bus_reads == ['pos']
+
+
+def test_no_estimate_read_once_the_model_follows_commands():
+    """Half-duplex bus: a read while streaming targets blocks the commands it
+    is competing with, and the model is not showing the estimate anyway."""
+    telemetry, session = _build_with_source('target')
+    for _ in range(5):
+        telemetry._mid_tick()
+    assert session.hand.bus_reads == []

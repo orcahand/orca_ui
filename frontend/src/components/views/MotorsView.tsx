@@ -11,6 +11,7 @@ import { EventLog } from '../motors/EventLog'
 import { LoopStatsBar } from '../motors/LoopStatsBar'
 import { MotorChainPanel } from '../motors/MotorChainPanel'
 import { MotorHealthPanel } from '../motors/MotorHealthPanel'
+import { ServoTuningPanel } from '../motors/ServoTuningPanel'
 import { TuningPanel } from '../motors/TuningPanel'
 
 export function MotorsView() {
@@ -79,6 +80,7 @@ export function MotorsView() {
         </div>
       </Panel>
       <MotorHealthPanel />
+      <ServoTuningPanel />
       {caps?.feedback_loop && (
         <Panel title="Control Loop">
           <TuningPanel />

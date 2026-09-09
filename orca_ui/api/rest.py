@@ -347,6 +347,10 @@ def build_router(service: HandService, telemetry=None) -> APIRouter:
         guard(service.set_max_current, body.ma)
         return {"ok": True, "control": service.control_state()}
 
+    @router.post("/control/pose_source")
+    def control_pose_source(body: schemas.PoseSourceRequest):
+        return {"ok": True, "control": guard(service.set_pose_source, body.mode)}
+
     @router.post("/control/rom_frame")
     def control_rom_frame(body: schemas.RomFrameRequest):
         return guard(service.set_rom_frame, body.mode)
@@ -357,6 +361,24 @@ def build_router(service: HandService, telemetry=None) -> APIRouter:
         return {"ok": True}
 
     # ----- direct motor control (advanced diagnostics) ---------------------------
+
+    @router.get("/motors/gains")
+    def motors_gains():
+        return {"ok": True, "gains": guard(service.read_servo_gains)}
+
+    @router.post("/motors/{motor_id}/gains")
+    def motors_set_gains(motor_id: int, body: schemas.ServoGainsRequest):
+        gains = guard(service.set_servo_gains, motor_id, body.model_dump())
+        return {"ok": True, "gains": gains}
+
+    @router.get("/motors/profile")
+    def motors_profile():
+        return {"ok": True, "profile": guard(service.read_servo_profile)}
+
+    @router.post("/motors/{motor_id}/profile")
+    def motors_set_profile(motor_id: int, body: schemas.ServoProfileRequest):
+        profile = guard(service.set_servo_profile, motor_id, body.model_dump())
+        return {"ok": True, "profile": profile}
 
     @router.post("/motors/{motor_id}/reboot")
     def motor_reboot(motor_id: int):
