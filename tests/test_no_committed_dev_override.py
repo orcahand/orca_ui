@@ -16,8 +16,8 @@ import subprocess
 import pytest
 
 # Fallback for Python 3.10, which has no TOML parser. This project declares no
-# other source, so the table appearing at all is the entry.
-SOURCE_TABLE = re.compile(r"tool\.uv\.sources")
+# other source, so the table header appearing at all is the entry.
+SOURCE_TABLE = re.compile(r"^[ \t]*\[tool\.uv\.sources", re.MULTILINE)
 
 FIX = ("Keep the override in your working tree, out of the commit:\n"
        "    git restore --staged pyproject.toml uv.lock\n"

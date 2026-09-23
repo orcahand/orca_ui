@@ -29,6 +29,7 @@ orca-ui-mcp = "orca_ui.mcp.cli:main"
 [dependency-groups]
 dev = [
     "pytest>=8.3.5,<9.0.0",
+    "pytest-timeout>=2.3,<3",
 ]
 # Only needed to (re)build the 3D hand asset bundle (scripts/build_hand_bundle.py).
 assets = [

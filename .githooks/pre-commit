@@ -9,7 +9,7 @@ staged=$(git diff --cached --name-only)
 # and uv has no local-only override file, so the edit lands in a tracked file.
 # Committed, it makes the project unresolvable on every other machine.
 if echo "$staged" | grep -qE '^(pyproject\.toml|uv\.lock)$' \
-   && git show :pyproject.toml 2>/dev/null | grep -qE '^orca[-_]core[[:space:]]*=[[:space:]]*\{'; then
+   && git show :pyproject.toml 2>/dev/null | grep -qE '^[[:space:]]*\[tool\.uv\.sources|^[[:space:]]*"?orca[-_]core"?[[:space:]]*=[[:space:]]*\{'; then
     cat >&2 <<'EOF'
 pre-commit: pyproject.toml has a local orca_core override staged.
 

@@ -13,6 +13,11 @@ on:
     # against the published core rather than keeping the paired job's verdict.
     types: [opened, synchronize, reopened, edited]
 
+# A new push or edit supersedes the run still going for the same PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   published:
     name: tests (published orca_core)
@@ -23,16 +28,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The oldest Python this project supports, and the one orca_core's own
+      # CI runs. Unpinned, the runner image would pick it.
       - name: Install uv
         uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.10"
 
       # --locked fails if pyproject.toml and uv.lock disagree, which is what a
       # committed orca_core override looks like however it is spelled.
       - name: Install dependencies
         run: uv sync --locked --group dev
 
+      # --timeout turns a hung test into a named failure rather than a job
+      # that times out fifteen minutes later with no culprit.
       - name: Run tests
-        run: uv run --no-sync pytest
+        run: uv run --no-sync pytest --timeout=120
 
   paired:
     name: tests (paired orca_core)
@@ -72,8 +83,12 @@ jobs:
           ref: ${{ steps.core.outputs.ref }}
           path: orca_core
 
+      # The oldest Python this project supports, and the one orca_core's own
+      # CI runs. Unpinned, the runner image would pick it.
       - name: Install uv
         uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.10"
 
       # --locked is the guard here: this job creates the very sibling layout a
       # committed override names, so without it uv would re-lock and pass.
@@ -87,4 +102,4 @@ jobs:
       # Any step here using plain `uv run` silently un-pairs the run.
       - name: Run tests
         working-directory: orca_ui
-        run: uv run --no-sync pytest
+        run: uv run --no-sync pytest --timeout=120
