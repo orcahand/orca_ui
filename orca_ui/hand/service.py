@@ -31,6 +31,11 @@ from orca_ui.settings import UiSettings
 
 logger = logging.getLogger(__name__)
 
+
+def _current_or_none(value) -> int | None:
+    """A config current as an int, or None while it is still the motor family's ``default``."""
+    return None if isinstance(value, str) else int(value)
+
 TACTILE_MODES = {
     "resultant": (True, False),
     "taxels": (False, True),
@@ -128,7 +133,9 @@ class HandService:
             get_session=lambda: self.supervisor.session,
             on_error=self._publish_error,
         )
-        self._max_current = int(self.supervisor.config.max_current)
+        # None until the motor family is known: config.yaml may leave the
+        # limit to the family, and the connected hand's config carries it.
+        self._max_current = _current_or_none(self.supervisor.config.max_current)
 
         library_root = (
             Path(settings.library_dir) if settings.library_dir
@@ -265,6 +272,10 @@ class HandService:
             # Fresh session, fresh (unpaused) loop: a stale armed flag must
             # not survive the reconnect and block joint targets.
             self._direct_motor_mode = False
+            if self._max_current is None:
+                hand_config = getattr(getattr(session, "hand", None), "config", None)
+                if hand_config is not None:
+                    self._max_current = _current_or_none(hand_config.max_current)
         self._publish_control_state()
         if session.caps.tactile:
             try:
@@ -533,11 +544,18 @@ class HandService:
         import dataclasses
 
         session = self._require_motors()
+        ma = int(ma)
+        # Validate before the hardware write: orca_core refuses a ceiling
+        # below the calibration current, and a rejected value must not leave
+        # the motors on it with the config and our snapshot on the old one.
+        try:
+            config = dataclasses.replace(session.hand.config, max_current=ma)
+        except Exception as e:
+            raise ServiceError(f"hand config rejected {ma} mA: {e}")
         session.hand.set_max_current(ma)
-        session.hand.config = dataclasses.replace(session.hand.config,
-                                                  max_current=ma)
+        session.hand.config = config
         with self._state_lock:
-            self._max_current = int(ma)
+            self._max_current = ma
         self._publish_control_state()
 
     def rebase(self) -> None:
