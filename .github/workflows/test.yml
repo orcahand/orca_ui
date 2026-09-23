@@ -28,17 +28,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The oldest Python this project supports, and the one orca_core's own
-      # CI runs. Unpinned, the runner image would pick it.
       - name: Install uv
         uses: astral-sh/setup-uv@v5
-        with:
-          python-version: "3.10"
 
       # --locked fails if pyproject.toml and uv.lock disagree, which is what a
       # committed orca_core override looks like however it is spelled.
+      # --python pins the oldest Python this project supports, the one
+      # orca_core's own CI runs; unpinned, the runner image would pick it.
       - name: Install dependencies
-        run: uv sync --locked --group dev
+        run: uv sync --locked --group dev --python 3.10
 
       # --timeout turns a hung test into a named failure rather than a job
       # that times out fifteen minutes later with no culprit.
@@ -83,19 +81,18 @@ jobs:
           ref: ${{ steps.core.outputs.ref }}
           path: orca_core
 
-      # The oldest Python this project supports, and the one orca_core's own
-      # CI runs. Unpinned, the runner image would pick it.
       - name: Install uv
         uses: astral-sh/setup-uv@v5
-        with:
-          python-version: "3.10"
 
       # --locked is the guard here: this job creates the very sibling layout a
       # committed override names, so without it uv would re-lock and pass.
+      # Python is pinned on the sync rather than through setup-uv, whose
+      # python-version input activates a venv of its own at the workspace
+      # root; the editable install would land there instead of in .venv.
       - name: Install dependencies
         working-directory: orca_ui
         run: |
-          uv sync --locked --group dev
+          uv sync --locked --group dev --python 3.10
           uv pip install -e ../orca_core
 
       # --no-sync keeps uv from reverting orca_core to the locked release.
