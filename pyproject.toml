@@ -59,6 +59,3 @@ artifacts = ["/orca_ui/webui/"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["orca_ui"]
-
-[tool.uv.sources]
-orca-core = { path = "../orca_core", editable = true }
