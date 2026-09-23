@@ -79,6 +79,51 @@ unreleased `orca_core` — check `./dev status` first.
 
 ---
 
+## Dev mode must never reach a commit
+
+`orca-dev local` points this checkout at an `orca_core` next to it. uv has no
+local-only override file, so the entry lands in tracked files:
+
+```toml
+[tool.uv.sources]
+orca-core = { path = "../orca_core", editable = true }
+```
+
+A relative path is a fact about one machine. Committed, it makes the project
+unresolvable everywhere else — `uv lock` fails outright on a clone with no
+sibling `orca_core`.
+
+**Never stage `pyproject.toml` or `uv.lock` without checking.** If a diff you
+are about to commit adds a `[tool.uv.sources]` entry for `orca_core`, drop it —
+even when the user asks for the file to be committed as-is, and even when it is
+the only way the branch currently runs. Say so instead; the pairing belongs in
+CI, not in the file.
+
+```bash
+git show :pyproject.toml | grep 'tool.uv.sources'   # must print nothing
+```
+
+Three things enforce this, and none of them replaces reading the diff:
+
+- `tests/test_no_committed_dev_override.py` reads the committed files, so it
+  passes while your working tree is in dev mode.
+- `.github/workflows/test.yml` runs it on every pull request, and installs with
+  `uv sync --locked` — which rejects an override however it is spelled, since
+  `pyproject.toml` and `uv.lock` then disagree.
+- `.githooks/pre-commit` strips the entry from the commit, or refuses the
+  commit when it cannot. It only runs in clones that set `core.hooksPath`
+  (`orca-dev local` does it; see DEVELOPMENT.md), because git will not ship
+  active hooks.
+
+A branch that needs an unreleased `orca_core` is paired in CI by checking the
+core out beside this repo, so it never needs a source entry of its own.
+`orca-dev branch <name>` is the other way to run unreleased core locally: it
+writes a git source instead of a path, which resolves on any machine but costs
+a push before the UI sees a change. It is still a source entry, and the guards
+above keep it out of commits just the same.
+
+---
+
 ## Code Style
 
 - Write concise, self-documenting code; avoid excessive comments.

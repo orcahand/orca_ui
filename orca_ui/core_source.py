@@ -456,6 +456,7 @@ _SOURCE_ENTRY = re.compile(r"^orca[-_]core\s*=\s*\{[^\n]*\}[ \t]*(?:\n|\Z)",
                            re.MULTILINE)
 _EMPTY_SOURCES_TABLE = re.compile(r"\n?^\[tool\.uv\.sources\][ \t]*\n(?=\s*(\[|\Z))",
                                   re.MULTILINE)
+_SOURCES_HEADER = re.compile(r"^[ \t]*\[tool\.uv\.sources", re.MULTILINE)
 
 PYPROJECT = "pyproject.toml"
 LOCKFILE = "uv.lock"
@@ -475,7 +476,25 @@ def strip_dev_override(text: str) -> str:
 
 
 def has_dev_override(text: str) -> bool:
-    return bool(_SOURCE_ENTRY.search(text))
+    """True when ``pyproject.toml`` carries an orca_core source entry.
+
+    Detection is deliberately broader than :func:`strip_dev_override`, which
+    only has to undo what ``uv add`` writes. A hand-written entry is equally
+    fatal to a clone, and TOML spells the same table several ways
+    (``[tool.uv.sources.orca-core]``, a quoted key, an indented one).
+    """
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        # Python 3.10 has no TOML parser. Fall back to spotting the table
+        # header: this project declares no other source, so one is the entry.
+        return bool(_SOURCE_ENTRY.search(text) or _SOURCES_HEADER.search(text))
+    try:
+        parsed = tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        return bool(_SOURCE_ENTRY.search(text) or _SOURCES_HEADER.search(text))
+    sources = parsed.get("tool", {}).get("uv", {}).get("sources", {})
+    return any(key.replace("_", "-") == "orca-core" for key in sources)
 
 
 def lock_has_dev_source(text: str) -> bool:
@@ -515,13 +534,20 @@ def precommit_fix() -> int:
     """Strip dev mode from what is about to be committed.
 
     The working tree is left alone — you stay in dev mode, and only the
-    commit is clean. Returns a shell exit code; never blocks the commit.
+    commit is clean. Returns a shell exit code. An entry it can see but
+    cannot rewrite blocks the commit rather than passing it off as fixed.
     """
     fixed = []
 
     staged_pyproject = _staged(PYPROJECT)
     if staged_pyproject and has_dev_override(staged_pyproject):
         stripped = strip_dev_override(staged_pyproject)
+        if has_dev_override(stripped):
+            sys.stderr.write(
+                "orca-dev: pyproject.toml has an orca_core source entry that "
+                "cannot be rewritten automatically.\nRemove it by hand, or "
+                "commit with --no-verify.\n")
+            return 1
         committed = _committed(PYPROJECT)
         if committed is not None and stripped == committed:
             _git("restore", "--staged", PYPROJECT)
