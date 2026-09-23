@@ -1,9 +1,33 @@
 #!/bin/sh
+# Keeps two local-only things out of shared history: a developer's orca_core
+# override, and a stale frontend bundle.
+
+staged=$(git diff --cached --name-only)
+
+# --- dev-mode override -------------------------------------------------------
+# Pointing this checkout at a sibling orca_core needs a [tool.uv.sources] entry,
+# and uv has no local-only override file, so the edit lands in a tracked file.
+# Committed, it makes the project unresolvable on every other machine.
+if echo "$staged" | grep -qE '^(pyproject\.toml|uv\.lock)$' \
+   && git show :pyproject.toml 2>/dev/null | grep -qE '^[[:space:]]*\[tool\.uv\.sources|^[[:space:]]*"?orca[-_]core"?[[:space:]]*=[[:space:]]*\{'; then
+    cat >&2 <<'EOF'
+pre-commit: pyproject.toml has a local orca_core override staged.
+
+A relative path only resolves on your machine; a clone without a sibling
+orca_core cannot install at all. Unstage it and commit the rest:
+
+    git restore --staged pyproject.toml uv.lock
+
+A branch that needs unpublished orca_core is paired in CI instead — see
+.github/workflows/test.yml.
+EOF
+    exit 1
+fi
+
+# --- frontend bundle ---------------------------------------------------------
 # The built frontend (orca_ui/webui/) is committed to git so npm-less machines
 # can run the UI from a plain checkout. Committing frontend sources without a
 # rebuilt bundle would ship a stale UI to every clone.
-
-staged=$(git diff --cached --name-only)
 
 echo "$staged" | grep -Eq '^frontend/(src/|public/|index\.html|package(-lock)?\.json|vite\.config\.ts|tsconfig)' || exit 0
 echo "$staged" | grep -q '^orca_ui/webui/' && exit 0
