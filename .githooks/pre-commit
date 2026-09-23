@@ -7,21 +7,53 @@ staged=$(git diff --cached --name-only)
 # --- dev-mode override -------------------------------------------------------
 # `orca-dev local` / `orca-dev branch` point this checkout at an orca_core that
 # exists only on this machine. uv has no local-only override file, so that edit
-# lands in tracked files; this strips it from the commit and leaves the working
-# tree in dev mode. Nothing is blocked — you can always commit.
-if echo "$staged" | grep -qE '^(pyproject\.toml|uv\.lock)$'; then
-    if [ -x .venv/bin/python ]; then
-        PY=.venv/bin/python
-    else
-        PY=$(command -v python3 || command -v python)
-    fi
-    [ -n "$PY" ] && "$PY" -c 'import sys
+# lands in tracked files, and committed it makes the project unresolvable
+# everywhere else.
+#
+# Detection is done here in shell so it needs nothing installed; python is only
+# used to strip the entry, which leaves the working tree in dev mode. An entry
+# that cannot be stripped blocks the commit instead of being waved through.
+override=""
+if echo "$staged" | grep -q '^pyproject\.toml$' && git show :pyproject.toml 2>/dev/null \
+   | grep -qE 'tool\.uv\.sources|^[[:space:]]*"?.?orca[-_]core"?.?[[:space:]]*='; then
+    override=pyproject.toml
+fi
+if echo "$staged" | grep -q '^uv\.lock$' && git show :uv.lock 2>/dev/null \
+   | grep -q 'source = { editable = "\.\.'; then
+    override="${override:+$override, }uv.lock"
+fi
+
+if [ -n "$override" ]; then
+    PY=""
+    [ -x .venv/bin/python ] && PY=.venv/bin/python
+    [ -z "$PY" ] && PY=$(command -v python3 || command -v python || true)
+    rc=1
+    if [ -n "$PY" ]; then
+        "$PY" - <<'PYEOF'
+import sys
 sys.path.insert(0, ".")
 try:
     from orca_ui.core_source import precommit_fix
 except Exception:
-    sys.exit(0)
-sys.exit(precommit_fix())'
+    sys.exit(1)
+sys.exit(precommit_fix())
+PYEOF
+        rc=$?
+    fi
+    if [ "$rc" -ne 0 ]; then
+        cat >&2 <<EOF
+pre-commit: a local orca_core override is staged in $override and could not be
+stripped automatically.
+
+A relative path only resolves on your machine; a clone without a sibling
+orca_core cannot install at all. Unstage it and commit the rest:
+
+    git restore --staged pyproject.toml uv.lock
+
+or bypass with --no-verify if you are certain the commit is clean.
+EOF
+        exit 1
+    fi
 fi
 
 # --- frontend bundle ---------------------------------------------------------
