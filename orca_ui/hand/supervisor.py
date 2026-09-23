@@ -37,10 +37,20 @@ MOTOR_FAILURES_BEFORE_RECONNECT = 3
 
 
 def load_config(config_path: str):
-    """Load the model config with the same class selection as the factory."""
+    """Load the model config with the same class selection as the factory.
+
+    Current limits the yaml leaves to ``default`` resolve here when it names
+    the motor family; otherwise they stay ``default`` until a session connects
+    and orca_core learns the family from the bus.
+    """
     raw = read_yaml(config_path) or {}
     config_cls = OrcaHandTouchConfig if "sensors" in raw else OrcaHandConfig
-    return config_cls.from_config_path(config_path=config_path)
+    config = config_cls.from_config_path(config_path=config_path)
+    if config.motor_type is not None and hasattr(config, "with_family_currents"):
+        from orca_core.hardware.motor_factory import motor_client_class
+
+        config = config.with_family_currents(motor_client_class(config.motor_type))
+    return config
 
 
 @dataclass(frozen=True)
