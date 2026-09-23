@@ -34,6 +34,7 @@ dev = [
     "pytest>=8.3.5,<9.0.0",
     # The suite is wait-bound, not CPU-bound; pytest.ini runs it with -n auto.
     "pytest-xdist>=3.8,<4",
+    "pytest-timeout>=2.3,<3",
 ]
 # Only needed to (re)build the 3D hand asset bundle (scripts/build_hand_bundle.py).
 assets = [

@@ -116,9 +116,11 @@ Three things enforce this, and none of them replaces reading the diff:
   active hooks.
 
 A branch that needs an unreleased `orca_core` is paired in CI by checking the
-core out beside this repo, so it never needs a path source of its own.
-`orca-dev branch <name>` is the other supported option: it writes a git source,
-which resolves on any machine, but costs a push before the UI sees a change.
+core out beside this repo, so it never needs a source entry of its own.
+`orca-dev branch <name>` is the other way to run unreleased core locally: it
+writes a git source instead of a path, which resolves on any machine but costs
+a push before the UI sees a change. It is still a source entry, and the guards
+above keep it out of commits just the same.
 
 ---
 

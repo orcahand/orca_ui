@@ -456,6 +456,7 @@ _SOURCE_ENTRY = re.compile(r"^orca[-_]core\s*=\s*\{[^\n]*\}[ \t]*(?:\n|\Z)",
                            re.MULTILINE)
 _EMPTY_SOURCES_TABLE = re.compile(r"\n?^\[tool\.uv\.sources\][ \t]*\n(?=\s*(\[|\Z))",
                                   re.MULTILINE)
+_SOURCES_HEADER = re.compile(r"^[ \t]*\[tool\.uv\.sources", re.MULTILINE)
 
 PYPROJECT = "pyproject.toml"
 LOCKFILE = "uv.lock"
@@ -485,13 +486,13 @@ def has_dev_override(text: str) -> bool:
     try:
         import tomllib
     except ModuleNotFoundError:
-        # Python 3.10 has no TOML parser. Fall back to spotting the table at
-        # all: this project declares no other source, so a match is the entry.
-        return bool(_SOURCE_ENTRY.search(text)) or "tool.uv.sources" in text
+        # Python 3.10 has no TOML parser. Fall back to spotting the table
+        # header: this project declares no other source, so one is the entry.
+        return bool(_SOURCE_ENTRY.search(text) or _SOURCES_HEADER.search(text))
     try:
         parsed = tomllib.loads(text)
     except tomllib.TOMLDecodeError:
-        return bool(_SOURCE_ENTRY.search(text))
+        return bool(_SOURCE_ENTRY.search(text) or _SOURCES_HEADER.search(text))
     sources = parsed.get("tool", {}).get("uv", {}).get("sources", {})
     return any(key.replace("_", "-") == "orca-core" for key in sources)
 

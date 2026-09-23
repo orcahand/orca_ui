@@ -5,17 +5,17 @@
 staged=$(git diff --cached --name-only)
 
 # --- dev-mode override -------------------------------------------------------
-# `orca-dev local` / `orca-dev branch` point this checkout at an orca_core that
-# exists only on this machine. uv has no local-only override file, so that edit
-# lands in tracked files, and committed it makes the project unresolvable
-# everywhere else.
+# `orca-dev local` / `orca-dev branch` point this checkout at an unreleased
+# orca_core. uv has no local-only override file, so that edit lands in tracked
+# files; committed, a path source resolves on no other machine and a git
+# source pins every clone to a branch.
 #
 # Detection is done here in shell so it needs nothing installed; python is only
 # used to strip the entry, which leaves the working tree in dev mode. An entry
 # that cannot be stripped blocks the commit instead of being waved through.
 override=""
 if echo "$staged" | grep -q '^pyproject\.toml$' && git show :pyproject.toml 2>/dev/null \
-   | grep -qE 'tool\.uv\.sources|^[[:space:]]*"?.?orca[-_]core"?.?[[:space:]]*='; then
+   | grep -qE '^[[:space:]]*\[tool\.uv\.sources|^[[:space:]]*"?orca[-_]core"?[[:space:]]*=[[:space:]]*\{'; then
     override=pyproject.toml
 fi
 if echo "$staged" | grep -q '^uv\.lock$' && git show :uv.lock 2>/dev/null \
