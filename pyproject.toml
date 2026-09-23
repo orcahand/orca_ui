@@ -10,7 +10,7 @@ license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "orca_core",
+    "orca-core>=0.4.2,<0.5",
     "fastapi>=0.110",
     "uvicorn>=0.30",
     "websockets>=12",
@@ -35,13 +35,6 @@ assets = [
     "trimesh>=4.4",
     "fast-simplification>=0.1.9",
 ]
-
-# The UI targets orca_core's joint-sensing work. During development it tracks a
-# local sibling checkout (which may be ahead of the public branch); on machines
-# without one, swap in the git source instead:
-#   orca_core = { git = "https://github.com/orcahand/orca_core.git", branch = "feature/joint-sensing" }
-[tool.uv.sources]
-orca_core = { path = "../orca_core", editable = true }
 
 [build-system]
 requires = ["hatchling>=1.27.0"]
