@@ -26,6 +26,8 @@ import type {
   TrajectoryData,
   TrajectoryEntry,
   UsageSnapshot,
+  EnduranceSnapshot,
+  EnduranceTest,
   ServoGains,
   PoseSource,
   ServoGainsMap,
@@ -95,6 +97,23 @@ export const api = {
   usageDeleteSession: (id: string) =>
     del<{ ok: boolean }>(`/api/usage/session/${encodeURIComponent(id)}`),
   usageReset: () => post<{ ok: boolean }>('/api/usage/reset'),
+  endurance: () => request<EnduranceSnapshot>('/api/endurance'),
+  enduranceTest: (id: string) =>
+    request<EnduranceTest>(`/api/endurance/tests/${encodeURIComponent(id)}`),
+  enduranceStart: (label?: string) =>
+    post<EnduranceTest>('/api/endurance/tests', { label }),
+  enduranceStop: (id: string) =>
+    post<{ ok: boolean }>(`/api/endurance/tests/${encodeURIComponent(id)}/stop`),
+  enduranceRename: (id: string, label: string) =>
+    put<{ ok: boolean }>(`/api/endurance/tests/${encodeURIComponent(id)}`, {
+      label,
+    }),
+  enduranceNote: (id: string, text: string) =>
+    post<{ ok: boolean }>(`/api/endurance/tests/${encodeURIComponent(id)}/note`, {
+      text,
+    }),
+  enduranceDelete: (id: string) =>
+    del<{ ok: boolean }>(`/api/endurance/tests/${encodeURIComponent(id)}`),
   stats: () => request<Stats>('/api/stats'),
   ports: () => request<PortInfo[]>('/api/ports'),
   taxelGeometry: () => request<TaxelGeometry>('/api/tactile/geometry'),

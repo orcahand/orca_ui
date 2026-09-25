@@ -13,6 +13,7 @@ open-loop pacing: nothing else waits for the hand.
 
 from __future__ import annotations
 
+import logging
 import math
 import time
 
@@ -22,6 +23,8 @@ from orca_ui.hand.operations import hand_ops
 from orca_ui.hand.operations.base import OpContext, Operation
 from orca_ui.hand.states import ControlSource
 from orca_ui.library import CONTINUOUS, MOTOR_WAYPOINTS, WAYPOINTS, LibraryError
+
+logger = logging.getLogger(__name__)
 
 SPEEDS = (0.5, 1.0, 2.0, 4.0, 8.0)
 WAYPOINT_SPEED_DEG_S = 60.0   # cruise speed for synthesized waypoint segments
@@ -183,36 +186,70 @@ def _arrived(sampled: dict | None, angles: dict[str, float],
     return bool(moved) and max(moved) <= DWELL_STILL_DEG
 
 
-def _hold_until_arrived(ctx: OpContext, angles: dict[str, float]) -> None:
+def _sample_state(session) -> "tuple[dict | None, dict | None]":
+    """The hold's poll: sampled joints plus the motor currents that ride the
+    same read where the session offers them."""
+    if session is None:
+        return None, None
+    sample = getattr(session, "sampled_state", None)
+    if sample is not None:
+        return sample()
+    return session.sampled_joints(), None
+
+
+def _record_hold(ctx: OpContext, sampled: dict | None, currents: dict | None,
+                 cycle: "int | None", leg: "int | None") -> None:
+    """Hand the settled sample to the endurance recorder, if the console has
+    one. The read already happened; a recorder fault must not stop playback."""
+    recorder = getattr(ctx.service, "endurance", None)
+    if recorder is None or not sampled:
+        return
+    try:
+        recorder.record_hold(sampled, currents, cycle, leg)
+    except Exception:
+        logger.debug("endurance sample dropped", exc_info=True)
+
+
+def _hold_until_arrived(ctx: OpContext, angles: dict[str, float],
+                        cycle: "int | None" = None,
+                        leg: "int | None" = None) -> None:
     """Sit on a commanded waypoint until the hand gets there.
 
     A waypoint recording is a sequence of *static* poses — each one captured
     while the hand was held still — so replay has to stop at each one. The
     frame stream on its own reaches a waypoint for a single frame period
     while the hand is still travelling towards the previous one.
+
+    The last poll is the settled sample the endurance recorder keeps, tagged
+    with the cycle and the leg (hold index) it belongs to.
     """
     ctx.sleep(DWELL_MIN_S)
     deadline = time.monotonic() + max(DWELL_MAX_S - DWELL_MIN_S, 0.0)
     previous: dict | None = None
+    sampled: dict | None = None
+    currents: dict | None = None
     while time.monotonic() < deadline:
         ctx.check_stop()
         ctx.pause_point()
-        session = ctx.service.session
-        sampled = session.sampled_joints() if session is not None else None
+        sampled, currents = _sample_state(ctx.service.session)
         if _arrived(sampled, angles, previous):
-            return
+            break
         previous = sampled
         ctx.sleep(DWELL_POLL_S)
+    _record_hold(ctx, sampled, currents, cycle, leg)
 
 
 def _stream(ctx: OpContext, joint_ids: list[str], frames: list[list[float]],
-            dt: float, progress=None, holds: "list[int] | tuple" = ()) -> None:
+            dt: float, progress=None, holds: "list[int] | tuple" = (),
+            cycle: "int | None" = None) -> None:
     """Command frames at a fixed cadence, honoring pause/stop.
 
     ``holds`` names frame indices to sit on until the hand arrives; the
-    cadence grid restarts afterwards, since the hold just broke it.
+    cadence grid restarts afterwards, since the hold just broke it. ``cycle``
+    is the playback cycle these frames belong to, for the hold samples.
     """
     hold_at = set(holds)
+    leg_of = {index: leg for leg, index in enumerate(sorted(hold_at))}
     total = len(frames)
     next_t = time.monotonic()
     last_progress = 0.0
@@ -228,7 +265,7 @@ def _stream(ctx: OpContext, joint_ids: list[str], frames: list[list[float]],
                 progress((index + 1) / total)
                 last_progress = now
         if index in hold_at:
-            _hold_until_arrived(ctx, angles)
+            _hold_until_arrived(ctx, angles, cycle=cycle, leg=leg_of[index])
             next_t = time.monotonic()
         next_t += dt
         delay = next_t - time.monotonic()
@@ -316,8 +353,12 @@ def play_frames(ctx: OpContext, *, name: str, joint_ids: list[str],
                 f"(≤{DWELL_MAX_S:g}s each)")
 
     while True:
+        # The cycle in progress, 1-based — the same count the hold samples
+        # carry, so a recorder or dashboard can line the two up.
+        ctx.set_extra({"cycle": cycles + 1, "loop": loop,
+                       "holds": len(holds)})
         _stream(ctx, joint_ids, frames, dt, progress=ctx.set_progress,
-                holds=holds)
+                holds=holds, cycle=cycles + 1)
         cycles += 1
         if loop and cycles >= MAX_LOOP_CYCLES:
             ctx.log(f"loop backstop reached ({MAX_LOOP_CYCLES} cycles) — "

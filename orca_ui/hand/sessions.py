@@ -135,6 +135,21 @@ class HandSession:
             return self._joint_estimate(self.hand.get_motor_state().position)
         return None
 
+    def sampled_state(self) -> "tuple[dict | None, dict | None]":
+        """``(sampled joints, per-motor currents in mA)`` from the read
+        ``sampled_joints`` already makes: on a hand whose joint source is the
+        motors, position and current arrive in one transaction and the
+        currents would otherwise be thrown away. Encoder hands read no
+        motors here, so their currents are ``None``."""
+        if self.caps.encoders:
+            return self.measured_joints(), None
+        if self.caps.motors and self._estimate_allowed():
+            state = self.hand.get_motor_state()
+            currents = {int(m): float(c) for m, c in
+                        zip(self.hand.config.motor_ids, state.current)}
+            return self._joint_estimate(state.position), currents
+        return None, None
+
     def _estimate_allowed(self) -> bool:
         if self._estimate_ok is None:
             # _motor_to_joint_pos prints per-joint warnings on uncalibrated

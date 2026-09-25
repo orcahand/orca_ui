@@ -24,9 +24,10 @@ from orca_core.hardware.sensing.constants import (
     ENCODER_LSB_DEG,
     JOINT_TO_ENCODER_SLOT,
 )
+from orca_core.constants import FINGER_NAMES
 from orca_core.hardware.sensing.health import EncoderStreamHealth
 
-from orca_ui.hand import usage_stats
+from orca_ui.hand import endurance, usage_stats
 from orca_ui.hand.faults import (
     BusErrorMonitor,
     TrackingMonitor,
@@ -59,6 +60,22 @@ MAX_TELEMETRY_STALENESS_S = 30.0
 # 3D model every time one window happens to pass clean.
 ENCODER_RESTORE_WINDOWS = 5
 
+# Tactile liveness is read off the stream itself, not the board's connect-time
+# finger flags, which never change while it runs. A finger whose frame has not
+# changed for this long while frames keep arriving is frozen; one reading all
+# zero this long while another finger reads force is dead; a value that is not
+# finite is garbage.
+TACTILE_FROZEN_S = 5.0
+TACTILE_ZERO_S = 5.0
+# An isolated one-frame excursion of at least this much force (N), up and
+# straight back, is a spike; this many inside the window makes the finger
+# "spiky". The fast tick sees every other frame at most, so a one-frame spike
+# can be missed — the count is a floor, not a total.
+TACTILE_SPIKE_N = 10.0
+TACTILE_SPIKE_WINDOW_S = 10.0
+TACTILE_SPIKES_FOR_VERDICT = 3
+TACTILE_STREAM_ALIVE_S = 1.0
+
 
 def _clean_angles(angles: dict | None) -> dict | None:
     """Drop None/NaN entries and round for the wire."""
@@ -75,14 +92,128 @@ def _clean_angles(angles: dict | None) -> dict | None:
     return out or None
 
 
+def _flatten(payload) -> list[float]:
+    """Every scalar in a finger's force vector or taxel rows, as floats;
+    anything unparseable reads as NaN so it is classed as garbage."""
+    out: list[float] = []
+    stack = [payload]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, (list, tuple)):
+            stack.extend(item)
+            continue
+        try:
+            out.append(float(item))
+        except (TypeError, ValueError):
+            out.append(float("nan"))
+    return out
+
+
+class TactileLiveness:
+    """Per-finger liveness verdicts derived from the tactile stream.
+
+    ``feed`` runs on the fast tick with the latest in-memory frame; ``report``
+    on the slow tick. Verdicts, most serious first: ``nan`` (a non-finite
+    value in the last window), ``no frames`` (the finger dropped out of a
+    live stream), ``frozen`` (a non-zero frame unchanged for
+    TACTILE_FROZEN_S while frames keep arriving), ``zero`` (all zero for
+    TACTILE_ZERO_S while another finger reads force), ``spiky``
+    (TACTILE_SPIKES_FOR_VERDICT isolated spikes in the window), else
+    ``live``.
+    """
+
+    def __init__(self):
+        self._last_ts: float | None = None
+        self._frame_mono = 0.0
+        self._nonzero_mono = 0.0
+        self._fingers: dict[str, dict] = {}
+
+    def feed(self, reading, now: float | None = None) -> None:
+        if reading is None:
+            return
+        ts = getattr(reading, "timestamp", None)
+        if ts is not None and ts == self._last_ts:
+            return   # the frame the previous tick already saw
+        now = time.monotonic() if now is None else now
+        self._last_ts = ts
+        self._frame_mono = now
+        forces = getattr(reading.forces, "forces", None) or {}
+        taxels = getattr(reading.taxels, "taxels", None) or {}
+        magnitudes = endurance.force_magnitudes(forces or None, taxels or None)
+        for finger in set(forces) | set(taxels):
+            flat = _flatten(taxels[finger] if finger in taxels else forces[finger])
+            state = self._fingers.get(finger)
+            if state is None:
+                state = self._fingers[finger] = {
+                    "seen": now, "changed": now, "nonzero": 0.0, "nan": 0.0,
+                    "last": None, "mags": [], "spikes": [], "spikes_total": 0,
+                }
+            state["seen"] = now
+            if any(math.isnan(v) or math.isinf(v) for v in flat):
+                state["nan"] = now
+            key = tuple(flat)
+            if key != state["last"]:
+                state["last"] = key
+                state["changed"] = now
+            if any(abs(v) > 1e-9 for v in flat if not math.isnan(v)):
+                state["nonzero"] = now
+                self._nonzero_mono = now
+            magnitude = magnitudes.get(finger)
+            if magnitude is not None and math.isfinite(magnitude):
+                mags = state["mags"]
+                mags.append(magnitude)
+                del mags[:-3]
+                if len(mags) == 3:
+                    a, b, c = mags
+                    if ((b - a >= TACTILE_SPIKE_N and b - c >= TACTILE_SPIKE_N)
+                            or (a - b >= TACTILE_SPIKE_N
+                                and c - b >= TACTILE_SPIKE_N)):
+                        state["spikes"].append(now)
+                        state["spikes_total"] += 1
+            cutoff = now - TACTILE_SPIKE_WINDOW_S
+            state["spikes"] = [t for t in state["spikes"] if t >= cutoff]
+
+    def report(self, finger: str, now: float | None = None) -> dict:
+        now = time.monotonic() if now is None else now
+        state = self._fingers.get(finger)
+        stream_alive = now - self._frame_mono <= TACTILE_STREAM_ALIVE_S
+        verdict, reason = "live", "updating"
+        if state is None:
+            verdict, reason = "no frames", "never appeared in the stream"
+        elif now - state["nan"] <= TACTILE_FROZEN_S:
+            verdict, reason = "nan", "non-finite value in the frame"
+        elif stream_alive and now - state["seen"] > TACTILE_FROZEN_S:
+            verdict, reason = "no frames", (
+                f"missing from the stream for {now - state['seen']:.0f}s")
+        elif (stream_alive and now - state["changed"] > TACTILE_FROZEN_S
+                and state["last"] and any(abs(v) > 1e-9 for v in state["last"])):
+            verdict, reason = "frozen", (
+                f"frame unchanged for {now - state['changed']:.0f}s")
+        elif (now - state["nonzero"] > TACTILE_ZERO_S
+                and now - self._nonzero_mono <= TACTILE_ZERO_S):
+            verdict, reason = "zero", (
+                f"all zero for {now - state['nonzero']:.0f}s while other "
+                "fingers read force")
+        elif len(state["spikes"]) >= TACTILE_SPIKES_FOR_VERDICT:
+            verdict, reason = "spiky", (
+                f"{len(state['spikes'])} isolated spikes ≥{TACTILE_SPIKE_N:g} N "
+                f"in {TACTILE_SPIKE_WINDOW_S:g}s")
+        return {
+            "verdict": verdict,
+            "reason": reason,
+            "spikes": len(state["spikes"]) if state else 0,
+            "spikes_total": state["spikes_total"] if state else 0,
+        }
+
+
 class SensorHealthMonitor:
     """Rolls encoder frames into windowed per-joint health verdicts and
     assembles the ``sensors.health`` payload — the browser twin of
     orca_core's ``scripts/monitor_sensors.py`` electrical monitor.
 
-    ``feed`` runs on the fast tick (in-memory read, no bus traffic);
-    ``payload`` runs on the slow tick and closes the accumulation window, so
-    verdicts cover roughly the last second of frames.
+    ``feed``/``feed_tactile`` run on the fast tick (in-memory reads, no bus
+    traffic); ``payload`` runs on the slow tick and closes the accumulation
+    window, so verdicts cover roughly the last second of frames.
     """
 
     def __init__(self):
@@ -90,6 +221,7 @@ class SensorHealthMonitor:
         self._last_ts: float | None = None
         self._last_reading = None
         self._prev_rates: dict[str, tuple[float, int]] = {}  # name -> (t, frames)
+        self.tactile = TactileLiveness()
 
     def feed(self, reading) -> None:
         if reading is None:
@@ -98,6 +230,9 @@ class SensorHealthMonitor:
             self._health.update(reading)
             self._last_ts = reading.timestamp
         self._last_reading = reading
+
+    def feed_tactile(self, reading) -> None:
+        self.tactile.feed(reading)
 
     @staticmethod
     def _verdict(report) -> str:
@@ -159,10 +294,17 @@ class SensorHealthMonitor:
         fingers = {}
         if cfg is not None:
             for finger, connected in cfg.connected.items():
-                fingers[finger] = {
+                entry = {
                     "connected": bool(connected),
                     "taxels": int(cfg.num_taxels.get(finger, 0)),
+                    "verdict": None,
+                    "reason": None,
+                    "spikes": 0,
+                    "spikes_total": 0,
                 }
+                if connected:
+                    entry.update(self.tactile.report(finger))
+                fingers[finger] = entry
         return {
             "present": True,
             "hz": round(self._rate("tac", getattr(stats, "frames_ok", None)), 1),
@@ -247,6 +389,10 @@ class TelemetryService:
         self._sensor_health = SensorHealthMonitor()
         self._usage: usage_stats.JointUsageTracker | None = None
         self._usage_path: str | None = None
+        self._endurance: endurance.EnduranceRecorder | None = None
+        self._endurance_path: str | None = None
+        self._endurance_lock = threading.Lock()
+        self._last_faults: dict | None = None
         # Joints whose encoder is currently distrusted (joint -> "verdict:
         # reason"). Written on the slow tick, read on the fast tick — always
         # replaced wholesale, never mutated in place.
@@ -278,6 +424,9 @@ class TelemetryService:
         usage = self._usage
         if usage is not None:
             usage.save()
+        recorder = self._endurance
+        if recorder is not None:
+            recorder.save()
 
     # ----- usage stats ---------------------------------------------------------
 
@@ -308,6 +457,53 @@ class TelemetryService:
         tracker = self.usage_tracker()
         if tracker is not None:
             tracker.feed(angles)
+
+    # ----- endurance -----------------------------------------------------------
+
+    def endurance_recorder(self) -> endurance.EnduranceRecorder | None:
+        """Endurance-test recorder for the current hand, next to its usage
+        stats; None without a config (duck-typed test stubs)."""
+        supervisor = getattr(self._service, "supervisor", None)
+        config = getattr(supervisor, "config", None)
+        calibration_path = getattr(config, "calibration_path", None)
+        if calibration_path is None:
+            return None
+        path = endurance.recorder_path(calibration_path)
+        with self._endurance_lock:
+            if self._endurance is None or self._endurance_path != path:
+                if self._endurance is not None:
+                    self._endurance.save()
+                motor_joint = {
+                    int(m): str(j) for m, j in
+                    (getattr(config, "motor_to_joint_dict", None) or {}).items()}
+                self._endurance = endurance.EnduranceRecorder(
+                    path, calibration_path,
+                    joints=list(config.joint_ids),
+                    motors=[int(m) for m in config.motor_ids],
+                    motor_joint=motor_joint,
+                    fingers=list(FINGER_NAMES))
+                self._endurance_path = path
+            return self._endurance
+
+    def _observe_endurance(self, health: dict | None) -> None:
+        """Slow-tick observation: the payloads this tick assembled anyway,
+        plus the operation snapshot and torque flag — no hardware reads."""
+        recorder = self.endurance_recorder()
+        if recorder is None:
+            return
+        operation = None
+        manager = getattr(self._service, "operation_manager", None)
+        if manager is not None:
+            try:
+                operation = manager.snapshot()
+            except Exception:
+                operation = None
+        torque = None
+        try:
+            torque = bool(self._service.supervisor.status().torque_enabled)
+        except Exception:
+            pass
+        recorder.observe(health, self._last_faults, operation, torque)
 
     # ----- ticks ---------------------------------------------------------------
 
@@ -345,6 +541,10 @@ class TelemetryService:
                 taxels = getattr(reading.taxels, "taxels", None)
                 if taxels:
                     self._hub.publish(T.TACTILE_TAXELS, {"taxels": taxels})
+                self._sensor_health.feed_tactile(reading)
+                recorder = self.endurance_recorder()
+                if recorder is not None and (forces or taxels):
+                    recorder.feed_forces(forces, taxels)
 
     def _mid_tick(self) -> None:
         session = self._service.session
@@ -396,6 +596,7 @@ class TelemetryService:
         tracker = self.usage_tracker()
         if tracker is not None:
             tracker.feed_health(health, session.caps)
+        self._observe_endurance(health)
 
     def _update_encoder_suppression(self, health: dict) -> None:
         """Distrust noisy encoders (fast to condemn, slow to forgive).
@@ -686,8 +887,8 @@ class TelemetryService:
             # dashboard needs this to tell a power latch from a hot motor.
             entry["hw_error"] = self._hw_error_info.get(mid)
             motors[mid] = entry
-        self._hub.publish(T.MOTORS_FAULTS,
-                          {"motors": motors, "bus": bus["bus"]})
+        self._last_faults = {"motors": motors, "bus": bus["bus"]}
+        self._hub.publish(T.MOTORS_FAULTS, self._last_faults)
 
     def _publish_motor_health(self, session, temps: bool = True,
                               currents: bool = True) -> None:

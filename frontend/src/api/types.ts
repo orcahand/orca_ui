@@ -617,9 +617,28 @@ export interface SensorsHealth {
     present: boolean
     hz: number
     stream_rearms: number | null
-    fingers: Record<string, { connected: boolean; taxels: number }>
+    fingers: Record<string, TactileFingerHealth>
   } | null
   links: Record<string, SensingLinkHealth>
+}
+
+// Liveness read off the tactile stream itself (orca_ui/hand/telemetry.py
+// TactileLiveness); the board's connected flag never changes while it runs.
+export type TactileVerdict =
+  | 'live'
+  | 'frozen'
+  | 'zero'
+  | 'nan'
+  | 'spiky'
+  | 'no frames'
+
+export interface TactileFingerHealth {
+  connected: boolean
+  taxels: number
+  verdict: TactileVerdict | null // null while disconnected
+  reason: string | null
+  spikes: number // isolated spikes inside the current window
+  spikes_total: number // since the session connected
 }
 
 export interface Stats {
@@ -755,6 +774,112 @@ export interface UsageSnapshot {
   bins: number
   current_id: string | null
   sessions: UsageSession[]
+}
+
+// ----- endurance tests ------------------------------------------------------
+
+// One test in endurance.json (next to joint_usage.json). Times are seconds
+// since t0 (the moment the test was started, epoch seconds).
+export interface EnduranceTestSummary {
+  id: string
+  label: string
+  started_at: string
+  ended_at: string | null
+  t0: number
+  active: boolean
+  elapsed_s: number
+  samples: number
+  cycles_total: number
+  events: number
+  checkpoints: number
+}
+
+export interface EnduranceSnapshot {
+  path: string
+  active_id: string | null
+  tests: EnduranceTestSummary[]
+}
+
+// Per-reversal samples rolled into time buckets, columnar: index i of every
+// array is bucket i. angle_* are the settled angles' min/max over the bucket
+// (their difference is the range the joint actually used), current_* the
+// holding currents (mA), force_* the fingertip force magnitudes (N).
+export interface EnduranceBuckets {
+  t0: number[]
+  t1: number[]
+  n: number[]
+  cycle0: number[]
+  cycle1: number[]
+  angle_min: Record<string, (number | null)[]>
+  angle_max: Record<string, (number | null)[]>
+  current_mean: Record<string, (number | null)[]>
+  current_max: Record<string, (number | null)[]>
+  force_mean: Record<string, (number | null)[]>
+  force_max: Record<string, (number | null)[]>
+}
+
+export interface EnduranceEvent {
+  t: number
+  cycle: number
+  leg: number | null
+  kind: 'operation' | 'torque' | 'fault' | 'tactile' | 'encoder' | 'link' | 'note' | 'test'
+  subject: string
+  detail: string
+  severity: 'info' | 'ok' | 'bad'
+}
+
+// A calibration run that finished while the test was active. travel_deg is
+// motor travel between the hardstops per joint (degrees of motor shaft);
+// ratio is motor-rad per joint-degree, so Δtravel × π/180 ÷ ratio is the
+// slack in joint degrees.
+export interface EnduranceCheckpoint {
+  t: number
+  cycle: number
+  started_at: string | null
+  finished_at: string | null
+  completed: boolean
+  travel_deg: Record<string, number>
+  ratio: Record<string, number>
+  problems: string[]
+}
+
+export interface EnduranceRun {
+  run_id: string
+  kind: string
+  params: Record<string, unknown>
+  t: number
+  ended_t: number | null
+  cycles: number
+  state: string
+}
+
+export interface EnduranceSample {
+  t: number
+  cycle: number
+  cycle_total: number
+  leg: number | null
+  run_id: string | null
+  angles: Record<string, number | null>
+  currents: Record<string, number | null>
+  forces: Record<string, number | null>
+}
+
+export interface EnduranceTest
+  extends Omit<EnduranceTestSummary, 'events' | 'checkpoints'> {
+  joints: string[]
+  motors: number[]
+  motor_joint: Record<string, string>
+  fingers: string[]
+  bucket_s: number
+  buckets: EnduranceBuckets
+  runs: EnduranceRun[]
+  runs_dropped: number
+  events: EnduranceEvent[]
+  events_dropped: number
+  checkpoints: EnduranceCheckpoint[]
+  checkpoints_dropped: number
+  latest: EnduranceSample | null
+  samples_url: string
 }
 
 // Full stored trajectory (GET /api/trajectories/{name}) — the waypoint

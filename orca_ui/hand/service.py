@@ -713,6 +713,14 @@ class HandService:
         return getattr(self, "_teleop_manager", None)
 
     @property
+    def endurance(self):
+        """The endurance recorder for the connected hand, or None. Owned by
+        telemetry (it is keyed off the same stats directory as usage)."""
+        telemetry = getattr(self, "_telemetry", None)
+        getter = getattr(telemetry, "endurance_recorder", None)
+        return getter() if getter is not None else None
+
+    @property
     def teleop_installer(self):
         # Present even when teleop_manager is None (--no-teleop): fetching the
         # checkout is exactly what an install-less console needs to offer.

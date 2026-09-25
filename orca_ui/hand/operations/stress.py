@@ -332,7 +332,7 @@ class StressTestOperation(Operation):
         if approach:
             ctx.set_phase("approach", detail="moving to the start of the range")
             _stream(ctx, stream_joints, approach, 1.0 / WAYPOINT_RATE_HZ)
-        self._settle(ctx, stream_joints, start, hold_s, tracker)
+        self._settle(ctx, stream_joints, start, hold_s, tracker, 0, 1)
 
         # Glide mode paces on the frame grid; stepped mode paces on replay's
         # command period. The glide rate is capped so a fast run submits at a
@@ -349,7 +349,7 @@ class StressTestOperation(Operation):
         ctx.set_extra(self._extra(tracker, 0, cycles, loop, opposed))
 
         while True:
-            for name in (FLEXED, EXTENDED):
+            for leg, name in enumerate((FLEXED, EXTENDED)):
                 target = pose[name]
                 ctx.set_detail(
                     f"cycle {completed + 1}"
@@ -365,7 +365,8 @@ class StressTestOperation(Operation):
                 _stream(ctx, stream_joints, frames, dt,
                         progress=self._leg_progress(ctx, done, legs))
                 current = list(target)
-                self._settle(ctx, stream_joints, target, hold_s, tracker)
+                self._settle(ctx, stream_joints, target, hold_s, tracker,
+                             completed + 1, leg)
                 done += 1
                 if legs is not None:
                     ctx.set_progress(done / legs)
@@ -428,11 +429,14 @@ class StressTestOperation(Operation):
         return lambda fraction: ctx.set_progress((done + fraction) / legs)
 
     def _settle(self, ctx: OpContext, joints: list[str], target: list[float],
-                hold_s: float, tracker: _ReachTracker) -> None:
+                hold_s: float, tracker: _ReachTracker, cycle: int,
+                leg: int) -> None:
         """Sit on a pose until the hand arrives (or stops approaching), dwell
-        for the configured hold, then record where it actually got to."""
+        for the configured hold, then record where it actually got to.
+        ``cycle`` is the one in progress (1-based; 0 for the approach) and
+        ``leg`` which extreme this is — the tags on the hold sample."""
         angles = dict(zip(joints, target))
-        _hold_until_arrived(ctx, angles)
+        _hold_until_arrived(ctx, angles, cycle=cycle, leg=leg)
         if hold_s > 0:
             ctx.sleep(hold_s)
         tracker.sample(ctx, angles)

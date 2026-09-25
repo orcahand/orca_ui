@@ -178,6 +178,18 @@ class UsageSessionBody(BaseModel):
     label: Optional[str] = Field(default=None, max_length=64)
 
 
+class EnduranceTestBody(BaseModel):
+    """Start or rename an endurance test; label is optional cosmetics."""
+
+    label: Optional[str] = Field(default=None, max_length=64)
+
+
+class EnduranceNoteBody(BaseModel):
+    """Operator marker on the running endurance test's timeline."""
+
+    text: str = Field(min_length=1, max_length=500)
+
+
 class TrajectoryUpdateRequest(BaseModel):
     """Waypoint-editor save: full replacement waypoint list (row order =
     the recording's joint_ids). ``save_as`` writes a copy under a new name

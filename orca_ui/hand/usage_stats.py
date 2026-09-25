@@ -365,8 +365,14 @@ class JointUsageTracker:
         tactile = (payload or {}).get("tactile")
         if tactile and tactile.get("fingers"):
             for finger, info in tactile["fingers"].items():
-                states[f"tactile:{finger}"] = (
-                    "up" if info.get("connected") else "down")
+                # A connected finger whose stream reads dead or garbage is
+                # not up: its verdict (frozen, nan, zero, spiky) is the state.
+                if not info.get("connected"):
+                    state = "down"
+                else:
+                    verdict = info.get("verdict") or "live"
+                    state = "up" if verdict == "live" else verdict
+                states[f"tactile:{finger}"] = state
         for name, link in ((payload or {}).get("links") or {}).items():
             healthy = link.get("connected") and not link.get("port_dead")
             states[f"link:{name}"] = "up" if healthy else "down"

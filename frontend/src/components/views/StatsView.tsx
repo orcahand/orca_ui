@@ -6,7 +6,10 @@
 // finger connections, links, motor bus) is watched whenever the hand is
 // connected: transitions become events, unhealthy time is accumulated.
 // Sessions can be created, renamed and deleted; "All sessions" stitches
-// them into the lifetime total. The calibration log lives here too.
+// them into the lifetime total. The calibration log lives here too, and
+// the endurance panel: per-hold settled angles, holding currents and
+// fingertip forces over a long looping test, with its events and
+// calibration checkpoints.
 
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../api/rest'
@@ -21,6 +24,7 @@ import type {
 import { useAppStore } from '../../state/appStore'
 import { Panel } from '../common/Panel'
 import { CalibrationLogSection } from '../setup/CalibrationLogSection'
+import { EndurancePanel } from '../stats/EndurancePanel'
 
 const REFRESH_S = 5
 const ALL = '__all__'
@@ -648,10 +652,14 @@ export function StatsView() {
         )}
       </Panel>
 
+      <EndurancePanel />
+
       <Panel title="Sensor Health">
         <p className="setup-copy dim">
           Watched whenever the hand is connected — idle included: per-joint
-          encoder verdicts, tactile finger connections, sensing links and
+          encoder verdicts, tactile fingers (connection, and whether the
+          stream itself reads live — a frame frozen, all zero while others
+          read force, NaN, or spiking counts as unhealthy), sensing links and
           the motor bus. {selectedSession ? 'This session' : 'All sessions'}
           {health.observed_s > 0 &&
             ` · ${fmtDuration(health.observed_s)} monitored`}

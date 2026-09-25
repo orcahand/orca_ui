@@ -101,6 +101,74 @@ def build_router(service: HandService, telemetry=None) -> APIRouter:
         _usage_tracker().reset()
         return {"ok": True}
 
+    # ----- endurance tests -------------------------------------------------
+
+    def _endurance():
+        recorder = (telemetry.endurance_recorder()
+                    if telemetry is not None else None)
+        if recorder is None:
+            raise HTTPException(status_code=503,
+                                detail="endurance recorder unavailable")
+        return recorder
+
+    def _endurance_test(test_id: str) -> dict:
+        test = _endurance().test(test_id)
+        if test is None:
+            raise HTTPException(status_code=404, detail="no such test")
+        return test
+
+    @router.get("/endurance")
+    def endurance_tests():
+        return _endurance().snapshot()
+
+    @router.post("/endurance/tests")
+    def endurance_start(body: schemas.EnduranceTestBody | None = None):
+        label = body.label if body is not None else None
+        try:
+            return _endurance().start(label)
+        except RuntimeError as e:
+            raise HTTPException(status_code=409, detail=str(e))
+
+    @router.get("/endurance/tests/{test_id}")
+    def endurance_test(test_id: str):
+        return _endurance_test(test_id)
+
+    @router.put("/endurance/tests/{test_id}")
+    def endurance_rename(test_id: str, body: schemas.EnduranceTestBody):
+        if not _endurance().rename(test_id, body.label or ""):
+            raise HTTPException(status_code=404, detail="no such test")
+        return {"ok": True}
+
+    @router.post("/endurance/tests/{test_id}/stop")
+    def endurance_stop(test_id: str):
+        if not _endurance().stop(test_id):
+            raise HTTPException(status_code=404, detail="no such test")
+        return {"ok": True}
+
+    @router.post("/endurance/tests/{test_id}/note")
+    def endurance_note(test_id: str, body: schemas.EnduranceNoteBody):
+        if not _endurance().note(test_id, body.text):
+            raise HTTPException(status_code=404, detail="no such test")
+        return {"ok": True}
+
+    @router.delete("/endurance/tests/{test_id}")
+    def endurance_delete(test_id: str):
+        if not _endurance().delete(test_id):
+            raise HTTPException(status_code=404, detail="no such test")
+        return {"ok": True}
+
+    @router.get("/endurance/tests/{test_id}/samples.csv")
+    def endurance_samples(test_id: str):
+        from fastapi.responses import FileResponse
+
+        recorder = _endurance()
+        recorder.save()   # flush the rows still buffered in memory
+        path = recorder.samples_path(test_id)
+        if path is None:
+            raise HTTPException(status_code=404, detail="no samples file")
+        return FileResponse(path, media_type="text/csv",
+                            filename=f"endurance-{test_id}.csv")
+
     @router.get("/ports")
     def ports():
         import serial.tools.list_ports
