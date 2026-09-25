@@ -176,6 +176,8 @@ export const api = {
   resetGains: (joints?: string[]) =>
     post('/api/control/gains/reset', { joints: joints ?? null }),
   setMaxCurrent: (ma: number) => post('/api/control/max_current', { ma }),
+  setMaxTargetSpeed: (degS: number) =>
+    post<{ control: ControlState }>('/api/control/max_target_speed', { deg_s: degS }),
   setPoseSource: (mode: PoseSource) =>
     post<{ control: ControlState }>('/api/control/pose_source', { mode }),
   rebase: () => post('/api/control/rebase'),

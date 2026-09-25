@@ -45,11 +45,20 @@ PERIOD_SMOOTHING = 0.3
 # instead of parked on its target. Costs this many frames of lag instead of one.
 RAMP_SLACK = 1.5
 
-# Speed cap for the ramp: a lone large jump (typed angle, slider grab far from
-# the pose, MCP set_joints) would otherwise ramp over one command gap — tens of
-# milliseconds — and whip the tendons. Continuous streams move a fraction of a
-# degree per frame, so the cap only stretches genuine jumps.
-MAX_TARGET_SPEED_DEG_S = 120.0
+# A command arriving this long after the previous one is a lone jump — a typed
+# angle, a slider grabbed far from the pose, MCP set_joints — not a frame of a
+# stream. Only those are speed-capped: a stream sets its own pace through its
+# cadence, and capping it would make the ramp fall ever further behind the
+# source, so a fast replay would turn around before reaching its waypoints
+# instead of playing faster.
+ISOLATED_GAP_S = 0.3
+
+# Speed cap for a lone jump: without it a large one would ramp over a single
+# command gap — tens of milliseconds — and whip the tendons. Adjustable at
+# runtime within these bounds (control_state's max_target_speed_deg_s).
+DEFAULT_MAX_TARGET_SPEED_DEG_S = 120.0
+MIN_MAX_TARGET_SPEED_DEG_S = 10.0
+MAX_MAX_TARGET_SPEED_DEG_S = 2000.0
 
 
 class CommandWorker(threading.Thread):
@@ -75,9 +84,10 @@ class CommandWorker(threading.Thread):
         self._commanded_at = 0.0
         self._period = DEFAULT_COMMAND_PERIOD_S
         self._period_seeded = False
-        # Duration of the active ramp: the measured command gap, stretched
-        # when the jump is too large for MAX_TARGET_SPEED_DEG_S.
+        # Duration of the active ramp: the measured command gap, stretched for
+        # a lone jump too large for the speed cap.
         self._span = DEFAULT_COMMAND_PERIOD_S * RAMP_SLACK
+        self._max_target_speed = DEFAULT_MAX_TARGET_SPEED_DEG_S
         # Last value actually written per joint — where the next ramp for that
         # joint starts. Only joints under an active ramp are ever written, so
         # this never resurrects a stale target for a joint nobody commanded.
@@ -93,7 +103,23 @@ class CommandWorker(threading.Thread):
                 "feed_hz": FEED_HZ,
                 "command_period_ms": round(self._period * 1000, 2),
                 "ramping": bool(self._to),
+                "max_target_speed_deg_s": self._max_target_speed,
             }
+
+    @property
+    def max_target_speed_deg_s(self) -> float:
+        with self._lock:
+            return self._max_target_speed
+
+    def set_max_target_speed(self, deg_s: float) -> None:
+        """Speed cap for lone jumps; streams are unaffected (see ISOLATED_GAP_S)."""
+        deg_s = float(deg_s)
+        if not MIN_MAX_TARGET_SPEED_DEG_S <= deg_s <= MAX_MAX_TARGET_SPEED_DEG_S:
+            raise ValueError(
+                f"max target speed must be {MIN_MAX_TARGET_SPEED_DEG_S:g}.."
+                f"{MAX_MAX_TARGET_SPEED_DEG_S:g} deg/s")
+        with self._lock:
+            self._max_target_speed = deg_s
 
     def applied_targets(self) -> dict[str, float]:
         """Last pose actually written per joint — the reference the fault
@@ -105,8 +131,10 @@ class CommandWorker(threading.Thread):
     def submit_targets(self, angles: dict[str, float]) -> None:
         now = self._clock()
         with self._lock:
+            isolated = True
             if self._commanded_at:
                 gap = now - self._commanded_at
+                isolated = gap > ISOLATED_GAP_S
                 if MIN_COMMAND_PERIOD_S <= gap <= MAX_COMMAND_PERIOD_S:
                     if self._period_seeded:
                         self._period += PERIOD_SMOOTHING * (gap - self._period)
@@ -126,10 +154,11 @@ class CommandWorker(threading.Thread):
                     joint, self._applied.get(joint, value))
                 self._to[joint] = value
             self._commanded_at = now
-            jump = max((abs(self._to[j] - self._from[j]) for j in angles),
-                       default=0.0)
-            self._span = max(self._period * RAMP_SLACK,
-                             jump / MAX_TARGET_SPEED_DEG_S)
+            self._span = self._period * RAMP_SLACK
+            if isolated:
+                jump = max((abs(self._to[j] - self._from[j]) for j in angles),
+                           default=0.0)
+                self._span = max(self._span, jump / self._max_target_speed)
         self._wake.set()
 
     def submit_op(self, op: Callable[[], None]) -> None:

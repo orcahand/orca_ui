@@ -164,6 +164,11 @@ export interface ControlState {
   // Lowest ceiling orca_core accepts (the hand's calibration current); a
   // write below it is a 400, so the control stops here.
   max_current_floor: number
+  // Speed cap for a lone joint jump (typed angle, slider grab), deg/s.
+  // Streams — replay, teleop, a slider drag — pace themselves and are not
+  // capped, so playback speed scales time rather than range.
+  max_target_speed_deg_s: number
+  default_max_target_speed_deg_s: number
   // The one gain set every loop joint shares, or null when they differ.
   gains: JointGains | null
   // Live gains per loop-controlled joint, read back from the controller.

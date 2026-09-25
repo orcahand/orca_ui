@@ -66,6 +66,12 @@ class MaxCurrentRequest(BaseModel):
     ma: int = Field(gt=0, le=2000)
 
 
+class MaxTargetSpeedRequest(BaseModel):
+    """Speed cap for lone joint jumps, deg/s (streams pace themselves)."""
+
+    deg_s: float = Field(gt=0, le=2000)
+
+
 class ServoGainsRequest(BaseModel):
     """Servo position-PID and feedforward gains. Omitted fields are left as
     they are on the motor, so one gain can be nudged without restating the

@@ -347,6 +347,11 @@ def build_router(service: HandService, telemetry=None) -> APIRouter:
         guard(service.set_max_current, body.ma)
         return {"ok": True, "control": service.control_state()}
 
+    @router.post("/control/max_target_speed")
+    def control_max_target_speed(body: schemas.MaxTargetSpeedRequest):
+        return {"ok": True,
+                "control": guard(service.set_max_target_speed, body.deg_s)}
+
     @router.post("/control/pose_source")
     def control_pose_source(body: schemas.PoseSourceRequest):
         return {"ok": True, "control": guard(service.set_pose_source, body.mode)}

@@ -100,3 +100,41 @@ def test_a_late_command_never_drives_the_joint_backwards(worker, clock):
     clock.advance(0.05)
     worker.submit_targets({"index_mcp": 10.0})
     assert worker._next_write(stale) == {"index_mcp": 0.0}
+
+
+def test_a_stream_keeps_its_own_pace_but_a_lone_jump_is_capped(worker, clock):
+    """A fast replay hands the worker 100 Hz frames stepping 2.4 deg each
+    (240 deg/s, twice the default cap). The ramp must land on every frame
+    before the next one arrives: a speed cap applied to a stream makes the
+    ramp fall further behind every frame, so a fast replay turns around short
+    of its waypoints instead of playing faster. A single 90 deg command out of
+    the blue must still be stretched to the cap, and the cap must follow its
+    runtime setting."""
+    worker.reset({"index_mcp": 0.0})
+    clock.advance(1.0)
+    worker.submit_targets({"index_mcp": 90.0})
+    clock.advance(0.2)
+    lone = worker._next_write(clock.now)["index_mcp"]
+    assert lone == pytest.approx(120.0 * 0.2, abs=0.5), lone
+
+    clock.advance(1.0)
+    worker._next_write(clock.now)
+    value = 90.0
+    for _ in range(40):
+        clock.advance(0.01)
+        value += 2.4
+        worker.submit_targets({"index_mcp": value})
+        worker._next_write(clock.now)
+    clock.advance(0.01)
+    lag = value - worker._next_write(clock.now)["index_mcp"]
+    assert lag < 2.4, f"ramp fell {lag:.1f} deg behind a 240 deg/s stream"
+
+    worker.set_max_target_speed(600.0)
+    clock.advance(1.0)
+    worker._next_write(clock.now)
+    worker.submit_targets({"index_mcp": 0.0})
+    clock.advance(0.1)
+    covered = value - worker._next_write(clock.now)["index_mcp"]
+    assert covered == pytest.approx(60.0, abs=0.5), covered
+    with pytest.raises(ValueError):
+        worker.set_max_target_speed(0.0)

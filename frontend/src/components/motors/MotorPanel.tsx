@@ -17,6 +17,7 @@ import { useControlGate } from '../../state/operationStore'
 import { Panel } from '../common/Panel'
 import { DirectMotorPanel } from './DirectMotorPanel'
 import { MaxCurrentControl } from './MaxCurrentControl'
+import { MaxSpeedControl } from './MaxSpeedControl'
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
@@ -348,6 +349,7 @@ sensors currently report — then only dial the joints that are off"
         </div>
       )}
       <MaxCurrentControl />
+      <MaxSpeedControl />
       <div>
         {[...GROUP_ORDER, 'other'].filter((g) => groups.has(g)).map((group) => (
           <div key={group} style={{ marginBottom: 8 }}>

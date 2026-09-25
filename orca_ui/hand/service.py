@@ -20,7 +20,7 @@ from pathlib import Path
 
 from orca_ui.core_source import resolve_cached as resolve_core_source
 from orca_ui.hand import zeroing
-from orca_ui.hand.commands import CommandWorker
+from orca_ui.hand.commands import DEFAULT_MAX_TARGET_SPEED_DEG_S, CommandWorker
 from orca_ui.hand.presets import BUILTIN_POSES, BUILTIN_SEQUENCES
 from orca_ui.hand.faults import classify_hw_error
 from orca_ui.hand.models import ModelEntry, available_models, describe
@@ -527,6 +527,9 @@ class HandService:
                 "config_max_current": self._config_max_current,
                 # Lowest ceiling orca_core accepts (see max_current_floor).
                 "max_current_floor": self.max_current_floor(),
+                # Speed cap for lone joint jumps; streams pace themselves.
+                "max_target_speed_deg_s": self.worker.max_target_speed_deg_s,
+                "default_max_target_speed_deg_s": DEFAULT_MAX_TARGET_SPEED_DEG_S,
                 # The one gain set every loop joint shares, or null when the
                 # joints are tuned individually.
                 "gains": _uniform_gains(joint_gains),
@@ -1212,6 +1215,15 @@ class HandService:
         with self._state_lock:
             self._max_current = ma
         self._publish_control_state()
+
+    def set_max_target_speed(self, deg_s: float) -> dict:
+        """Speed cap for lone joint jumps (streams pace themselves)."""
+        try:
+            self.worker.set_max_target_speed(deg_s)
+        except ValueError as e:
+            raise ServiceError(str(e))
+        self._publish_control_state()
+        return self.control_state()
 
     def rebase(self) -> None:
         session = self._require_feedback()
