@@ -151,6 +151,19 @@ def build_router(service: HandService, telemetry=None) -> APIRouter:
             raise HTTPException(status_code=404, detail="no such test")
         return {"ok": True}
 
+    @router.post("/endurance/tests/{test_id}/slack")
+    def endurance_slack(test_id: str):
+        """Post this test's digest to the configured Slack channel."""
+        recorder = _endurance()
+        if recorder.notifier is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Slack is not configured — start the console with "
+                       "ORCA_UI_SLACK_WEBHOOK set")
+        if not recorder.post_digest(test_id):
+            raise HTTPException(status_code=404, detail="no such test")
+        return {"ok": True}
+
     @router.delete("/endurance/tests/{test_id}")
     def endurance_delete(test_id: str):
         if not _endurance().delete(test_id):

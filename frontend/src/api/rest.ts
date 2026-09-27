@@ -114,6 +114,8 @@ export const api = {
     }),
   enduranceDelete: (id: string) =>
     del<{ ok: boolean }>(`/api/endurance/tests/${encodeURIComponent(id)}`),
+  enduranceSlack: (id: string) =>
+    post<{ ok: boolean }>(`/api/endurance/tests/${encodeURIComponent(id)}/slack`),
   stats: () => request<Stats>('/api/stats'),
   ports: () => request<PortInfo[]>('/api/ports'),
   taxelGeometry: () => request<TaxelGeometry>('/api/tactile/geometry'),

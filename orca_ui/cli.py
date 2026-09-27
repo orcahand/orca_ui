@@ -86,6 +86,24 @@ def parse_args(argv=None) -> argparse.Namespace:
                              "(overrides --teleop-dir).")
     parser.add_argument("--no-teleop", action="store_true",
                         help="Disable the teleoperation subsystem entirely.")
+    parser.add_argument("--slack-webhook", type=str, metavar="URL",
+                        default=os.environ.get("ORCA_UI_SLACK_WEBHOOK") or None,
+                        help="Slack Incoming Webhook URL: endurance tests then "
+                             "post their start, stop, notes, timeline events, "
+                             "calibration checkpoints and an hourly digest to "
+                             "that channel. Prefer the ORCA_UI_SLACK_WEBHOOK "
+                             "environment variable — the URL is a secret and "
+                             "a flag shows up in process listings.")
+    parser.add_argument("--slack-heartbeat", type=float, default=1.0,
+                        metavar="HOURS",
+                        help="How often a running endurance test posts a "
+                             "digest to Slack (default 1; 0 = never).")
+    parser.add_argument("--slack-mention", type=str, default=None,
+                        metavar="TEXT",
+                        help="Prepended to alerts (a fault latch, a sensor "
+                             "dropping out, a failed calibration): "
+                             "'<!channel>', '<!here>' or a user id like "
+                             "'<@U0123ABC>'. Default: $ORCA_UI_SLACK_MENTION.")
     return parser.parse_args(argv)
 
 
@@ -157,7 +175,20 @@ def build_settings(argv=None) -> UiSettings:
         teleop_enabled=not args.no_teleop,
         teleop_cmd=args.teleop_cmd,
         teleop_dir=args.teleop_dir,
+        slack_webhook_url=(args.slack_webhook or "").strip() or None,
+        slack_heartbeat_h=args.slack_heartbeat,
+        slack_mention=args.slack_mention or os.environ.get("ORCA_UI_SLACK_MENTION"),
+        console_url=_console_url(args.host, args.port),
     )
+
+
+def _console_url(host: str, port: int) -> str:
+    """The address a teammate's browser reaches this console on — the first
+    routable IP when bound wide, else localhost."""
+    if host not in ("0.0.0.0", "::", ""):
+        return f"http://{host}:{port}"
+    ips = _reachable_ips()
+    return f"http://{ips[0] if ips else 'localhost'}:{port}"
 
 
 def _reachable_ips() -> list[str]:
@@ -208,12 +239,18 @@ def main(argv=None) -> None:
             network = f"  network   {urls}\n"
         network += ("  caution   exposed beyond localhost — anyone who can "
                     "reach the port can move the hand\n")
+    slack = ""
+    if settings.slack_webhook_url:
+        every = (f"digest every {settings.slack_heartbeat_h:g} h"
+                 if settings.slack_heartbeat_h > 0 else "no periodic digest")
+        slack = f"  slack     endurance notifications on ({every})\n"
     print(f"\n{rule}\n"
           f"  ORCA UI   http://localhost:{settings.port}\n"
           f"{network}"
           f"  config    {settings.config_path}{provisional}\n"
           f"  mode      {mode}\n"
           f"  core      {core.summary()}\n"
+          f"{slack}"
           f"{rule}\n")
 
     # orca_core prints hardware diagnostics; the connect ladder would repeat

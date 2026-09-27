@@ -76,7 +76,8 @@ sweep) and disables torque.
 Useful flags: `--no-feedback` (open-loop sliders even on feedback hands),
 `--host/--port` (default `127.0.0.1:5001` — this UI can move motors, so LAN
 exposure is opt-in), `--model-version`, `--side`, `--library-dir` (pose &
-trajectory storage, default `~/.orca_ui/library`).
+trajectory storage, default `~/.orca_ui/library`), `--slack-webhook` (see
+[Slack notifications](#slack-notifications)).
 
 ### Views
 
@@ -142,6 +143,53 @@ loop) over in-memory serial links: taxels stream sine waves and the joint loop
 genuinely converges on slider targets. Useful for UI development, demos, and
 CI. Mock mode also adds a joint-sweep tool in the 3D view for verifying the
 model calibration.
+
+### Slack notifications
+
+A long endurance test is watched from Slack rather than from the Stats page.
+Create an [Incoming Webhook](https://api.slack.com/messaging/webhooks) for the
+channel that should hear about it, hand the console its URL through the
+environment, and start as usual:
+
+```bash
+export ORCA_UI_SLACK_WEBHOOK='https://hooks.slack.com/services/T000/B000/xxxx'
+export ORCA_UI_SLACK_MENTION='<!here>'      # optional: who to ping on alerts
+uv run orca-ui --config ~/.orca_ui/my-hand
+```
+
+The URL is a secret: keep it in the environment (or a shell profile the
+console machine reads), not on the command line, where `ps` shows it to
+everyone on the box. A `slack` line in the startup banner confirms it was
+picked up, and the first message — *console up* — confirms the webhook
+works.
+
+From then on every endurance test posts, to that one channel:
+
+- **Start, stop, notes.** The stop message carries the digest: events (and
+  how many were bad), runs, checkpoints, each motor's holding current at the
+  hold against its first-hour mean, each joint's motor travel against the
+  first calibration checkpoint, what is still in a bad state, and a link to
+  the raw samples CSV.
+- **Timeline events** — an operation starting or finishing, torque dropping,
+  a motor latching a hardware error, a fingertip freezing or dropping out, a
+  link going down, and each recovery. The first event after a quiet minute
+  posts at once; anything that follows within that minute is folded into one
+  message, so a flapping sensor costs one post a minute, not one a second.
+- **Calibration checkpoints** — motor travel per joint with the change since
+  the test's first checkpoint, plus any problems the run flagged.
+- **A digest every hour** while a test is running (`--slack-heartbeat 2` for
+  every two hours, `0` for none), and on demand from the **Slack** button on
+  the Stats page's Endurance panel.
+
+Messages that mention an alert — a fault latch, a sensor dropping out, a
+calibration that did not complete — are prefixed with `ORCA_UI_SLACK_MENTION`
+(`--slack-mention`): `<!channel>`, `<!here>` or a user id such as
+`<@U0123ABC>`.
+
+Delivery runs on one background thread with a bounded queue and never
+touches the hand's threads: a Slack outage costs nothing but the messages
+that were queued during it, and the next successful post says how many were
+dropped. Nothing is written to disk.
 
 ## MCP server
 

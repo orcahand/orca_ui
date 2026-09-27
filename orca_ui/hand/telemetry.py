@@ -369,9 +369,10 @@ class _Sampler(threading.Thread):
 
 
 class TelemetryService:
-    def __init__(self, service, hub: StreamHub, settings):
+    def __init__(self, service, hub: StreamHub, settings, notifier=None):
         self._service = service
         self._hub = hub
+        self._notifier = notifier
         self._samplers = [
             _Sampler("telemetry-fast", 1.0 / settings.fast_hz, self._fast_tick),
             _Sampler("telemetry-mid", 1.0 / settings.mid_hz, self._mid_tick),
@@ -481,9 +482,15 @@ class TelemetryService:
                     joints=list(config.joint_ids),
                     motors=[int(m) for m in config.motor_ids],
                     motor_joint=motor_joint,
-                    fingers=list(FINGER_NAMES))
+                    fingers=list(FINGER_NAMES), notifier=self._notifier)
                 self._endurance_path = path
             return self._endurance
+
+    def endurance_digest(self) -> dict | None:
+        """Digest of the running endurance test for the Slack heartbeat;
+        None when nothing is running. Called from the notifier's thread."""
+        recorder = self.endurance_recorder()
+        return recorder.active_digest() if recorder is not None else None
 
     def _observe_endurance(self, health: dict | None) -> None:
         """Slow-tick observation: the payloads this tick assembled anyway,

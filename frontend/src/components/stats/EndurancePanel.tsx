@@ -450,6 +450,7 @@ export function EndurancePanel() {
   const [currentStat, setCurrentStat] = useState<'mean' | 'max'>('max')
   const [forceStat, setForceStat] = useState<'mean' | 'max'>('max')
   const [allEvents, setAllEvents] = useState(false)
+  const [slackPosted, setSlackPosted] = useState(false)
 
   const loadList = () =>
     api
@@ -591,6 +592,16 @@ export function EndurancePanel() {
       .then(() => api.enduranceTest(selected).then(setTest))
       .catch(fail)
   }
+  const postToSlack = () => {
+    if (!selected) return
+    void api
+      .enduranceSlack(selected)
+      .then(() => {
+        setSlackPosted(true)
+        window.setTimeout(() => setSlackPosted(false), 3000)
+      })
+      .catch(fail)
+  }
   const deleteTest = () => {
     if (!selected || !selectedSummary) return
     if (
@@ -650,6 +661,16 @@ export function EndurancePanel() {
               >
                 ⭳ CSV
               </a>
+              {snapshot?.slack?.enabled && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={postToSlack}
+                  disabled={slackPosted}
+                  title="post this test's digest to the configured Slack channel: elapsed, cycles, holding-current drift, motor-travel drift, what is still in a bad state"
+                >
+                  {slackPosted ? '✓ Posted' : '💬 Slack'}
+                </button>
+              )}
               <button
                 className="btn btn-danger"
                 onClick={deleteTest}

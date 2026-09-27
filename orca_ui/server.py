@@ -51,13 +51,28 @@ def create_app(settings: UiSettings) -> FastAPI:
         is_teleop_active=lambda: teleop is not None and teleop.active(),
     )
     service.attach_teleop_installer(installer)
-    telemetry = TelemetryService(service, hub, settings)
+    notifier = None
+    if getattr(settings, "slack_webhook_url", None):
+        from orca_ui.slack import SlackNotifier
+        notifier = SlackNotifier(
+            settings.slack_webhook_url,
+            hand=lambda: service.supervisor.model_name,
+            console_url=settings.console_url,
+            mention=settings.slack_mention,
+            heartbeat_s=float(settings.slack_heartbeat_h) * 3600.0,
+        )
+    telemetry = TelemetryService(service, hub, settings, notifier=notifier)
     service.attach_telemetry(telemetry)
+    if notifier is not None:
+        notifier.bind_digest(telemetry.endurance_digest)
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
         service.start()
         telemetry.start()
+        if notifier is not None:
+            notifier.start()
+            notifier.console_started(telemetry.endurance_digest())
         broadcaster = asyncio.create_task(hub.broadcaster())
         try:
             yield
@@ -70,6 +85,8 @@ def create_app(settings: UiSettings) -> FastAPI:
             operations.shutdown()
             telemetry.stop()
             service.stop()
+            if notifier is not None:
+                notifier.close()
 
     app = FastAPI(title="ORCA Hand Console", version="0.2.0", lifespan=lifespan)
     app.state.settings = settings

@@ -54,6 +54,18 @@ class UiSettings:
     # orcahand_description checkout for the retargeter's URDF; None ->
     # auto-detect the sibling checkout, exported as ORCAHAND_DESCRIPTION_DIR.
     teleop_urdf_dir: str | None = None
+    # Slack notifications for endurance tests: an Incoming Webhook URL (one
+    # channel), how often a running test posts a heartbeat digest (hours,
+    # 0 = never), and an optional mention prepended to alerts — "<!channel>"
+    # or a user id "<@U0123>". The URL is a secret: it comes from the
+    # environment (ORCA_UI_SLACK_WEBHOOK) so it stays out of shell history
+    # and process listings.
+    slack_webhook_url: str | None = None
+    slack_heartbeat_h: float = 1.0
+    slack_mention: str | None = None
+    # Where a browser reaches this console; linked from Slack messages.
+    console_url: str | None = None
+
     teleop_ramp_s: float = 2.0             # engage ramp-in duration
     teleop_hold_after_ms: int = 250        # target silence -> tracking lost
     teleop_disengage_after_s: float = 10.0  # lost this long -> auto-disengage (0 = never)

@@ -798,6 +798,8 @@ export interface EnduranceSnapshot {
   path: string
   active_id: string | null
   tests: EnduranceTestSummary[]
+  // Slack notifications are configured on the backend (ORCA_UI_SLACK_WEBHOOK).
+  slack: { enabled: boolean }
 }
 
 // Per-reversal samples rolled into time buckets, columnar: index i of every
