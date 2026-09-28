@@ -8,7 +8,6 @@ status code the REST layer forwards verbatim.
 from __future__ import annotations
 
 import logging
-import os
 import threading
 from typing import Callable
 
@@ -20,9 +19,15 @@ from orca_ui.core_source import resolve_cached as resolve_core_source
 from orca_ui.hand import zeroing
 from orca_ui.hand.commands import CommandWorker
 from orca_ui.hand.presets import BUILTIN_POSES, BUILTIN_SEQUENCES
+from orca_ui.hand.models import ModelEntry, available_models, describe
 from orca_ui.hand.sessions import HandSession
 from orca_ui.hand.states import ControlSource
-from orca_ui.hand.supervisor import HandSupervisor
+from orca_ui.hand.supervisor import (
+    HandBusyError,
+    HandSupervisor,
+    ModelSelectError,
+    model_name_of,
+)
 from orca_ui.library import Library, LibraryError
 from orca_ui.settings import UiSettings
 
@@ -136,6 +141,7 @@ class HandService:
             on_status=lambda snapshot: self._publish_status(snapshot.as_dict()),
             on_session_ready=self._session_ready,
             on_error=self._publish_error,
+            on_model_changed=self._model_changed,
         )
         self.worker = CommandWorker(
             get_session=lambda: self.supervisor.session,
@@ -145,13 +151,11 @@ class HandService:
         # limit to the family, and the connected hand's config carries it.
         self._max_current = _current_or_none(self.supervisor.config.max_current)
 
-        library_root = (
+        self._library_root = (
             Path(settings.library_dir) if settings.library_dir
             else Path.home() / ".orca_ui" / "library"
         )
-        model_name = os.path.basename(
-            os.path.dirname(self.supervisor.config.config_path))
-        self.library = Library(library_root, model_name)
+        self.library = Library(self._library_root, self.supervisor.model_name)
 
     # ----- lifecycle ---------------------------------------------------------
 
@@ -217,7 +221,7 @@ class HandService:
             for joint in config.joint_ids
         ]
         info = {
-            "model_name": os.path.basename(os.path.dirname(config.config_path)),
+            "model_name": model_name_of(config),
             "side": config.type,
             "mock": self.settings.mock,
             "joints": joints,
@@ -236,6 +240,123 @@ class HandService:
                 "num_taxels": dict(tactile_config.num_taxels),
             }
         return info
+
+    def models(self) -> dict:
+        """The model menu: what can be selected, and what is selected now.
+
+        ``selected`` is the config in force whether or not it is one of the
+        listed models — ``--config`` can name a file outside the bundle, and
+        the menu must still say what the console is currently running.
+        """
+        config = self.supervisor.config
+        status = self.supervisor.status()
+        entries = [dict(entry.as_dict(), selectable=True)
+                   for entry in available_models(self.settings.model_version)]
+        if self.settings.mock:
+            # The simulated hand's own model. Not one of orca_core's, but the
+            # supervisor can re-materialize it by name, so it stays on offer
+            # after switching the mock onto a bundled model.
+            entries.insert(0, dict(self._mock_entry().as_dict(),
+                                   selectable=True))
+        selected = model_name_of(config)
+        if not any(entry["name"] == selected for entry in entries):
+            # A --config path: what is running, so the picker has to show it,
+            # but there is no model name to resolve it back from later.
+            side, tactile, encoders = describe(config.config_path)
+            entries.append(dict(ModelEntry(
+                name=selected, version="", side=side, tactile=tactile,
+                encoders=encoders, config_path=config.config_path).as_dict(),
+                selectable=False))
+        return {
+            "models": entries,
+            "selected": selected,
+            "pinned": status.model_pinned,
+            # Detection needs a bus to ask; mock mode has none, so "let the
+            # hand decide" is not on offer there.
+            "auto_available": not self.settings.mock,
+            "config_path": config.config_path,
+        }
+
+    @staticmethod
+    def _mock_entry() -> ModelEntry:
+        from orca_ui.mock import MOCK_MODEL_CONFIG, MOCK_MODEL_NAME
+
+        side, tactile, encoders = describe(MOCK_MODEL_CONFIG)
+        return ModelEntry(name=MOCK_MODEL_NAME, version="", side=side,
+                          tactile=tactile, encoders=encoders,
+                          config_path=MOCK_MODEL_CONFIG)
+
+    def select_model(self, name: str | None,
+                     version: str | None = None) -> dict:
+        """Pin the hand config by model name, or (``None``) return the choice
+        to hardware detection. Reconnects when the model actually changes."""
+        try:
+            self.supervisor.select_model(name, version)
+        except (HandBusyError, ModelSelectError) as e:
+            raise ServiceError(str(e), status_code=409)
+        return self.models()
+
+    def boards(self) -> dict:
+        """The board menu: every board on this machine, and the pin in force.
+
+        The console's own session holds its board's ports, which probe as
+        silent — so that board is rebuilt here from what the session knows,
+        flagged ``held_by_console`` for the picker to label.
+        """
+        if self.settings.mock:
+            return {"boards": [], "selected": None, "available": False}
+        from orca_ui.hand.boards import scan_boards
+
+        status = self.supervisor.status()
+        own = {port for port in status.ports.values()
+               if port and port != "mock"}
+        entries = []
+        for board in scan_boards():
+            if own & set(board.ports):
+                continue  # rebuilt below from the live session
+            entries.append(dict(board.as_dict(), held_by_console=False))
+        if own:
+            entries.append({
+                "device": status.ports.get("motor") or sorted(own)[0],
+                "kind": "oh_board",
+                "side": status.side or None,
+                "hand_id": None,
+                "model_name": status.model,
+                "ports": sorted(own),
+                "busy": False,
+                "held_by_console": True,
+            })
+            entries.sort(key=lambda entry: entry["device"])
+        return {"boards": entries, "selected": status.board_pinned,
+                "available": True}
+
+    def select_board(self, device: str | None) -> dict:
+        """Pin the console to one board by device path, or (``None``) back
+        to first-to-answer. Reconnects when the pin actually changes."""
+        try:
+            self.supervisor.select_board(device)
+        except (HandBusyError, ModelSelectError) as e:
+            raise ServiceError(str(e), status_code=409)
+        return self.boards()
+
+    def disconnect(self) -> dict:
+        """Close the session and hold the ports free until Reconnect."""
+        manager = self._operation_manager
+        if manager is not None and manager.active():
+            raise ServiceError(
+                "an operation is running — stop it before disconnecting",
+                status_code=409)
+        try:
+            self.supervisor.disconnect()
+        except HandBusyError as e:
+            raise ServiceError(str(e), status_code=409)
+        self.worker.reset()
+        return self.status()
+
+    def reconnect(self) -> dict:
+        """Drop the session and redial; lifts a disconnect hold."""
+        self.supervisor.request_reconnect()
+        return self.status()
 
     def _calibration_state(self, session, encoder_backed: set,
                            encoder_calibrated: set | None) -> dict:
@@ -326,6 +447,16 @@ class HandService:
         return out
 
     # ----- session bootstrap ---------------------------------------------------
+
+    def _model_changed(self, config) -> None:
+        """The supervisor swapped in the model the hardware reports (a hand
+        that was off at startup, or a different one plugged in since). Repoint
+        everything keyed by model; the browser refetches ``/hand/info`` off
+        the model field in the status stream."""
+        # Poses and recordings are per-model — a left hand's library must not
+        # follow the right hand that replaced it.
+        self.library = Library(self._library_root, model_name_of(config))
+        self._max_current = _current_or_none(config.max_current)
 
     def _session_ready(self, session: HandSession) -> None:
         # connect() builds a new controller on the config's gains, so last

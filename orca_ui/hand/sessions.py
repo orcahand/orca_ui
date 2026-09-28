@@ -194,9 +194,12 @@ class HandSession:
             # All hand classes tolerate partial state; for sensors-only
             # sessions this also tears down the tactile link opened by
             # connect_sensors_only().
-            self.hand.disconnect()
+            result = self.hand.disconnect()
         except Exception:
             logger.exception("hand disconnect failed during session close")
+        else:
+            if isinstance(result, tuple) and len(result) == 2 and not result[0]:
+                logger.warning("hand disconnect incomplete: %s", result[1])
         for link in self._owned_links:
             try:
                 link.disconnect()
@@ -210,15 +213,22 @@ class HandSession:
 # ---------------------------------------------------------------------------
 
 
-def connect_session(settings: UiSettings, config) -> HandSession:
-    """Probe hardware and connect at the best achievable tier."""
+def connect_session(settings: UiSettings, config,
+                    presence: HardwarePresence | None = None) -> HandSession:
+    """Connect at the best achievable tier.
+
+    ``presence`` may be supplied by a caller that has already probed (the
+    supervisor does, because the same probe decides which model ``config``
+    is); left out, this probes for itself.
+    """
     declared = declared_capabilities(config, settings.engage_feedback,
                                      motors_enabled=settings.motors_enabled)
 
     if settings.mock:
-        return _connect_mock(settings, declared)
+        return _connect_mock(settings, config, declared)
 
-    presence = probe_hardware(config)
+    if presence is None:
+        presence = probe_hardware(config)
     sensing_present = bool(presence.sensing.tactile or presence.sensing.encoder)
 
     if settings.motors_enabled and presence.motor_port:
@@ -248,6 +258,23 @@ def connect_session(settings: UiSettings, config) -> HandSession:
     )
 
 
+NO_TACTILE_SENSORS = "tactile port answered but no sensor responded on it"
+
+
+def _tactile_sensors_answered(hand) -> bool:
+    """False when the tactile link is up but the board reports no sensor.
+
+    orca_core's tactile client connects fine to a board with nothing on its
+    sensor slots and only fails once a stream is started, so a hand with a
+    dead or unplugged sensor chain would otherwise count as a touch hand.
+    """
+    client = getattr(hand, "_tactile_client", None)
+    if client is None:
+        return True
+    config = getattr(client, "_tactile_config", None)
+    return config is None or config.num_active_sensors > 0
+
+
 def _caps_from_hand(hand, declared: dict) -> Capabilities:
     feedback = isinstance(hand, OrcaHandJointFeedback) and hand._loop is not None
     return Capabilities(
@@ -259,10 +286,12 @@ def _caps_from_hand(hand, declared: dict) -> Capabilities:
     )
 
 
-def _connect_mock(settings: UiSettings, declared: dict) -> HandSession:
+def _connect_mock(settings: UiSettings, config, declared: dict) -> HandSession:
     from orca_ui.mock import build_mock_hand
 
-    hand = build_mock_hand(settings.config_path,
+    # The config in force, not settings.config_path: the model can be changed
+    # from the browser, and the mock has to simulate the hand now selected.
+    hand = build_mock_hand(config.config_path,
                            engage_feedback=settings.engage_feedback)
     try:
         ok, msg = hand.connect(interactive=False)
@@ -280,14 +309,19 @@ def _connect_mock(settings: UiSettings, declared: dict) -> HandSession:
 
 
 def _build_hand(settings: UiSettings, config, feedback: bool, tactile: bool):
-    """Fresh hand instance for one ladder rung (never reuse across attempts)."""
+    """Fresh hand instance for one ladder rung (never reuse across attempts).
+
+    Always built from ``config`` — settings.config_path is only where the
+    process *started*, and the supervisor may since have swapped the model to
+    match the hand that is actually plugged in.
+    """
     if feedback and not tactile and isinstance(config, OrcaHandTouchConfig):
         # No factory entry for 'feedback hand from a touch config': construct
         # directly; OrcaHandJointFeedback ignores the sensors block.
         return OrcaHandJointFeedback(config=config)
     if not feedback and not tactile and isinstance(config, OrcaHandTouchConfig):
         return OrcaHand(config=config)
-    return load_hand(config_path=settings.config_path,
+    return load_hand(config_path=config.config_path,
                      engage_feedback=feedback)
 
 
@@ -310,11 +344,33 @@ def _connect_with_motors(settings, config, declared, presence: HardwarePresence)
     for feedback, tactile in ladder:
         tier = _tier_name(feedback, tactile)
         hand = _build_hand(settings, config, feedback, tactile)
+        if presence.motor_port and \
+                getattr(getattr(hand, "config", None), "port", None) == "auto":
+            # Discovery already resolved the motor port — scoped to the pinned
+            # board when one is pinned. Left as "auto", connect() re-resolves
+            # it machine-globally: ambiguous with two adapters attached, and
+            # with a board pinned it must not look beyond that board at all.
+            # In-memory only: nothing writes the port back to the file.
+            import copy
+
+            if hand.config is config:
+                # Never mutate the supervisor's shared config object.
+                hand.config = copy.copy(config)
+            object.__setattr__(hand.config, "port", presence.motor_port)
         try:
             ok, msg = hand.connect(interactive=False)
         except (JointFeedbackConnectError, RuntimeError) as e:
             attempts.append(f"{tier}: {e}")
             logger.warning("connect tier %s failed: %s", tier, e)
+            continue
+        if ok and tactile and not _tactile_sensors_answered(hand):
+            attempts.append(f"{tier}: {NO_TACTILE_SENSORS}")
+            logger.warning("connect tier %s: %s — continuing without tactile",
+                           tier, NO_TACTILE_SENSORS)
+            try:
+                hand.disconnect()
+            except Exception:
+                logger.exception("disconnect after a sensorless tactile tier failed")
             continue
         if ok:
             return HandSession(hand=hand, caps=_caps_from_hand(hand, declared),
@@ -343,7 +399,7 @@ def _tier_name(feedback: bool, tactile: bool) -> str:
 
 def _connect_sensors_only(settings, config, declared, presence: HardwarePresence):
     """Motors unpowered: tactile viewing and/or encoder viewing only."""
-    hand = load_hand(config_path=settings.config_path, engage_feedback=False)
+    hand = load_hand(config_path=config.config_path, engage_feedback=False)
     ports = {"motor": None, "tactile": None, "encoder": None}
     messages: list[str] = []
     owned_links: list[HandSerialLink] = []
@@ -351,6 +407,9 @@ def _connect_sensors_only(settings, config, declared, presence: HardwarePresence
 
     if declared["tactile"] and presence.sensing.tactile:
         ok, msg = hand.connect_sensors_only()
+        if ok and not _tactile_sensors_answered(hand):
+            ok, msg = False, NO_TACTILE_SENSORS
+            logger.warning("sensors-only connect: %s", NO_TACTILE_SENSORS)
         messages.append(msg)
         tactile_ok = ok
         if ok:

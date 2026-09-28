@@ -1,10 +1,12 @@
 // Thin fetch wrappers over the REST API. Errors carry the backend's detail.
 
 import type {
+  BoardsInfo,
   DemoEntry,
   DirectMotorSnapshot,
   HandInfo,
   ModelMetadata,
+  ModelsInfo,
   OperationLogPayload,
   OperationSnapshot,
   PortInfo,
@@ -69,7 +71,19 @@ export const api = {
   stats: () => request<Stats>('/api/stats'),
   ports: () => request<PortInfo[]>('/api/ports'),
   taxelGeometry: () => request<TaxelGeometry>('/api/tactile/geometry'),
-  reconnect: () => post('/api/reconnect'),
+  reconnect: () => post<{ status: StatusSnapshot }>('/api/reconnect'),
+  // Closes the session and holds the ports free; only reconnect() lifts it.
+  disconnect: () => post<{ status: StatusSnapshot }>('/api/disconnect'),
+
+  // Scans free serial ports on the backend, so it can take a moment.
+  boards: () => request<BoardsInfo>('/api/boards'),
+  // device null hands the choice back to "first board to answer".
+  selectBoard: (device: string | null) =>
+    post<BoardsInfo>('/api/board/select', { device }),
+  models: () => request<ModelsInfo>('/api/models'),
+  // name null hands the choice back to hardware detection.
+  selectModel: (name: string | null, version?: string | null) =>
+    post<ModelsInfo>('/api/model/select', { name, version: version ?? null }),
 
   operation: () =>
     request<{ operation: OperationSnapshot | null }>('/api/operation'),

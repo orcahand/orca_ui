@@ -45,9 +45,23 @@ class ServerState:
         self.set_joints_times: list[float] = []
         self._summary: dict | None = None
         self._summary_at = 0.0
+        # Bumped by every tool call (tools.py's `tool()` wrapper); read by
+        # cli.py's idle watchdog. Starts counting from server boot, so a
+        # server nobody ever calls still times out.
+        self.last_activity = time.monotonic()
 
     def invalidate_hand_summary(self) -> None:
         self._summary = None
+
+    def note_status(self, status: dict) -> None:
+        """Drop the cached summary when a status snapshot names a different
+        model. The backend re-derives the model from the hardware, so ROMs and
+        neutral poses can change under a live server — they must not ride out
+        the TTL belonging to the hand that was unplugged."""
+        model = status.get("model")
+        if (model and self._summary is not None
+                and self._summary.get("model_name") != model):
+            self._summary = None
 
     async def hand_summary(self, fresh: bool = False) -> dict:
         """Condensed /api/hand/info (60 s TTL): identity, mock flag, ROMs,
@@ -85,6 +99,7 @@ async def state_block(state: ServerState) -> dict:
     backend = state.backend
     try:
         status = await backend.get("/api/status")
+        state.note_status(status)
         out["torque_enabled"] = bool(status.get("torque_enabled"))
     except BackendError:
         pass
@@ -170,6 +185,13 @@ async def mock_gate(state: ServerState) -> dict | None:
 
 
 def build_server(settings: McpSettings) -> FastMCP:
+    mcp, _state = build_server_with_state(settings)
+    return mcp
+
+
+def build_server_with_state(settings: McpSettings) -> tuple[FastMCP, ServerState]:
+    """Same as :func:`build_server`, but also hands back the ``ServerState``
+    — cli.py's idle watchdog needs to read ``state.last_activity``."""
     backend = BackendClient(settings.url, timeout=settings.timeout)
     state = ServerState(backend, settings)
 
@@ -187,4 +209,4 @@ def build_server(settings: McpSettings) -> FastMCP:
                   lifespan=lifespan)
     from orca_ui.mcp.tools import register_tools
     register_tools(mcp, state)
-    return mcp
+    return mcp, state

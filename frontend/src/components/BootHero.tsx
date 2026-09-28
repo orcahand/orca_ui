@@ -44,9 +44,13 @@ export function BootHero() {
   const caps = status?.capabilities
   const statusLine = !wsConnected
     ? 'BACKEND OFFLINE'
-    : status?.state === 'connecting'
-      ? 'CONNECTING …'
-      : 'SEARCHING FOR HARDWARE …'
+    : // Released is a resting state, not a search: nothing is probing, and
+      // nothing will until Reconnect is pressed.
+      status?.released
+      ? 'DISCONNECTED'
+      : status?.state === 'connecting'
+        ? 'CONNECTING …'
+        : 'SEARCHING FOR HARDWARE …'
 
   const portFor = (item: string): PortInfo | undefined =>
     ports.find((p) => p.kind !== null && PORT_KIND_BY_ITEM[item].includes(p.kind))

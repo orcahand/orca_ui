@@ -15,6 +15,18 @@ class UiSettings:
     """
 
     config_path: str
+    # False only when nothing on the command line named a model, i.e.
+    # ``config_path`` is a guess from whatever was plugged in at startup. The
+    # supervisor then keeps re-deriving the model from the hardware, so a hand
+    # that was off (or a different hand entirely) is picked up later.
+    # ``model_version`` is carried along so re-derivation stays on the version
+    # the user asked for.
+    model_pinned: bool = True
+    model_version: str | None = None
+    # Device path of the board this console is pinned to, or None for "first
+    # board to answer". Pinning is what makes two consoles on one machine
+    # deterministic: a pinned supervisor never opens another board's ports.
+    board: str | None = None
     mock: bool = False
     engage_feedback: bool = True
     motors_enabled: bool = True
