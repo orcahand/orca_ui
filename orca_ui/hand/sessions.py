@@ -113,6 +113,27 @@ class HandSession:
             return None
         return self.hand._raw_to_joint_angle(reading.raw_counts)
 
+    def joint_source(self) -> "str | None":
+        """Where sampled joint angles come from: ``"encoders"`` for measured
+        angles, ``"motors"`` for the calibrated motor-derived estimate, or
+        ``None`` when the session has neither."""
+        if self.caps.encoders:
+            return "encoders"
+        if self.caps.motors and self._estimate_allowed():
+            return "motors"
+        return None
+
+    def sampled_joints(self) -> dict | None:
+        """Joint angles for recording and pose capture, or ``None``.
+
+        Encoder-measured when the hand has encoders, otherwise the
+        calibrated motor estimate from a single bus read."""
+        if self.caps.encoders:
+            return self.measured_joints()
+        if self.caps.motors and self._estimate_allowed():
+            return self._joint_estimate(self.hand.get_motor_state().position)
+        return None
+
     def _estimate_allowed(self) -> bool:
         if self._estimate_ok is None:
             # _motor_to_joint_pos prints per-joint warnings on uncalibrated
