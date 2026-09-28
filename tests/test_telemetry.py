@@ -6,6 +6,8 @@ therefore freezes it for a cycle or more. These pin when a read is allowed to
 happen at all.
 """
 
+from types import SimpleNamespace
+
 from orca_ui.hand.telemetry import (
     MOTOR_TELEMETRY_MIN_INTERVAL_S,
     TelemetryService,
@@ -81,18 +83,26 @@ class _Manager:
 
 
 class _Worker:
-    def __init__(self, ramping=False):
+    def __init__(self, ramping=False, applied=None):
         self._ramping = ramping
+        self._applied = dict(applied or {})
 
     def stats(self):
         return {"ramping": self._ramping}
 
+    def applied_targets(self):
+        return dict(self._applied)
+
 
 class _Service:
-    def __init__(self, session, ramping=False, op_active=False):
+    def __init__(self, session, ramping=False, op_active=False,
+                 torque=False, applied=None):
         self.session = session
-        self.worker = _Worker(ramping)
+        self.worker = _Worker(ramping, applied)
         self.operation_manager = _Manager(op_active)
+        self.supervisor = SimpleNamespace(
+            status=lambda: SimpleNamespace(torque_enabled=torque))
+        self._direct_motor_mode = False
 
     def stats(self):
         return {}
@@ -112,9 +122,10 @@ class _Settings:
     slow_hz = 1.0
 
 
-def _build(ramping=False, op_active=False, feedback_loop=True):
+def _build(ramping=False, op_active=False, feedback_loop=True,
+           torque=False, applied=None):
     session = _Session(feedback_loop)
-    service = _Service(session, ramping, op_active)
+    service = _Service(session, ramping, op_active, torque, applied)
     telemetry = TelemetryService(service, _Hub(), _Settings())
     return telemetry, session
 
@@ -220,3 +231,25 @@ def test_no_estimate_read_once_the_model_follows_commands():
     for _ in range(5):
         telemetry._mid_tick()
     assert session.hand.bus_reads == []
+
+
+# ----- command adherence ------------------------------------------------------
+
+
+def test_tracking_compares_what_was_written_against_what_the_hand_did():
+    """Stall detection is only alive if the worker's applied targets reach the
+    monitor. The call is wrapped in a try/except, so a missing accessor leaves
+    tracking permanently null and the TRACK column permanently blank — which is
+    indistinguishable from a healthy hand."""
+    # Commanded and measured agree: following, no stall.
+    telemetry, _ = _build(torque=True, applied={"index_mcp": 10.0})
+    telemetry._mid_tick()
+    tracking = telemetry._tracking.snapshot()
+    assert tracking["index_mcp"]["following"] is True
+
+    # Commanded far from where the hand actually is: the gap is recorded. It
+    # only becomes a stall once it outlasts TRACKING_GRACE_S, which is the
+    # monitor's own business — what matters here is that the gap arrives.
+    telemetry, _ = _build(torque=True, applied={"index_mcp": 80.0})
+    telemetry._mid_tick()
+    assert telemetry._tracking.snapshot()["index_mcp"]["deviation_deg"] == 70.0

@@ -75,6 +75,16 @@ class CommandWorker(threading.Thread):
         self._applied: dict[str, float] = {}
         self._writes = 0
 
+    def applied_targets(self) -> dict[str, float]:
+        """The last angle written per joint.
+
+        Tracking compares commanded against measured, so it needs what actually
+        reached the motors: a destination still mid-ramp has not been asked for
+        yet, and comparing against it would read as a stall.
+        """
+        with self._lock:
+            return dict(self._applied)
+
     def stats(self) -> dict:
         """Cumulative counters, diffed by the caller like the loop's — the feed
         rate during motion is the observable that says interpolation is live."""
