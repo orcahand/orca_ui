@@ -258,6 +258,44 @@ def _waypoint_trajectory(client, name, waypoints):
     return joint_ids
 
 
+def test_arrival_is_within_tolerance_or_no_longer_approaching():
+    """A hold ends when the hand is at the pose, or has stopped getting
+    closer: a tendon joint short of its target must not run every hold to
+    the cap, and no reading means no confirmation."""
+    target = {"index_mcp": 30.0, "thumb_mcp": 10.0}
+    assert player._arrived({"index_mcp": 29.0, "thumb_mcp": 10.5}, target, None)
+    assert not player._arrived({"index_mcp": 20.0, "thumb_mcp": 10.0}, target, None)
+    still = {"index_mcp": 20.1, "thumb_mcp": 10.0}
+    assert player._arrived(still, target, {"index_mcp": 20.0, "thumb_mcp": 10.0})
+    assert not player._arrived({"index_mcp": 24.0, "thumb_mcp": 10.0}, target,
+                               {"index_mcp": 20.0, "thumb_mcp": 10.0})
+    assert not player._arrived(None, target, None)
+    assert not player._arrived({"wrist": 0.0}, target, None)
+
+
+def test_recording_refuses_a_motors_only_hand_without_calibration():
+    """The motor estimate is meaningless before calibration, so a recording
+    made from it would replay to arbitrary angles."""
+    from types import SimpleNamespace
+
+    from orca_ui.hand.operations.record import RecordOperation
+    from orca_ui.hand.service import ServiceError
+
+    session = SimpleNamespace(joint_source=lambda: None,
+                              caps=SimpleNamespace(motors=True, encoders=False))
+    with pytest.raises(ServiceError) as excinfo:
+        RecordOperation.validate(SimpleNamespace(session=session), {})
+    assert excinfo.value.status_code == 409
+    assert "calibration" in str(excinfo.value)
+
+
+def test_looped_waypoint_replay_holds_each_pose_once_per_cycle():
+    waypoints = [[0.0, 0.0], [30.0, 0.0], [30.0, 30.0]]
+    _, _, holds = player._interpolate(waypoints + [list(waypoints[0])])
+    assert len(holds) == 4
+    assert len(holds[:-1]) == len(waypoints)
+
+
 def _segment_frames(travel_deg: float) -> int:
     """Frames the player synthesizes for one segment, at the pacing in force.
 
@@ -268,15 +306,18 @@ def _segment_frames(travel_deg: float) -> int:
 
 
 def test_interpolate_paces_segments_by_travel():
-    # Travel over the minimum segment is paced at the cruise speed.
-    frames, rate = _interpolate([[0.0, 0.0], [60.0, 0.0]])
+    # Travel over the minimum segment is paced at the cruise speed. The frame
+    # list opens on the first waypoint, so it carries one more than the segment.
+    frames, rate, holds = _interpolate([[0.0, 0.0], [60.0, 0.0]])
     assert rate == WAYPOINT_RATE_HZ
-    assert len(frames) == _segment_frames(60.0)
+    assert len(frames) == _segment_frames(60.0) + 1
+    # Both waypoints are hold points: the opening pose is held like every other.
+    assert holds == [0, len(frames) - 1]
     # A tiny adjustment still glides over the minimum segment duration.
-    tiny, _ = _interpolate([[0.0, 0.0], [0.5, 0.0]])
-    assert len(tiny) == int(player.MIN_SEGMENT_S * WAYPOINT_RATE_HZ)
+    tiny, _, _ = _interpolate([[0.0, 0.0], [0.5, 0.0]])
+    assert len(tiny) == int(player.MIN_SEGMENT_S * WAYPOINT_RATE_HZ) + 1
     # None (unrecorded joint) passes through untouched.
-    sparse, _ = _interpolate([[0.0, None], [60.0, None]])
+    sparse, _, _ = _interpolate([[0.0, None], [60.0, None]])
     assert all(row[1] is None for row in sparse)
 
 
@@ -295,7 +336,7 @@ def test_looped_waypoint_replay_closes_the_cycle(client):
                 json={"params": {"name": "ring2"}})
     snapshot = _wait_op_state(client, "done")
     one_way = snapshot["result"]["frames"]
-    assert one_way == _segment_frames(60.0)
+    assert one_way == _segment_frames(60.0) + 1
 
     # Looped: the synthesized return glide doubles the cycle.
     client.post("/api/operation/replay/start",
@@ -303,7 +344,7 @@ def test_looped_waypoint_replay_closes_the_cycle(client):
     detail = _wait_for(lambda: (
         d := ((_operation(client) or {}).get("detail") or ""))
         and "@" in d and d)
-    cycle_s = 2 * _segment_frames(60.0) / WAYPOINT_RATE_HZ
+    cycle_s = (2 * _segment_frames(60.0) + 1) / WAYPOINT_RATE_HZ
     assert f"{cycle_s:.1f}s" in detail, detail
     client.post("/api/operation/stop")
     _wait_op_state(client, "done")

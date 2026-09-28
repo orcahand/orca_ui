@@ -1,4 +1,8 @@
-"""Trajectory recording: sample measured joints while the hand is posed by hand.
+"""Trajectory recording: sample joint angles while the hand is posed by hand.
+
+Angles come from the session's joint source: encoder-measured on hands that
+have joint encoders, otherwise the calibrated motor-derived estimate — so
+motor-only hands record too, once they are calibrated.
 
 Torque is disabled at start and NEVER re-enabled by this operation (the
 "torque is never auto-enabled" rule). The op owns the control source so a
@@ -19,7 +23,7 @@ from orca_ui.hand.states import ControlSource
 from orca_ui.library import CONTINUOUS, WAYPOINTS, LibraryError
 
 DEFAULT_FREQUENCY_HZ = 50.0
-MAX_FREQUENCY_HZ = 60.0   # the encoder read path is fresh well past this
+MAX_FREQUENCY_HZ = 60.0   # both joint-source read paths keep up past this
 MAX_FRAMES = 30_000       # 10 min @ 50 Hz
 SAVE_VALUES = {"save", "stop & save", "stop_and_save"}
 
@@ -39,10 +43,15 @@ class RecordOperation(Operation):
         session = service.session
         if session is None:
             raise ServiceError("hand not connected", status_code=503)
-        if not session.caps.encoders:
+        if session.joint_source() is None:
+            if session.caps.motors:
+                raise ServiceError(
+                    "recording on a hand without joint encoders needs a "
+                    "completed calibration (joint angles are estimated from "
+                    "motor positions)", status_code=409)
             raise ServiceError(
-                "recording needs joint encoders (measured joint angles)",
-                status_code=409)
+                "recording needs a joint-angle source: joint encoders, or "
+                "motors with a completed calibration", status_code=409)
 
         mode = params.get("mode", "continuous")
         if mode not in ("continuous", "waypoints"):
@@ -82,16 +91,23 @@ class RecordOperation(Operation):
             except ServiceError:
                 pass  # sensors-only session: nothing to disable
 
+        source = session.joint_source()
+        if source is None:
+            raise ServiceError(
+                "recording needs a joint-angle source: joint encoders, or "
+                "motors with a completed calibration", status_code=409)
+
         config = service.supervisor.config
         joint_ids = list(config.joint_ids)
         metadata = {
             "created_at": time.strftime("%Y%m%d_%H%M%S"),
             "joint_ids": joint_ids,
             "hand_type": config.type,
+            "joint_source": source,
         }
 
         def sample() -> list[float]:
-            measured = session.measured_joints() or {}
+            measured = session.sampled_joints() or {}
             return [float(measured.get(j, 0.0)) for j in joint_ids]
 
         if self.params["mode"] == "waypoints":

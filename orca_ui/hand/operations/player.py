@@ -2,9 +2,13 @@
 
 The player owns frame pacing on the op thread and submits the latest frame
 through ``service.set_targets(source=OPERATION)`` — full validation, torque
-gate, and the ``joints.target`` echo apply. Effective rates above the
-command worker's MAX_APPLY_HZ (50) are downsampled by its latest-wins
-coalescing, which is kinematically benign for position streaming.
+gate, and the ``joints.target`` echo apply. The command worker re-samples that
+stream onto the joint-loop rate, so the frame rate here sets how faithfully the
+commanded path reaches the loop.
+
+Waypoint replay additionally *holds* at each captured pose until the hand
+reaches it (see :func:`_hold_until_arrived`). Everything else here is
+open-loop pacing: nothing else waits for the hand.
 """
 
 from __future__ import annotations
@@ -19,10 +23,25 @@ from orca_ui.library import CONTINUOUS, WAYPOINTS, LibraryError
 SPEEDS = (0.5, 1.0, 2.0)
 WAYPOINT_SPEED_DEG_S = 60.0   # cruise speed for synthesized waypoint segments
 MIN_SEGMENT_S = 0.3           # floor so near-identical waypoints still glide
-WAYPOINT_RATE_HZ = 25.0
+# Half the worker's feed rate — upsampling to the loop rate is its job, not
+# this one's, and submitting faster only adds echo traffic and lock churn.
+WAYPOINT_RATE_HZ = 100.0
 LEAD_IN_MIN_DEG = 2.0         # skip the approach glide when already at start
 PROGRESS_EVERY_S = 0.2
 MAX_LOOP_CYCLES = 1000
+
+# Waypoint holds. The hand trails the command stream by its own tracking lag
+# (~100 ms on a motors-only hand, more on a loaded thumb), while a waypoint is
+# commanded for a single frame period — so without a hold every corner is
+# rounded and the poses that were captured at full flexion are never made.
+# Bounded at both ends: a floor so the mechanics settle even when the sampled
+# pose already agrees, and a cap so a joint that cannot reach its target slows
+# playback down instead of stalling it.
+DWELL_TOLERANCE_DEG = 1.5
+DWELL_STILL_DEG = 0.3         # per poll: movement below this is "stopped"
+DWELL_MIN_S = 0.15
+DWELL_MAX_S = 1.0
+DWELL_POLL_S = 0.05
 
 
 def _require_playable(service) -> None:
@@ -62,26 +81,41 @@ def _segment_frames(start: list, end: list,
     return frames
 
 
-def _interpolate(waypoints: list[list[float]],
-                 rate_hz: float = WAYPOINT_RATE_HZ) -> tuple[list[list[float]], float]:
-    """Expand sparse waypoints into linearly interpolated frames."""
-    frames: list[list[float]] = []
+def _interpolate(
+    waypoints: list[list[float]], rate_hz: float = WAYPOINT_RATE_HZ,
+) -> tuple[list[list[float]], float, list[int]]:
+    """Expand sparse waypoints into linearly interpolated frames.
+
+    Returns the frames, their rate, and the indices of the frames that land
+    exactly on a waypoint — where waypoint replay holds. The list opens on
+    the first waypoint (segments emit only the frames *after* their start),
+    so the pose the recording starts from is held like every other one.
+    """
+    if not waypoints:
+        return [], rate_hz, []
+    frames: list[list[float]] = [list(waypoints[0])]
+    holds = [0]
     for start, end in zip(waypoints, waypoints[1:]):
         frames.extend(_segment_frames(start, end, rate_hz))
-    return (frames or list(waypoints)), rate_hz
+        holds.append(len(frames) - 1)
+    return frames, rate_hz, holds
 
 
 def _lead_in(service, joint_ids: list[str],
              first_row: list, rate_hz: float) -> list[list[float]]:
-    """Approach glide from the measured pose to the first frame.
+    """Approach glide from the hand's current pose to the first frame.
 
     Without it, the first command of playback jumps the hand from wherever
     it currently is at full motor speed. Empty when the pose is unknown or
     already within LEAD_IN_MIN_DEG of the start.
+
+    Reads the session's joint source rather than the encoders alone: a hand
+    without joint encoders has a calibrated motor estimate, which is what it
+    recorded from.
     """
     session = service.session
-    measured = (session.measured_joints() or {}) if session else {}
-    start = [measured.get(j) for j in joint_ids]
+    sampled = (session.sampled_joints() or {}) if session else {}
+    start = [sampled.get(j) for j in joint_ids]
     deltas = [abs(b - a) for a, b in zip(start, first_row)
               if a is not None and b is not None]
     if max(deltas, default=0.0) < LEAD_IN_MIN_DEG:
@@ -89,9 +123,66 @@ def _lead_in(service, joint_ids: list[str],
     return _segment_frames(start, first_row, rate_hz)
 
 
+def _arrived(sampled: dict | None, angles: dict[str, float],
+             previous: dict | None) -> bool:
+    """True once the hand is at the pose, or has stopped approaching it.
+
+    Two exits, because a tendon-driven joint does not always reach its
+    target: inside DWELL_TOLERANCE_DEG is arrival, and having stopped moving
+    between polls means this is as close as the joint gets (tendon stretch,
+    a current limit, slack). Without the second one a single stiff joint —
+    a loose thumb is enough — runs every hold to its cap.
+
+    ``sampled`` is the same source a recording samples: encoders, else the
+    calibrated motor estimate, so a replayed pose is compared against the
+    recorded one in the units it was captured in. Nothing to read means
+    nothing to confirm, and the hold runs to its cap.
+    """
+    if not sampled:
+        return False
+    errors = [abs(sampled[joint] - target)
+              for joint, target in angles.items() if joint in sampled]
+    if not errors:
+        return False
+    if max(errors) <= DWELL_TOLERANCE_DEG:
+        return True
+    if not previous:
+        return False
+    moved = [abs(sampled[joint] - previous[joint]) for joint in angles
+             if joint in sampled and joint in previous]
+    return bool(moved) and max(moved) <= DWELL_STILL_DEG
+
+
+def _hold_until_arrived(ctx: OpContext, angles: dict[str, float]) -> None:
+    """Sit on a commanded waypoint until the hand gets there.
+
+    A waypoint recording is a sequence of *static* poses — each one captured
+    while the hand was held still — so replay has to stop at each one. The
+    frame stream on its own reaches a waypoint for a single frame period
+    while the hand is still travelling towards the previous one.
+    """
+    ctx.sleep(DWELL_MIN_S)
+    deadline = time.monotonic() + max(DWELL_MAX_S - DWELL_MIN_S, 0.0)
+    previous: dict | None = None
+    while time.monotonic() < deadline:
+        ctx.check_stop()
+        ctx.pause_point()
+        session = ctx.service.session
+        sampled = session.sampled_joints() if session is not None else None
+        if _arrived(sampled, angles, previous):
+            return
+        previous = sampled
+        ctx.sleep(DWELL_POLL_S)
+
+
 def _stream(ctx: OpContext, joint_ids: list[str], frames: list[list[float]],
-            dt: float, progress=None) -> None:
-    """Command frames at a fixed cadence, honoring pause/stop."""
+            dt: float, progress=None, holds: "list[int] | tuple" = ()) -> None:
+    """Command frames at a fixed cadence, honoring pause/stop.
+
+    ``holds`` names frame indices to sit on until the hand arrives; the
+    cadence grid restarts afterwards, since the hold just broke it.
+    """
+    hold_at = set(holds)
     total = len(frames)
     next_t = time.monotonic()
     last_progress = 0.0
@@ -106,6 +197,9 @@ def _stream(ctx: OpContext, joint_ids: list[str], frames: list[list[float]],
             if now - last_progress >= PROGRESS_EVERY_S or index == total - 1:
                 progress((index + 1) / total)
                 last_progress = now
+        if index in hold_at:
+            _hold_until_arrived(ctx, angles)
+            next_t = time.monotonic()
         next_t += dt
         delay = next_t - time.monotonic()
         if delay > 0:
@@ -114,8 +208,13 @@ def _stream(ctx: OpContext, joint_ids: list[str], frames: list[list[float]],
 
 def play_frames(ctx: OpContext, *, name: str, joint_ids: list[str],
                 frames: list[list[float]], rate_hz: float,
-                speed: float, loop: bool) -> dict:
-    """Paced playback with pause/stop; returns {frames, cycles}."""
+                speed: float, loop: bool,
+                holds: "list[int] | tuple" = ()) -> dict:
+    """Paced playback with pause/stop; returns {frames, cycles}.
+
+    ``duration_s`` counts the commanded motion only — waypoint holds add to
+    the wall clock on top of it, by however long the hand takes to arrive.
+    """
     total = len(frames)
     if not total:
         return {"frames": 0, "cycles": 0, "duration_s": 0.0}
@@ -134,9 +233,13 @@ def play_frames(ctx: OpContext, *, name: str, joint_ids: list[str],
                   detail=f"{name} · {duration_s:.1f}s @ ×{speed:g}")
     ctx.log(f"playing {name}: {total} frames, {duration_s:.1f}s at ×{speed:g}"
             f"{' (loop)' if loop else ''}")
+    if holds:
+        ctx.log(f"holding at {len(holds)} waypoint(s) until the hand arrives "
+                f"(≤{DWELL_MAX_S:g}s each)")
 
     while True:
-        _stream(ctx, joint_ids, frames, dt, progress=ctx.set_progress)
+        _stream(ctx, joint_ids, frames, dt, progress=ctx.set_progress,
+                holds=holds)
         cycles += 1
         if loop and cycles >= MAX_LOOP_CYCLES:
             ctx.log(f"loop backstop reached ({MAX_LOOP_CYCLES} cycles) — "
@@ -196,19 +299,27 @@ class ReplayOperation(Operation):
         joint_ids = list(meta.get("joint_ids")
                          or ctx.service.supervisor.config.joint_ids)
         if meta.get("type") == CONTINUOUS:
+            # A continuous recording carries its own timing: every frame is a
+            # sample of a hand in motion, so there is no pose to hold.
             frames = data.get("angles") or []
             rate_hz = float(meta["sampling_frequency_hz"])
+            holds: list[int] = []
         else:
             waypoints = data.get("waypoints") or []
             # Close the cycle when looping so the wrap-around glides back
             # to the first waypoint instead of jumping at motor speed.
             if self.params["loop"] and len(waypoints) > 1:
                 waypoints = waypoints + [list(waypoints[0])]
-            frames, rate_hz = _interpolate(waypoints)
+            frames, rate_hz, holds = _interpolate(waypoints)
+            if self.params["loop"] and len(holds) > 1:
+                # The closing waypoint is the next cycle's opening one, which
+                # is held there; holding it twice would double the dwell.
+                holds = holds[:-1]
         return play_frames(
             ctx, name=self.params["name"], joint_ids=joint_ids,
             frames=frames, rate_hz=rate_hz,
             speed=self.params["speed"], loop=self.params["loop"],
+            holds=holds,
         )
 
 
@@ -253,7 +364,9 @@ class DemoOperation(Operation):
         # the first keyframe instead of jumping.
         if self.params["loop"] and waypoints:
             waypoints.append(list(waypoints[0]))
-        frames, rate_hz = _interpolate(waypoints)
+        frames, rate_hz, _holds = _interpolate(waypoints)
+        # Demos do not hold at keyframes: they are continuous flourishes, not
+        # separately captured poses.
         return play_frames(
             ctx, name=self.params["name"], joint_ids=joint_ids,
             frames=frames, rate_hz=rate_hz, speed=1.0,

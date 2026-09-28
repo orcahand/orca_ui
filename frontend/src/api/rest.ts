@@ -94,12 +94,17 @@ export const api = {
   jointsTarget: (angles: Record<string, number>) =>
     post('/api/joints/target', { angles }),
   jointsNeutral: () => post('/api/joints/neutral'),
+  // joints omitted = every loop-controlled joint; a joint list writes
+  // exactly those and leaves the rest as they are.
   setGains: (gains: {
     kp: number
     ki: number
     correction_max_deg: number
-    i_clamp_deg?: number
+    joints?: string[]
   }) => post('/api/control/gains', gains),
+  // Restore the config gains; joints omitted = every loop-controlled joint.
+  resetGains: (joints?: string[]) =>
+    post('/api/control/gains/reset', { joints: joints ?? null }),
   setMaxCurrent: (ma: number) => post('/api/control/max_current', { ma }),
   rebase: () => post('/api/control/rebase'),
 
