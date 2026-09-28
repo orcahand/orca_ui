@@ -61,14 +61,20 @@ def _overrides(config) -> tuple[str, str, str]:
 
 
 def names_a_hand(detection: HandDetection | None) -> bool:
-    """True when a controller board actually answered.
+    """True when a controller board — or a legacy hand's motor adapter —
+    actually answered.
 
     :func:`~orca_core.detect_hand` degrades to the plain right-hand model
     when nothing is plugged in, so ``model_name`` alone can't distinguish
     "this is a plain right hand" from "nothing is there". The identity reply
-    can: it only exists when a board answered ``ORCA_INFO?``/``ORCA_ID?``.
+    is the usual signal — it only exists when a board answered
+    ``ORCA_INFO?``/``ORCA_ID?`` — but a legacy hand predates that protocol
+    and never has one even though its motor bus resolved, so a live
+    ``motor_port`` counts too.
     """
-    return detection is not None and detection.identity is not None
+    return detection is not None and (
+        detection.identity is not None or detection.motor_port is not None
+    )
 
 
 def run_detection(config, *, force: bool = False) -> HandDetection | None:

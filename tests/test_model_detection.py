@@ -88,6 +88,24 @@ def test_empty_bus_keeps_the_last_known_hand():
     assert adopted == []
 
 
+def test_a_legacy_hand_is_adopted_despite_having_no_identity():
+    """A legacy hand predates ORCA_ID?/ORCA_INFO? and so never has an
+    identity, but its motor bus still resolves — that alone must be enough
+    to tell it apart from an empty bus, or an unpinned legacy hand never
+    gets its real (e.g. touch) model adopted at all."""
+    sup, adopted = build("orcahand-right")
+    legacy_touch = HandDetection(
+        model_name="orcahand-touch-right", side="right",
+        has_tactile=True, has_encoders=False,
+        motor_port="/dev/cu.feetech", sensing_port=None, identity=None,
+    )
+
+    assert sup._adopt_model(legacy_touch) is True
+
+    assert sup.model_name == "orcahand-touch-right"
+    assert [c.config_path for c in adopted] == [sup.config.config_path]
+
+
 def test_a_pinned_model_is_never_revised():
     sup, adopted = build("orcahand-right", pinned=True)
 
