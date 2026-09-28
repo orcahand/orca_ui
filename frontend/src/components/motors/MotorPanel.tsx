@@ -56,6 +56,9 @@ export function MotorPanel() {
   const locked = !gate.manualAllowed
   const lockReason = gate.reason ?? undefined
   const directArmed = control?.direct_motor_mode ?? false
+  // Motor limits/ratios unrecorded: _joint_to_motor_pos maps every joint to
+  // None and the write is dropped, so a slider move is silently a no-op.
+  const uncalibrated = handInfo?.calibration.motors === false
 
   // Initial seed: latch the first available pose (measured, else estimate)
   // so opening the panel never yanks the hand.
@@ -133,14 +136,20 @@ export function MotorPanel() {
       )}
       <button
         className="btn btn-secondary"
-        disabled={!torqueOn || locked}
-        title={lockReason}
+        disabled={!torqueOn || locked || uncalibrated}
+        title={uncalibrated ? 'hand is not calibrated' : lockReason}
         onClick={() => void goNeutral()}
       >
         Neutral
       </button>
     </div>
   )
+
+  const sliderLockReason = uncalibrated
+    ? 'hand is not calibrated — use Direct motor control below'
+    : directArmed
+      ? 'direct motor mode is armed'
+      : lockReason
 
   return (
     <Panel title="Motor Control" toolbar={toolbar}>
@@ -149,7 +158,16 @@ export function MotorPanel() {
           {gate.reason} — manual control resumes when it releases
         </div>
       )}
-      {!locked && !torqueOn && (
+      {!locked && uncalibrated && (
+        <div style={{ fontSize: 10, color: 'var(--warn)', marginBottom: 8 }}>
+          ⚠ NOT CALIBRATED — {handInfo.calibration.hint ?? 'the hand is not calibrated'}.
+          Sliders are disabled: a joint target silently sends no motor
+          command until motor limits are recorded. Use{' '}
+          <strong>Direct motor control</strong> below to drive motors
+          directly in the meantime.
+        </div>
+      )}
+      {!locked && !uncalibrated && !torqueOn && (
         <div style={{ fontSize: 10, color: 'var(--dimmer)', marginBottom: 8 }}>
           enable torque to command joints — sliders re-seed from the current
           pose on enable
@@ -161,16 +179,14 @@ export function MotorPanel() {
             key={joint.id}
             joint={joint}
             value={values[joint.id] ?? clamp(0, joint.rom[0], joint.rom[1])}
-            disabled={!torqueOn || locked || directArmed}
-            lockReason={
-              directArmed ? 'direct motor mode is armed' : lockReason
-            }
+            disabled={!torqueOn || locked || directArmed || uncalibrated}
+            lockReason={sliderLockReason}
             showFeedback={feedback && joint.encoder_backed}
             onSlide={onSlide}
           />
         ))}
       </div>
-      <DirectMotorPanel torqueOn={torqueOn} locked={locked} />
+      <DirectMotorPanel torqueOn={torqueOn} locked={locked} forceOpen={uncalibrated} />
     </Panel>
   )
 }
@@ -212,7 +228,9 @@ function SliderRow({
         type="range"
         min={lo}
         max={hi}
-        step={0.5}
+        // Continuous, like the Tk slider: a 0.5° quantum turns a slow drag
+        // into a staircase the 100 Hz PI loop chases step by step.
+        step="any"
         value={value}
         disabled={disabled}
         title={lockReason}
