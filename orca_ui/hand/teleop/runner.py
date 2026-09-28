@@ -58,7 +58,12 @@ def resolve_command(settings) -> tuple[list[str] | None, str]:
         return None, f"no pyproject.toml in {teleop_dir}"
     if shutil.which("uv") is None:
         return None, "uv not on PATH"
-    prefix = ["uv", "run", "--project", teleop_dir,
+    # --frozen: take the checkout's lock as given. Without it every launch
+    # revalidates orca_teleop's direct-URL wheels against github.com —
+    # including the manus one, which macOS never installs — so a DNS blip kills
+    # the spawn with uv exit 2 before the streamer prints a line. A missing
+    # lock now makes uv say so instead of silently re-resolving.
+    prefix = ["uv", "run", "--project", teleop_dir, "--frozen",
               "--extra", "mediapipe", "--extra", "adaptive", STREAMER_SCRIPT]
     return prefix, f"uv run --project {teleop_dir}"
 
