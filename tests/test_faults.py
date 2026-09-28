@@ -176,6 +176,23 @@ class TestHardwareErrorSweep:
         assert client.batches == 1
         assert sampler._hw_errors == {1: ["overload"]}
 
+    def test_a_latch_already_recorded_does_not_re_read_every_tick(self):
+        """A latch persists until the motor is rebooted and keeps re-alerting
+        meanwhile. Honouring every alert would read the bus once a second for
+        as long as the fault lasts — and the sweep runs while the hand is being
+        driven, where a stall costs a control cycle. The flags cannot change,
+        so there is nothing to learn from re-reading."""
+        sampler, session, _ = self._sampler({1: ["overload"], 2: []})
+        client = _BatchSweepClient({1: ["overload"], 2: []})
+        client.alerts = {1: 0x80}
+        session.hand.motor_client = client
+        sampler._hw_errors = {1: ["overload"]}   # already recorded
+
+        sampler._last_hw_error_sweep = time.monotonic()
+        sampler._sweep_hardware_errors(session)
+
+        assert client.batches == 0
+
     def test_a_quiet_bus_still_waits_out_the_interval(self):
         sampler, session, _ = self._sampler({1: ["overload"], 2: []})
         client = _BatchSweepClient({1: ["overload"], 2: []})

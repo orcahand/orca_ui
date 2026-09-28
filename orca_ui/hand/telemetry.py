@@ -534,7 +534,14 @@ class TelemetryService:
         # next tick rather than waiting out the interval.
         alerted = self._drain_alerts(client)
         now = time.monotonic()
-        if not alerted and now - self._last_hw_error_sweep < HW_ERROR_SWEEP_S:
+        # Only a motor we have no latch recorded for earns that shortcut. A
+        # latch persists until the motor is rebooted and re-alerts on every
+        # status packet meanwhile, so honouring every alert would put a bus
+        # read on every tick for as long as the fault lasts — including
+        # mid-motion, where the sweep is not gated and the bus can least
+        # spare one. Re-reading tells us nothing: the flags cannot change.
+        news = any(int(mid) not in self._hw_errors for mid in alerted)
+        if not news and now - self._last_hw_error_sweep < HW_ERROR_SWEEP_S:
             return
         self._last_hw_error_sweep = now
         raw = self._read_hardware_errors(client, hand)
