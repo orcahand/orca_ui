@@ -792,14 +792,31 @@ export interface EnduranceTestSummary {
   cycles_total: number
   events: number
   checkpoints: number
+  // The self-contained HTML report, built when the test stops and on demand
+  // (served at /api/endurance/tests/{id}/report.html); null until built.
+  report: EnduranceReportInfo | null
+}
+
+export interface EnduranceReportInfo {
+  file: string
+  built_at: string
+  bytes: number
+}
+
+// Something polling /api/endurance that announced itself (the Slack bot):
+// when it last looked and whether that is recent for its poll interval.
+export interface EnduranceWatcher {
+  name: string
+  ago_s: number
+  poll_s: number
+  live: boolean
 }
 
 export interface EnduranceSnapshot {
   path: string
   active_id: string | null
   tests: EnduranceTestSummary[]
-  // Slack notifications are configured on the backend (ORCA_UI_SLACK_WEBHOOK).
-  slack: { enabled: boolean }
+  watchers: EnduranceWatcher[]
 }
 
 // Per-reversal samples rolled into time buckets, columnar: index i of every

@@ -24,12 +24,10 @@ Persistence, next to ``joint_usage.json``:
 - ``endurance/<test id>.csv`` — every per-reversal sample as recorded, one
   row per hold: seconds since the test started, run, cycle, leg, settled
   angle per joint, holding current per motor, fingertip force per finger.
-  Append-only, never read back by the console; served for download.
-
-With a :class:`~orca_ui.slack.SlackNotifier` attached, the same milestones
-(start, stop, notes, checkpoints, timeline events, digests) are handed to it
-from an outbox that is drained only after the recorder's lock is released;
-the notifier never blocks and never raises back into here.
+  Append-only; read back only to build the report; served for download.
+- ``endurance/reports/<name>.html`` — the self-contained report
+  (:mod:`orca_ui.hand.endurance_report`), built when a test stops and on
+  demand; each test records which file is its current report.
 """
 
 from __future__ import annotations
@@ -49,6 +47,7 @@ logger = logging.getLogger(__name__)
 
 ENDURANCE_BASENAME = "endurance.json"
 SAMPLES_DIRNAME = "endurance"
+REPORTS_DIRNAME = "reports"
 SCHEMA = 1
 AUTOSAVE_S = 60.0
 # Buckets start this wide and double whenever a test outgrows MAX_BUCKETS, so
@@ -58,7 +57,6 @@ MAX_BUCKETS = 360
 MAX_EVENTS = 5000
 MAX_CHECKPOINTS = 500
 # Notifier calls queued between two flushes; every path that emits flushes.
-MAX_OUTBOX = 64
 MAX_RUNS = 500
 # A fingertip force older than this at a hold is not the force at the hold.
 FORCE_FRESH_S = 2.0
@@ -115,11 +113,8 @@ class EnduranceRecorder:
 
     def __init__(self, path: str, calibration_path: str, joints: list[str],
                  motors: list[int], motor_joint: dict[int, str],
-                 fingers: list[str], notifier=None):
+                 fingers: list[str]):
         self._path = path
-        self._notifier = notifier
-        # Notifier calls queued under the lock, made after it is released.
-        self._outbox: list[tuple[str, tuple]] = []
         self._calibration_path = calibration_path
         self._joints = [str(j) for j in joints]
         self._motors = [int(m) for m in motors]
@@ -200,6 +195,32 @@ class EnduranceRecorder:
         path = self._samples_path(test_id)
         return path if os.path.exists(path) else None
 
+    def reports_dir(self) -> str:
+        return os.path.join(self._samples_dir(), REPORTS_DIRNAME)
+
+    def report_path(self, test_id: str) -> str | None:
+        """The test's current report file, or None when none was built yet."""
+        with self._lock:
+            test = self._find(test_id)
+            info = (test or {}).get("report")
+        if not info or not info.get("file"):
+            return None
+        path = os.path.join(self.reports_dir(), info["file"])
+        return path if os.path.exists(path) else None
+
+    def set_report(self, test_id: str, file: str, size: int) -> dict:
+        """Record that ``file`` (under ``reports_dir()``) is this test's report."""
+        with self._lock:
+            test = self._find(test_id)
+            if test is None:
+                raise KeyError(test_id)
+            test["report"] = {"file": file, "built_at": _now_iso(),
+                              "bytes": int(size)}
+            self._dirty = True
+            info = dict(test["report"])
+        self.save()
+        return info
+
     # ----- tests ---------------------------------------------------------------
 
     def _find(self, test_id: str) -> dict | None:
@@ -208,35 +229,6 @@ class EnduranceRecorder:
     def _active(self) -> dict | None:
         active_id = self._data.get("active_id")
         return self._find(active_id) if active_id else None
-
-    # ----- notifier outbox -----------------------------------------------------
-
-    def _emit(self, method: str, test: dict, *args) -> None:
-        """Queue a notifier call about ``test``; only meaningful while the
-        lock is held. The test's digest is built once, at flush time."""
-        if self._notifier is not None and len(self._outbox) < MAX_OUTBOX:
-            self._outbox.append((method, test, args))
-
-    def _flush_outbox(self) -> None:
-        """Hand queued calls to the notifier outside the lock, with one
-        digest per test however many calls name it."""
-        if not self._outbox:
-            return
-        with self._lock:
-            calls, self._outbox = self._outbox, []
-            digests = {}
-            for _, test, _ in calls:
-                if test["id"] not in digests:
-                    digests[test["id"]] = self._digest(test)
-        for method, test, args in calls:
-            try:
-                getattr(self._notifier, method)(digests[test["id"]], *args)
-            except Exception:
-                logger.debug("endurance notifier call failed", exc_info=True)
-
-    @property
-    def notifier(self):
-        return self._notifier
 
     def start(self, label: str | None = None) -> dict:
         """Begin a test: t0 is now. Refuses while another test is running."""
@@ -276,7 +268,6 @@ class EnduranceRecorder:
             self._states = {}
             self._run_id = None
             self._dirty = True
-            self._emit("test_started", test)
             header = self._csv_header()
             path = self._samples_path(test["id"])
         try:
@@ -286,7 +277,6 @@ class EnduranceRecorder:
         except Exception:
             logger.exception("could not create endurance samples file")
         self.save()
-        self._flush_outbox()
         return self.test(test["id"]) or {}
 
     def stop(self, test_id: str) -> bool:
@@ -300,9 +290,7 @@ class EnduranceRecorder:
                             "stopped")
                 self._data["active_id"] = None
                 self._dirty = True
-                self._emit("test_stopped", test)
         self.save()
-        self._flush_outbox()
         return True
 
     def rename(self, test_id: str, label: str) -> bool:
@@ -326,12 +314,15 @@ class EnduranceRecorder:
                 self._csv_rows = []
             self._dirty = True
             path = self._samples_path(test_id)
-        try:
-            os.remove(path)
-        except FileNotFoundError:
-            pass
-        except Exception:
-            logger.exception("could not remove endurance samples file")
+            report = (test.get("report") or {}).get("file")
+        for stale in ([path] + ([os.path.join(self.reports_dir(), report)]
+                                if report else [])):
+            try:
+                os.remove(stale)
+            except FileNotFoundError:
+                pass
+            except Exception:
+                logger.exception("could not remove endurance file %s", stale)
         self.save()
         return True
 
@@ -343,9 +334,7 @@ class EnduranceRecorder:
             if test is None:
                 return False
             self._event(test, self._elapsed(test), "note", "operator", text)
-            self._emit("note", test, text)
         self.save()
-        self._flush_outbox()
         return True
 
     # ----- per-reversal samples ------------------------------------------------
@@ -520,7 +509,6 @@ class EnduranceRecorder:
             test["cycles_total"] = max(int(test["cycles_total"]),
                                        int(test["closed_cycles"]))
         self._autosave()
-        self._flush_outbox()
 
     def _observe_operation(self, test: dict, snap: dict | None, t: float) -> None:
         run_id = snap.get("run_id") if snap else None
@@ -649,8 +637,6 @@ class EnduranceRecorder:
         }
         test["events"].append(event)
         self._dirty = True
-        if kind not in ("note", "test"):
-            self._emit("event", test, dict(event))
 
     # ----- calibration checkpoints ---------------------------------------------
 
@@ -705,7 +691,6 @@ class EnduranceRecorder:
         }
         test["checkpoints"].append(checkpoint)
         self._dirty = True
-        self._emit("checkpoint", test, dict(checkpoint), _travel_drift(test))
 
     # ----- reads ---------------------------------------------------------------
 
@@ -724,49 +709,8 @@ class EnduranceRecorder:
             "samples": test["samples"], "cycles_total": test["cycles_total"],
             "events": len(test["events"]),
             "checkpoints": len(test["checkpoints"]),
+            "report": dict(test["report"]) if test.get("report") else None,
         }
-
-    def _digest(self, test: dict) -> dict:
-        """What a Slack message needs to say about a test: the summary plus
-        the drift signals — holding current now vs. the first hour, motor
-        travel now vs. the first checkpoint, subsystems still in a bad
-        state. Cheap: one pass over the buckets, none over the CSV."""
-        out = self._summary(test)
-        events = test["events"]
-        out["events_bad"] = sum(1 for e in events if e.get("severity") == "bad")
-        out["runs"] = len(test["runs"])
-        last: dict[str, dict] = {}
-        for event in events:
-            if event.get("severity") in ("bad", "ok"):
-                last[event["subject"]] = event
-        out["open_bad"] = [dict(e) for e in last.values()
-                           if e.get("severity") == "bad"]
-        out["current_drift"] = _current_drift(test)
-        latest = test.get("latest") or {}
-        out["forces"] = {f: v for f, v in (latest.get("forces") or {}).items()
-                         if v is not None}
-        out["travel_drift"] = _travel_drift(test)
-        return out
-
-    def digest(self, test_id: str) -> dict | None:
-        with self._lock:
-            test = self._find(test_id)
-            return None if test is None else self._digest(test)
-
-    def active_digest(self) -> dict | None:
-        with self._lock:
-            test = self._active()
-            return None if test is None else self._digest(test)
-
-    def post_digest(self, test_id: str) -> bool:
-        """On-demand digest to Slack; False when the test is unknown."""
-        with self._lock:
-            test = self._find(test_id)
-            if test is None:
-                return False
-            self._emit("digest", test)
-        self._flush_outbox()
-        return True
 
     def snapshot(self) -> dict:
         with self._lock:
@@ -774,7 +718,6 @@ class EnduranceRecorder:
                 "path": self._path,
                 "active_id": self._data.get("active_id"),
                 "tests": [self._summary(t) for t in self._data["tests"]],
-                "slack": {"enabled": self._notifier is not None},
             }
 
     def test(self, test_id: str) -> dict | None:
@@ -844,53 +787,6 @@ def _columnar(test: dict) -> dict:
 
 
 BASELINE_S = 3600.0
-
-
-def _current_drift(test: dict) -> dict:
-    """Latest bucket's mean holding current per motor against the mean over
-    the test's first hour (or everything so far, when younger than that)."""
-    buckets = test["buckets"]
-    if not buckets:
-        return {}
-    latest = buckets[-1]
-    baseline_end = max(BASELINE_S, float(buckets[0]["t1"]))
-    out: dict[str, dict] = {}
-    for motor in test["motors"]:
-        key = str(motor)
-        now = latest["current"].get(key)
-        if now is None:
-            continue
-        total = 0.0
-        count = 0
-        for bucket in buckets:
-            if bucket["t0"] >= baseline_end:
-                break
-            cell = bucket["current"].get(key)
-            if cell is not None:
-                total += cell[0] * cell[2]
-                count += cell[2]
-        base = total / count if count else None
-        # Inside the baseline window "now" is part of its own baseline.
-        pct = None
-        if (base is not None and abs(base) >= 1.0
-                and float(latest["t0"]) >= baseline_end):
-            pct = round((now[0] - base) / abs(base) * 100.0, 1)
-        out[key] = {"joint": test["motor_joint"].get(key),
-                    "now": round(now[0], 1),
-                    "base": None if base is None else round(base, 1),
-                    "pct": pct}
-    return out
-
-
-def _travel_drift(test: dict) -> dict[str, float]:
-    """Motor travel per joint at the latest checkpoint minus the first."""
-    checkpoints = test["checkpoints"]
-    if len(checkpoints) < 2:
-        return {}
-    first = checkpoints[0].get("travel_deg") or {}
-    latest = checkpoints[-1].get("travel_deg") or {}
-    return {j: round(latest[j] - first[j], 2)
-            for j in latest if j in first}
 
 
 def _describe_params(params: dict | None) -> str:

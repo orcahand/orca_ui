@@ -450,7 +450,7 @@ export function EndurancePanel() {
   const [currentStat, setCurrentStat] = useState<'mean' | 'max'>('max')
   const [forceStat, setForceStat] = useState<'mean' | 'max'>('max')
   const [allEvents, setAllEvents] = useState(false)
-  const [slackPosted, setSlackPosted] = useState(false)
+  const [reportBusy, setReportBusy] = useState(false)
 
   const loadList = () =>
     api
@@ -592,15 +592,14 @@ export function EndurancePanel() {
       .then(() => api.enduranceTest(selected).then(setTest))
       .catch(fail)
   }
-  const postToSlack = () => {
+  const buildReport = () => {
     if (!selected) return
+    setReportBusy(true)
     void api
-      .enduranceSlack(selected)
-      .then(() => {
-        setSlackPosted(true)
-        window.setTimeout(() => setSlackPosted(false), 3000)
-      })
+      .enduranceReport(selected)
+      .then(() => loadList())
       .catch(fail)
+      .finally(() => setReportBusy(false))
   }
   const deleteTest = () => {
     if (!selected || !selectedSummary) return
@@ -621,12 +620,28 @@ export function EndurancePanel() {
 
   const tests = snapshot?.tests ?? []
   const anyActive = Boolean(snapshot?.active_id)
+  const bot = snapshot?.watchers?.find((w) => w.name === 'endurance-slack')
+  const botAgo = bot ? (bot.ago_s < 90 ? `${bot.ago_s} s` : `${Math.round(bot.ago_s / 60)} min`) : ''
+  const botLabel = !bot
+    ? '⚪ no Slack bot'
+    : bot.live
+      ? `🟢 Slack bot · polled ${botAgo} ago`
+      : `⚪ Slack bot last seen ${botAgo} ago`
+  const botTitle = bot
+    ? `endurance-slack polls this console every ${Math.round(bot.poll_s / 60)} min: it announces starts, stops, alerts and reports in Slack`
+    : 'no endurance-slack bot has polled this console yet: start one next to it (uv run endurance-slack) or point a running one here with /endurance console <this address>'
 
   return (
     <Panel
       title="Endurance"
       toolbar={
-        <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+        <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span
+            title={botTitle}
+            style={{ fontSize: 12, opacity: 0.8, marginRight: 4, cursor: 'help', whiteSpace: 'nowrap' }}
+          >
+            {botLabel}
+          </span>
           <button
             className="btn btn-primary"
             disabled={anyActive}
@@ -661,15 +676,29 @@ export function EndurancePanel() {
               >
                 ⭳ CSV
               </a>
-              {snapshot?.slack?.enabled && (
-                <button
+              <button
+                className="btn btn-secondary"
+                onClick={buildReport}
+                disabled={reportBusy}
+                title={
+                  selectedSummary.report
+                    ? `rebuild the HTML report (last built ${new Date(selectedSummary.report.built_at).toLocaleString()}); it is saved next to the samples and the Slack bot sends it to the channel`
+                    : 'build the self-contained HTML report: findings, timeline, pose repeatability, motor current, calibration checkpoints, fingertip force, joint usage; saved next to the samples and sent to Slack by the bot'
+                }
+              >
+                {reportBusy ? '⏳ Building…' : selectedSummary.report ? '↻ Report' : '📄 Report'}
+              </button>
+              {selectedSummary.report && (
+                <a
                   className="btn btn-secondary"
-                  onClick={postToSlack}
-                  disabled={slackPosted}
-                  title="post this test's digest to the configured Slack channel: elapsed, cycles, holding-current drift, motor-travel drift, what is still in a bad state"
+                  href={`/api/endurance/tests/${encodeURIComponent(selectedSummary.id)}/report.html`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={`open ${selectedSummary.report.file} (${(selectedSummary.report.bytes / 1e6).toFixed(1)} MB)`}
+                  style={{ textDecoration: 'none' }}
                 >
-                  {slackPosted ? '✓ Posted' : '💬 Slack'}
-                </button>
+                  ⭳ Open report
+                </a>
               )}
               <button
                 className="btn btn-danger"

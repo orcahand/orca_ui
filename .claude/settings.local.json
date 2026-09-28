@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "\"$HOME/.claude/hooks/verify-gate.sh\"", "timeout": 150 }
+        ]
+      }
+    ]
+  }
+}

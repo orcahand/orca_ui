@@ -3,11 +3,18 @@ FastAPI's threadpool, never on the event loop."""
 
 from __future__ import annotations
 
+import logging
+import os
+import threading
+import time
+
 from fastapi import APIRouter, HTTPException, Request
 
 from orca_ui.api import schemas
 from orca_ui.hand.service import HandService, ServiceError
 from orca_ui.hand.taxel_geometry import get_taxel_geometry
+
+logger = logging.getLogger(__name__)
 
 
 def build_router(service: HandService, telemetry=None) -> APIRouter:
@@ -117,9 +124,26 @@ def build_router(service: HandService, telemetry=None) -> APIRouter:
             raise HTTPException(status_code=404, detail="no such test")
         return test
 
+    # Who polls the endurance API (the Slack bot sends these headers), so the
+    # Stats page can show that a bot is watching and when it last looked.
+    watchers: dict[str, dict] = {}
+
     @router.get("/endurance")
-    def endurance_tests():
-        return _endurance().snapshot()
+    def endurance_tests(request: Request):
+        name = request.headers.get("x-endurance-watcher")
+        if name:
+            try:
+                poll_s = float(request.headers.get("x-endurance-poll") or 0)
+            except ValueError:
+                poll_s = 0.0
+            watchers[name[:40]] = {"seen": time.time(), "poll_s": poll_s}
+        snapshot = _endurance().snapshot()
+        now = time.time()
+        snapshot["watchers"] = [
+            {"name": n, "ago_s": round(now - w["seen"]), "poll_s": w["poll_s"],
+             "live": now - w["seen"] <= 2 * w["poll_s"] + 30}
+            for n, w in watchers.items()]
+        return snapshot
 
     @router.post("/endurance/tests")
     def endurance_start(body: schemas.EnduranceTestBody | None = None):
@@ -139,10 +163,44 @@ def build_router(service: HandService, telemetry=None) -> APIRouter:
             raise HTTPException(status_code=404, detail="no such test")
         return {"ok": True}
 
+    def _build_report(test_id: str) -> dict:
+        """Build and save the test's HTML report from the console's own records."""
+        from orca_ui.hand import endurance_report
+
+        recorder = _endurance()
+        config = service.supervisor.config
+        usage = None
+        try:
+            tracker = telemetry.usage_tracker() if telemetry is not None else None
+            usage = tracker.snapshot() if tracker is not None else None
+        except Exception:
+            logger.debug("usage stats unavailable for the report", exc_info=True)
+        hand = None
+        try:
+            hand = service.hand_info()
+        except Exception:
+            logger.debug("hand info unavailable for the report", exc_info=True)
+        return endurance_report.build_and_save(
+            recorder, test_id,
+            calibration_path=getattr(config, "calibration_path", None),
+            usage=usage, hand=hand)
+
+    def _build_report_in_background(test_id: str) -> None:
+        def run():
+            try:
+                _build_report(test_id)
+            except Exception:
+                logger.exception("endurance report for %s failed", test_id)
+        threading.Thread(target=run, name=f"endurance-report-{test_id}",
+                         daemon=True).start()
+
     @router.post("/endurance/tests/{test_id}/stop")
     def endurance_stop(test_id: str):
         if not _endurance().stop(test_id):
             raise HTTPException(status_code=404, detail="no such test")
+        # The CSV of a multi-day test takes seconds to digest: never on the
+        # request that stops the test. The summary shows ``report`` once done.
+        _build_report_in_background(test_id)
         return {"ok": True}
 
     @router.post("/endurance/tests/{test_id}/note")
@@ -151,18 +209,27 @@ def build_router(service: HandService, telemetry=None) -> APIRouter:
             raise HTTPException(status_code=404, detail="no such test")
         return {"ok": True}
 
-    @router.post("/endurance/tests/{test_id}/slack")
-    def endurance_slack(test_id: str):
-        """Post this test's digest to the configured Slack channel."""
-        recorder = _endurance()
-        if recorder.notifier is None:
-            raise HTTPException(
-                status_code=503,
-                detail="Slack is not configured — start the console with "
-                       "ORCA_UI_SLACK_WEBHOOK set")
-        if not recorder.post_digest(test_id):
-            raise HTTPException(status_code=404, detail="no such test")
-        return {"ok": True}
+    @router.post("/endurance/tests/{test_id}/report")
+    def endurance_report_build(test_id: str):
+        """Build (or rebuild) the self-contained HTML report now."""
+        _endurance_test(test_id)
+        try:
+            return {"report": _build_report(test_id)}
+        except Exception as e:
+            logger.exception("endurance report for %s failed", test_id)
+            raise HTTPException(status_code=500,
+                                detail=f"report failed: {e}")
+
+    @router.get("/endurance/tests/{test_id}/report.html")
+    def endurance_report_file(test_id: str):
+        from fastapi.responses import FileResponse
+
+        _endurance_test(test_id)
+        path = _endurance().report_path(test_id)
+        if path is None:
+            raise HTTPException(status_code=404, detail="no report built yet")
+        return FileResponse(path, media_type="text/html",
+                            filename=os.path.basename(path))
 
     @router.delete("/endurance/tests/{test_id}")
     def endurance_delete(test_id: str):

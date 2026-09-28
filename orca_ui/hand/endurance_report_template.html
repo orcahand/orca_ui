@@ -1,0 +1,782 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Endurance report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  color-scheme: light;
+  --plane: #f3f3f0;
+  --surface: #fcfcfb;
+  --ink: #141412;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --ring: rgba(11,11,11,0.10);
+  --band: rgba(11,11,11,0.045);
+  --s1: #2a78d6;   /* closed pose, current, force */
+  --s2: #eb6834;   /* open pose */
+  --seq-lo: #cde2fb; --seq-hi: #0d366b;
+  --div-neg: #2a78d6; --div-mid: #f0efec; --div-pos: #e34948;
+  --good: #0ca30c; --warn: #fab219; --serious: #ec835a; --critical: #d03b3b;
+  --font: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --plane: #101010; --surface: #1a1a19; --ink: #f4f4f0; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10); --band: rgba(255,255,255,0.06);
+    --s1: #3987e5; --s2: #d95926; --seq-lo: #184f95; --seq-hi: #cde2fb;
+    --div-neg: #3987e5; --div-mid: #383835; --div-pos: #e66767;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --plane: #101010; --surface: #1a1a19; --ink: #f4f4f0; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10); --band: rgba(255,255,255,0.06);
+  --s1: #3987e5; --s2: #d95926; --seq-lo: #184f95; --seq-hi: #cde2fb;
+  --div-neg: #3987e5; --div-mid: #383835; --div-pos: #e66767;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--plane); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.5;
+  padding-block: 28px 64px; padding-inline: clamp(16px, 4vw, 40px);
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 40px; }
+header h1 { font-size: 30px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01em; text-wrap: balance; }
+header .sub { color: var(--ink-2); margin: 0; max-width: 70ch; }
+.eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 500; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 22px; }
+.tile { background: var(--surface); border: 1px solid var(--ring); border-radius: 6px; padding: 12px 14px; }
+.tile .label { font-size: 12px; color: var(--ink-2); }
+.tile .value { font-size: 26px; font-weight: 500; line-height: 1.15; margin-top: 4px; }
+.tile .value small { font-size: 13px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+section > h2 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+section > p.read { margin: 0 0 14px; color: var(--ink-2); max-width: 78ch; }
+.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 6px; padding: 14px 16px 10px; }
+.card + .card { margin-top: 12px; }
+.card h3 { font-size: 14px; font-weight: 600; margin: 0 0 8px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.card h3 .hint { font-weight: 400; color: var(--muted); font-size: 12.5px; }
+svg { display: block; width: 100%; overflow: visible; }
+svg text { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+svg .lab { font-family: var(--font); fill: var(--ink-2); font-size: 11.5px; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-2); margin: 0 0 8px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.sw.box { height: 10px; width: 10px; border-radius: 2px; }
+.sw.dash { height: 0; border-top: 1.5px dashed var(--axis); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(255px, 1fr)); gap: 10px 18px; }
+.sm h4 { margin: 0; font-size: 12.5px; font-weight: 500; color: var(--ink); display: flex; justify-content: space-between; }
+.sm h4 .rom { color: var(--muted); font-family: var(--mono); font-weight: 400; font-size: 11px; }
+.toggle { display: inline-flex; border: 1px solid var(--ring); border-radius: 5px; overflow: hidden; font-size: 12.5px; }
+.toggle button { background: transparent; border: 0; color: var(--ink-2); padding: 4px 10px; font: inherit; cursor: pointer; }
+.toggle button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.toggle button:focus-visible { outline: 2px solid var(--s1); outline-offset: -2px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+th { font-weight: 500; color: var(--ink-2); font-size: 12px; white-space: nowrap; }
+td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.mono { font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+.tblwrap { overflow-x: auto; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.chips button { border: 1px solid var(--ring); background: transparent; color: var(--ink-2); border-radius: 999px; padding: 3px 11px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.chips button[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.findings { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.findings li { background: var(--surface); border: 1px solid var(--ring); border-radius: 6px; padding: 10px 14px 10px 12px; border-left: 4px solid var(--axis); }
+.findings li.critical { border-left-color: var(--critical); }
+.findings li.serious { border-left-color: var(--serious); }
+.findings li.warn { border-left-color: var(--warn); }
+.findings li.note { border-left-color: var(--s1); }
+.findings b { font-weight: 600; }
+.findings .at { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-left: 6px; }
+#tip { position: fixed; pointer-events: none; z-index: 10; background: var(--ink); color: var(--surface); font-size: 12px; line-height: 1.4; padding: 7px 9px; border-radius: 5px; max-width: 320px; box-shadow: 0 4px 14px rgba(0,0,0,0.18); font-family: var(--mono); white-space: pre-line; }
+#tip[hidden] { display: none; }
+.ramp { height: 8px; border-radius: 3px; flex: 0 0 120px; }
+.small { font-size: 12.5px; color: var(--muted); }
+details summary { cursor: pointer; color: var(--ink-2); font-size: 13.5px; }
+section > details > summary { list-style: none; display: flex; align-items: baseline; gap: 10px; }
+section > details > summary::-webkit-details-marker { display: none; }
+section > details > summary::before { content: '▸'; color: var(--muted); }
+section > details[open] > summary::before { content: '▾'; }
+footer { color: var(--muted); font-size: 12.5px; max-width: 80ch; }
+.occ { display: inline-flex; height: 12px; width: 120px; border-radius: 2px; overflow: hidden; vertical-align: middle; }
+.occ i { flex: 1; display: block; }
+.strip { position: relative; display: flex; height: 22px; min-width: 460px; border-radius: 3px; overflow: hidden; }
+.strip i { flex: 1; display: block; }
+.strip .mean { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); }
+.strip .mean::after { content: ""; position: absolute; left: -3px; top: -1px; border: 4px solid transparent; border-top-color: var(--ink); }
+.striplab { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 2px; }
+th[data-def] { cursor: help; text-decoration: underline dotted var(--axis); text-underline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="tip" hidden></div>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow" id="eyebrow"></div>
+  <h1 id="title"></h1>
+  <p class="sub" id="subtitle"></p>
+  <div class="tiles" id="tiles"></div>
+</header>
+
+<section>
+  <h2>What happened</h2>
+  <p class="read">Read top to bottom: the hardware story of the test, with the hour it happened. Every claim is visible in a chart below.</p>
+  <ul class="findings" id="findings"></ul>
+</section>
+
+<section>
+  <h2>Timeline</h2>
+  <p class="read">Throughput per 640 s bucket with the replay runs behind it, calibration runs as ticks, and the recorded bad events beneath. Hover any bar or tick for the wall-clock time.</p>
+  <div class="card">
+    <h3>Cycles per hour <span class="hint">bars: closed cycles in each bucket, scaled to an hour · bands: replay runs, labelled recording × speed · ticks: calibrations</span></h3>
+    <div id="throughput"></div>
+  </div>
+  <div class="card">
+    <h3>Bad events <span class="hint">one tick per event · hatched: after the log filled up · fingertip live↔zero flips are left out, see Fingertip force</span></h3>
+    <div class="legend">
+      <span><i class="sw box" style="background:var(--critical)"></i>motor fault (latched by the motor)</span>
+      <span><i class="sw box" style="background:var(--serious)"></i>torque switched off</span>
+      <span><i class="sw box" style="background:var(--warn)"></i>tactile link down (USB device gone)</span>
+    </div>
+    <div id="eventlanes"></div>
+  </div>
+</section>
+
+<section id="sec-pose">
+  <h2>Pose repeatability</h2>
+  <p class="read">Each cycle holds the hand at two waypoints. Per bucket, the median angle at the higher hold and at the lower hold, from the samples CSV. A flat line means the joint returns to the same place cycle after cycle. A step means a different recording was replayed (thin vertical lines). The two lines meeting means the joint stopped moving. Dashed lines are the configured range of motion. The console numbers the waypoints as legs 0 and 1 in recording order, which flips between recordings, so the holds are sorted by angle instead.</p>
+  <div class="legend">
+    <span><i class="sw" style="background:var(--s1)"></i>higher hold</span>
+    <span><i class="sw" style="background:var(--s2)"></i>lower hold</span>
+    <span><i class="sw dash"></i>range of motion</span>
+    <span><i class="sw" style="background:var(--axis); height:1px"></i>recording changed</span>
+  </div>
+  <div class="grid" id="pose"></div>
+</section>
+
+<section>
+  <h2>Motor current</h2>
+  <p class="read">Holding current is what each motor draws while the hand sits still at a waypoint, in current-based position control: the torque needed to keep the joint at its target against tendon tension, friction and the opposing tendon. Averaged per bucket, darker is more current.<span id="maxcur"></span></p>
+  <div class="card">
+    <h3>Holding current, |mA| <span class="toggle" role="group" aria-label="current statistic"><button id="cur-mean" aria-pressed="true">mean</button><button id="cur-peak" aria-pressed="false">peak</button></span>
+      <span class="hint" style="display:inline-flex;align-items:center;gap:8px">0 <i class="ramp" id="ramp"></i> <span id="rampmax"></span></span></h3>
+    <div id="heat"></div>
+  </div>
+  <div class="card">
+    <h3>Drift in holding current <span class="hint">hover a column header for its definition</span></h3>
+    <p class="small" style="margin:0 0 10px;max-width:80ch">If the same pose needs more current over time, something got stiffer or tighter (friction, a shortened tendon, heat). If it needs less, tension has gone (a stretched, slipped or broken tendon). The console’s own definition compares the last bucket with the first hour of the test, but those replayed different recordings, so part of that number is a pose change. The “within final run” columns compare inside the last long replay, where the pose was constant.</p>
+    <div class="tblwrap" id="drift"></div>
+  </div>
+</section>
+
+<section id="sec-cp">
+  <h2>Calibration checkpoints</h2>
+  <p class="read">Every calibration during the test measures how far each motor turns between the two hardstops. The cell shows the deviation from the joint’s travel baseline (<span id="basesrc"></span>). Small numbers are normal wear or a stale baseline; hundreds of percent mean a tendon slipped or broke.</p>
+  <div class="card">
+    <h3>Motor travel vs. baseline, % <span class="hint" style="display:inline-flex;align-items:center;gap:8px">−50 % <i class="ramp" id="ramp2"></i> +50 % · values beyond the ramp are bold</span></h3>
+    <div id="checkpoints"></div>
+    <details style="margin-top:10px"><summary>Problems the console reported at each checkpoint</summary><div id="cpproblems" style="margin-top:8px"></div></details>
+  </div>
+</section>
+
+<section id="sec-force">
+  <h2>Fingertip force</h2>
+  <p class="read">Resultant force per fingertip sensor, mean and peak per bucket, for the whole test. Zero is the normal reading for a fingertip that touches nothing, so the strips below only distinguish buckets in which the sensor read any force at all from buckets where it was all zero or returned no reading.</p>
+  <div class="legend">
+    <span><i class="sw" style="background:var(--s1)"></i>mean</span>
+    <span><i class="sw box" style="background:var(--s1);opacity:.28"></i>peak</span>
+  </div>
+  <div class="grid" id="force"></div>
+  <div class="card" style="margin-top:12px">
+    <h3>Sensor reading state <span class="hint" id="rshint"></span></h3>
+    <div class="legend">
+      <span><i class="sw box" style="background:var(--s1)"></i>read force</span>
+      <span><i class="sw box" style="background:var(--grid)"></i>all zero</span>
+      <span><i class="sw box" style="background:var(--critical)"></i>no reading</span>
+    </div>
+    <div id="readstate"></div>
+  </div>
+</section>
+
+<section id="sec-usage">
+  <h2>Joint usage</h2>
+  <p class="read" id="usageread"></p>
+  <div class="card"><div class="tblwrap" id="usage"></div></div>
+  <details style="margin-top:12px">
+    <summary>Where each joint spent its time, and how far its extremes sit from its mean angle</summary>
+    <div class="card" style="margin-top:8px"><div class="tblwrap" id="usage2"></div></div>
+  </details>
+</section>
+
+<section id="sec-hist">
+  <details>
+  <summary><h2 style="display:inline">Calibrations</h2> <span class="small" id="histcount"></span></summary>
+  <p class="read" style="margin-top:8px">All calibration runs in the history file, including runs from before the test. Warnings are travel outside the baseline; errors are joints that never settled or motors with a latched fault.</p>
+  <div class="card"><div class="tblwrap" id="history"></div></div>
+  </details>
+</section>
+
+<section>
+  <details>
+  <summary><h2 style="display:inline">Event log</h2> <span class="small" id="evcount"></span></summary>
+  <p class="read" style="margin-top:8px" id="evread">Every recorded event except the fingertip live↔zero flips.</p>
+  <div class="card">
+    <div class="chips" id="chips"></div>
+    <div class="tblwrap" id="events"></div>
+  </div>
+  </details>
+</section>
+
+<footer id="foot"></footer>
+</div>
+
+<script>
+const D = /*__DATA__*/;
+(function () {
+const M = D.meta;
+const T0 = new Date(M.started_at);
+const H = 3600;
+const $ = (s) => document.querySelector(s);
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs = {}, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) if (attrs[k] !== undefined && attrs[k] !== null) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function text(parent, x, y, s, attrs = {}) { const t = el('text', Object.assign({ x, y }, attrs), parent); t.textContent = s; return t; }
+const fmt = (n, d = 0) => n == null ? '—' : Number(n).toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d });
+const hrs = (s) => (s / H).toFixed(1) + ' h';
+const wall = (s) => new Date(T0.getTime() + s * 1000).toLocaleString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+const wallShort = (iso) => new Date(iso).toLocaleString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const nice = (j) => j.replace('_', ' ').replace(/\b(cmc|abd|mcp|dip|pip)\b/g, (m) => m.toUpperCase());
+const motorOf = {}; for (const m in D.motor_joint) motorOf[D.motor_joint[m]] = +m;
+
+// ---- tooltip ------------------------------------------------------------
+const tip = $('#tip');
+function showTip(ev, s) { tip.textContent = s; tip.hidden = false; moveTip(ev); }
+function moveTip(ev) {
+  const pad = 12, w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = ev.clientX + pad, y = ev.clientY + pad;
+  if (x + w > innerWidth - 8) x = ev.clientX - w - pad;
+  if (y + h > innerHeight - 8) y = ev.clientY - h - pad;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+}
+function hideTip() { tip.hidden = true; }
+function hover(node, fn) {
+  node.addEventListener('mouseenter', (e) => showTip(e, fn(e)));
+  node.addEventListener('mousemove', (e) => { tip.textContent = fn(e); moveTip(e); });
+  node.addEventListener('mouseleave', hideTip);
+}
+
+// ---- colour helpers -----------------------------------------------------
+function hex2rgb(h) { h = h.replace('#', ''); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); }
+function mix(a, b, t) { const A = hex2rgb(a), B = hex2rgb(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',')})`; }
+const SEQ_LIGHT = ['#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#1c5cab', '#104281', '#0d366b'];
+function seq(t) { // 0..1 -> sequential blue; dark mode reverses lightness so "more" stays darker-on-light / brighter-on-dark
+  t = Math.max(0, Math.min(1, t));
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme !== 'light' || document.documentElement.dataset.theme === 'dark';
+  const ramp = dark ? SEQ_LIGHT.slice().reverse() : SEQ_LIGHT;
+  const i = Math.min(ramp.length - 2, Math.floor(t * (ramp.length - 1)));
+  return mix(ramp[i], ramp[i + 1], t * (ramp.length - 1) - i);
+}
+function div(t) { // -1..1 -> blue..gray..red
+  const neg = css('--div-neg'), mid = css('--div-mid'), pos = css('--div-pos');
+  t = Math.max(-1, Math.min(1, t));
+  return t < 0 ? mix(mid, neg, -t) : mix(mid, pos, t);
+}
+$('#ramp').style.background = `linear-gradient(90deg, ${[0, .25, .5, .75, 1].map(seq).join(',')})`;
+$('#ramp2').style.background = `linear-gradient(90deg, ${[-1, -.5, 0, .5, 1].map(div).join(',')})`;
+
+// ---- header -------------------------------------------------------------
+const elapsed = M.elapsed_s;
+$('#eyebrow').textContent = `ORCA hand${M.hand ? ' · ' + M.hand : ''} · endurance test ${M.id}${M.active ? ' · still running' : ''}`;
+document.title = `Endurance ${M.label}`;
+$('#title').textContent = `Endurance test “${M.label}”`;
+$('#subtitle').textContent = `${wallShort(M.started_at)} to ${wallShort(M.ended_at)} · ${M.runs} runs · ${D.buckets.t0.length} buckets of ${M.bucket_s} s · ${M.checkpoints} calibration checkpoints`;
+$('#maxcur').textContent = M.max_current ? ` The hand’s limit is ${M.max_current} mA.` : '';
+$('#basesrc').textContent = M.baseline_source;
+const tiles = [
+  ['Duration', (elapsed / H).toFixed(1), 'h'],
+  ['Closed cycles', fmt(M.cycles), ''],
+  ['Holds sampled', fmt(M.samples), ''],
+  ['Replay runs', D.runs.filter((r) => r.kind === 'replay').length, `of ${M.runs}`],
+  ['Calibrations', M.checkpoints, ''],
+  ['Bad events logged', fmt(M.events_bad), `of ${fmt(M.events_kept)} kept`],
+];
+$('#tiles').innerHTML = tiles.map(([l, v, u]) => `<div class="tile"><div class="label">${l}</div><div class="value">${v}${u ? `<small>${u}</small>` : ''}</div></div>`).join('');
+
+// ---- shared time scale --------------------------------------------------
+const margin = { l: 52, r: 14, t: 22, b: 26 };
+function width(container) { return Math.max(320, container.clientWidth); }
+function xScale(W) { const pw = W - margin.l - margin.r; return (s) => margin.l + (s / elapsed) * pw; }
+function timeAxis(svg, x, y, W, withDays = true) {
+  const step = W < 600 ? 12 * H : 6 * H;
+  for (let s = 0; s <= elapsed; s += step) {
+    el('line', { x1: x(s), x2: x(s), y1: y, y2: y + 4, stroke: css('--axis') }, svg);
+    text(svg, x(s), y + 15, (s / H) + ' h', { 'text-anchor': 'middle' });
+  }
+  if (!withDays) return;
+  // midnight lines with date labels
+  const d = new Date(T0); d.setHours(24, 0, 0, 0);
+  for (; (d - T0) / 1000 < elapsed; d.setDate(d.getDate() + 1)) {
+    const s = (d - T0) / 1000;
+    el('line', { x1: x(s), x2: x(s), y1: margin.t - 6, y2: y, stroke: css('--grid'), 'stroke-dasharray': '2 3' }, svg);
+    text(svg, x(s) + 4, margin.t - 8, d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' }), { class: 'lab' });
+  }
+}
+function yTicks(svg, y, x0, x1, ticks, fmtT) {
+  for (const v of ticks) {
+    el('line', { x1: x0, x2: x1, y1: y(v), y2: y(v), stroke: css('--grid') }, svg);
+    text(svg, x0 - 6, y(v) + 4, fmtT(v), { 'text-anchor': 'end' });
+  }
+}
+const Bk = D.buckets, NB = Bk.t0.length;
+
+// recording boundaries: replay runs whose name differs from the previous replay
+const replays = D.runs.filter((r) => r.kind === 'replay' && r.t1);
+const recChanges = [];
+for (let i = 1; i < replays.length; i++) if (replays[i].name !== replays[i - 1].name) recChanges.push(replays[i].t);
+
+// ---- throughput ---------------------------------------------------------
+function drawThroughput() {
+  const box = $('#throughput'); box.innerHTML = '';
+  const W = width(box), Hh = 230;
+  const svg = el('svg', { viewBox: `0 0 ${W} ${Hh}`, width: W, height: Hh }, box);
+  const x = xScale(W), plotY0 = margin.t + 10, plotY1 = Hh - margin.b;
+  const rate = Bk.t0.map((t0, i) => (Bk.c1[i] - Bk.c0[i]) / (Bk.t1[i] - t0) * H);
+  const ymax = Math.ceil(Math.max(...rate) / 500) * 500;
+  const y = (v) => plotY1 - (v / ymax) * (plotY1 - plotY0);
+  // run bands
+  replays.forEach((r, i) => {
+    const x0 = x(r.t), x1 = x(r.t1);
+    const g = el('g', {}, svg);
+    el('rect', { x: x0, y: plotY0 - 4, width: Math.max(1, x1 - x0), height: plotY1 - plotY0 + 4, fill: css('--band'), opacity: i % 2 ? 0.55 : 1 }, g);
+    if (x1 - x0 > 64) text(g, x0 + 4, plotY0 + 8, `${r.name} ×${r.speed}`, { class: 'lab' });
+    hover(g, () => `replay “${r.name}” ×${r.speed}\n${wall(r.t)} → ${wall(r.t1)}\n${hrs(r.t1 - r.t)} · ${fmt(r.cycles)} cycles`);
+  });
+  yTicks(svg, y, margin.l, W - margin.r, [0, ymax / 2, ymax], (v) => fmt(v));
+  text(svg, margin.l - 6, plotY0 - 8, 'cycles / h', { 'text-anchor': 'end', class: 'lab' });
+  // bars
+  const gap = 1;
+  for (let i = 0; i < NB; i++) {
+    if (!(rate[i] > 0)) continue;
+    const x0 = x(Bk.t0[i]), x1 = x(Bk.t1[i]);
+    const r = el('rect', { x: x0 + gap / 2, y: y(rate[i]), width: Math.max(0.8, x1 - x0 - gap), height: plotY1 - y(rate[i]), fill: css('--s1'), rx: 1 }, svg);
+    hover(r, () => `${wall(Bk.t0[i])} · ${hrs(Bk.t0[i])}\n${fmt(rate[i])} cycles/h\ncycles ${fmt(Bk.c0[i])} → ${fmt(Bk.c1[i])}\n${fmt(Bk.n[i])} holds`);
+  }
+  // calibration ticks
+  D.runs.filter((r) => r.kind === 'calibrate').forEach((r) => {
+    const cx = x(r.t);
+    const p = el('path', { d: `M${cx - 4},${plotY0 - 14} L${cx + 4},${plotY0 - 14} L${cx},${plotY0 - 7} Z`, fill: css('--ink-2') }, svg);
+    el('rect', { x: cx - 6, y: plotY0 - 18, width: 12, height: 14, fill: 'transparent' }, svg);
+    hover(p, () => `calibration\n${wall(r.t)} · ${hrs(r.t)}\n${((r.t1 || r.t) - r.t).toFixed(0)} s`);
+  });
+  el('line', { x1: margin.l, x2: W - margin.r, y1: plotY1, y2: plotY1, stroke: css('--axis') }, svg);
+  timeAxis(svg, x, plotY1, W);
+}
+
+// ---- event lanes --------------------------------------------------------
+function drawEventLanes() {
+  const box = $('#eventlanes'); box.innerHTML = '';
+  const W = width(box), laneH = 22, lanes = ['motor fault', 'torque off', 'tactile link'];
+  const Hh = 8 + lanes.length * laneH + margin.b;
+  const svg = el('svg', { viewBox: `0 0 ${W} ${Hh}`, width: W, height: Hh }, box);
+  const x = xScale(W);
+  const colors = [css('--critical'), css('--serious'), css('--warn'), css('--muted')];
+  // hatched "log full" region
+  const defs = el('defs', {}, svg);
+  const pat = el('pattern', { id: 'hatch', width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
+  el('line', { x1: 0, y1: 0, x2: 0, y2: 6, stroke: css('--axis'), 'stroke-width': 1 }, pat);
+  const yTop = 4, yBot = 8 + lanes.length * laneH;
+  if (M.events_dropped > 0) {
+    el('rect', { x: x(M.last_event_t), y: yTop, width: x(elapsed) - x(M.last_event_t), height: yBot - yTop, fill: 'url(#hatch)', opacity: 0.6 }, svg);
+    text(svg, x(M.last_event_t) + 6, yTop + 12, `event log full at ${hrs(M.last_event_t)} · ${fmt(M.events_dropped)} events dropped`, { class: 'lab' });
+  }
+  lanes.forEach((name, li) => {
+    const y0 = 8 + li * laneH;
+    text(svg, margin.l - 6, y0 + laneH / 2 + 4, name, { 'text-anchor': 'end', class: 'lab' });
+    el('line', { x1: margin.l, x2: W - margin.r, y1: y0 + laneH, y2: y0 + laneH, stroke: css('--grid') }, svg);
+  });
+  const laneOf = (e) => e.kind === 'fault' ? 0 : e.kind === 'torque' ? 1 : e.kind === 'link' ? 2 : -1;
+  D.events.filter((e) => e.severity === 'bad' && laneOf(e) >= 0).forEach((e) => {
+    const li = laneOf(e), y0 = 8 + li * laneH;
+    const g = el('g', {}, svg);
+    el('line', { x1: x(e.t), x2: x(e.t), y1: y0 + 4, y2: y0 + laneH - 4, stroke: colors[li], 'stroke-width': 2 }, g);
+    el('rect', { x: x(e.t) - 4, y: y0, width: 8, height: laneH, fill: 'transparent' }, g);
+    hover(g, () => `${e.subject}\n${e.detail}\n${wall(e.t)} · ${hrs(e.t)} · cycle ${fmt(e.cycle)}`);
+  });
+  timeAxis(svg, x, yBot, W, false);
+}
+
+// ---- pose small multiples -----------------------------------------------
+function linePath(x, y, xs, ys) {
+  let d = '', pen = false;
+  for (let i = 0; i < xs.length; i++) {
+    if (ys[i] == null) { pen = false; continue; }
+    d += (pen ? 'L' : 'M') + x(xs[i]).toFixed(1) + ',' + y(ys[i]).toFixed(1); pen = true;
+  }
+  return d;
+}
+function drawPose() {
+  $('#sec-pose').hidden = !D.pose;
+  if (!D.pose) return;
+  const box = $('#pose'); box.innerHTML = '';
+  const mids = Bk.t0.map((t0, i) => (t0 + Bk.t1[i]) / 2);
+  D.joints.forEach((j) => {
+    const card = document.createElement('div'); card.className = 'sm'; box.appendChild(card);
+    const rom = D.roms[j] || [-90, 90];
+    card.innerHTML = `<h4><span>${nice(j)} <span class="rom">M${motorOf[j]}</span></span><span class="rom">${rom[0]}° … ${rom[1]}°</span></h4>`;
+    const W = width(card), Hh = 118, m = { l: 34, r: 34, t: 6, b: 18 };
+    const svg = el('svg', { viewBox: `0 0 ${W} ${Hh}`, width: W, height: Hh }, card);
+    const x = (s) => m.l + (s / elapsed) * (W - m.l - m.r);
+    const vals = [...D.pose.upper[j], ...D.pose.lower[j]].filter((v) => v != null);
+    let lo = Math.min(rom[0], ...vals), hi = Math.max(rom[1], ...vals);
+    const pad = (hi - lo) * 0.06; lo -= pad; hi += pad;
+    const y = (v) => m.t + (1 - (v - lo) / (hi - lo)) * (Hh - m.t - m.b);
+    // ROM dashed
+    for (const v of rom) el('line', { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), stroke: css('--axis'), 'stroke-dasharray': '3 3' }, svg);
+    text(svg, m.l - 4, y(rom[1]) + 4, rom[1] + '°', { 'text-anchor': 'end' });
+    text(svg, m.l - 4, y(rom[0]) + 4, rom[0] + '°', { 'text-anchor': 'end' });
+    // recording changes
+    recChanges.forEach((t) => el('line', { x1: x(t), x2: x(t), y1: m.t, y2: Hh - m.b, stroke: css('--axis') }, svg));
+    el('line', { x1: m.l, x2: W - m.r, y1: Hh - m.b, y2: Hh - m.b, stroke: css('--axis') }, svg);
+    for (let s = 0; s <= elapsed; s += 24 * H) text(svg, x(s), Hh - 4, (s / H) + ' h', { 'text-anchor': s ? 'middle' : 'start' });
+    const series = [['lower', css('--s2')], ['upper', css('--s1')]];
+    series.forEach(([k, c]) => {
+      el('path', { d: linePath(x, y, mids, D.pose[k][j]), fill: 'none', stroke: c, 'stroke-width': 1.6, 'stroke-linejoin': 'round' }, svg);
+      const arr = D.pose[k][j]; let li = arr.length - 1; while (li >= 0 && arr[li] == null) li--;
+      if (li >= 0) text(svg, W - m.r + 4, y(arr[li]) + 4, arr[li].toFixed(0) + '°', { fill: css('--ink-2') });
+    });
+    // hover: nearest bucket
+    const hit = el('rect', { x: m.l, y: m.t, width: W - m.l - m.r, height: Hh - m.t - m.b, fill: 'transparent' }, svg);
+    const cursor = el('line', { x1: 0, x2: 0, y1: m.t, y2: Hh - m.b, stroke: css('--ink-2'), 'stroke-width': 1, opacity: 0 }, svg);
+    hit.addEventListener('mousemove', (e) => {
+      const r = svg.getBoundingClientRect();
+      const s = ((e.clientX - r.left) * (W / r.width) - m.l) / (W - m.l - m.r) * elapsed;
+      let i = Math.round(s / M.bucket_s); i = Math.max(0, Math.min(NB - 1, Bk.t0.findIndex((t0, k) => s < Bk.t1[k]) ));
+      if (i < 0) i = NB - 1;
+      cursor.setAttribute('x1', x(mids[i])); cursor.setAttribute('x2', x(mids[i])); cursor.setAttribute('opacity', 1);
+      const u = D.pose.upper[j][i], l = D.pose.lower[j][i];
+      showTip(e, `${nice(j)} · ${wall(Bk.t0[i])} · ${hrs(Bk.t0[i])}\nhigher hold ${u == null ? '—' : u.toFixed(1) + '°'}   lower hold ${l == null ? '—' : l.toFixed(1) + '°'}\nrange in bucket ${Bk.angle_min[j][i] ?? '—'}° … ${Bk.angle_max[j][i] ?? '—'}°`);
+    });
+    hit.addEventListener('mouseleave', () => { cursor.setAttribute('opacity', 0); hideTip(); });
+  });
+}
+
+// ---- current heatmap ----------------------------------------------------
+let curMode = 'mean';
+function drawHeat() {
+  const box = $('#heat'); box.innerHTML = '';
+  const W = width(box), rowH = 18, ml = 118;
+  const rows = D.joints.map((j) => motorOf[j]);
+  const Hh = margin.t + rows.length * rowH + margin.b;
+  const svg = el('svg', { viewBox: `0 0 ${W} ${Hh}`, width: W, height: Hh }, box);
+  const x = (s) => ml + (s / elapsed) * (W - ml - margin.r);
+  const src = curMode === 'mean' ? Bk.cur_mean : Bk.cur_peak;
+  const peakMax = Math.max(1, ...D.motors.flatMap((m) => (Bk.cur_peak[m] || []).filter((v) => v != null).map(Math.abs)));
+  const vmax = curMode === 'mean' ? 150 : (M.max_current || Math.ceil(peakMax / 100) * 100);
+  $('#rampmax').textContent = `${vmax} mA`;
+  rows.forEach((m, ri) => {
+    const y0 = margin.t + ri * rowH;
+    text(svg, ml - 6, y0 + rowH / 2 + 4, `M${m} ${nice(D.motor_joint[m])}`, { 'text-anchor': 'end', class: 'lab' });
+    const arr = src[m] || [];
+    for (let i = 0; i < NB; i++) {
+      if (arr[i] == null) continue;
+      const v = Math.abs(arr[i]);
+      const r = el('rect', { x: x(Bk.t0[i]), y: y0 + 1, width: Math.max(1, x(Bk.t1[i]) - x(Bk.t0[i]) + 0.3), height: rowH - 2, fill: seq(v / vmax) }, svg);
+      hover(r, () => `M${m} · ${nice(D.motor_joint[m])}\n${wall(Bk.t0[i])} · ${hrs(Bk.t0[i])}\nmean ${fmt(Bk.cur_mean[m][i], 1)} mA · peak ${fmt(Bk.cur_peak[m][i], 1)} mA\n${fmt(Bk.n[i])} holds`);
+    }
+  });
+  const yb = margin.t + rows.length * rowH;
+  recChanges.forEach((t) => el('line', { x1: x(t), x2: x(t), y1: margin.t, y2: yb, stroke: css('--surface'), 'stroke-width': 1.5 }, svg));
+  timeAxis(svg, x, yb, W);
+}
+$('#cur-mean').onclick = () => { curMode = 'mean'; $('#cur-mean').setAttribute('aria-pressed', 'true'); $('#cur-peak').setAttribute('aria-pressed', 'false'); drawHeat(); };
+$('#cur-peak').onclick = () => { curMode = 'peak'; $('#cur-peak').setAttribute('aria-pressed', 'true'); $('#cur-mean').setAttribute('aria-pressed', 'false'); drawHeat(); };
+
+function defineHeaders(root) {
+  root.querySelectorAll('th[data-def]').forEach((th) => hover(th, () => th.dataset.def));
+}
+function weightedMean(arr, from, to) {
+  let tot = 0, w = 0;
+  for (let i = 0; i < NB; i++) if (Bk.t0[i] >= from && Bk.t0[i] < to && arr[i] != null) { tot += arr[i] * Bk.n[i]; w += Bk.n[i]; }
+  return w ? tot / w : null;
+}
+function lastValue(arr, before) {
+  let li = -1;
+  for (let i = 0; i < NB; i++) if (arr[i] != null && Bk.t1[i] <= before + M.bucket_s) li = i;
+  return li >= 0 ? arr[li] : null;
+}
+function pctChange(base, now) { return base != null && Math.abs(base) >= 1 && now != null ? (now - base) / Math.abs(base) * 100 : null; }
+function drawDrift() {
+  const finalRun = replays.filter((r) => r.t1 - r.t >= 2 * H).slice(-1)[0];
+  const rows = D.joints.map((j) => {
+    const m = motorOf[j], arr = Bk.cur_mean[m];
+    const base = weightedMean(arr, 0, H), now = lastValue(arr, elapsed);
+    const base2 = finalRun ? weightedMean(arr, finalRun.t, finalRun.t + H) : null;
+    const now2 = finalRun ? lastValue(arr, finalRun.t1) : null;
+    const peak = Math.max(...(Bk.cur_peak[m] || []).filter((v) => v != null).map(Math.abs));
+    return { j, m, base, now, pct: pctChange(base, now), base2, now2, pct2: pctChange(base2, now2), peak };
+  });
+  const fr = finalRun ? `“${finalRun.name}” ×${finalRun.speed}, ${hrs(finalRun.t)} to ${hrs(finalRun.t1)}` : 'none';
+  const pc = (v) => v == null ? '—' : (v > 0 ? '+' : '') + fmt(v, 0) + ' %';
+  $('#drift').innerHTML = `<table><thead><tr>
+    <th>Motor</th><th>Joint</th>
+    <th class="num" data-def="Mean signed holding current over all holds in the first hour of the test (replay “test” ×4). The console’s baseline.">First hour, mA</th>
+    <th class="num" data-def="Mean signed holding current in the last bucket of the test (replay “test4” ×8).">Last bucket, mA</th>
+    <th class="num" data-def="Last bucket relative to the first hour, as the console reports it. Only shown when the baseline is at least 1 mA. Includes the pose change between recordings.">Change, console</th>
+    <th class="num" data-def="Mean signed holding current over the first hour of the final long run: ${fr}.">Final run, first hour</th>
+    <th class="num" data-def="Mean signed holding current in the last bucket of that same run.">Final run, last bucket</th>
+    <th class="num" data-def="Change within the final run, same pose throughout. This is the cleaner drift number.">Change within final run</th>
+    <th class="num" data-def="Largest holding current seen in any hold of the test, either sign.${M.max_current ? ' The configured limit is ' + M.max_current + ' mA.' : ''}">Peak in test, mA</th>
+  </tr></thead><tbody>` +
+    rows.map((r) => `<tr><td class="mono">M${r.m}</td><td>${nice(r.j)}</td><td class="num">${fmt(r.base, 1)}</td><td class="num">${fmt(r.now, 1)}</td><td class="num">${pc(r.pct)}</td><td class="num">${fmt(r.base2, 1)}</td><td class="num">${fmt(r.now2, 1)}</td><td class="num">${pc(r.pct2)}</td><td class="num">${fmt(r.peak, 0)}</td></tr>`).join('') + '</tbody></table>';
+  defineHeaders($('#drift'));
+}
+
+// ---- checkpoints heatmap ------------------------------------------------
+function drawCheckpoints() {
+  $('#sec-cp').hidden = !D.checkpoints.length;
+  if (!D.checkpoints.length) return;
+  const box = $('#checkpoints'); box.innerHTML = '';
+  const cps = D.checkpoints, W = width(box), ml = 104, rowH = 22, mt = 40;
+  const colW = (W - ml - margin.r) / cps.length;
+  const Hh = mt + D.joints.length * rowH + 6;
+  const svg = el('svg', { viewBox: `0 0 ${W} ${Hh}`, width: W, height: Hh }, box);
+  cps.forEach((c, ci) => {
+    const cx = ml + ci * colW + colW / 2;
+    text(svg, cx, 14, hrs(c.t), { 'text-anchor': 'middle', class: 'lab' });
+    text(svg, cx, 28, new Date(T0.getTime() + c.t * 1000).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' }), { 'text-anchor': 'middle' });
+  });
+  D.joints.forEach((j, ri) => {
+    const y0 = mt + ri * rowH;
+    text(svg, ml - 6, y0 + rowH / 2 + 4, nice(j), { 'text-anchor': 'end', class: 'lab' });
+    const base = D.baseline_travel[j];
+    cps.forEach((c, ci) => {
+      const tr = c.travel[j];
+      const x0 = ml + ci * colW;
+      const g = el('g', {}, svg);
+      if (tr == null || !base) {
+        el('rect', { x: x0 + 1, y: y0 + 1, width: colW - 2, height: rowH - 2, fill: 'none', stroke: css('--grid') }, g);
+        text(g, x0 + colW / 2, y0 + rowH / 2 + 4, 'skipped', { 'text-anchor': 'middle' });
+        hover(g, () => `${nice(j)} · ${wall(c.t)}\nnot calibrated in this run`);
+        return;
+      }
+      const pct = (tr / base - 1) * 100;
+      el('rect', { x: x0 + 1, y: y0 + 1, width: colW - 2, height: rowH - 2, fill: div(pct / 50), rx: 2 }, g);
+      const strong = Math.abs(pct) > 50;
+      const label = (pct > 0 ? '+' : '') + (Math.abs(pct) >= 100 ? fmt(pct, 0) : fmt(pct, 0));
+      text(g, x0 + colW / 2, y0 + rowH / 2 + 4, label, { 'text-anchor': 'middle', fill: Math.abs(pct) > 30 ? '#ffffff' : css('--ink-2'), 'font-weight': strong ? 600 : 400 });
+      const probs = c.problems.filter((p) => p.includes(j));
+      hover(g, () => `${nice(j)} · ${wall(c.t)} · cycle ${fmt(c.cycle)}\ntravel ${tr.toFixed(1)}° vs baseline ${base}° (${label} %)` + (probs.length ? '\n' + probs.join('\n') : ''));
+    });
+  });
+  $('#cpproblems').innerHTML = cps.map((c) => `<div style="margin-bottom:8px"><span class="mono small">${wall(c.t)} · ${hrs(c.t)} · cycle ${fmt(c.cycle)}</span>${c.problems.length ? '<ul style="margin:2px 0 0 18px;padding:0;font-size:13px">' + c.problems.map((p) => `<li>${p}</li>`).join('') + '</ul>' : ' <span class="small">no problems</span>'}</div>`).join('');
+}
+
+// ---- force ---------------------------------------------------------------
+function drawForce() {
+  $('#sec-force').hidden = !D.fingers.length;
+  if (!D.fingers.length) return;
+  const box = $('#force'); box.innerHTML = '';
+  const mids = Bk.t0.map((t0, i) => (t0 + Bk.t1[i]) / 2);
+  const allMax = Math.max(...D.fingers.flatMap((f) => Bk.force_max[f].filter((v) => v != null)));
+  D.fingers.forEach((f) => {
+    const card = document.createElement('div'); card.className = 'sm'; box.appendChild(card);
+    card.innerHTML = `<h4><span>${f} fingertip</span><span class="rom">N</span></h4>`;
+    const W = width(card), Hh = 110, m = { l: 34, r: 10, t: 6, b: 18 };
+    const svg = el('svg', { viewBox: `0 0 ${W} ${Hh}`, width: W, height: Hh }, card);
+    const x = (s) => m.l + (s / elapsed) * (W - m.l - m.r);
+    const ymax = Math.ceil(allMax);
+    const y = (v) => m.t + (1 - v / ymax) * (Hh - m.t - m.b);
+    yTicks(svg, y, m.l, W - m.r, [0, ymax / 2, ymax], (v) => v.toFixed(0));
+    // peak area
+    let d = '', pen = false, lastX = null;
+    const mx = Bk.force_max[f];
+    for (let i = 0; i < NB; i++) {
+      if (mx[i] == null) { if (pen) { d += `L${lastX},${y(0)}Z`; pen = false; } continue; }
+      if (!pen) { d += `M${x(Bk.t0[i]).toFixed(1)},${y(0)}`; pen = true; }
+      d += `L${x(mids[i]).toFixed(1)},${y(mx[i]).toFixed(1)}`; lastX = x(Bk.t1[i]).toFixed(1);
+    }
+    if (pen) d += `L${lastX},${y(0)}Z`;
+    el('path', { d, fill: css('--s1'), opacity: 0.28 }, svg);
+    el('path', { d: linePath(x, y, mids, Bk.force_mean[f]), fill: 'none', stroke: css('--s1'), 'stroke-width': 1.5 }, svg);
+    el('line', { x1: m.l, x2: W - m.r, y1: Hh - m.b, y2: Hh - m.b, stroke: css('--axis') }, svg);
+    for (let s = 0; s <= elapsed; s += 24 * H) text(svg, x(s), Hh - 4, (s / H) + ' h', { 'text-anchor': s ? 'middle' : 'start' });
+    const hit = el('rect', { x: m.l, y: m.t, width: W - m.l - m.r, height: Hh - m.t - m.b, fill: 'transparent' }, svg);
+    hit.addEventListener('mousemove', (e) => {
+      const r = svg.getBoundingClientRect();
+      const s = ((e.clientX - r.left) * (W / r.width) - m.l) / (W - m.l - m.r) * elapsed;
+      let i = Bk.t0.findIndex((t0, k) => s < Bk.t1[k]); if (i < 0) i = NB - 1;
+      showTip(e, `${f} · ${wall(Bk.t0[i])} · ${hrs(Bk.t0[i])}\nmean ${Bk.force_mean[f][i] == null ? '—' : Bk.force_mean[f][i].toFixed(2) + ' N'} · peak ${mx[i] == null ? '—' : mx[i].toFixed(2) + ' N'}`);
+    });
+    hit.addEventListener('mouseleave', hideTip);
+  });
+  // reading-state strips
+  const rbox = $('#readstate'); rbox.innerHTML = '';
+  $('#rshint').textContent = `per ${M.bucket_s} s bucket · “read force” = peak above ${D.force_min_n} N`;
+  const RW = width(rbox), rowH = 22, ml = 118, Hh = D.fingers.length * rowH + 30;
+  const rsvg = el('svg', { viewBox: `0 0 ${RW} ${Hh}`, width: RW, height: Hh }, rbox);
+  const rx = (s) => ml + (s / elapsed) * (RW - ml - margin.r);
+  const stateColor = [css('--critical'), css('--grid'), css('--s1')], stateName = ['no reading', 'all zero', 'read force'];
+  D.fingers.forEach((f, ri) => {
+    const y0 = ri * rowH, st = D.read_state[f], last = D.last_force_t[f];
+    text(rsvg, ml - 6, y0 + rowH / 2 + 4, `${f}`, { 'text-anchor': 'end', class: 'lab' });
+    for (let i = 0; i < NB; i++) {
+      if (st[i] == null) continue;
+      const r = el('rect', { x: rx(Bk.t0[i]), y: y0 + 3, width: Math.max(1, rx(Bk.t1[i]) - rx(Bk.t0[i]) + 0.3), height: rowH - 6, fill: stateColor[st[i]] }, rsvg);
+      hover(r, () => `${f} · ${wall(Bk.t0[i])} · ${hrs(Bk.t0[i])}\n${stateName[st[i]]}\nmean ${Bk.force_mean[f][i] == null ? '—' : Bk.force_mean[f][i].toFixed(2) + ' N'} · peak ${Bk.force_max[f][i] == null ? '—' : Bk.force_max[f][i].toFixed(2) + ' N'}`);
+    }
+    if (last != null && last < elapsed - M.bucket_s) text(rsvg, rx(last) + 5, y0 + rowH / 2 + 4, `last force ${hrs(last)} · ${wall(last)}`, { class: 'lab', stroke: css('--surface'), 'stroke-width': 4, 'paint-order': 'stroke', 'stroke-linejoin': 'round' });
+  });
+  el('line', { x1: ml, x2: RW - margin.r, y1: D.fingers.length * rowH, y2: D.fingers.length * rowH, stroke: css('--axis') }, rsvg);
+  timeAxis(rsvg, rx, D.fingers.length * rowH, RW, false);
+}
+
+// ---- joint usage tables -------------------------------------------------
+function drawUsage() {
+  $('#sec-usage').hidden = !D.usage;
+  if (!D.usage) return;
+  const s = M.usage_session;
+  $('#usageread').innerHTML = `From the console’s joint-usage session “${s.label}” (${wallShort(s.started_at)} onward), which spans the test. The console only counts a joint while it is actually travelling: a step must exceed the 0.35° encoder deadband, and time is credited only in the second after such a step, so a hand holding a pose accumulates nothing. Hover a column header for its definition.`;
+  const rows = D.joints.map((j) => {
+    const r = Object.assign({ j }, D.usage[j] || {});
+    const rom = r.rom || D.roms[j], hist = r.hist || [], span = (rom[1] - rom[0]) / (hist.length || 1);
+    const tot = hist.reduce((a, b) => a + b, 0);
+    r.mean = tot ? hist.reduce((a, v, i) => a + v * (rom[0] + (i + 0.5) * span), 0) / tot : null;
+    r.romv = rom; r.span = span; r.tot = tot;
+    r.glitchLo = r.min_deg < rom[0] - 30; r.glitchHi = r.max_deg > rom[1] + 30;
+    return r;
+  });
+  $('#usage').innerHTML = `<table><thead><tr>
+    <th>Joint</th><th>Motor</th>
+    <th class="num" data-def="Sum of every accepted encoder step (a step of at least 0.35°) over the session, in millions of degrees.">Travel</th>
+    <th class="num" data-def="Time credited to accepted steps, at most 0.5 s per step. A joint holding still credits nothing.">Moving</th>
+    <th class="num" data-def="Number of times the direction of motion changed between accepted steps. Roughly two per cycle.">Reversals</th>
+    <th class="num" data-def="Largest step size divided by the time since the previous accepted step.">Max speed</th>
+  </tr></thead><tbody>` +
+    rows.map((r) => `<tr><td>${nice(r.j)}</td><td class="mono">M${motorOf[r.j]}</td><td class="num">${(r.travel_deg / 1e6).toFixed(1)} M°</td><td class="num">${(r.moving_s / H).toFixed(1)} h</td><td class="num">${fmt(r.reversals)}</td><td class="num">${fmt(r.max_speed_dps, 0)} °/s</td></tr>`).join('') + '</tbody></table>';
+  defineHeaders($('#usage'));
+
+  const box2 = $('#usage2');
+  box2.innerHTML = `<table><thead><tr>
+    <th>Joint</th>
+    <th class="num" data-def="Time-weighted average angle over the moving seconds, computed from the 24 slices of the range of motion (slice centres).">Mean angle</th>
+    <th class="num" data-def="Smallest angle the encoder ever reported while the joint was moving, shown as its distance below the mean angle. ⚠ marks a value more than 30° outside the range of motion: an encoder glitch, not motion.">Lowest, from mean</th>
+    <th class="num" data-def="Largest angle the encoder ever reported while the joint was moving, shown as its distance above the mean angle. ⚠ marks a value more than 30° outside the range of motion: an encoder glitch, not motion.">Highest, from mean</th>
+    <th data-def="The configured range of motion split into 24 equal slices, left = lower limit, right = upper limit. Darker means more moving seconds spent in that slice. The black tick is the mean angle. Hover a slice for the numbers.">Time across the range of motion</th>
+  </tr></thead><tbody>` +
+    rows.map((r) => {
+      const rom = r.romv, hmax = r.hist.reduce((a, b) => Math.max(a, b), 0) || 1;
+      const bins = r.hist.map((v, bi) => `<i style="background:${seq(v / hmax)}" data-tip="${nice(r.j)} · ${(rom[0] + bi * r.span).toFixed(0)}° to ${(rom[0] + (bi + 1) * r.span).toFixed(0)}°\n${(v / H).toFixed(2)} h · ${(v / (r.tot || 1) * 100).toFixed(1)} % of moving time"></i>`).join('');
+      const meanPos = r.mean == null ? null : Math.max(0, Math.min(100, (r.mean - rom[0]) / (rom[1] - rom[0]) * 100));
+      const lo = r.min_deg - r.mean, hi = r.max_deg - r.mean;
+      return `<tr><td>${nice(r.j)}</td><td class="num">${fmt(r.mean, 0)}°</td><td class="num">${r.glitchLo ? '⚠ ' : ''}${fmt(lo, 0)}°<br><span class="small">(${fmt(r.min_deg, 0)}°)</span></td><td class="num">${r.glitchHi ? '⚠ ' : ''}+${fmt(hi, 0)}°<br><span class="small">(${fmt(r.max_deg, 0)}°)</span></td><td><div class="strip">${bins}${meanPos == null ? '' : `<span class="mean" style="left:calc(${meanPos.toFixed(1)}% - 1px)"></span>`}</div><div class="striplab"><span>${rom[0]}°</span><span>${rom[1]}°</span></div></td></tr>`;
+    }).join('') + '</tbody></table>';
+  defineHeaders(box2);
+  box2.querySelectorAll('.strip i[data-tip]').forEach((i) => hover(i, () => i.dataset.tip));
+}
+
+// ---- calibration history ------------------------------------------------
+function drawHistory() {
+  $('#sec-hist').hidden = !D.history.length;
+  $('#histcount').textContent = `${D.history.length} runs, click to expand`;
+  $('#history').innerHTML = `<table><thead><tr><th>Started</th><th>During test</th><th>Joints</th><th>Result</th><th>Problems</th></tr></thead><tbody>` +
+    D.history.map((h) => {
+      const dur = (new Date(h.finished_at) - new Date(h.started_at)) / 1000;
+      const probs = h.problems.map((p) => `<span class="dot" style="background:${p.severity === 'error' ? css('--critical') : css('--warn')}"></span>${p.headline}`).join('<br>');
+      return `<tr><td class="mono">${wallShort(h.started_at)}<br><span class="small">${dur.toFixed(0)} s${h.force_wrist ? ' · wrist with force' : ''}</span></td><td>${h.in_test ? 'yes' : '<span class="small">before</span>'}</td><td>${h.joints ? `${h.joints.length} of ${D.joints.length}` : 'all'}</td><td>${h.completed ? 'completed' : 'aborted'}</td><td style="font-size:12.5px">${probs || '<span class="small">none</span>'}</td></tr>`;
+    }).join('') + '</tbody></table>';
+}
+
+// ---- event log ----------------------------------------------------------
+let filter = 'all';
+function drawEvents() {
+  $('#evcount').textContent = `${D.events.length} events, click to expand`;
+  if (M.events_dropped > 0) $('#evread').textContent = `Every recorded event except the fingertip live↔zero flips. The log filled up at ${hrs(M.last_event_t)}.`;
+  const kinds = ['all', 'fault', 'torque', 'link', 'operation'];
+  $('#chips').innerHTML = kinds.map((k) => `<button aria-pressed="${filter === k}" data-k="${k}">${k}${k === 'all' ? ` (${D.events.length})` : ` (${D.events.filter((e) => e.kind === k).length})`}</button>`).join('');
+  $('#chips').querySelectorAll('button').forEach((b) => b.onclick = () => { filter = b.dataset.k; drawEvents(); });
+  const rows = D.events.filter((e) => filter === 'all' || e.kind === filter);
+  const sevColor = (e) => e.severity === 'bad' ? css('--critical') : e.severity === 'ok' ? css('--good') : css('--axis');
+  $('#events').innerHTML = `<table><thead><tr><th>Time</th><th class="num">Cycle</th><th>Kind</th><th>Subject</th><th>Detail</th></tr></thead><tbody>` +
+    rows.map((e) => `<tr><td class="mono">${hrs(e.t)}<br><span class="small">${wall(e.t)}</span></td><td class="num">${e.cycle ? fmt(e.cycle) : '—'}</td><td><span class="dot" style="background:${sevColor(e)}"></span>${e.kind}</td><td>${e.subject}</td><td style="font-size:12.5px">${e.detail}</td></tr>`).join('') + '</tbody></table>';
+}
+
+$('#foot').textContent = `Generated ${new Date(M.generated_at).toLocaleString('en-GB')} by endurance-slack from the ORCA console’s endurance record${M.has_csv ? `, its samples CSV (${fmt(M.samples)} holds, pose medians per ${M.bucket_s} s bucket)` : ''}${D.history.length ? ', the calibration history' : ''}${D.usage ? ', the joint-usage stats' : ''}. Times are shown in this browser’s local time zone.`;
+
+function medianOf(a) { const b = a.slice().sort((x, y) => x - y); return b.length ? (b.length % 2 ? b[(b.length - 1) / 2] : (b[b.length / 2 - 1] + b[b.length / 2]) / 2) : null; }
+function findings() {
+  const out = [], base = D.baseline_travel, seen = new Set();
+  D.checkpoints.forEach((c, ci) => D.joints.forEach((j) => {
+    if (seen.has(j)) return;
+    const tr = c.travel[j], b = base[j];
+    const never = c.problems.some((p) => p.startsWith(j + ' never settled'));
+    if ((tr != null && b && tr / b > 2) || never) {
+      seen.add(j);
+      out.push({ cls: 'critical', title: `${nice(j)} tendon likely slipped or broke.`, at: `${hrs(c.t)} · ${wall(c.t)}`,
+        body: never ? `At this calibration ${nice(j)} never settled onto a hardstop.` : `At this calibration the motor swept ${tr.toFixed(0)}° between the hardstops, ${(tr / b).toFixed(1)}× its ${b.toFixed(0)}° baseline (${M.baseline_source}).` });
+    }
+  }));
+  if (D.pose) D.joints.forEach((j) => {
+    const u = D.pose.upper[j], l = D.pose.lower[j];
+    const span = (i) => (u[i] != null && l[i] != null) ? u[i] - l[i] : null;
+    const spans = u.map((_, i) => span(i)).filter((v) => v != null);
+    if (spans.length < 10) return;
+    const typical = medianOf(spans);
+    if (typical < 10) return;
+    let lastMove = -1;
+    for (let i = 0; i < NB; i++) { const sp = span(i); if (sp != null && sp > typical * 0.25) lastMove = i; }
+    const stillAfter = u.map((_, i) => i).filter((i) => i > lastMove && span(i) != null).length;
+    if (lastMove >= 0 && lastMove < NB - 1 && stillAfter >= 3) {
+      const at = u[NB - 1] ?? u[lastMove + 1];
+      out.push({ cls: 'critical', title: `${nice(j)} stopped moving.`, at: `${hrs(Bk.t1[lastMove])} · ${wall(Bk.t1[lastMove])}`,
+        body: `From then on both holds sit at the same angle (${fmt(at, 0)}°) while the joint used to travel ${typical.toFixed(0)}° per cycle.` });
+    }
+  });
+  const faults = D.events.filter((e) => e.kind === 'fault' && e.severity === 'bad');
+  if (faults.length) {
+    const by = {}; faults.forEach((e) => { by[e.subject] = (by[e.subject] || 0) + 1; });
+    const top = Object.entries(by).sort((a, b) => b[1] - a[1]);
+    const heat = faults.filter((e) => /overheat|thermal/i.test(e.detail)).length;
+    out.push({ cls: 'serious', title: `${faults.length} motor fault${faults.length > 1 ? 's' : ''} latched on ${top.length} motor${top.length > 1 ? 's' : ''}.`, at: `first ${hrs(faults[0].t)} · ${wall(faults[0].t)}`,
+      body: `${heat} overheating, ${faults.length - heat} other. Most on ${top[0][0]} (${top[0][1]}).${M.events_dropped ? ' Counted only up to where the event log filled.' : ''}` });
+  }
+  const link = D.events.filter((e) => e.kind === 'link' && e.severity === 'bad');
+  if (link.length) out.push({ cls: 'warn', title: `${link[0].subject} dropped ${link.length} time${link.length > 1 ? 's' : ''}.`, at: `first ${hrs(link[0].t)} · ${wall(link[0].t)}`, body: link[0].detail });
+  const lost = D.fingers.filter((f) => D.last_force_t[f] != null && D.last_force_t[f] < elapsed - H);
+  const never = D.fingers.filter((f) => D.last_force_t[f] == null);
+  if (lost.length || never.length) out.push({ cls: 'warn', title: `${[...lost, ...never].join(', ')} fingertip${lost.length + never.length > 1 ? 's' : ''} stopped reading force before the end.`, at: lost.map((f) => `${f} ${hrs(D.last_force_t[f])}`).join(' · '),
+    body: `${lost.map((f) => `${f} last read force at ${wall(D.last_force_t[f])}`).join(', ')}${never.length ? `${lost.length ? '; ' : ''}${never.join(', ')} never read force` : ''}. The record carries one resultant per finger, so which taxels failed is not in it.` });
+  if (D.checkpoints.length >= 4) D.joints.forEach((j) => {
+    const n = D.checkpoints.filter((c) => c.problems.some((p) => p.startsWith(j + ' swept'))).length;
+    if (n >= D.checkpoints.length / 2 && !seen.has(j)) out.push({ cls: 'warn', title: `${nice(j)} is outside its travel baseline at ${n} of ${D.checkpoints.length} checkpoints.`, at: '', body: 'A constant offset from the first checkpoint on points to a stale baseline rather than drift. Re-measure it.' });
+  });
+  if (M.events_dropped > 0) out.push({ cls: 'note', title: `The event log filled up at ${hrs(M.last_event_t)}.`, at: wall(M.last_event_t), body: `The console keeps ${fmt(M.events_kept)} events and dropped ${fmt(M.events_dropped)} more, so the event lanes and the event log end there. Holds, currents, forces, checkpoints and joint usage cover the whole test.` });
+  if (!out.length) out.push({ cls: 'note', title: 'Nothing stood out.', at: '', body: 'No motor faults, no travel anomalies at the checkpoints, every fingertip read force until the end.' });
+  return out;
+}
+function drawFindings() {
+  $('#findings').innerHTML = findings().map((f) => `<li class="${f.cls}"><b>${f.title}</b>${f.at ? `<span class="at">${f.at}</span>` : ''}<br>${f.body}</li>`).join('');
+}
+function drawAll() {
+  drawFindings(); drawThroughput(); drawEventLanes(); drawPose(); drawHeat(); drawDrift(); drawCheckpoints(); drawForce(); drawUsage(); drawHistory(); drawEvents(); }
+drawAll();
+let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(drawAll, 150); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawAll);
+})();
+</script>
+</body>
+</html>

@@ -2,6 +2,7 @@
 
 import type {
   BoardsInfo,
+  EnduranceReportInfo,
   CalibrationRun,
   SensorFrameEntry,
   DemoEntry,
@@ -114,8 +115,10 @@ export const api = {
     }),
   enduranceDelete: (id: string) =>
     del<{ ok: boolean }>(`/api/endurance/tests/${encodeURIComponent(id)}`),
-  enduranceSlack: (id: string) =>
-    post<{ ok: boolean }>(`/api/endurance/tests/${encodeURIComponent(id)}/slack`),
+  enduranceReport: (id: string) =>
+    post<{ report: EnduranceReportInfo }>(
+      `/api/endurance/tests/${encodeURIComponent(id)}/report`,
+    ),
   stats: () => request<Stats>('/api/stats'),
   ports: () => request<PortInfo[]>('/api/ports'),
   taxelGeometry: () => request<TaxelGeometry>('/api/tactile/geometry'),
