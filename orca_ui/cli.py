@@ -140,6 +140,7 @@ def build_settings(argv=None) -> UiSettings:
 def main(argv=None) -> None:
     import uvicorn
     from orca_ui.console import install_stdout_dedupe
+    from orca_ui.core_source import resolve as resolve_core_source
     from orca_ui.server import create_app
 
     settings = build_settings(argv)
@@ -147,11 +148,15 @@ def main(argv=None) -> None:
     mode = "MOCK — no hardware" if settings.mock else "hardware"
     if settings.mock is False and not settings.motors_enabled:
         mode += ", sensors only (--no-motors)"
+    # Which orca_core is driving the hardware is invisible otherwise: a dev
+    # checkout and the release it was cut from carry the same version string.
+    core = resolve_core_source()
     rule = "─" * 62
     print(f"\n{rule}\n"
           f"  ORCA UI   http://localhost:{settings.port}\n"
           f"  config    {settings.config_path}\n"
           f"  mode      {mode}\n"
+          f"  core      {core.summary()}\n"
           f"{rule}\n")
 
     # orca_core prints hardware diagnostics; the connect ladder would repeat

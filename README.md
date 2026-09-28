@@ -4,8 +4,8 @@ Web interface for the [ORCA Hand](https://www.orcahand.com): live sensor
 visualization (tactile taxels + joint encoders), motor control, a 3D hand
 view, pose/trajectory playback, and the hand's lifecycle operations
 (tensioning, calibration, guided setup). Uses
-[orca_core](https://github.com/orcahand/orca_core) (the
-`feature/joint-sensing` line) for all hardware communication.
+[orca_core](https://github.com/orcahand/orca_core) for all hardware
+communication.
 
 The UI adapts to the hand described by the config: tactile-only hands get the
 taxel/force views, joint-sensing hands get encoder gauges and the closed-loop
@@ -14,25 +14,20 @@ connected on startup — no connect button.
 
 ## Installation
 
-This project uses [uv](https://docs.astral.sh/uv/). During development
-`orca_core` tracks a local sibling checkout (`../orca_core`); on machines
-without one, switch the `[tool.uv.sources]` entry in `pyproject.toml` to the
-git source (instructions in the comment there).
+This project uses [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync
 ```
 
-The built frontend is committed to git (`orca_ui/webui/`), so a plain checkout
-runs without node. If you change frontend code, rebuild and commit the output:
+That installs the published `orca_core` from PyPI, so a plain clone works with
+no sibling checkout. The built frontend is committed to git
+(`orca_ui/webui/`), so it also runs without node.
 
-```bash
-cd frontend && npm install && npm run build && cd ..
-```
-
-A pre-commit hook warns when frontend sources are committed without a rebuilt
-`orca_ui/webui/`. Enable it once per clone (only needed on machines that edit
-the frontend):
+Working on the console itself — running from source, rebuilding the frontend,
+or developing against an unreleased `orca_core` — is covered in
+[DEVELOPMENT.md](DEVELOPMENT.md). Enable the hooks once per clone if you will
+be committing:
 
 ```bash
 git config core.hooksPath .githooks
@@ -41,7 +36,7 @@ git config core.hooksPath .githooks
 ## Usage
 
 ```bash
-uv run orca-ui                              # orca_core default model
+uv run orca-ui                              # autodetects the connected hand
 uv run orca-ui --model orcahand-full-right  # bundled model by name
 uv run orca-ui --config /path/to/config.yaml   # explicit config (or its folder)
 uv run orca-ui --mock                       # full simulated hand, no hardware
@@ -85,9 +80,9 @@ sweep) and disables torque — it never errors, it reports what it actioned.
   interchangeable with orca_core's record/replay example scripts.
 - **Teleop** — drive the hand with your own: webcam (MediaPipe), Manus
   gloves, Apple Vision Pro, or a synthetic waveform (no hardware). The
-  retargeting pipeline runs as a separate `orca_teleop` process (spawned via
-  `uv run --project ../orca_teleop`, or launched manually/remotely in
-  *external* mode with a session token). Sessions start in **preview** —
+  retargeting pipeline runs as a separate `orca_teleop` process (spawned with
+  `uv run --frozen` in the `orca_teleop` checkout, or launched manually/remotely
+  in *external* mode with a session token). Sessions start in **preview** —
   retargeted poses render as a cyan ghost in the 3D view and the hand never
   moves — then **engage** takes the control channel (manual sliders lock,
   named owner tooltips) and ramps in from the current pose. Tracking loss
@@ -173,37 +168,5 @@ there. De-escalation (e-stop, torque off, `orca_park`, stop/disengage) is
 never gated. Assembly-time tools (`configure_chain`, `wizard`) and PID gain
 tuning are deliberately not exposed.
 
-## Development
-
-```bash
-uv run orca-ui --mock --no-browser        # backend on :5001
-cd frontend && npm run dev                 # Vite dev server on :5173, proxied
-```
-
-Tests: `uv run pytest tests/`. The frontend has a headless URDF check:
-`cd frontend && node scripts/check-urdf.mjs`.
-
-### 3D asset bundle
-
-`orca_ui/models/hand_v2/` is generated from the `orcahand_description` repo by
-
-```bash
-uv run --group assets python scripts/build_hand_bundle.py
-```
-
-which renames the Fusion-exported URDF joints to orca_core canonical ids,
-decimates the meshes to browser-friendly GLBs, adds fingertip frames, and
-prints a per-joint ROM report cross-checking the URDF limits against
-orca_core's ROMs (orca_core degrees map onto the URDF 1:1 — there is no
-per-joint correction table). Verify joint directions with the mock sweep
-tool, one joint at a time.
-
-## Releasing
-
-```bash
-cd frontend && npm run build && cd ..
-uv build
-```
-
-The `orca_ui/webui` build output is committed to git and ships in the wheel;
-rebuild before releasing so the committed bundle is current.
+Running from source, the frontend build, the 3D asset bundle and releasing
+are covered in [DEVELOPMENT.md](DEVELOPMENT.md).

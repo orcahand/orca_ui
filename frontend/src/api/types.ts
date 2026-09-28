@@ -77,12 +77,24 @@ export interface DirectMotorSnapshot {
   motors: DirectMotorInfo[]
 }
 
+// Which orca_core the backend imported. `development` is true for a local
+// checkout or a git branch — i.e. not a released build.
+export interface CoreSourceInfo {
+  version: string
+  kind: 'released' | 'local' | 'git' | 'unknown'
+  branch: string | null
+  dirty: boolean
+  development: boolean
+  summary: string
+}
+
 export interface HandInfo {
   model_name: string
   side: 'left' | 'right'
   mock: boolean
   joints: JointInfo[]
   control: ControlState
+  core?: CoreSourceInfo
   finger_to_sensor_id?: Record<Finger, number>
   tactile?: { active_sensors: Finger[]; num_taxels: Record<Finger, number> }
 }
