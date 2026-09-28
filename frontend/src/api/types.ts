@@ -146,6 +146,12 @@ export interface ControlState {
   control_owner: string
   // Raw motor-space control armed: loop writes paused, joint targets 409.
   direct_motor_mode: boolean
+  // Which stream the 3D model follows. "auto" tracks the torque state:
+  // motor estimate while limp (polled), commanded targets once torqued (no
+  // polling, so reads stop competing with commands for the bus).
+  pose_source: PoseSource
+  // What "auto" resolved to right now; equals pose_source when pinned.
+  effective_pose_source: 'estimate' | 'target'
 }
 
 export interface DirectMotorInfo {
@@ -371,6 +377,23 @@ export interface MotorTracking {
   stalled_total_s: number // cumulative not-following time this session
 }
 
+// A latched Hardware Error Status, classified by what to do about it. Every
+// latched bit disables the motor identically (it answers the bus and ACKs
+// torque enable, but never energizes) — `kind` is what separates a fault you
+// wait out from one you go and fix.
+export type HwErrorKind = 'thermal' | 'power' | 'load' | 'encoder' | 'unknown'
+
+export interface HwErrorInfo {
+  flags: string[]
+  kind: HwErrorKind
+  disabled: boolean // always true today; the motor will not move until reboot
+  needs_cooling: boolean // separate from kind: a motor can latch both
+  temperature_c: number | null
+  headline: string
+  advice: string
+  disabled_note: string
+}
+
 export interface MotorFaultEntry {
   joint: string | null
   errors: number // failed bus transactions this session
@@ -378,7 +401,36 @@ export interface MotorFaultEntry {
   last_error: string | null
   last_error_age_s: number | null
   tracking: MotorTracking | null
+  hw_error_flags?: string[]
+  // null when nothing is latched.
+  hw_error?: HwErrorInfo | null
 }
+
+// The servo's own position-PID and feedforward gains (X-series registers
+// 80-91). Distinct from the host outer-loop PI in the Control Loop panel:
+// these close the loop inside the motor. null when the family cannot report
+// them.
+export interface ServoGains {
+  kp: number | null
+  ki: number | null
+  kd: number | null
+  ff_1st: number | null
+  ff_2nd: number | null
+}
+
+export type ServoGainsMap = Record<string, ServoGains | null>
+
+// Trajectory limits the servo shapes its own motion with. 0 disables a limit.
+// Non-zero values rate-limit streamed targets too, not just point-to-point
+// moves — a safety property for teleop, an unwanted lag inside a tuned loop.
+export interface ServoProfile {
+  velocity_rad_s: number | null
+  acceleration_rad_s2: number | null
+}
+
+export type ServoProfileMap = Record<string, ServoProfile | null>
+
+export type PoseSource = 'auto' | 'estimate' | 'target'
 
 export interface MotorsFaults {
   motors: Record<string, MotorFaultEntry>
@@ -480,6 +532,25 @@ export interface Stats {
     stream_rearms: number
   } | null
   encoder: { frames_ok: number; last_freshness_ms: number } | null
+}
+
+// Something the operator has to act on, surfaced on the run's `extra` while
+// it goes and kept on its result. One entry per joint per kind.
+export interface CalibrationProblem {
+  kind: 'no_motion' | 'travel' | 'rejected' | 'timeout' | 'faulted'
+  joint: string
+  severity: 'error' | 'warn'
+  headline: string
+  advice: string
+  motor?: number
+  direction?: string
+  moved_deg?: number
+  travel_deg?: number
+  expected_deg?: number
+  flags?: string[]
+  temperature_c?: number | null
+  fault_kind?: string
+  needs_cooling?: boolean
 }
 
 // ----- calibration history --------------------------------------------------

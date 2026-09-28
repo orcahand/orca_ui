@@ -15,7 +15,10 @@ import {
   encoderDiagnosis,
   linkDiagnosis,
   motorDiagnosis,
+  TEMP_ERR_FRACTION,
+  TEMP_WARN_FRACTION,
   tactileDiagnosis,
+  thermalDiagnosis,
 } from './monitorShared'
 
 // A count in the strip; when something behind it is broken it becomes a
@@ -25,17 +28,19 @@ function Segment({
   ok,
   diagnoses,
   align,
+  color,
 }: {
   text: string
   ok: boolean
   diagnoses: Diagnosis[]
   align?: 'left' | 'right'
+  color?: string
 }) {
   const broken = diagnoses.filter((d) => !d.ok)
   const body = (
     <span
       style={{
-        color: ok ? 'var(--dim)' : 'var(--warn)',
+        color: color ?? (ok ? 'var(--dim)' : 'var(--warn)'),
         textDecoration: broken.length > 0 ? 'underline dotted' : undefined,
         textUnderlineOffset: 3,
       }}
@@ -60,6 +65,11 @@ export function HealthSummary() {
   // Which motor ids answer telemetry reads (temps/currents payloads).
   const [motorsAnswering, setMotorsAnswering] = useState<string[] | null>(null)
   const lastIds = useRef('')
+  // Whole degrees only: the strip re-renders on change and the raw reading
+  // dithers by tenths at 1 Hz.
+  const [temps, setTemps] = useState<Record<string, number>>({})
+  const [maxTempC, setMaxTempC] = useState<number | null>(null)
+  const lastTemps = useRef('')
   useStreamFrame((frames) => {
     const ids = Array.from(
       new Set([
@@ -71,6 +81,17 @@ export function HealthSummary() {
     if (json !== lastIds.current) {
       lastIds.current = json
       setMotorsAnswering(ids.length > 0 ? ids : null)
+    }
+
+    const rounded: Record<string, number> = {}
+    for (const [id, t] of Object.entries(frames.motors.temps)) {
+      rounded[id] = Math.round(t)
+    }
+    const key = JSON.stringify(rounded) + String(frames.motors.maxTempC)
+    if (key !== lastTemps.current) {
+      lastTemps.current = key
+      setTemps(rounded)
+      setMaxTempC(frames.motors.maxTempC)
     }
   })
 
@@ -136,6 +157,31 @@ export function HealthSummary() {
       )
     : []
 
+  // Hottest motor on the bus, and everything running warm behind it.
+  const jointForMotor = new Map<string, string>(
+    motorJoints.map((j) => [String(j.motor_id), j.id] as [string, string]),
+  )
+  const tempEntries = Object.entries(temps)
+  const ratedMax = maxTempC ?? 70
+  const hottest = tempEntries.reduce<[string, number] | null>(
+    (best, e) => (best === null || e[1] > best[1] ? e : best),
+    null,
+  )
+  const warmEntries = tempEntries
+    .filter(([, t]) => t >= ratedMax * TEMP_WARN_FRACTION)
+    .sort((a, b) => b[1] - a[1])
+  const thermalDiagnoses = warmEntries.map(([id, t]) =>
+    thermalDiagnosis(id, jointForMotor.get(id) ?? null, t, ratedMax),
+  )
+  const thermalColor =
+    hottest === null
+      ? 'var(--dim)'
+      : hottest[1] >= ratedMax * TEMP_ERR_FRACTION
+        ? 'var(--err)'
+        : hottest[1] >= ratedMax * TEMP_WARN_FRACTION
+          ? 'var(--warn)'
+          : 'var(--dim)'
+
   const links = Object.entries(health.links)
   const linksDirty = links.filter(
     ([, l]) => l.port_dead || !l.connected || l.resyncs > 0 || l.bad_lrc > 0,
@@ -190,6 +236,22 @@ export function HealthSummary() {
             text={`motors ${motorsAnswering?.length ?? '--'}/${motorTotal}`}
             ok={(motorsAnswering?.length ?? 0) === motorTotal}
             diagnoses={motorDiagnoses}
+          />
+        </>
+      )}
+      {showMotors && hottest !== null && (
+        <>
+          {sep}
+          <Segment
+            text={
+              `${hottest[1]} °C max (` +
+              (jointForMotor.get(hottest[0]) ?? `motor ${hottest[0]}`) +
+              ')' +
+              (warmEntries.length > 1 ? ` · ${warmEntries.length} warm` : '')
+            }
+            ok={warmEntries.length === 0}
+            diagnoses={thermalDiagnoses}
+            color={thermalColor}
           />
         </>
       )}

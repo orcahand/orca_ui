@@ -9,18 +9,29 @@ import { api } from '../../api/rest'
 import type { MotorFaultEntry, MotorsFaults } from '../../api/types'
 import { useStreamFrame } from '../../hooks/useStreamFrame'
 import { useAppStore } from '../../state/appStore'
-import { Diagnosable, type Diagnosis } from '../common/Diagnosable'
+import { Diagnosable } from '../common/Diagnosable'
 import { Panel } from '../common/Panel'
+import { MotorIssues } from './MotorIssues'
+import { RebootButton } from './RebootButton'
+import {
+  currentClass,
+  deriveMotorIssues,
+  errorClass,
+  issueToDiagnosis,
+  sortIssues,
+  tempClass,
+  tempPct,
+  type MotorIssue,
+  ERROR_RECENT_S,
+  TEMP_ERR_PCT,
+  TEMP_WARN_PCT,
+  trackClass,
+} from './motorIssueRules'
 
 // Rated max operating temperature fallback (XC330/XC430) until telemetry
 // carries the value from the connected motor family.
 const DEFAULT_MAX_TEMP_C = 70
-// stress_test.py's temp_color thresholds, in % of rated max.
-const TEMP_WARN_PCT = 70
-const TEMP_ERR_PCT = 90
 const BAR_SEGMENTS = 10
-// Current tint kicks in near the configured max_current ceiling.
-const CURRENT_WARN_FRACTION = 0.8
 
 function tempPctColor(pct: number): string {
   if (pct >= TEMP_ERR_PCT) return 'var(--err)'
@@ -51,9 +62,6 @@ function TempBar({ pct }: { pct: number }) {
   )
 }
 
-// A bus error this recent means the motor is failing right now, not history.
-const ERROR_RECENT_S = 60
-
 interface MotorRow {
   id: string
   temp: number | null
@@ -81,19 +89,15 @@ function buildRows(
   }))
 }
 
-function errorClass(faults: MotorFaultEntry | null): string {
-  if (!faults) return ''
-  const total = faults.errors + faults.overloads
-  if (total === 0) return ''
-  const age = faults.last_error_age_s
-  return age !== null && age < ERROR_RECENT_S ? 'err' : 'warn'
-}
-
-function trackClass(faults: MotorFaultEntry | null): string {
-  const tracking = faults?.tracking
-  if (!tracking) return ''
-  if (!tracking.following) return 'err'
-  return tracking.stalls > 0 ? 'warn' : ''
+// What the operator has to DO, not which bit is set — the bit names are in
+// the tooltip. "POWER" and "HEAT" are different jobs; that is the whole point
+// of showing this separately from the temperature column.
+const HW_KIND_LABEL: Record<string, string> = {
+  power: 'POWER',
+  thermal: 'HEAT',
+  load: 'JAM',
+  encoder: 'ENCODER',
+  unknown: 'FAULT',
 }
 
 // Hand-wide motor current ceiling (mA): editable here because this panel is
@@ -205,24 +209,31 @@ export function MotorHealthPanel() {
     if (rated !== null && rated !== maxTemp) setMaxTemp(rated)
   })
 
-  const tempPct = (temp: number | null): number | null =>
-    temp === null || maxTemp <= 0 ? null : (temp / maxTemp) * 100
+  // Per-motor issues, derived once: the table above the grid renders them,
+  // and each row's popover reuses the very same list.
+  const issuesByMotor = useMemo(() => {
+    const map = new Map<string, MotorIssue[]>()
+    for (const row of rows) {
+      map.set(
+        row.id,
+        deriveMotorIssues({
+          motorId: row.id,
+          joint: jointOfMotor.get(row.id) ?? null,
+          temp: row.temp,
+          current: row.current,
+          faults: row.faults,
+          maxTemp,
+          maxCurrent,
+        }),
+      )
+    }
+    return map
+  }, [rows, jointOfMotor, maxTemp, maxCurrent])
 
-  const tempClass = (temp: number | null): string => {
-    const pct = tempPct(temp)
-    if (pct === null) return ''
-    if (pct >= TEMP_ERR_PCT) return 'err'
-    if (pct >= TEMP_WARN_PCT) return 'warn'
-    return ''
-  }
-
-  const currentClass = (current: number | null): string => {
-    if (current === null || maxCurrent === null || maxCurrent <= 0) return ''
-    const load = Math.abs(current) / maxCurrent
-    if (load >= 1) return 'err'
-    if (load >= CURRENT_WARN_FRACTION) return 'warn'
-    return ''
-  }
+  const allIssues = useMemo(
+    () => sortIssues([...issuesByMotor.values()].flat()),
+    [issuesByMotor],
+  )
 
   const peak = rows.reduce<number | null>(
     (best, row) =>
@@ -238,6 +249,7 @@ export function MotorHealthPanel() {
         </div>
       ) : (
         <>
+        <MotorIssues issues={allIssues} />
         <div style={{ fontSize: 10, color: 'var(--dimmer)', marginBottom: 4 }}>
           max operating temp: {maxTemp.toFixed(0)}°C
         </div>
@@ -245,12 +257,16 @@ export function MotorHealthPanel() {
           <thead>
             <tr>
               <th>MOTOR</th>
+              <th>JOINT</th>
               <th>TEMP °C</th>
               <th>%MAX</th>
               <th aria-label="temperature bar" />
               <th>CURRENT mA</th>
               <th title="failed bus transactions + overload reboots this session">
                 ERRORS
+              </th>
+              <th title="latched hardware error: the motor answers the bus but will not energize until it is rebooted">
+                FAULT
               </th>
               <th title="is the motor actually following its commanded target?">
                 TRACK
@@ -260,73 +276,15 @@ export function MotorHealthPanel() {
           <tbody>
             {rows.map((row) => {
               // A hot or overloaded motor is clickable: the popover names
-              // the joint and what to check.
-              const problems: Diagnosis[] = []
+              // the joint and what to check. Same list the issues table
+              // above renders, so the two can never disagree.
               const joint = jointOfMotor.get(row.id) ?? null
-              if (tempClass(row.temp)) {
-                problems.push({
-                  subject: `motor ${row.id}${joint ? ` (${joint})` : ''}`,
-                  state: `${row.temp!.toFixed(1)} °C (${tempPct(row.temp)!.toFixed(0)}% of the ${maxTemp.toFixed(0)}°C rating) — ${
-                    tempClass(row.temp) === 'err' ? 'overheating' : 'hot'
-                  }`,
-                  ok: false,
-                  checks: [
-                    'give it a rest — motors shed heat slowly inside the palm',
-                    'check the joint for mechanical binding or over-tensioned tendons',
-                    'consider a lower max current (Motors → Control Loop)',
-                  ],
-                })
-              }
-              if (currentClass(row.current)) {
-                problems.push({
-                  subject: `motor ${row.id}${joint ? ` (${joint})` : ''}`,
-                  state: `${row.current!.toFixed(0)} mA — near the current ceiling`,
-                  ok: false,
-                  checks: [
-                    'check for a jammed or obstructed joint',
-                    'check tendon tension — an over-tensioned tendon loads the motor at rest',
-                    'sustained high current is what overheats motors',
-                  ],
-                })
-              }
+              const problems = (issuesByMotor.get(row.id) ?? []).map(
+                issueToDiagnosis,
+              )
+              const hw = row.faults?.hw_error ?? null
               const faults = row.faults
-              if (faults && errorClass(faults)) {
-                const age = faults.last_error_age_s
-                problems.push({
-                  subject: `motor ${row.id}${joint ? ` (${joint})` : ''}`,
-                  state:
-                    `${faults.errors} failed bus transaction(s), ` +
-                    `${faults.overloads} overload reboot(s) this session` +
-                    (faults.last_error
-                      ? ` — last: ${faults.last_error}` +
-                        (age !== null ? ` (${age.toFixed(0)}s ago)` : '')
-                      : ''),
-                  ok: false,
-                  checks: [
-                    '"Port is in use" bursts mean another process or thread is holding the serial bus — close other tools using the port',
-                    '"no status packet" means the motor did not answer — check power and the daisy-chain cabling up to this motor',
-                    'overload reboots mean the motor hit its torque limit — check for jams and over-tensioned tendons',
-                  ],
-                })
-              }
               const tracking = faults?.tracking ?? null
-              if (tracking && !tracking.following) {
-                problems.push({
-                  subject: `motor ${row.id}${joint ? ` (${joint})` : ''}`,
-                  state:
-                    `not following its command — off by ` +
-                    `${tracking.deviation_deg?.toFixed(1) ?? '?'}° for ` +
-                    `${tracking.stall_s.toFixed(0)}s ` +
-                    `(${tracking.stalls} stall(s), ` +
-                    `${tracking.stalled_total_s.toFixed(0)}s total this session)`,
-                  ok: false,
-                  checks: [
-                    'a latched hardware error stops the motor from energizing — check the ERRORS column, toggle torque to clear it',
-                    'check the tendon: slack or snapped tendons move the motor without moving the joint',
-                    'check for mechanical jams or a joint blocked at its limit',
-                  ],
-                })
-              }
               const idCell =
                 problems.length > 0 ? (
                   <Diagnosable
@@ -346,22 +304,22 @@ export function MotorHealthPanel() {
                 ) : (
                   row.id
                 )
-              const pct = tempPct(row.temp)
+              const pct = tempPct(row.temp, maxTemp)
               return (
                 <tr key={row.id}>
                   <td>{idCell}</td>
                   <td className="motor-joint">{joint ?? '--'}</td>
-                  <td className={tempClass(row.temp)}>
+                  <td className={tempClass(row.temp, maxTemp)}>
                     {row.temp === null ? '--' : row.temp.toFixed(1)}
                   </td>
                   <td
-                    className={tempClass(row.temp)}
+                    className={tempClass(row.temp, maxTemp)}
                     style={{ color: pct !== null ? tempPctColor(pct) : undefined }}
                   >
                     {pct === null ? '--' : `${pct.toFixed(0)}%`}
                   </td>
                   <td>{pct !== null && <TempBar pct={pct} />}</td>
-                  <td className={currentClass(row.current)}>
+                  <td className={currentClass(row.current, maxCurrent)}>
                     {row.current === null ? '--' : row.current.toFixed(1)}
                   </td>
                   <td
@@ -381,6 +339,23 @@ export function MotorHealthPanel() {
                     {faults === null
                       ? '--'
                       : faults.errors + faults.overloads}
+                  </td>
+                  <td
+                    className={hw ? 'err' : ''}
+                    title={
+                      hw
+                        ? `${hw.headline}. ${hw.disabled_note} ${hw.advice}`
+                        : 'no latched hardware error'
+                    }
+                  >
+                    {hw ? (
+                      <span className="fault-cell">
+                        {HW_KIND_LABEL[hw.kind] ?? hw.kind.toUpperCase()}
+                        <RebootButton id={row.id} needsCooling={hw.needs_cooling} />
+                      </span>
+                    ) : (
+                      '--'
+                    )}
                   </td>
                   <td
                     className={trackClass(faults)}

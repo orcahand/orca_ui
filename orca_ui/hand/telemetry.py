@@ -26,11 +26,26 @@ from orca_core.hardware.sensing.constants import (
 )
 from orca_core.hardware.sensing.health import EncoderStreamHealth
 
-from orca_ui.hand.faults import BusErrorMonitor, TrackingMonitor
+from orca_ui.hand.faults import (
+    BusErrorMonitor,
+    TrackingMonitor,
+    classify_hw_error,
+)
 from orca_ui.streaming import topics as T
 from orca_ui.streaming.hub import StreamHub
 
 logger = logging.getLogger(__name__)
+
+# How often the latched Hardware Error Status registers are swept. One
+# transaction where the motor family can read the register from every motor at
+# once, one read per motor otherwise.
+HW_ERROR_SWEEP_S = 10.0
+
+# Minimum gap between motor-bus telemetry reads on a hand with no joint loop.
+# There is no loop to contend with, but the bus is half-duplex: every read
+# blocks commands for its whole round trip, and temperature moves over minutes,
+# so reading faster than this buys nothing.
+MOTOR_TELEMETRY_MIN_INTERVAL_S = 10.0
 
 # How long motor telemetry may go unread while the hand keeps moving before a
 # read is forced through anyway.
@@ -224,6 +239,9 @@ class TelemetryService:
         # Start the staleness window now, so a hand already moving at startup
         # isn't read immediately on a "never read" technicality.
         self._last_bus_read = time.monotonic()
+        # Negative infinity so the first slow tick publishes straight away:
+        # the panel should not sit empty for a whole interval after connect.
+        self._last_motor_telemetry = float("-inf")
         self._motor_health: dict[str, dict] = {"temps": {}, "currents": {}}
         self._sensor_health = SensorHealthMonitor()
         # Joints whose encoder is currently distrusted (joint -> "verdict:
@@ -236,6 +254,14 @@ class TelemetryService:
         self._bus_errors = BusErrorMonitor()
         self._tracking = TrackingMonitor()
         self._faults_session_key: int | None = None
+        # Latched Hardware Error Status per motor, swept rarely: a latched
+        # motor answers the bus and acks torque enable but never energizes,
+        # so nothing else in the telemetry notices it has stopped moving.
+        self._hw_errors: dict[int, list[str]] = {}
+        # Classified form of the same, keyed by motor id.
+        self._hw_error_info: dict[int, dict] = {}
+        self._hw_errors_warned: set[int] = set()
+        self._last_hw_error_sweep = 0.0
 
     def start(self) -> None:
         self._bus_errors.attach()
@@ -260,9 +286,9 @@ class TelemetryService:
             if measured and suppressed:
                 # Distrusted sensors fall back: their joints leave the
                 # measured stream entirely, so every consumer (3D model,
-                # sparklines) rides the motor estimate instead of the noise.
-                # The payload names them so clients drop any stale value
-                # they already hold.
+                # sparklines) rides the motor estimate instead
+                # of the noise. The payload names them so clients drop any
+                # stale value they already hold.
                 measured = {j: v for j, v in measured.items()
                             if j not in suppressed}
             if measured or suppressed:
@@ -289,9 +315,13 @@ class TelemetryService:
             return
 
         # The estimate costs a bus round trip, so with a loop running it rides
-        # the slow tick instead; without one there is no motion to stall.
+        # the slow tick instead. Without one it is gated on the pose source:
+        # in "auto" that means reading the motors while they are limp and
+        # stopping once torque is on, so streamed commands are not competing
+        # with reads for a half-duplex bus.
         estimate = None
-        if session.caps.motors and not session.caps.feedback_loop:
+        if (session.caps.motors and not session.caps.feedback_loop
+                and self._estimate_is_wanted()):
             estimate = self._publish_estimate(session)
 
         if session.caps.feedback_loop:
@@ -311,8 +341,11 @@ class TelemetryService:
             return
 
         if session.caps.motors:
+            self._sweep_hardware_errors(session)
             if not session.caps.feedback_loop:
-                self._publish_motor_health(session)
+                if self._motor_telemetry_is_due():
+                    self._last_motor_telemetry = time.monotonic()
+                    self._publish_motor_health(session)
             elif not self._hand_is_driven() or self._telemetry_is_stale():
                 self._bus_read_tick(session)
 
@@ -366,8 +399,8 @@ class TelemetryService:
 
     # ----- motor-bus reads -----------------------------------------------------
     #
-    # A bulk read holds the bus for a round trip per motor (~15 ms for 17), so
-    # one landing mid-motion freezes the hand for more than a loop cycle.
+    # A group read holds the bus for a round trip per motor, so one landing
+    # mid-motion freezes the hand for more than a loop cycle.
 
     def _hand_is_driven(self) -> bool:
         """True while something is actively commanding motion."""
@@ -381,6 +414,23 @@ class TelemetryService:
             return bool(manager and manager.active())
         except Exception:
             return False
+
+    def _estimate_is_wanted(self) -> bool:
+        """True while the model is following the motor estimate.
+
+        Command-adherence tracking needs the estimate too, so it goes quiet on
+        a motor-only hand whenever the estimate does; pinning the pose source
+        to "estimate" is how an operator gets it back during motion.
+        """
+        try:
+            return self._service.effective_pose_source() == "estimate"
+        except Exception:
+            return True
+
+    def _motor_telemetry_is_due(self) -> bool:
+        """True once the loopless hand's telemetry has aged out its rate limit."""
+        return ((time.monotonic() - self._last_motor_telemetry)
+                >= MOTOR_TELEMETRY_MIN_INTERVAL_S)
 
     def _telemetry_is_stale(self) -> bool:
         """True once telemetry is old enough to be worth one hitch, so a long
@@ -466,6 +516,95 @@ class TelemetryService:
         else:
             self._tracking.idle()
 
+    def forget_hw_error(self, motor_id: int) -> None:
+        """Drop a motor's cached latch after a reboot cleared it, so the
+        dashboard updates on the reply instead of waiting out the sweep. A
+        fault that is still there comes straight back on the next sweep."""
+        mid = int(motor_id)
+        self._hw_errors.pop(mid, None)
+        self._hw_error_info.pop(mid, None)
+        self._hw_errors_warned.discard(mid)
+
+    def _sweep_hardware_errors(self, session) -> None:
+        """Refresh the latched-error table, warning once per newly latched motor."""
+        hand = getattr(session, "hand", None)
+        client = getattr(hand, "motor_client", None)
+        # Free: the reads that already happened carried each motor's error
+        # byte. A motor that faulted since the last sweep is confirmed on the
+        # next tick rather than waiting out the interval.
+        alerted = self._drain_alerts(client)
+        now = time.monotonic()
+        if not alerted and now - self._last_hw_error_sweep < HW_ERROR_SWEEP_S:
+            return
+        self._last_hw_error_sweep = now
+        raw = self._read_hardware_errors(client, hand)
+        if raw is None:
+            return
+        motor_to_joint = hand.config.motor_to_joint_dict
+        found: dict[int, list[str]] = {}
+        classified: dict[int, dict] = {}
+        for mid in hand.config.motor_ids:
+            try:
+                flags = client.decode_hardware_error(raw[int(mid)])
+            except Exception:
+                continue
+            if not flags:
+                self._hw_errors_warned.discard(int(mid))
+                continue
+            info = classify_hw_error(
+                flags, motor=mid, joint=motor_to_joint.get(mid),
+                temperature_c=(self._motor_health.get("temps") or {}).get(int(mid)))
+            found[int(mid)] = flags
+            classified[int(mid)] = info
+            if int(mid) in self._hw_errors_warned:
+                continue
+            self._hw_errors_warned.add(int(mid))
+            # Advice that matches the fault: a power latch at 32 °C must not
+            # be met with "let it cool", which is what a single templated
+            # message for every bit used to say.
+            message = (
+                f"{info['headline']}: {info['disabled_note']} "
+                f"{info['advice']}"
+            )
+            logger.warning(message)
+            # orca_ui installs no log handler that prints, and a motor that
+            # has stopped moving has to reach the operator, not just the
+            # stream — same yellow the core's warnings use.
+            print(f"\033[93mWarning: {message}\033[0m")
+        self._hw_errors = found
+        self._hw_error_info = classified
+
+    @staticmethod
+    def _drain_alerts(client) -> dict:
+        """Motors whose status packets carried the Alert bit since last asked.
+
+        A hint about when to sweep, not a diagnosis: the sweep reads the error
+        register itself, and rebooting is the operator's call.
+        """
+        take = getattr(client, "take_hardware_alerts", None)
+        if take is None:
+            return {}
+        try:
+            return take() or {}
+        except Exception:
+            logger.debug("hardware-alert drain failed", exc_info=True)
+            return {}
+
+    @staticmethod
+    def _read_hardware_errors(client, hand) -> dict | None:
+        """Every motor's latched error in one transaction where the family
+        supports it, falling back to one read each. ``None`` if unreadable."""
+        read_all = getattr(client, "read_hardware_errors", None)
+        read_one = getattr(client, "read_hardware_error", None)
+        try:
+            if read_all is not None:
+                return read_all(hand.config.motor_ids)
+            if read_one is not None:
+                return {int(mid): read_one(mid) for mid in hand.config.motor_ids}
+        except Exception:
+            logger.debug("hardware-error sweep failed", exc_info=True)
+        return None
+
     def _publish_motor_faults(self, session) -> None:
         if session is not None:
             key = id(session)
@@ -493,6 +632,10 @@ class TelemetryService:
             joint = motor_to_joint.get(mid)
             entry["joint"] = joint
             entry["tracking"] = tracking.get(joint) if joint else None
+            entry["hw_error_flags"] = self._hw_errors.get(mid) or []
+            # Classified: which kind of latch, and what to do about it. The
+            # dashboard needs this to tell a power latch from a hot motor.
+            entry["hw_error"] = self._hw_error_info.get(mid)
             motors[mid] = entry
         self._hub.publish(T.MOTORS_FAULTS,
                           {"motors": motors, "bus": bus["bus"]})

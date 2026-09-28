@@ -48,6 +48,102 @@ _ID_LIST_RE = re.compile(
     r"\[([\d,\s]*)\]")
 
 
+# ---------------------------------------------------------------------------
+# Latched hardware errors
+# ---------------------------------------------------------------------------
+
+# Dynamixel X-series Hardware Error Status (address 70) bits, grouped by what
+# the operator has to do about them.
+#
+# Every latched bit inhibits the power stage identically: the motor keeps
+# answering the bus and still acknowledges torque enable, it just never
+# energizes. So "latched" on its own tells an operator nothing actionable —
+# the *kind* is what differs. A thermal latch is waited out. A power latch is
+# not: it re-latches on the next command until the supply or wiring is fixed,
+# and telling someone to let a 32 °C motor cool sends them looking in the
+# wrong place entirely.
+HW_ERROR_KINDS: dict[str, str] = {
+    "overheating": "thermal",
+    "electrical_shock": "power",
+    "input_voltage": "power",
+    "overload": "load",
+    "motor_encoder": "encoder",
+}
+
+# Most-actionable first. A motor latched thermal *and* power is a power
+# problem: cooling it would clear the thermal bit and change nothing.
+_HW_KIND_PRIORITY = ("power", "encoder", "load", "thermal", "unknown")
+
+_HW_KIND_ADVICE: dict[str, str] = {
+    "thermal": (
+        "Let it cool before rebooting — reboot it hot and it re-latches on "
+        "the next command. Then look for what overheated it: a binding joint "
+        "or an over-tensioned tendon holds current at rest."
+    ),
+    "power": (
+        "Cooling will not help — this is a supply or wiring fault, and it "
+        "latches again on the next command until the cause is fixed. Check "
+        "this motor's cable and connector at both ends, and the rail voltage "
+        "while the motor is driven; the bit also means \"insufficient power "
+        "to operate the motor\"."
+    ),
+    "load": (
+        "Something stalled the motor. Clear the obstruction or slacken the "
+        "tendon before rebooting, or it latches again as soon as it is driven."
+    ),
+    "encoder": (
+        "The motor's own position sensor failed. A reboot may clear it; if it "
+        "returns, the motor needs replacing."
+    ),
+    "unknown": (
+        "Reboot or power-cycle the motor, then watch whether it latches again "
+        "on the next command."
+    ),
+}
+
+_HW_DISABLED_NOTE = (
+    "It still answers the bus and still acknowledges torque enable, but it "
+    "will not move until it is rebooted or power-cycled."
+)
+
+
+def classify_hw_error(flags, *, motor=None, joint=None,
+                      temperature_c: float | None = None) -> dict | None:
+    """Describe a motor's latched Hardware Error Status.
+
+    Returns ``None`` when nothing is latched. Otherwise a dict carrying the
+    raw ``flags``, the ``kind`` that decides what to do about them, and a
+    ``headline``/``advice`` pair written for whoever has to fix it.
+
+    ``needs_cooling`` is deliberately separate from ``kind``: a motor can
+    latch thermal *and* power at once, and the operator needs to know that
+    waiting is part of the job without being told that waiting is the job.
+    """
+    flags = [str(f) for f in (flags or [])]
+    if not flags:
+        return None
+    kinds = {HW_ERROR_KINDS.get(f, "unknown") for f in flags}
+    kind = next((k for k in _HW_KIND_PRIORITY if k in kinds), "unknown")
+
+    who = f"motor {motor}" if motor is not None else "the motor"
+    if joint:
+        who += f" ({joint})"
+    temp = "" if temperature_c is None else f" at {float(temperature_c):.0f} °C"
+    return {
+        "flags": flags,
+        "kind": kind,
+        # Every latched bit disables the power stage; named so callers do not
+        # have to know that, and so it survives a bit we do not decode yet.
+        "disabled": True,
+        "needs_cooling": "overheating" in flags,
+        "temperature_c": (None if temperature_c is None
+                          else float(temperature_c)),
+        "headline": f"{who} has latched {' + '.join(flags)}{temp}",
+        "advice": _HW_KIND_ADVICE[kind],
+        "disabled_note": _HW_DISABLED_NOTE,
+    }
+
+
 def _summarize(message: str) -> str:
     """Strip the SDK's bracket noise down to the human part."""
     message = re.sub(r"\[TxRxResult\]\s*", "", message)

@@ -21,6 +21,12 @@ import type {
   TeleopSourcesInfo,
   TrajectoryData,
   TrajectoryEntry,
+  ServoGains,
+  PoseSource,
+  ServoGainsMap,
+  ServoProfile,
+  ServoProfileMap,
+  ControlState,
 } from './types'
 
 export class ApiError extends Error {
@@ -81,6 +87,28 @@ export const api = {
   // device null hands the choice back to "first board to answer".
   selectBoard: (device: string | null) =>
     post<BoardsInfo>('/api/board/select', { device }),
+  // Clears a latched hardware error. The motor returns with torque off.
+  rebootMotor: (id: number) =>
+    post<{
+      motor: number
+      joint: string | null
+      cleared: boolean
+      hw_error_flags: string[] | null
+    }>(`/api/motors/${id}/reboot`),
+
+  // Read straight off the motors: gains are RAM and a power cycle clears
+  // them, so what was last typed is not evidence of what they hold.
+  servoGains: () =>
+    request<{ gains: ServoGainsMap }>('/api/motors/gains'),
+  // Omitted fields are left alone on the motor.
+  setServoGains: (id: number, gains: Partial<ServoGains>) =>
+    post<{ gains: ServoGainsMap }>(`/api/motors/${id}/gains`, gains),
+
+  servoProfile: () =>
+    request<{ profile: ServoProfileMap }>('/api/motors/profile'),
+  setServoProfile: (id: number, profile: Partial<ServoProfile>) =>
+    post<{ profile: ServoProfileMap }>(`/api/motors/${id}/profile`, profile),
+
   models: () => request<ModelsInfo>('/api/models'),
   // name null hands the choice back to hardware detection.
   selectModel: (name: string | null, version?: string | null) =>
@@ -121,6 +149,8 @@ export const api = {
   resetGains: (joints?: string[]) =>
     post('/api/control/gains/reset', { joints: joints ?? null }),
   setMaxCurrent: (ma: number) => post('/api/control/max_current', { ma }),
+  setPoseSource: (mode: PoseSource) =>
+    post<{ control: ControlState }>('/api/control/pose_source', { mode }),
   rebase: () => post('/api/control/rebase'),
 
   motorsDirect: () => request<DirectMotorSnapshot>('/api/motors/direct'),
