@@ -15,9 +15,13 @@ import type { URDFRobot } from 'urdf-loader'
 import type { Finger, TaxelGeometry, Vec3 } from '../../api/types'
 import type { FingertipEntry, SensorMounts } from '../../api/rest'
 import type { ArrowColorScheme } from '../../state/appStore'
-import { MAX_TAXEL_FORCE } from '../../theme/tokens'
+import { markOverlay } from './loadHandRobot'
+import { MAX_FORCE_SCALE, maxTaxelForce } from '../../theme/tokens'
 import { getArrowColor2D } from '../tactile/taxelRender'
 
+// Noise floors below which an arrow is meaningless. The toolbar threshold,
+// when enabled, raises these rather than replacing them, so the 3D view hides
+// exactly what the 2D taxel maps hide.
 const RESULTANT_MIN_N = 0.3
 const RESULTANT_MAX_LEN_M = 0.035
 const TAXEL_MIN_N = 0.3
@@ -66,6 +70,9 @@ export class ForceArrowLayer {
 
       const group = new THREE.Group()
       group.name = `sensor-frame-${finger}`
+      // Parented to a link for the kinematics, but not part of the hand:
+      // keeps setSkinTone from repainting the arrows as black plastic.
+      markOverlay(group)
       group.matrixAutoUpdate = false
       // Row-major 4x4 from the backend; Matrix4.set takes row-major args.
       const rows = mount.matrix
@@ -90,8 +97,10 @@ export class ForceArrowLayer {
       group.add(resultant)
 
       const count = Math.max(taxelPositions.length, 1)
-      const shaftMaterial = new THREE.MeshBasicMaterial()
-      const headMaterial = new THREE.MeshBasicMaterial()
+      // Instrument colours bypass the canvas's tone mapping (as ArrowHelper
+      // does), so a force reads the same colour here as in the 2D taxel map.
+      const shaftMaterial = new THREE.MeshBasicMaterial({ toneMapped: false })
+      const headMaterial = new THREE.MeshBasicMaterial({ toneMapped: false })
       const shafts = new THREE.InstancedMesh(shaftGeometry, shaftMaterial, count)
       const heads = new THREE.InstancedMesh(headGeometry, headMaterial, count)
       shafts.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
@@ -131,8 +140,10 @@ export class ForceArrowLayer {
   updateResultants(
     forces: Partial<Record<Finger, Vec3>> | null,
     scheme: ArrowColorScheme,
+    threshold = 0,
   ): void {
     if (!this.resultantVisible) return
+    const minN = Math.max(RESULTANT_MIN_N, threshold)
     for (const [finger, entry] of this.entries) {
       const force = forces?.[finger]
       if (!force) {
@@ -141,11 +152,13 @@ export class ForceArrowLayer {
       }
       const [fx, fy, fz] = force
       const magnitude = Math.sqrt(fx * fx + fy * fy + fz * fz)
-      if (magnitude < RESULTANT_MIN_N) {
+      if (magnitude < minN) {
         entry.resultant.visible = false
         continue
       }
-      const normalized = Math.min(magnitude / MAX_TAXEL_FORCE, 1)
+      // The resultant is its own per-finger reading, so it scales like the 2D
+      // dial does — not against a per-taxel peak.
+      const normalized = Math.min(magnitude / MAX_FORCE_SCALE, 1)
       this.v.set(fx, fy, fz).normalize()
       const length = 0.006 + normalized * RESULTANT_MAX_LEN_M
       entry.resultant.position.copy(entry.centroid)
@@ -160,9 +173,12 @@ export class ForceArrowLayer {
   updateTaxels(
     taxels: Partial<Record<Finger, Vec3[]>> | null,
     scheme: ArrowColorScheme,
+    threshold = 0,
   ): void {
     if (!this.taxelsVisible) return
+    const minN = Math.max(TAXEL_MIN_N, threshold)
     for (const [finger, entry] of this.entries) {
+      const maxForce = maxTaxelForce(finger)
       const forces = taxels?.[finger]
       const n = Math.min(
         forces?.length ?? 0,
@@ -173,13 +189,13 @@ export class ForceArrowLayer {
         const [fx, fy, fz] = forces![i]
         const magnitude = Math.sqrt(fx * fx + fy * fy + fz * fz)
         const position = entry.taxelPositions[i]
-        if (magnitude < TAXEL_MIN_N) {
+        if (magnitude < minN) {
           this.m.makeScale(0, 0, 0) // hide this instance
           entry.shafts.setMatrixAt(i, this.m)
           entry.heads.setMatrixAt(i, this.m)
           continue
         }
-        const normalized = Math.min(magnitude / MAX_TAXEL_FORCE, 1)
+        const normalized = Math.min(magnitude / maxForce, 1)
         const length = TAXEL_BASE_LEN_M + normalized * TAXEL_MAX_EXTRA_LEN_M
         this.v.set(fx, fy, fz).normalize()
         this.q.setFromUnitVectors(UP, this.v)

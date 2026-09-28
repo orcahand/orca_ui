@@ -4,7 +4,35 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ORCA Hand Console</title>
-    <style>html { background: #1a1c2a; }</style>
+    <script>
+      // Resolve the theme before the first paint, or the page flashes the
+      // wrong one while the bundle loads. Deliberately duplicates the rule in
+      // src/theme/themeStore.ts — a stored choice wins, otherwise the OS
+      // decides — because that module cannot run early enough to matter.
+      // Keep the two in step; the store re-applies the same answer on boot.
+      (function () {
+        var theme
+        try {
+          var stored = localStorage.getItem('orca-ui.theme')
+          if (stored === 'dark' || stored === 'light') theme = stored
+        } catch (e) {
+          /* storage disabled: fall through to the OS preference */
+        }
+        if (!theme) {
+          theme =
+            window.matchMedia &&
+            window.matchMedia('(prefers-color-scheme: light)').matches
+              ? 'light'
+              : 'dark'
+        }
+        var root = document.documentElement
+        root.dataset.theme = theme
+        root.style.colorScheme = theme
+        // theme.css has not loaded yet, so this one value is inlined rather
+        // than tokenised. It must track --bg in src/theme/theme.css.
+        root.style.background = theme === 'light' ? '#f6f5f1' : '#1a1c2a'
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>
