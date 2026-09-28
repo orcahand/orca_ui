@@ -1,11 +1,13 @@
-// Console header: brand lockup, model badge, status pill, the five view
-// tabs, and the E-stop hard right. Capability badges + Hz meters live in the
-// Motors tab.
+// Console header: brand lockup, model picker, status pill, the link controls
+// (disconnect / reconnect), the view tabs, and the E-stop hard right.
+// Capability badges + Hz meters live in the Motors tab.
 
 import type { HandState } from '../../api/types'
 import type { ViewName } from '../../state/appStore'
 import { useAppStore } from '../../state/appStore'
 import { EStopButton } from './EStopButton'
+import { LinkControls } from './LinkControls'
+import { ModelPicker } from './ModelPicker'
 import { ThemeToggle } from './ThemeToggle'
 
 const STATE_CLASS: Record<HandState, string> = {
@@ -65,12 +67,7 @@ export function AppHeader() {
         <span className="brand-mark">◈ ORCA</span>
         <span className="brand-sub">HAND CONSOLE</span>
       </h1>
-      {handInfo && (
-        <span className="capability-badge">
-          {handInfo.model_name}
-          {handInfo.mock ? ' · MOCK' : ''}
-        </span>
-      )}
+      <ModelPicker />
       {handInfo?.core?.development && (
         // Only shown off a release: on a dev build the hand's behaviour may
         // not match any shipped version, and that should never be a surprise.
@@ -83,6 +80,7 @@ export function AppHeader() {
       <span className={`status-indicator ${pillClass}`}>
         {wsConnected ? pillLabel : 'Backend offline'}
       </span>
+      <LinkControls />
       <div className="header-spacer" />
       <nav className="view-tabs">
         {tabs.map((tab) => (

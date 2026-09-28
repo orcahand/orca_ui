@@ -62,6 +62,13 @@ class StatusSnapshot:
     # when it sees this change.
     model: str = ""
     side: str = ""
+    # False while the model is still detection's to revise; True once the
+    # command line or the browser named one. The picker shows which of the
+    # two is in force, so it rides along here rather than being polled.
+    model_pinned: bool = True
+    # True while a human has asked for the hardware back: the auto-connect
+    # ladder is suspended and DISCONNECTED is a resting state, not a search.
+    released: bool = False
 
     def as_dict(self) -> dict:
         caps = None
@@ -83,4 +90,6 @@ class StatusSnapshot:
             "since": self.since,
             "model": self.model,
             "side": self.side,
+            "model_pinned": self.model_pinned,
+            "released": self.released,
         }
