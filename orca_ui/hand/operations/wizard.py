@@ -59,7 +59,7 @@ class WizardOperation(Operation):
             ctx.check_stop()
             ctx.set_phase("connecting", detail="opening motor-only connection")
             hand = hand_ops.build_maintenance_hand(
-                ctx.settings.config_path, ctx.stop_event)
+                supervisor.config.config_path, ctx.stop_event)
             self._hand = hand
             try:
                 encoder_client, encoder_link = hand_ops.open_encoder_client(

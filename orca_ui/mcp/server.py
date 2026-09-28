@@ -49,6 +49,16 @@ class ServerState:
     def invalidate_hand_summary(self) -> None:
         self._summary = None
 
+    def note_status(self, status: dict) -> None:
+        """Drop the cached summary when a status snapshot names a different
+        model. The backend re-derives the model from the hardware, so ROMs and
+        neutral poses can change under a live server — they must not ride out
+        the TTL belonging to the hand that was unplugged."""
+        model = status.get("model")
+        if (model and self._summary is not None
+                and self._summary.get("model_name") != model):
+            self._summary = None
+
     async def hand_summary(self, fresh: bool = False) -> dict:
         """Condensed /api/hand/info (60 s TTL): identity, mock flag, ROMs,
         neutral pose. Invalidated on any fetch failure — fail toward REAL.
@@ -85,6 +95,7 @@ async def state_block(state: ServerState) -> dict:
     backend = state.backend
     try:
         status = await backend.get("/api/status")
+        state.note_status(status)
         out["torque_enabled"] = bool(status.get("torque_enabled"))
     except BackendError:
         pass

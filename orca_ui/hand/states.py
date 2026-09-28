@@ -56,6 +56,12 @@ class StatusSnapshot:
     message: str
     ports: dict
     since: float
+    # Which hand config is in force. Streamed because it is not fixed for the
+    # process: with no model pinned on the command line, the supervisor
+    # re-derives it from the hardware, and the browser refetches /hand/info
+    # when it sees this change.
+    model: str = ""
+    side: str = ""
 
     def as_dict(self) -> dict:
         caps = None
@@ -75,4 +81,6 @@ class StatusSnapshot:
             "message": self.message,
             "ports": dict(self.ports),
             "since": self.since,
+            "model": self.model,
+            "side": self.side,
         }
