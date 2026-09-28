@@ -6,8 +6,8 @@ telemetry, stream stats). All rates come from settings and are decoupled from
 the hardware rates — orca_core's clients buffer the latest frame internally.
 
 Motor-bus reads share the servo bus with the joint loop's writes, so with a
-loop running they are confined to the slow tick, one per tick, and skipped
-entirely while the hand is being driven.
+loop running they are confined to the slow tick, one per tick, and deferred
+while the hand is being driven.
 """
 
 from __future__ import annotations
@@ -329,7 +329,7 @@ class TelemetryService:
             if trim is not None:
                 self._hub.publish(T.JOINTS_CORRECTION, {"trim": trim})
 
-        if session.caps.motors:
+        if session.caps.motors and (session.caps.encoders or estimate is not None):
             self._feed_tracking(session, estimate)
 
     def _slow_tick(self) -> None:
@@ -348,6 +348,12 @@ class TelemetryService:
                     self._publish_motor_health(session)
             elif not self._hand_is_driven() or self._telemetry_is_stale():
                 self._bus_read_tick(session)
+
+        if (session.caps.motors and not session.caps.feedback_loop
+                and not self._estimate_is_wanted()):
+            # The model follows targets, so the mid tick is not polling the
+            # estimate; adherence tracking still needs it, once a second.
+            self._feed_tracking(session, self._estimate_for_tracking(session))
 
         self._hub.publish(T.STATS, self._service.stats())
         health = self._sensor_health.payload(session)
@@ -373,6 +379,10 @@ class TelemetryService:
         suppressed = dict(self._enc_suppressed)
         for joint, info in (encoders.get("joints") or {}).items():
             verdict = info.get("verdict")
+            if verdict == "no frames":
+                # The whole stream is down, not this joint; suppressing every
+                # joint would then hold them all through five clean windows.
+                continue
             if verdict != "live":
                 detail = f"{verdict}: {info.get('reason')}"
                 if joint not in suppressed:
@@ -404,12 +414,15 @@ class TelemetryService:
 
     def _hand_is_driven(self) -> bool:
         """True while something is actively commanding motion."""
+        service = getattr(self, "_service", None)
+        if service is None:
+            return False
         try:
-            if self._service.worker.stats().get("ramping"):
+            if service.worker.stats().get("ramping"):
                 return True
         except Exception:
             pass
-        manager = self._service.operation_manager
+        manager = getattr(service, "operation_manager", None)
         try:
             return bool(manager and manager.active())
         except Exception:
@@ -426,6 +439,17 @@ class TelemetryService:
             return self._service.effective_pose_source() == "estimate"
         except Exception:
             return True
+
+    def _estimate_for_tracking(self, session) -> dict | None:
+        """One motor read for adherence tracking while the hand is torqued;
+        nothing while it is limp, when deviation is expected."""
+        try:
+            if not self._service.supervisor.status().torque_enabled:
+                return None
+            estimate, _currents = session.motor_snapshot()
+        except Exception:
+            return None
+        return _clean_angles(estimate)
 
     def _motor_telemetry_is_due(self) -> bool:
         """True once the loopless hand's telemetry has aged out its rate limit."""
@@ -541,7 +565,8 @@ class TelemetryService:
         # mid-motion, where the sweep is not gated and the bus can least
         # spare one. Re-reading tells us nothing: the flags cannot change.
         news = any(int(mid) not in self._hw_errors for mid in alerted)
-        if not news and now - self._last_hw_error_sweep < HW_ERROR_SWEEP_S:
+        if not news and (self._hand_is_driven()
+                         or now - self._last_hw_error_sweep < HW_ERROR_SWEEP_S):
             return
         self._last_hw_error_sweep = now
         raw = self._read_hardware_errors(client, hand)
@@ -560,15 +585,15 @@ class TelemetryService:
                 continue
             info = classify_hw_error(
                 flags, motor=mid, joint=motor_to_joint.get(mid),
-                temperature_c=(self._motor_health.get("temps") or {}).get(int(mid)))
+                temperature_c=(self._motor_health.get("temps") or {}).get(int(mid)),
+                can_reboot=hasattr(client, "reboot_motor"))
             found[int(mid)] = flags
             classified[int(mid)] = info
             if int(mid) in self._hw_errors_warned:
                 continue
             self._hw_errors_warned.add(int(mid))
             # Advice that matches the fault: a power latch at 32 °C must not
-            # be met with "let it cool", which is what a single templated
-            # message for every bit used to say.
+            # be met with "let it cool".
             message = (
                 f"{info['headline']}: {info['disabled_note']} "
                 f"{info['advice']}"
@@ -621,6 +646,9 @@ class TelemetryService:
                 self._faults_session_key = key
                 self._bus_errors.reset()
                 self._tracking.reset()
+                self._hw_errors = {}
+                self._hw_error_info = {}
+                self._hw_errors_warned = set()
         bus = self._bus_errors.snapshot()
         tracking = self._tracking.snapshot()
         config = getattr(getattr(self._service, "supervisor", None),

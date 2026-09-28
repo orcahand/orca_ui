@@ -96,13 +96,17 @@ class _Worker:
 
 class _Service:
     def __init__(self, session, ramping=False, op_active=False,
-                 torque=False, applied=None):
+                 torque=False, applied=None, pose_source="estimate"):
         self.session = session
         self.worker = _Worker(ramping, applied)
         self.operation_manager = _Manager(op_active)
         self.supervisor = SimpleNamespace(
             status=lambda: SimpleNamespace(torque_enabled=torque))
         self._direct_motor_mode = False
+        self._pose_source = pose_source
+
+    def effective_pose_source(self):
+        return self._pose_source
 
     def stats(self):
         return {}
@@ -123,9 +127,9 @@ class _Settings:
 
 
 def _build(ramping=False, op_active=False, feedback_loop=True,
-           torque=False, applied=None):
+           torque=False, applied=None, pose_source="estimate"):
     session = _Session(feedback_loop)
-    service = _Service(session, ramping, op_active, torque, applied)
+    service = _Service(session, ramping, op_active, torque, applied, pose_source)
     telemetry = TelemetryService(service, _Hub(), _Settings())
     return telemetry, session
 
@@ -253,3 +257,27 @@ def test_tracking_compares_what_was_written_against_what_the_hand_did():
     telemetry, _ = _build(torque=True, applied={"index_mcp": 80.0})
     telemetry._mid_tick()
     assert telemetry._tracking.snapshot()["index_mcp"]["deviation_deg"] == 70.0
+
+
+def test_tracking_still_runs_when_the_model_follows_targets():
+    """In the default pose source the mid tick stops polling the estimate
+    once torque is on, which is the only time a stall can happen; tracking
+    then takes one motor read a second from the slow tick instead."""
+    telemetry, session = _build(feedback_loop=False, torque=True,
+                                applied={"index_mcp": 30.0}, pose_source="target")
+    session.caps.encoders = False
+    for _ in range(3):
+        telemetry._mid_tick()
+    assert "pos" not in session.hand.bus_reads
+    telemetry._slow_tick()
+    assert "state" in session.hand.bus_reads
+    assert telemetry._tracking._joints["index_mcp"].deviation == 25.0
+    # The next mid tick must not wipe what the slow tick measured.
+    telemetry._mid_tick()
+    assert telemetry._tracking._joints["index_mcp"].deviation == 25.0
+
+
+def test_a_dead_stream_is_not_suppressed_joint_by_joint():
+    telemetry, _ = _build()
+    telemetry._update_encoder_suppression(_health("no frames"))
+    assert telemetry._enc_suppressed == {}

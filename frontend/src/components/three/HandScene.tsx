@@ -192,10 +192,15 @@ function HandRig({
       // the estimate). Non-encoder hands: commanded targets win instead.
       // Composed into one pose so the adapter sees each joint once per frame;
       // two passes would fight its per-joint slack.
-      rig.adapter.apply({
-        ...frames.joints.estimate,
-        ...(caps.encoders ? frames.joints.measured : frames.joints.target),
-      })
+      // On a non-encoder hand the top layer is chosen, not merged: the
+      // commanded targets are the last thing published before torque drops,
+      // and layering them would keep masking the live estimate afterwards.
+      const overlay = caps.encoders
+        ? frames.joints.measured
+        : useAppStore.getState().control?.effective_pose_source === 'estimate'
+          ? {}
+          : frames.joints.target
+      rig.adapter.apply({ ...frames.joints.estimate, ...overlay })
 
       if (rig.ghost) {
         // Without encoders the main hand already shows the motor estimate,

@@ -92,7 +92,9 @@ export const api = {
     post<{
       motor: number
       joint: string | null
-      cleared: boolean
+      // null: the motor did not answer the read-back after the reboot.
+      cleared: boolean | null
+      read_back: boolean
       hw_error_flags: string[] | null
     }>(`/api/motors/${id}/reboot`),
 

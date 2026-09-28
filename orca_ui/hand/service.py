@@ -66,21 +66,21 @@ _MOVE_STEP_S = 0.02
 _MOVE_MIN_S = 0.5
 _MOVE_MAX_S = 3.0
 
-# Dynamixel X-series Hardware Error Status bits. Any latched bit makes the
-# motor refuse to energize until rebooted. The UI decodes the bits to human-readable names for display.
-_HW_ERROR_BITS = (
-    (0x01, "input_voltage"),
-    (0x04, "overheating"),
-    (0x08, "motor_encoder"),
-    (0x10, "electrical_shock"),
-    (0x20, "overload"),
-)
-
-
-def _decode_hw_error(value: int | None) -> list[str] | None:
-    if value is None:
+def _decode_hw_error(client, value: int | None) -> list[str] | None:
+    """Names of the latched bits, in the connected family's own vocabulary."""
+    decode = getattr(client, "decode_hardware_error", None)
+    if decode is None or value is None:
         return None
-    return [name for bit, name in _HW_ERROR_BITS if value & bit]
+    return list(decode(value))
+
+
+def _bus_fence(hand):
+    """The joint loop's write fence when a loop runs, else nothing: a bus
+    transaction outside it interleaves with the loop's sync writes."""
+    from contextlib import nullcontext
+
+    fence = getattr(hand, "_loop_writes_paused", None)
+    return fence() if fence is not None else nullcontext()
 
 
 def _gain_entry(kp: float, ki: float, correction_max_deg: float) -> dict:
@@ -181,9 +181,10 @@ class HandService:
         # Servo gains the operator has explicitly chosen, per motor. Empty
         # until someone sets one: gains nobody picked must not be overwritten
         # with our idea of a default.
-        self._servo_gains: dict[int, "ServoGains"] = {}
+        # Keyed by model name, so a swapped hand never inherits another's.
+        self._servo_gains: dict[str, dict[int, "ServoGains"]] = {}
         # Same rule for trajectory limits: only what the operator picked.
-        self._servo_profiles: dict[int, "ServoProfile"] = {}
+        self._servo_profiles: dict[str, dict[int, "ServoProfile"]] = {}
         # Which stream the 3D model follows, and whether the motor estimate is
         # polled at all. "auto" reads the motors while they are limp and stops
         # once torque is on, so commands are not competing with reads for the
@@ -271,6 +272,8 @@ class HandService:
                 session, encoder_backed, encoder_calibrated),
             "control": self.control_state(),
             "core": resolve_core_source().as_dict(),
+            "reboot_supported": bool(session is not None and hasattr(
+                getattr(session.hand, "motor_client", None), "reboot_motor")),
         }
         mapping = getattr(config, "finger_to_sensor_id", None)
         if mapping:
@@ -793,7 +796,16 @@ class HandService:
         unknown = set(angles) - known
         if unknown:
             raise ServiceError(f"unknown joints: {sorted(unknown)}")
-        clean = {j: float(v) for j, v in angles.items()}
+        # Clamped here, not left to orca_core: the echo, the interpolator and
+        # adherence tracking must all see the value the hand is really sent.
+        roms = session.hand.config.joint_roms_dict
+        clean = {}
+        for joint, value in angles.items():
+            value = float(value)
+            rom = roms.get(joint)
+            if rom is not None:
+                value = min(max(value, float(rom[0])), float(rom[1]))
+            clean[joint] = value
         self.worker.submit_targets(clean)
         with self._state_lock:
             self._targets.update(clean)
@@ -958,7 +970,8 @@ class HandService:
         if ma is None:
             return
         try:
-            session.hand.set_max_current(ma)
+            with _bus_fence(session.hand):
+                session.hand.set_max_current(ma)
         except Exception:
             logger.warning("could not apply the %d mA current ceiling", ma,
                            exc_info=True)
@@ -971,22 +984,24 @@ class HandService:
         motors are left alone.
         """
         with self._state_lock:
-            gains = dict(self._servo_gains)
+            gains = dict(self._servo_gains.get(self.supervisor.model_name, {}))
         if not gains:
             return
         try:
-            session.hand.set_servo_gains(gains)
+            with _bus_fence(session.hand):
+                session.hand.set_servo_gains(gains)
         except Exception:
             logger.warning("could not apply servo gains", exc_info=True)
 
     def _apply_servo_profiles(self, session) -> None:
         """Re-apply the operator's chosen trajectory limits (RAM, like gains)."""
         with self._state_lock:
-            profiles = dict(self._servo_profiles)
+            profiles = dict(self._servo_profiles.get(self.supervisor.model_name, {}))
         if not profiles:
             return
         try:
-            session.hand.set_servo_profile(profiles)
+            with _bus_fence(session.hand):
+                session.hand.set_servo_profile(profiles)
         except Exception:
             logger.warning("could not apply servo profiles", exc_info=True)
 
@@ -994,7 +1009,8 @@ class HandService:
         """Read the trajectory limits off the motors, in SI units."""
         session = self._require_motors()
         try:
-            profiles = session.hand.get_servo_profile()
+            with _bus_fence(session.hand):
+                profiles = session.hand.get_servo_profile()
         except Exception as e:
             raise ServiceError(f"could not read servo profile: {e}",
                                status_code=502)
@@ -1018,17 +1034,24 @@ class HandService:
         if not named:
             raise ServiceError("no profile values given")
         try:
-            session.hand.set_servo_profile({motor_id: ServoProfile(**named)})
+            with _bus_fence(session.hand):
+                session.hand.set_servo_profile({motor_id: ServoProfile(**named)})
         except Exception as e:
             raise ServiceError(f"profile write failed: {e}", status_code=502)
+        result = self.read_servo_profile()
+        if result.get(str(motor_id)) is None:
+            raise ServiceError(
+                "this motor family does not expose servo trajectory limits",
+                status_code=501)
         with self._state_lock:
-            previous = self._servo_profiles.get(motor_id)
+            store = self._servo_profiles.setdefault(self.supervisor.model_name, {})
+            previous = store.get(motor_id)
             merged = named if previous is None else {
                 **{k: v for k, v in previous.__dict__.items() if v is not None},
                 **named,
             }
-            self._servo_profiles[motor_id] = ServoProfile(**merged)
-        return self.read_servo_profile()
+            store[motor_id] = ServoProfile(**merged)
+        return result
 
     def read_servo_gains(self) -> dict:
         """Read the gains off the motors — hardware truth, not what was typed.
@@ -1037,7 +1060,8 @@ class HandService:
         """
         session = self._require_motors()
         try:
-            gains = session.hand.get_servo_gains()
+            with _bus_fence(session.hand):
+                gains = session.hand.get_servo_gains()
         except Exception as e:
             raise ServiceError(f"could not read servo gains: {e}",
                                status_code=502)
@@ -1062,17 +1086,23 @@ class HandService:
             raise ServiceError("no gain values given")
         entry = ServoGains(**named)
         try:
-            session.hand.set_servo_gains({motor_id: entry})
+            with _bus_fence(session.hand):
+                session.hand.set_servo_gains({motor_id: entry})
         except Exception as e:
             raise ServiceError(f"gain write failed: {e}", status_code=502)
+        result = self.read_servo_gains()
+        if result.get(str(motor_id)) is None:
+            raise ServiceError("this motor family does not expose servo gains",
+                               status_code=501)
         with self._state_lock:
-            previous = self._servo_gains.get(motor_id)
+            store = self._servo_gains.setdefault(self.supervisor.model_name, {})
+            previous = store.get(motor_id)
             merged = named if previous is None else {
                 **{k: v for k, v in previous.__dict__.items() if v is not None},
                 **named,
             }
-            self._servo_gains[motor_id] = ServoGains(**merged)
-        return self.read_servo_gains()
+            store[motor_id] = ServoGains(**merged)
+        return result
 
     def set_max_current(self, ma: int) -> None:
         import dataclasses
@@ -1086,7 +1116,8 @@ class HandService:
             config = dataclasses.replace(session.hand.config, max_current=ma)
         except Exception as e:
             raise ServiceError(f"hand config rejected {ma} mA: {e}")
-        session.hand.set_max_current(ma)
+        with _bus_fence(session.hand):
+            session.hand.set_max_current(ma)
         session.hand.config = config
         with self._state_lock:
             self._max_current = ma
@@ -1110,15 +1141,12 @@ class HandService:
         per-motor status round-trips don't interleave with 100 Hz writes on
         the shared bus.
         """
-        from contextlib import nullcontext
-
         session = self._require_motors()
         hand = session.hand
-        fence = getattr(hand, "_loop_writes_paused", None)
-        with (fence() if fence is not None else nullcontext()):
+        client = getattr(hand, "motor_client", None)
+        with _bus_fence(hand):
             positions = hand.get_motor_pos(as_dict=True)
-            read_error = getattr(
-                getattr(hand, "_motor_client", None), "read_hardware_error", None)
+            read_error = getattr(client, "read_hardware_error", None)
             errors: dict = {}
             for mid in hand.config.motor_ids:
                 err = None
@@ -1140,7 +1168,7 @@ class HandService:
                     "joint": str(motor_to_joint.get(mid, "")),
                     "position": float(positions[mid]),
                     "hw_error": errors[mid],
-                    "hw_error_flags": _decode_hw_error(errors[mid]),
+                    "hw_error_flags": _decode_hw_error(client, errors[mid]),
                 }
                 for mid in hand.config.motor_ids
             ],
@@ -1157,22 +1185,25 @@ class HandService:
         again on the next command, and that should happen under a deliberate
         torque enable rather than silently inside a recovery call.
         """
-        from contextlib import nullcontext
-
         session = self._require_motors()
+        self._require_manual_control()
+        if self.supervisor.status().torque_enabled:
+            # A rebooted motor comes back limp while the rest stay torqued,
+            # and the streams keep writing to it while it restarts.
+            raise ServiceError("disable torque before rebooting a motor",
+                               status_code=409)
         hand = session.hand
         motor_id = int(motor_id)
         if motor_id not in set(hand.config.motor_ids):
             raise ServiceError(f"unknown motor {motor_id}", status_code=404)
 
-        client = getattr(hand, "_motor_client", None)
+        client = getattr(hand, "motor_client", None)
         reboot = getattr(client, "reboot_motor", None)
         if reboot is None:
             raise ServiceError("this motor family has no reboot instruction",
                                status_code=501)
 
-        fence = getattr(hand, "_loop_writes_paused", None)
-        with (fence() if fence is not None else nullcontext()):
+        with _bus_fence(hand):
             try:
                 reboot(motor_id)
             except Exception as e:
@@ -1188,7 +1219,7 @@ class HandService:
                 except Exception:
                     error = None
 
-        flags = _decode_hw_error(error)
+        flags = _decode_hw_error(client, error)
         joint = hand.config.motor_to_joint_dict.get(motor_id)
         info = classify_hw_error(flags, motor=motor_id, joint=joint)
         # Drop the cached latch so the dashboard updates on this reply rather
@@ -1200,7 +1231,10 @@ class HandService:
         return {
             "motor": motor_id,
             "joint": joint,
-            "cleared": not flags,
+            # None when the motor did not answer the read-back: unknown is
+            # not the same as clear.
+            "cleared": None if error is None else not flags,
+            "read_back": error is not None,
             "hw_error": error,
             "hw_error_flags": flags,
             "info": info,

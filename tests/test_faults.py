@@ -223,3 +223,16 @@ class TestHardwareErrorSweep:
         sampler._sweep_hardware_errors(session)  # immediately again
 
         assert client.reads == first
+
+
+def test_every_family_bit_name_has_a_kind_and_a_reboot_less_note():
+    """orca_core decodes Feetech latches to angle_sensor/overcurrent; those
+    must classify, and a family with no reboot instruction must not be told
+    to reboot."""
+    from orca_ui.hand.faults import classify_hw_error
+
+    assert classify_hw_error(["overcurrent"])["kind"] == "load"
+    assert classify_hw_error(["angle_sensor"])["kind"] == "encoder"
+    note = classify_hw_error(["overload"], can_reboot=False)["disabled_note"]
+    assert "power-cycled" in note and "rebooted" not in note
+    assert classify_hw_error(["overload"])["can_reboot"] is True

@@ -10,7 +10,7 @@ from orca_ui.hand.service import HandService, ServiceError
 from orca_ui.hand.taxel_geometry import get_taxel_geometry
 
 
-def build_router(service: HandService, telemetry=None) -> APIRouter:
+def build_router(service: HandService) -> APIRouter:
     router = APIRouter(prefix="/api")
 
     def guard(fn, *args, **kwargs):

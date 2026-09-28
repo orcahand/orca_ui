@@ -52,8 +52,8 @@ _ID_LIST_RE = re.compile(
 # Latched hardware errors
 # ---------------------------------------------------------------------------
 
-# Dynamixel X-series Hardware Error Status (address 70) bits, grouped by what
-# the operator has to do about them.
+# Hardware Error Status bits, by the names orca_core's motor clients decode
+# them to, grouped by what the operator has to do about them.
 #
 # Every latched bit inhibits the power stage identically: the motor keeps
 # answering the bus and still acknowledges torque enable, it just never
@@ -67,7 +67,9 @@ HW_ERROR_KINDS: dict[str, str] = {
     "electrical_shock": "power",
     "input_voltage": "power",
     "overload": "load",
+    "overcurrent": "load",
     "motor_encoder": "encoder",
+    "angle_sensor": "encoder",
 }
 
 # Most-actionable first. A motor latched thermal *and* power is a power
@@ -105,10 +107,16 @@ _HW_DISABLED_NOTE = (
     "It still answers the bus and still acknowledges torque enable, but it "
     "will not move until it is rebooted or power-cycled."
 )
+_HW_DISABLED_NOTE_NO_REBOOT = (
+    "It still answers the bus and still acknowledges torque enable, but it "
+    "will not move until the hand is power-cycled (this motor family has no "
+    "reboot instruction)."
+)
 
 
 def classify_hw_error(flags, *, motor=None, joint=None,
-                      temperature_c: float | None = None) -> dict | None:
+                      temperature_c: float | None = None,
+                      can_reboot: bool = True) -> dict | None:
     """Describe a motor's latched Hardware Error Status.
 
     Returns ``None`` when nothing is latched. Otherwise a dict carrying the
@@ -140,7 +148,9 @@ def classify_hw_error(flags, *, motor=None, joint=None,
                           else float(temperature_c)),
         "headline": f"{who} has latched {' + '.join(flags)}{temp}",
         "advice": _HW_KIND_ADVICE[kind],
-        "disabled_note": _HW_DISABLED_NOTE,
+        "disabled_note": (_HW_DISABLED_NOTE if can_reboot
+                          else _HW_DISABLED_NOTE_NO_REBOOT),
+        "can_reboot": can_reboot,
     }
 
 

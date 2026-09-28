@@ -187,6 +187,8 @@ export interface HandInfo {
   calibration: CalibrationInfo
   control: ControlState
   core?: CoreSourceInfo
+  // False on a motor family with no reboot instruction; the reboot control hides.
+  reboot_supported?: boolean
   finger_to_sensor_id?: Record<Finger, number>
   tactile?: { active_sensors: Finger[]; num_taxels: Record<Finger, number> }
 }

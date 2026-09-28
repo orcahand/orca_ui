@@ -17,13 +17,18 @@ export function RebootButton({
 }) {
   const [busy, setBusy] = useState(false)
   const setError = useAppStore((s) => s.setError)
+  const torqueOn = useAppStore((s) => s.control?.torque_enabled ?? false)
+  const supported = useAppStore((s) => s.handInfo?.reboot_supported ?? true)
+  if (!supported) return null
   return (
     <button
       type="button"
       className="btn btn-secondary reboot-btn"
-      disabled={busy}
+      disabled={busy || torqueOn}
       title={
-        needsCooling
+        torqueOn
+          ? 'Disable torque first: a rebooted motor comes back limp while the rest stay torqued.'
+          : needsCooling
           ? 'Reboot this motor. It is a heat fault — let it cool first or it latches again immediately.'
           : 'Reboot this motor to clear the latch. It returns with torque off; if the fault persists it latches again when next driven.'
       }
@@ -32,11 +37,13 @@ export function RebootButton({
         api
           .rebootMotor(Number(id))
           .then((r) => {
-            setError(
-              r.cleared
-                ? null
-                : `motor ${id} re-latched immediately: ${(r.hw_error_flags ?? []).join(' + ')} — the cause is still present`,
-            )
+            if (r.cleared === null) {
+              setError(`motor ${id} did not answer after the reboot — check it before driving`)
+            } else if (r.cleared) {
+              setError(null)
+            } else {
+              setError(`motor ${id} re-latched immediately: ${(r.hw_error_flags ?? []).join(' + ')} — the cause is still present`)
+            }
           })
           .catch((e) => setError(String((e as Error).message ?? e)))
           .finally(() => setBusy(false))

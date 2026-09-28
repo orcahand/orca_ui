@@ -391,3 +391,62 @@ def test_control_state_carries_both_the_mode_and_what_it_resolved_to(service):
     assert state["effective_pose_source"] == "estimate"
     with pytest.raises(ServiceError):
         service.set_pose_source("nonsense")
+
+
+def test_targets_are_clamped_to_the_rom_before_anything_sees_them(service):
+    """The echo, the interpolator and adherence tracking must agree on what
+    the hand is sent, so the clamp happens here, not deep in orca_core."""
+    service.enable_torque()
+    rom = service.supervisor.config.joint_roms_dict["index_mcp"]
+    service.set_targets({"index_mcp": float(rom[1]) + 500.0})
+    assert service._targets["index_mcp"] == float(rom[1])
+    assert service.worker._to["index_mcp"] == float(rom[1])
+
+
+def test_servo_writes_are_refused_on_a_family_without_the_registers(service, monkeypatch):
+    """orca_core ignores the write and logs; the console must say so with a
+    501 instead of storing values the motors never held."""
+    from types import SimpleNamespace
+
+    hand = SimpleNamespace(
+        config=service.supervisor.config,
+        get_servo_gains=lambda: {m: None for m in service.supervisor.config.motor_ids},
+        set_servo_gains=lambda gains: None,
+        get_servo_profile=lambda: {m: None for m in service.supervisor.config.motor_ids},
+        set_servo_profile=lambda profiles: None,
+    )
+    monkeypatch.setattr(service, "_require_motors", lambda: SimpleNamespace(hand=hand))
+    motor = service.supervisor.config.motor_ids[0]
+    with pytest.raises(ServiceError) as excinfo:
+        service.set_servo_gains(motor, {"kp": 800})
+    assert excinfo.value.status_code == 501
+    with pytest.raises(ServiceError) as excinfo:
+        service.set_servo_profile(motor, {"velocity_rad_s": 1.0})
+    assert excinfo.value.status_code == 501
+    assert service._servo_gains == {} and service._servo_profiles == {}
+
+
+def test_reboot_needs_torque_off_and_reports_an_unanswered_read_back(service, monkeypatch):
+    service.enable_torque()
+    motor = service.supervisor.config.motor_ids[0]
+    with pytest.raises(ServiceError) as excinfo:
+        service.reboot_motor(motor)
+    assert excinfo.value.status_code == 409
+    service.disable_torque()
+
+    client = service.session.hand.motor_client
+    monkeypatch.setattr(type(client), "reboot_motor", lambda self, mid: None, raising=False)
+    monkeypatch.setattr(type(client), "read_hardware_error", lambda self, mid: None)
+    monkeypatch.setattr("orca_ui.hand.service.MOTOR_REBOOT_SETTLE_S", 0.0)
+    result = service.reboot_motor(motor)
+    assert result["cleared"] is None and result["read_back"] is False
+
+    monkeypatch.setattr(type(client), "read_hardware_error", lambda self, mid: 0)
+    result = service.reboot_motor(motor)
+    assert result["cleared"] is True and result["read_back"] is True
+
+
+def test_hand_info_says_whether_the_family_can_reboot(service):
+    info = service.hand_info()
+    client = service.session.hand.motor_client
+    assert info["reboot_supported"] == hasattr(client, "reboot_motor")
