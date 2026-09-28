@@ -242,8 +242,7 @@ class HandService:
         """Motor vs joint-feedback calibration, and what recalibrating fixes.
 
         ``hint`` is set when the motors are calibrated but encoder anchors are
-        missing — the state every calibration recorded before the wrist joined
-        the loop lands in.
+        missing, so recalibrating those joints is what closes the loop on them.
         """
         state: dict = {"motors": None, "joint_feedback": None,
                        "missing_anchors": [], "hint": None}
@@ -717,6 +716,7 @@ class HandService:
     def rebase(self) -> None:
         session = self._require_feedback()
         session.hand.rebase_loop()
+        self.worker.reset()
 
     # ----- direct motor control (advanced diagnostics) -----------------------
     #
@@ -729,7 +729,7 @@ class HandService:
         """Per-motor position + latched hardware-error state.
 
         Reads happen under the loop-write fence (when a loop runs) so the
-        per-motor status round-trips don't interleave with 100 Hz writes on
+        per-motor status round-trips don't interleave with the loop's writes on
         the shared bus.
         """
         from contextlib import nullcontext
@@ -800,6 +800,7 @@ class HandService:
                 loop.resume_writes()
             except Exception:
                 logger.exception("resume_writes failed leaving direct motor mode")
+        self.worker.reset()
         self._publish_control_state()
 
     def set_motor_position(self, motor_id: int, position: float) -> dict:

@@ -1,7 +1,7 @@
 """Telemetry sampler tests: what the ticks are allowed to put on the motor bus.
 
 A bulk read holds the servo bus for a round trip per motor (~15 ms on a
-17-motor hand), and the joint loop writes over that same bus every 10 ms. A
+17-motor hand), and the joint loop writes over that same bus every cycle. A
 read taken while the hand is moving therefore freezes it for a cycle and a
 half. These pin when a read is allowed to happen at all.
 """
@@ -160,7 +160,10 @@ def test_a_long_motion_still_gets_telemetry_eventually():
     telemetry, session = _build(ramping=True)
     telemetry._last_bus_read -= MAX_TELEMETRY_STALENESS_S + 1.0
     telemetry._slow_tick()
-    assert session.hand.bus_reads == ["state"]
+    assert session.hand.bus_reads == ["temp"]
+    # The forced read resets the clock: the next tick defers again.
+    telemetry._slow_tick()
+    assert session.hand.bus_reads == ["temp"]
 
 
 def test_hand_without_a_loop_is_unrestricted():

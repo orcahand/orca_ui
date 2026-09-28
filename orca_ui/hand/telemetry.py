@@ -135,8 +135,12 @@ class TelemetryService:
         if session.caps.motors:
             if not session.caps.feedback_loop:
                 self._publish_motor_health(session)
-            elif not self._hand_is_driven() or self._telemetry_is_stale():
+            elif not self._hand_is_driven():
                 self._bus_read_tick(session)
+            elif self._telemetry_is_stale():
+                # The one read motion may not defer: an overheating motor.
+                self._last_bus_read = time.monotonic()
+                self._publish_motor_health(session, currents=False)
 
         self._hub.publish(T.STATS, self._service.stats())
 

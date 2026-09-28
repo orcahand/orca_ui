@@ -41,7 +41,7 @@ def build_maintenance_hand(config_path: str, stop_event: threading.Event,
                            retry_s: float = 2.0):
     """Fresh motor-only OrcaHand for a maintenance operation.
 
-    Always the plain class — never the feedback subclass, whose 100 Hz loop
+    Always the plain class — never the feedback subclass, whose joint loop
     refuses to calibrate. Port-open is retried briefly to absorb the OS
     serial release latency after the supervisor closed the session.
     """
