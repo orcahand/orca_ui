@@ -25,3 +25,6 @@ env/
 # Frontend
 node_modules/
 .superpowers/
+
+# Where orca-dev remembers this machine's orca_core checkout
+.orca-dev.json
