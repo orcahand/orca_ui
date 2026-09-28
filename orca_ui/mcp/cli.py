@@ -18,8 +18,8 @@ from orca_ui.mcp.settings import DEFAULT_URL, McpSettings
 
 # A stdio server outlives its host if the host ever dies without closing the
 # pipe (a killed terminal, a crashed client) — nothing then tells this
-# process to exit, and it's easy to forget it's still holding the backend's
-# hand port. Idle-shutdown is the backstop: 0 disables it.
+# process to exit, and it keeps a client's hold on the backend nobody is
+# driving. Idle-shutdown is the backstop: 0 disables it.
 DEFAULT_IDLE_TIMEOUT_HOURS = 3.0
 IDLE_CHECK_INTERVAL_S = 60.0
 

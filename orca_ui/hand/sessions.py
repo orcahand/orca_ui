@@ -194,9 +194,12 @@ class HandSession:
             # All hand classes tolerate partial state; for sensors-only
             # sessions this also tears down the tactile link opened by
             # connect_sensors_only().
-            self.hand.disconnect()
+            result = self.hand.disconnect()
         except Exception:
             logger.exception("hand disconnect failed during session close")
+        else:
+            if isinstance(result, tuple) and len(result) == 2 and not result[0]:
+                logger.warning("hand disconnect incomplete: %s", result[1])
         for link in self._owned_links:
             try:
                 link.disconnect()
@@ -330,8 +333,7 @@ def _connect_with_motors(settings, config, declared, presence: HardwarePresence)
             # board when one is pinned. Left as "auto", connect() re-resolves
             # it machine-globally: ambiguous with two adapters attached, and
             # with a board pinned it must not look beyond that board at all.
-            # In-memory only; persist_resolved_driver diffs against the file,
-            # so a patched port is never written back.
+            # In-memory only: nothing writes the port back to the file.
             import copy
 
             if hand.config is config:

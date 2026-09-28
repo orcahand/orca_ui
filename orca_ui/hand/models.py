@@ -3,9 +3,9 @@
 Which model is in force is normally a conclusion rather than a setting: the
 supervisor reads it off the controller board's identity reply on every
 detection pass. A hand with no ORCA board to answer — a legacy build, or one
-driven by someone else's electronics — has nothing to read, so
-``detect_hand()`` degrades to orca_core's default model and every left /
-touch / joint hand of that kind looks like a plain right one.
+driven by someone else's electronics — reports no side, so
+``detect_hand()`` defaults it and every left hand of that kind looks like a
+right one.
 
 Naming the model is the way out. ``--model`` does it at startup; this module
 is the list of names to offer when it has to be done from the browser

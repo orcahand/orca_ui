@@ -106,6 +106,20 @@ def test_a_legacy_hand_is_adopted_despite_having_no_identity():
     assert [c.config_path for c in adopted] == [sup.config.config_path]
 
 
+def test_a_legacy_hand_never_changes_the_side_a_human_chose():
+    """Without a board there is no side to read: detection defaults it. A
+    left hand selected by the operator must not come back as right the
+    moment the choice is handed back to detection."""
+    sup, adopted = build("orcahand-left")
+    legacy_right = HandDetection(
+        model_name="orcahand-right", side="right",
+        has_tactile=False, has_encoders=False,
+        motor_port="/dev/cu.feetech", sensing_port=None, identity=None,
+    )
+    assert sup._adopt_model(legacy_right) is False
+    assert sup.model_name == "orcahand-left" and adopted == []
+
+
 def test_a_pinned_model_is_never_revised():
     sup, adopted = build("orcahand-right", pinned=True)
 

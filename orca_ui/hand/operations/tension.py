@@ -71,13 +71,14 @@ class TensionOperation(Operation):
     def run(self, ctx: OpContext) -> dict:
         supervisor = ctx.service.supervisor
         ctx.set_phase("acquiring", detail="taking the hand into maintenance")
-        supervisor.enter_maintenance(self.kind)
+        lease = supervisor.enter_maintenance(self.kind)
         hand = None
         try:
             ctx.check_stop()
             ctx.set_phase("connecting", detail="opening motor-only connection")
             hand = hand_ops.build_maintenance_hand(
-                supervisor.config.config_path, ctx.stop_event)
+                supervisor.config.config_path, ctx.stop_event,
+                motor_port=lease.presence.motor_port if lease.presence else None)
             self._hand = hand
             run_tension(hand, ctx, move_motors=self.params["move_motors"])
             ctx.check_stop()

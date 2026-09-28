@@ -11,6 +11,7 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
+import orca_ui.hand.supervisor as supervisor_mod
 from orca_ui.hand.states import HandState
 from orca_ui.hand.supervisor import HandBusyError
 from orca_ui.mock import materialize_mock_model
@@ -18,6 +19,61 @@ from orca_ui.server import create_app
 from orca_ui.settings import UiSettings
 
 from test_model_detection import build
+
+
+class _FakeSession:
+    def __init__(self):
+        self.closed = False
+        self.caps = type("Caps", (), {"motors": False, "degraded": False})()
+        self.tier = "fake"
+        self.message = "fake"
+        self.ports = {}
+
+    def close(self):
+        self.closed = True
+
+
+def test_a_disconnect_during_a_connect_in_flight_wins(monkeypatch):
+    """On hardware a connect takes seconds. A disconnect that lands in that
+    window must not be undone by the session the connect then installs."""
+    from test_model_detection import build
+
+    sup, _ = build("orcahand-right")
+    fake = _FakeSession()
+
+    def connect_and_release(settings, config, presence=None):
+        sup.disconnect()
+        return fake
+
+    monkeypatch.setattr(supervisor_mod, "run_detection", lambda config, force=False: None)
+    monkeypatch.setattr(supervisor_mod, "presence_from_detection",
+                        lambda config, detection, **kw: None)
+    monkeypatch.setattr(supervisor_mod, "connect_session", connect_and_release)
+
+    sup._try_connect()
+
+    assert fake.closed
+    assert sup.session is None
+    status = sup.status()
+    assert status.released and status.state == HandState.DISCONNECTED
+
+
+def test_a_released_hand_refuses_a_maintenance_lease():
+    from test_model_detection import build
+
+    sup, _ = build("orcahand-right")
+    sup.disconnect()
+    with pytest.raises(RuntimeError, match="released"):
+        sup.enter_maintenance("calibrate", timeout=0.2)
+
+
+def test_selecting_a_model_lifts_the_hold():
+    from test_model_detection import build
+
+    sup, _ = build("orcahand-right")
+    sup.disconnect()
+    sup.select_model("orcahand-left")
+    assert not sup.status().released
 
 
 def _wait_for(predicate, timeout=10.0, interval=0.05):

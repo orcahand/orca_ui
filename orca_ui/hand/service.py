@@ -341,10 +341,16 @@ class HandService:
 
     def disconnect(self) -> dict:
         """Close the session and hold the ports free until Reconnect."""
+        manager = self._operation_manager
+        if manager is not None and manager.active():
+            raise ServiceError(
+                "an operation is running — stop it before disconnecting",
+                status_code=409)
         try:
             self.supervisor.disconnect()
         except HandBusyError as e:
             raise ServiceError(str(e), status_code=409)
+        self.worker.reset()
         return self.status()
 
     def reconnect(self) -> dict:
@@ -448,10 +454,10 @@ class HandService:
         that was off at startup, or a different one plugged in since). Repoint
         everything keyed by model; the browser refetches ``/hand/info`` off
         the model field in the status stream."""
-        self._max_current = int(config.max_current)
         # Poses and recordings are per-model — a left hand's library must not
         # follow the right hand that replaced it.
         self.library = Library(self._library_root, model_name_of(config))
+        self._max_current = _current_or_none(config.max_current)
 
     def _session_ready(self, session: HandSession) -> None:
         # connect() builds a new controller on the config's gains, so last

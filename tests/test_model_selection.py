@@ -64,6 +64,28 @@ def test_capabilities_come_off_the_config():
 # ----- selection on the supervisor ------------------------------------------
 
 
+def test_a_model_change_repoints_the_library_before_reading_currents(monkeypatch):
+    """Packaged configs leave max_current at the motor family's ``default``
+    until a family is known; the hook must not choke on it, and the pose
+    library must follow the new model either way."""
+    import orca_ui.hand.service as service_mod
+    from orca_ui.hand.service import HandService
+    from test_model_detection import model_config
+
+    service = HandService(UiSettings(config_path=materialize_mock_model(),
+                                     mock=True, open_browser=False))
+    libraries = []
+    monkeypatch.setattr(service_mod, "Library",
+                        lambda root, name: libraries.append(name) or (root, name))
+    config = model_config("orcahand-left")
+    assert config.max_current == "default"
+
+    service._model_changed(config)
+
+    assert libraries == ["orcahand-left"]
+    assert service._max_current is None
+
+
 def test_selecting_a_model_swaps_the_config_and_pins_it():
     sup, adopted = build("orcahand-right")
     assert sup.status().model_pinned is False

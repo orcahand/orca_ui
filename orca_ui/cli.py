@@ -33,7 +33,7 @@ def parse_args(argv=None) -> argparse.Namespace:
                         help="Shorthand for --model orcahand-<side>.")
     parser.add_argument("--board", type=str, default=None, metavar="DEVICE",
                         help="Pin the console to one board by device path "
-                             "(e.g. /dev/cu.usbmodem101 — its motor CDC, or a "
+                             "(e.g. /dev/cu.usbmodemXXXX — its motor CDC, or a "
                              "legacy motor adapter). Default: connect to the "
                              "first board that answers. Pin it when running "
                              "one console per hand on the same machine, so "
