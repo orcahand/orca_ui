@@ -301,7 +301,8 @@ class HandService:
 
     def stats(self) -> dict:
         session = self.session
-        out: dict = {"loop": None, "tactile": None, "encoder": None}
+        out: dict = {"loop": None, "tactile": None, "encoder": None,
+                     "command": self.worker.stats()}
         if session is None:
             return out
         try:
@@ -484,6 +485,7 @@ class HandService:
             if session is not None and session.caps.motors:
                 session.hand.disable_torque()
                 self.supervisor.set_torque_flag(False)
+                self.worker.reset()
                 self._publish_control_state()
                 report["torque_disabled"] = True
             else:
@@ -518,6 +520,9 @@ class HandService:
         session.hand.enable_torque()
         self.supervisor.set_torque_flag(True)
         seed = self._current_pose(session)
+        # The hand may have been posed by hand while limp: the interpolator
+        # must ramp out of where it actually is, not where it last drove to.
+        self.worker.reset(seed)
         with self._state_lock:
             self._targets = dict(seed)
         self._publish_control_state()
@@ -528,6 +533,7 @@ class HandService:
         session = self._require_motors()
         session.hand.disable_torque()
         self.supervisor.set_torque_flag(False)
+        self.worker.reset()
         self._publish_control_state()
 
     def _current_pose(self, session: HandSession) -> dict:
