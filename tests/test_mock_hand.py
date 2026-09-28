@@ -120,3 +120,36 @@ def test_reduced_capability_configs_select_lesser_classes(tmp_path, strip):
             assert _wait_for(hand.get_tactile_forces) is not None
     finally:
         hand.disconnect()
+
+
+@pytest.mark.parametrize("side", ["right", "left"])
+def test_measured_joints_start_at_rest_on_both_sides(tmp_path, side):
+    """The encoder pump must encode with the same per-side polarity table
+    orca_core decodes with. The mirrored assembly flips the abduction axes,
+    so encoding a left hand with the right-hand signs decoded those six
+    joints as (2 * rom_upper - angle) — every abd joint pinned at its ROM
+    limit, rendering the hand as a splayed claw.
+    """
+    import os
+    import shutil
+
+    config_path = materialize_mock_model()
+    with open(config_path) as f:
+        raw = yaml.safe_load(f)
+    raw["type"] = side
+    sided = tmp_path / "config.yaml"
+    sided.write_text(yaml.safe_dump(raw, sort_keys=False))
+    shutil.copy(os.path.join(os.path.dirname(config_path), "calibration.yaml"),
+                tmp_path / "calibration.yaml")
+
+    hand = build_mock_hand(str(sided))
+    ok, msg = hand.connect()
+    assert ok, msg
+    try:
+        measured = _wait_for(hand.get_measured_joints)
+        assert measured is not None
+        assert len(measured) == 17
+        for joint, angle in measured.items():
+            assert abs(angle) < 1.0, f"{side} {joint} starts at {angle:.2f} deg"
+    finally:
+        hand.disconnect()
