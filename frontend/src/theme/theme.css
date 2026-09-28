@@ -269,6 +269,14 @@ header h1 {
   border-color: rgba(200, 160, 80, 0.2);
 }
 
+/* Not a released orca_core. Deliberately louder than the neutral badges: it
+   is the one thing that explains otherwise inexplicable hand behaviour. */
+.capability-badge.dev-build {
+  background: rgba(200, 160, 80, 0.14);
+  color: var(--warn);
+  border-color: rgba(200, 160, 80, 0.35);
+}
+
 .rate-meters {
   font-size: 9px;
   color: var(--dimmer);
