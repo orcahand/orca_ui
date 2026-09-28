@@ -41,11 +41,32 @@ def validate_calibrate_params(service, params: dict) -> dict:
 def run_calibrate(hand, encoder_client, ctx: OpContext,
                   joints: list[str] | None, force_wrist: bool) -> dict:
     """Blocking calibration with progress mapped onto the op snapshot."""
-    progress = {"steps_done": 0, "total": 0, "joints_calibrated": []}
+    progress = {"steps_done": 0, "total": 0, "joints_calibrated": [],
+                "anchors_recorded": [], "anchors_dead": []}
 
     def on_event(event: dict) -> None:
         kind = event.get("event")
-        if kind == "calibration_started":
+        if kind == "encoder_anchor_recorded":
+            progress["anchors_recorded"].append(event["joint"])
+            ctx.log(f"encoder anchor recorded: {event['joint']} "
+                    f"(count {event['anchor_count']} at "
+                    f"{event['anchor_angle_deg']:.1f}°)")
+        elif kind == "encoder_anchor_failed":
+            reason = str(event.get("error", ""))
+            # A slot that doesn't move with the sweep is dead or unwired —
+            # a hardware fault, not a retryable sampling glitch.
+            if "did not track the sweep" in reason:
+                progress["anchors_dead"].append(event["joint"])
+                ctx.log(f"encoder DEAD on {event['joint']}: {reason}. Check "
+                        "its wiring at the connector board; the joint stays "
+                        "open-loop until the encoder reads.")
+            else:
+                ctx.log(f"encoder anchor not captured for {event['joint']}: "
+                        f"{reason} — it keeps its previous anchor")
+        elif kind == "wrist_skipped":
+            ctx.log("wrist already calibrated (motor limits and encoder "
+                    "anchor) — skipping its steps; force wrist to re-run")
+        elif kind == "calibration_started":
             progress["total"] = event["steps"]
             ctx.set_phase("calibrating", progress=0.0,
                           detail=f"{event['steps']} steps")
@@ -83,6 +104,8 @@ def run_calibrate(hand, encoder_client, ctx: OpContext,
     return {
         "steps_done": progress["steps_done"],
         "joints_calibrated": progress["joints_calibrated"],
+        "anchors_recorded": progress["anchors_recorded"],
+        "anchors_dead": progress["anchors_dead"],
         "calibrated": bool(hand.calibrated),
     }
 

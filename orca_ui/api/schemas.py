@@ -22,7 +22,14 @@ class GainsRequest(BaseModel):
     kp: float = Field(ge=0)
     ki: float = Field(ge=0)
     correction_max_deg: float = Field(gt=0)
-    i_clamp_deg: Optional[float] = Field(default=None, gt=0)
+    # null = every loop-controlled joint; a joint list writes exactly those.
+    joints: Optional[list[str]] = None
+
+
+class GainsResetRequest(BaseModel):
+    """Restore the config gains; null joints = every loop-controlled joint."""
+
+    joints: Optional[list[str]] = None
 
 
 class MaxCurrentRequest(BaseModel):

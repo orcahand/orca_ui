@@ -33,6 +33,12 @@ class HardwarePresence:
     def any_present(self) -> bool:
         return bool(self.motor_port or self.sensing.tactile or self.sensing.encoder)
 
+    @property
+    def busy_ports(self) -> tuple[str, ...]:
+        """Controller-board ports another process holds open. They probe as
+        absent, so this is the difference between 'unplugged' and 'in use'."""
+        return self.detection.busy_ports if self.detection is not None else ()
+
 
 def probe_hardware(config) -> HardwarePresence:
     """Probe for the ports this config's declared capabilities need.
