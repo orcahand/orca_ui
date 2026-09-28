@@ -12,15 +12,9 @@ import time
 
 import pytest
 from fastapi.testclient import TestClient
-from orca_core.hand_config import _resolve_config_path
 
 from orca_ui.hand.models import available_models
-from orca_ui.hand.supervisor import (
-    HandBusyError,
-    HandSupervisor,
-    ModelSelectError,
-    load_config,
-)
+from orca_ui.hand.supervisor import HandBusyError, ModelSelectError
 from orca_ui.mock import materialize_mock_model
 from orca_ui.server import create_app
 from orca_ui.settings import UiSettings

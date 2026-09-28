@@ -48,7 +48,7 @@ from orca_ui.hand.sessions import (
     connect_session,
     declared_capabilities,
 )
-from orca_ui.hand.states import Capabilities, HandState, StatusSnapshot
+from orca_ui.hand.states import HandState, StatusSnapshot
 from orca_ui.settings import UiSettings
 
 logger = logging.getLogger(__name__)

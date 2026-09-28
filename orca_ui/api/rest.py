@@ -3,7 +3,7 @@ FastAPI's threadpool, never on the event loop."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 
 from orca_ui.api import schemas
 from orca_ui.hand.service import HandService, ServiceError

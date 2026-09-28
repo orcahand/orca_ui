@@ -10,11 +10,14 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from typing import Callable
+from typing import Callable, TYPE_CHECKING
 
 import numpy as np
 
 from orca_core import JointGains
+
+if TYPE_CHECKING:
+    from orca_core.hardware.motor_client import ServoGains, ServoProfile
 
 from pathlib import Path
 
@@ -399,7 +402,6 @@ class HandService:
         missing — the state every calibration recorded before the wrist joined
         the loop lands in.
         """
-        config = self.supervisor.config
         state: dict = {"motors": None, "joint_feedback": None,
                        "missing_anchors": [], "hint": None}
         if session is None or not session.caps.motors:

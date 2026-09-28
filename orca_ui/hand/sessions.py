@@ -22,10 +22,7 @@ from dataclasses import dataclass, field
 from orca_core import load_hand
 from orca_core.hand_config import OrcaHandTouchConfig
 from orca_core.hardware.hand_serial_link import HandSerialLink
-from orca_core.hardware.joint_encoder_client import (
-    EncodersNotAvailableError,
-    JointEncoderClient,
-)
+from orca_core.hardware.joint_encoder_client import JointEncoderClient
 from orca_core.hardware.sensing.types import LinkHealth
 from orca_core import JointFeedbackConnectError, OrcaHand, OrcaHandJointFeedback
 
