@@ -35,6 +35,8 @@ from orca_core.hand_config import (
 )
 from orca_core.utils.utils import read_yaml
 
+from orca_core.hardware.sensing.serial_discovery import oh_board_ports
+
 from orca_ui.hand.boards import detect_pinned_board
 from orca_ui.hand.detection import (
     names_a_hand,
@@ -523,6 +525,19 @@ class HandSupervisor(threading.Thread):
             else:
                 detection = run_detection(self.config,
                                           force=not self._model_pinned)
+                if self._board_motor_bus_unresolved(detection):
+                    # A board answered but its motor CDC did not (held, or a
+                    # missed identity reply), so detection fell back to
+                    # whatever bare adapter was free: connecting now would
+                    # wire this board's sensors to another hand's motors.
+                    self._set_state(
+                        HandState.DETECTING,
+                        "controller board answered but its motor port did "
+                        "not — retrying")
+                    delay = self._backoff
+                    self._backoff = min(self._backoff * 1.5,
+                                        DETECT_BACKOFF_MAX_S)
+                    return delay
                 self._adopt_model(detection)
                 presence = presence_from_detection(self.config, detection)
         config = self.config
@@ -578,6 +593,18 @@ class HandSupervisor(threading.Thread):
             logger.exception("session-ready hook failed")
             self._on_error(f"session init: {e}")
         return HEALTH_PERIOD_S
+
+    def _board_motor_bus_unresolved(self, detection: HandDetection | None) -> bool:
+        """True when a controller board identified itself but the motor port
+        detection resolved is not one of a board's own CDCs: a bare adapter
+        found by the fallback scan, i.e. some other hand's bus."""
+        if (not self._settings.motors_enabled or detection is None
+                or detection.identity is None):
+            return False
+        if detection.busy_ports:
+            return True
+        return (detection.motor_port is not None
+                and detection.motor_port not in set(oh_board_ports()))
 
     def _close_stale_session(self, session: HandSession) -> None:
         try:
