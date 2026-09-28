@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import type { Finger } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
 import { useStreamFrame } from '../../hooks/useStreamFrame'
+import { usePalette } from '../../theme/themeStore'
 import { maxTaxelForce } from '../../theme/tokens'
 import type { ArrowPoolEntry, TaxelHandles } from './taxelRender'
 import { hideAllArrows, renderTaxelFrame } from './taxelRender'
@@ -48,6 +49,7 @@ export function FingerTaxelSvg({
   finger: Finger
   positions: [number, number, number][]
 }) {
+  const { taxel } = usePalette()
   const layout = useMemo(() => computeLayout(finger, positions), [finger, positions])
   const svgRef = useRef<SVGSVGElement>(null)
   const handlesRef = useRef<TaxelHandles | null>(null)
@@ -115,8 +117,8 @@ export function FingerTaxelSvg({
             cx={point.cx}
             cy={point.cy}
             r={taxelRadius}
-            fill="#1a1a1a"
-            stroke="#2a2a2a"
+            fill={taxel.idle}
+            stroke={taxel.stroke}
             strokeWidth={0.5}
           />
         ))}

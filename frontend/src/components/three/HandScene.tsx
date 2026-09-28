@@ -21,7 +21,14 @@ import { subscribeFrames } from '../../state/streamStore'
 import { ForceArrowLayer } from './ForceArrowLayer'
 import { JointGlowLayer } from './JointGlowLayer'
 import { JointPoseAdapter } from './JointPoseAdapter'
-import { loadHandRobot, makeGhost } from './loadHandRobot'
+import { palette } from '../../theme/palette'
+import { usePalette } from '../../theme/themeStore'
+import {
+  loadHandRobot,
+  makeGhost,
+  setGhostAppearance,
+  setSkinTone,
+} from './loadHandRobot'
 
 export interface HandAssets {
   metadata: ModelMetadata
@@ -72,13 +79,12 @@ function HandRig({
         const bounds = new THREE.Box3()
           .setFromObject(robot)
           .getBoundingSphere(new THREE.Sphere())
-        const ghost = makeGhost(robot)
-        // Emissive cyan so it can't be confused with the gray motor ghost;
+        const scene = palette().scene
+        const ghost = makeGhost(robot, scene.ghost)
+        // Emissive accent so it can't be confused with the gray motor ghost;
         // the static tower/forearm never move, so ghosting them adds nothing.
         const teleopGhost = makeGhost(robot, {
-          color: 0x22d3ee,
-          opacity: 0.45,
-          emissiveIntensity: 0.6,
+          ...scene.teleopGhost,
           hideLinks: ['tower', 'forearm'],
         })
         built = {
@@ -111,6 +117,27 @@ function HandRig({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assets.metadata.urdf_url])
+
+  // Touch and full hands carry Paxini sensors under black silicone; plain
+  // hands wear the white skin the bundle ships with. Keyed on the declared
+  // capability (i.e. the configured hand type), not the live one, so a sensor
+  // board that drops off mid-session doesn't repaint the hand.
+  const blackSkin = (caps.declared?.tactile ?? caps.tactile) === true
+  useEffect(() => {
+    if (!rig) return
+    setSkinTone(rig.robot, blackSkin ? 'black' : 'white')
+    invalidate()
+  }, [rig, blackSkin, invalidate])
+
+  const { scene: sceneColors } = usePalette()
+  useEffect(() => {
+    if (!rig) return
+    if (rig.ghost) setGhostAppearance(rig.ghost, sceneColors.ghost)
+    if (rig.teleopGhost) {
+      setGhostAppearance(rig.teleopGhost, sceneColors.teleopGhost)
+    }
+    invalidate()
+  }, [rig, sceneColors, invalidate])
 
   // Frame the camera on the hand once it exists: fit the whole model with a
   // margin, looking down from a 3/4 angle.
@@ -228,6 +255,46 @@ function HandRig({
   )
 }
 
+// Three-point lighting parented to the camera, so the hand is lit from the
+// viewer's front-top-left at every orbit angle instead of falling into shadow
+// whenever you swing around to the unlit side. Camera space: -Z is where the
+// camera looks, so a light at +Z sits behind the lens and shines forward.
+// The rig is per-theme (palette.scene.lights): a bright room carries more of
+// the exposure in the ambient term, so the key comes down, and the rim —
+// which exists to separate a dark hand from a dark ground — is mostly dialled
+// out on paper, where the silhouette separates by itself.
+function ViewerLights({
+  rig,
+}: {
+  rig: [number, number, number, number, string][]
+}) {
+  const camera = useThree((s) => s.camera)
+  const scene = useThree((s) => s.scene)
+  const invalidate = useThree((s) => s.invalidate)
+  useEffect(() => {
+    // The renderer only collects lights it finds under the scene, and R3F
+    // keeps the default camera outside the graph — attach it first.
+    const detached = !camera.parent
+    if (detached) scene.add(camera)
+    const lights = rig.map(([x, y, z, intensity, color]) => {
+      const light = new THREE.DirectionalLight(color, intensity)
+      light.position.set(x, y, z)
+      light.target.position.set(0, 0, -1) // aim into the view direction
+      camera.add(light, light.target)
+      return light
+    })
+    invalidate()
+    return () => {
+      for (const light of lights) {
+        camera.remove(light, light.target)
+        light.dispose()
+      }
+      if (detached) scene.remove(camera)
+    }
+  }, [camera, scene, invalidate, rig])
+  return null
+}
+
 export function HandScene({
   assets,
   joints,
@@ -237,23 +304,25 @@ export function HandScene({
   joints: JointInfo[]
   caps: Capabilities
 }) {
+  const { scene } = usePalette()
   return (
     <Canvas
       frameloop="demand"
       dpr={[1, 2]}
       camera={{ fov: 35, position: [0.28, 0.25, 0.3], near: 0.01, far: 10 }}
-      style={{ background: '#14161f', minHeight: 480 }}
+      style={{ background: scene.bg, minHeight: 480 }}
     >
-      <hemisphereLight args={['#cfd6e4', '#20222e', 0.9]} />
-      <directionalLight position={[0.5, 1, 0.6]} intensity={1.4} />
-      <directionalLight position={[-0.6, 0.4, -0.5]} intensity={0.35} />
+      <hemisphereLight
+        args={[scene.hemiSky, scene.hemiGround, scene.hemiIntensity]}
+      />
+      <ViewerLights rig={scene.lights} />
       <Grid
         position={[0, -0.001, 0]}
         args={[1.2, 1.2]}
         cellSize={0.025}
-        cellColor="#2a2e3e"
+        cellColor={scene.gridCell}
         sectionSize={0.1}
-        sectionColor="#3a4054"
+        sectionColor={scene.gridSection}
         fadeDistance={0.9}
         infiniteGrid
       />

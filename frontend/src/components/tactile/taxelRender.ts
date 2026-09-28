@@ -6,11 +6,7 @@
 
 import type { Vec3 } from '../../api/types'
 import type { ArrowColorScheme, TactileSettings } from '../../state/appStore'
-import {
-  ORCA_GRADIENT,
-  TAXEL_GRAY_FLOOR,
-  TAXEL_GRAY_SPAN,
-} from '../../theme/tokens'
+import { palette } from '../../theme/palette'
 
 export interface TaxelHandles {
   circles: SVGCircleElement[]
@@ -24,17 +20,24 @@ export interface ArrowPoolEntry {
   head: SVGPolygonElement
 }
 
+// Shared by the 2D taxel arrows and the 3D fingertip arrows, so both read
+// the same scheme off the same palette and can never disagree about which
+// way "more force" points.
 export function getArrowColor2D(
   scheme: ArrowColorScheme,
   normalized: number,
 ): string {
+  const { arrows } = palette()
   switch (scheme) {
     case 'intensity': {
-      const l = Math.round(15 + normalized * 85)
+      // Pure lightness, so this is the one scheme that genuinely inverts:
+      // it climbs toward white on black and falls toward ink on paper.
+      const { intensityFrom: from, intensityTo: to } = arrows
+      const l = Math.round(from + normalized * (to - from))
       return `hsl(0, 0%, ${l}%)`
     }
     case 'orca': {
-      const stops = ORCA_GRADIENT
+      const stops = arrows.orca
       const scaled = normalized * (stops.length - 1)
       const idx = Math.min(Math.floor(scaled), stops.length - 2)
       const frac = scaled - idx
@@ -44,10 +47,13 @@ export function getArrowColor2D(
       return `rgb(${r}, ${g}, ${b})`
     }
     default: {
-      // 'heat'
+      // 'heat' — blue to red by hue. The hue *is* the reading, so it needs no
+      // inversion at all; only the lightness band moves, a notch darker on
+      // paper so a mid-ramp cyan still holds against the page.
       const hue = (1 - normalized) * 240
-      const saturation = 70 + normalized * 30
-      const lightness = 55 - normalized * 10
+      const { heatSatFrom, heatSatTo, heatLightFrom, heatLightTo } = arrows
+      const saturation = heatSatFrom + normalized * (heatSatTo - heatSatFrom)
+      const lightness = heatLightFrom + normalized * (heatLightTo - heatLightFrom)
       return `hsl(${hue}, ${saturation}%, ${lightness}%)`
     }
   }
@@ -59,6 +65,7 @@ export function renderTaxelFrame(
   settings: TactileSettings,
   maxForce: number,
 ): void {
+  const { taxel, direction } = palette()
   const threshold = settings.thresholdEnabled ? settings.threshold : 0
   const n = Math.min(taxels.length, handles.circles.length)
 
@@ -73,13 +80,13 @@ export function renderTaxelFrame(
 
     // Below threshold: reset to idle and skip.
     if (threshold > 0 && magnitude < threshold) {
-      circle.setAttribute('fill', '#1a1a1a')
+      circle.setAttribute('fill', taxel.idle)
       if (settings.displayMode === 'arrows') hideArrow(handles.arrows[i])
       continue
     }
 
     if (settings.displayMode === 'arrows') {
-      circle.setAttribute('fill', '#0a0a0a')
+      circle.setAttribute('fill', taxel.idleArrows)
       renderArrow(
         handles.arrows[i],
         handles.positions[i],
@@ -91,26 +98,32 @@ export function renderTaxelFrame(
     } else if (settings.displayMode === 'direction') {
       const absX = Math.abs(fx)
       const absY = Math.abs(fy)
-      let color = '#1a1a1a'
+      let color = taxel.idle
       if (magnitude >= 0.1) {
         const alpha = Math.min(magnitude / maxForce, 1)
+        // Alpha, not lightness, carries the magnitude here — which already
+        // reads the right way round on either ground (pale at rest,
+        // saturated under load), so only the four hues are re-picked.
         const opacity = 0.3 + alpha * 0.7
-        if (absX > absY) {
-          color = fx > 0
-            ? `rgba(239, 68, 68, ${opacity})`
-            : `rgba(6, 182, 212, ${opacity})`
-        } else {
-          color = fy > 0
-            ? `rgba(16, 185, 129, ${opacity})`
-            : `rgba(245, 158, 11, ${opacity})`
-        }
+        const [r, g, b] =
+          absX > absY
+            ? fx > 0 ? direction.posX : direction.negX
+            : fy > 0 ? direction.posY : direction.negY
+        color = `rgba(${r}, ${g}, ${b}, ${opacity})`
       }
       circle.setAttribute('fill', color)
     } else {
-      // magnitude: grayscale ramp
-      const normalized = Math.min(magnitude / maxForce, 1)
-      const gray = Math.round(TAXEL_GRAY_FLOOR + normalized * TAXEL_GRAY_SPAN)
-      circle.setAttribute('fill', `rgb(${gray}, ${gray}, ${gray})`)
+      // magnitude: a straight ramp between the palette's two endpoints.
+      // Dark runs near-black -> white (force adds light); light runs pale ->
+      // ink (force adds ink). Same span, so a given force sits at the same
+      // point along the ramp in either theme.
+      const t = Math.min(magnitude / maxForce, 1)
+      const [r0, g0, b0] = taxel.rampFrom
+      const [r1, g1, b1] = taxel.rampTo
+      const r = Math.round(r0 + (r1 - r0) * t)
+      const g = Math.round(g0 + (g1 - g0) * t)
+      const b = Math.round(b0 + (b1 - b0) * t)
+      circle.setAttribute('fill', `rgb(${r}, ${g}, ${b})`)
     }
   }
 }
