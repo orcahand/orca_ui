@@ -85,14 +85,9 @@ export type SkinTone = 'white' | 'black'
  * Marks an object (and its subtree) as an overlay rather than hand geometry.
  *
  * The force-arrow and joint-glow layers parent themselves to the robot's
- * links so they inherit the kinematics — which also puts them in reach of
- * robot.traverse(). setSkinTone was repainting them as black plastic: the
- * arrows kept their instanceColor but had material.color driven to
- * BLACK_FRAME, so every arrow rendered at a tenth of its intended
- * brightness, and the glow rings had their material swapped outright, which
- * silently disconnected the error ramp JointGlowLayer was still writing to
- * the original. Only the resultant arrow escaped, because ArrowHelper
- * re-sets material.color on every frame.
+ * links to inherit the kinematics, which puts them in reach of
+ * robot.traverse(); the skin walk stops at marked objects so their materials
+ * are never repainted as hand plastic.
  */
 export function markOverlay(object: THREE.Object3D): void {
   object.userData.orcaOverlay = true
@@ -212,20 +207,15 @@ export function makeGhost(
  * exactly where it leaves the hand defeats the point of drawing it, since
  * the deviation is the whole signal.
  *
- * makeGhost gives every mesh the same material instance, so the Set is
- * really a formality — it just keeps this honest if that ever stops being
- * true.
+ * makeGhost gives every mesh the same material instance, registered per
+ * ghost; editing that one instance recolours the whole ghost.
  */
 export function setGhostAppearance(
   ghost: THREE.Object3D,
   { color, opacity, emissiveIntensity }: GhostAppearance,
 ): void {
-  // Edits the one material makeGhost built, looked up by identity rather
-  // than found by walking the ghost. Traversing repainted whatever material
-  // each mesh happened to hold, which on a hand whose skin is left as the
-  // stock white — i.e. any hand without tactile sensors — reached straight
-  // through the clone into the real hand and turned its forearm and tower
-  // into translucent accent-coloured ghosts.
+  // Only the ghost's own material is touched: Object3D.clone() shares
+  // materials by reference, so walking the ghost would reach the real hand.
   const material = ghostMaterials.get(ghost)
   if (!material) return
   material.color.set(color)

@@ -259,10 +259,9 @@ function HandRig({
 // viewer's front-top-left at every orbit angle instead of falling into shadow
 // whenever you swing around to the unlit side. Camera space: -Z is where the
 // camera looks, so a light at +Z sits behind the lens and shines forward.
-// The rig is per-theme (palette.scene.lights): a bright room carries more of
-// the exposure in the ambient term, so the key comes down, and the rim —
-// which exists to separate a dark hand from a dark ground — is mostly dialled
-// out on paper, where the silhouette separates by itself.
+// The rig is per-theme (palette.scene.lights): key and fill are shared, and
+// the rim, which separates a dark hand from a dark ground, is dialled down on
+// paper, where the silhouette separates by itself.
 function ViewerLights({
   rig,
 }: {

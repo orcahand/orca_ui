@@ -2,7 +2,7 @@
 // heatmaps, the three.js scene, and the uPlot sparklines. Every value here
 // has a counterpart in theme.css — change one, change the other.
 //
-// The dark palette is the original console, value for value. The light one
+// The dark palette is the console's default. The light one
 // is NOT a numeric inversion: each instrument encodes something (force,
 // direction, tracking error), and the encoding has to survive the swap.
 // Where a scheme reads as "brighter = more" on black it becomes "darker =
@@ -173,8 +173,8 @@ const DARK: Palette = {
     idle: '#1a1a1a',
     idleArrows: '#0a0a0a',
     stroke: '#2a2a2a',
-    // 26 -> 255: the original TAXEL_GRAY_FLOOR + TAXEL_GRAY_SPAN, and the
-    // floor matches `idle` so an unloaded taxel reads the same in every mode.
+    // The floor matches `idle` so an unloaded taxel reads the same in every
+    // mode.
     rampFrom: [26, 26, 26],
     rampTo: [255, 255, 255],
   },
@@ -277,10 +277,8 @@ const LIGHT: Palette = {
   },
 
   arrows: {
-    // Zero sits a shade darker than the dark theme's slate sits above its
-    // ground: the taxel tile is pure white here, and the old pale end was
-    // nearly invisible on it. The top stop is ink, not black — mirroring the
-    // dark ramp, which ends near-white rather than at pure white.
+    // Zero sits a clear shade below the white taxel tile; the top stop is
+    // ink, not black, mirroring the dark ramp, which ends near-white.
     orca: [
       [198, 194, 183],
       [150, 144, 130],
@@ -343,12 +341,9 @@ const LIGHT: Palette = {
     // Bounce off a light floor rather than a dark room.
     hemiGround: '#d8d3c6',
     hemiIntensity: 0.8,
-    // Key and fill stay at the dark theme's strength. The hand is dark
-    // plastic under either theme, and it is the directional rig — not the
-    // ambient term — that puts specular highlights on it and gives it form;
-    // trading key for hemisphere flattened it to a charcoal silhouette.
-    // Only the rim comes down, and only partway: its job is separating a
-    // dark hand from a dark ground, which paper does for free.
+    // Key and fill keep the dark theme's strength: the directional rig is
+    // what gives the dark plastic its form. Only the rim comes down, since
+    // paper separates a dark hand from the ground by itself.
     lights: [
       [-0.55, 0.85, 0.5, 1.8, '#ffffff'],
       [0.9, -0.15, 0.45, 0.55, '#efe9dc'],

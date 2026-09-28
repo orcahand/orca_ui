@@ -11,21 +11,21 @@ includes taxels). Press one finger hard and hold; the summary reports the peak
 magnitude every taxel reached, and flags readings sitting on the int8/uint8
 rails, which mean the sensor is saturating rather than measuring.
 
-Usage: python scripts/measure_taxels.py [seconds] [finger]
+Usage: python scripts/measure_taxels.py [seconds] [finger] [--url ws://host:port/ws]
 """
 
+import argparse
 import asyncio
 import json
 import math
-import sys
 
 import websockets
 
-URL = "ws://localhost:5001/ws"
+DEFAULT_URL = "ws://localhost:5001/ws"
 PRESS_N = 2.0  # a finger peaking below this was not pressed, just idling
 
 
-async def main(duration_s: float, focus: str) -> None:
+async def main(duration_s: float, focus: str, url: str) -> None:
     # {finger: [peak magnitude per taxel]} and the peak whole-frame picture.
     peaks: dict[str, list[float]] = {}
     frames = 0
@@ -33,7 +33,7 @@ async def main(duration_s: float, focus: str) -> None:
     # every finger so one capture can cover several presses in sequence.
     best: dict[str, tuple] = {}
 
-    async with websockets.connect(URL, max_size=None) as ws:
+    async with websockets.connect(url, max_size=None) as ws:
         await ws.send(json.dumps(
             {"type": "subscribe", "data": {"topics": ["tactile.taxels"]}}))
         deadline = asyncio.get_event_loop().time() + duration_s
@@ -63,10 +63,11 @@ async def main(duration_s: float, focus: str) -> None:
     print("per-finger peak taxel magnitude over the whole capture (N):")
     for finger, slot in sorted(peaks.items()):
         ranked = sorted(slot, reverse=True)
+        nth = lambda k: ranked[min(k, len(ranked) - 1)]
         print(f"  {finger:<7} n={len(slot):<3} "
-              f"max={ranked[0]:6.2f}  2nd={ranked[1]:6.2f}  "
-              f"5th={ranked[4]:6.2f}  10th={ranked[9]:6.2f}  "
-              f"median={ranked[len(ranked) // 2]:6.2f}")
+              f"max={nth(0):6.2f}  2nd={nth(1):6.2f}  "
+              f"5th={nth(4):6.2f}  10th={nth(9):6.2f}  "
+              f"median={nth(len(ranked) // 2):6.2f}")
 
     # Only fingers that were actually pressed are worth a breakdown; the rest
     # sit at the ~0.35 N noise floor.
@@ -94,6 +95,10 @@ async def main(duration_s: float, focus: str) -> None:
 
 
 if __name__ == "__main__":
-    seconds = float(sys.argv[1]) if len(sys.argv) > 1 else 12.0
-    finger = sys.argv[2] if len(sys.argv) > 2 else "ring"
-    asyncio.run(main(seconds, finger))
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser.add_argument("seconds", nargs="?", type=float, default=12.0)
+    parser.add_argument("finger", nargs="?", default="ring")
+    parser.add_argument("--url", default=DEFAULT_URL,
+                        help=f"console WebSocket (default {DEFAULT_URL}; match --port)")
+    args = parser.parse_args()
+    asyncio.run(main(args.seconds, args.finger, args.url))
