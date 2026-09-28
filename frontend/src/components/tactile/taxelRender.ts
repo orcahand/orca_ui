@@ -6,7 +6,11 @@
 
 import type { Vec3 } from '../../api/types'
 import type { ArrowColorScheme, TactileSettings } from '../../state/appStore'
-import { MAX_TAXEL_FORCE, ORCA_GRADIENT } from '../../theme/tokens'
+import {
+  ORCA_GRADIENT,
+  TAXEL_GRAY_FLOOR,
+  TAXEL_GRAY_SPAN,
+} from '../../theme/tokens'
 
 export interface TaxelHandles {
   circles: SVGCircleElement[]
@@ -53,6 +57,7 @@ export function renderTaxelFrame(
   handles: TaxelHandles,
   taxels: Vec3[],
   settings: TactileSettings,
+  maxForce: number,
 ): void {
   const threshold = settings.thresholdEnabled ? settings.threshold : 0
   const n = Math.min(taxels.length, handles.circles.length)
@@ -81,13 +86,14 @@ export function renderTaxelFrame(
         fx, fy, fz,
         magnitude,
         settings,
+        maxForce,
       )
     } else if (settings.displayMode === 'direction') {
       const absX = Math.abs(fx)
       const absY = Math.abs(fy)
       let color = '#1a1a1a'
       if (magnitude >= 0.1) {
-        const alpha = Math.min(magnitude / MAX_TAXEL_FORCE, 1)
+        const alpha = Math.min(magnitude / maxForce, 1)
         const opacity = 0.3 + alpha * 0.7
         if (absX > absY) {
           color = fx > 0
@@ -102,8 +108,8 @@ export function renderTaxelFrame(
       circle.setAttribute('fill', color)
     } else {
       // magnitude: grayscale ramp
-      const normalized = Math.min(magnitude / MAX_TAXEL_FORCE, 1)
-      const gray = Math.round(60 + normalized * 180)
+      const normalized = Math.min(magnitude / maxForce, 1)
+      const gray = Math.round(TAXEL_GRAY_FLOOR + normalized * TAXEL_GRAY_SPAN)
       circle.setAttribute('fill', `rgb(${gray}, ${gray}, ${gray})`)
     }
   }
@@ -127,6 +133,7 @@ function renderArrow(
   fz: number,
   magnitude: number,
   settings: TactileSettings,
+  maxForce: number,
 ): void {
   // Same gating as the original: tiny forces draw nothing.
   if (magnitude < 0.1) {
@@ -135,11 +142,11 @@ function renderArrow(
   }
 
   const { cx, cy } = position
-  const normalized = Math.min(magnitude / MAX_TAXEL_FORCE, 1)
+  const normalized = Math.min(magnitude / maxForce, 1)
   const xyMag = Math.sqrt(fx * fx + fy * fy)
 
   const baseLength = (4 + normalized * 10) * settings.lengthMult
-  const zFactor = 1 + (Math.abs(fz) / MAX_TAXEL_FORCE) * 0.5
+  const zFactor = 1 + (Math.abs(fz) / maxForce) * 0.5
   const arrowLength = baseLength * (xyMag > 0.1 ? 1 : 0.3) * zFactor
 
   let angle = 0

@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import type { Finger } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
 import { useStreamFrame } from '../../hooks/useStreamFrame'
+import { maxTaxelForce } from '../../theme/tokens'
 import type { ArrowPoolEntry, TaxelHandles } from './taxelRender'
 import { hideAllArrows, renderTaxelFrame } from './taxelRender'
 
@@ -52,6 +53,9 @@ export function FingerTaxelSvg({
   const handlesRef = useRef<TaxelHandles | null>(null)
   const lastFrameT = useRef(0)
   const taxelRadius = 5
+  // This finger's sensor model reaches its own peak force; normalizing every
+  // model against one number left the 87-taxel fingers stuck in dark grey.
+  const maxForce = maxTaxelForce(finger)
 
   // Build the arrow pool once per layout; collect circle handles.
   useEffect(() => {
@@ -89,7 +93,7 @@ export function FingerTaxelSvg({
     // Transient read: settings changes don't re-render the SVG tree.
     const settings = useAppStore.getState().tactile
     if (settings.displayMode !== 'arrows') hideAllArrows(handles)
-    renderTaxelFrame(handles, taxels, settings)
+    renderTaxelFrame(handles, taxels, settings, maxForce)
   })
 
   return (
