@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import functools
 import time
 from typing import Annotated, Literal
 
@@ -67,9 +68,24 @@ def _ann(title: str, *, read_only: bool = False, destructive: bool = False,
 def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
     backend = state.backend
 
+    def tool(*args, **kwargs):
+        """Same as ``mcp.tool()``, but marks ``state.last_activity`` on every
+        call so the idle-shutdown watchdog (cli.py) knows something other
+        than the initial handshake is actually driving this server."""
+        register = mcp.tool(*args, **kwargs)
+
+        def decorator(fn):
+            @functools.wraps(fn)
+            async def wrapper(*call_args, **call_kwargs):
+                state.last_activity = time.monotonic()
+                return await fn(*call_args, **call_kwargs)
+            return register(wrapper)
+
+        return decorator
+
     # ----- e-stop (always registered, always first) ---------------------------
 
-    @mcp.tool(annotations=_ann("EMERGENCY STOP", idempotent=True))
+    @tool(annotations=_ann("EMERGENCY STOP", idempotent=True))
     async def orca_estop() -> dict:
         """EMERGENCY STOP — immediately stops teleop, aborts any running
         operation, and disables torque on all motors. Always safe to call;
@@ -90,8 +106,8 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
 
     # ----- reads ---------------------------------------------------------------
 
-    @mcp.tool(annotations=_ann("Hand status overview", read_only=True,
-                               idempotent=True))
+    @tool(annotations=_ann("Hand status overview", read_only=True,
+                           idempotent=True))
     async def orca_get_status() -> dict:
         """One-call situational overview: torque, real-vs-mock, connection
         state/capabilities, control owner, active operation, teleop session,
@@ -143,8 +159,8 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
             pass
         return out
 
-    @mcp.tool(annotations=_ann("Hand model info", read_only=True,
-                               idempotent=True))
+    @tool(annotations=_ann("Hand model info", read_only=True,
+                           idempotent=True))
     async def orca_get_hand_info() -> dict:
         """Static hand description: every joint with its ROM [lo, hi] in
         DEGREES, neutral angle, and encoder status, plus tactile sensor
@@ -155,8 +171,8 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
         info.pop("control", None)
         return info
 
-    @mcp.tool(annotations=_ann("Read live telemetry", read_only=True,
-                               idempotent=True))
+    @tool(annotations=_ann("Read live telemetry", read_only=True,
+                           idempotent=True))
     async def orca_read_telemetry(
         topics: Annotated[list[Topic], Field(
             min_length=1,
@@ -189,8 +205,8 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
             backend.url, list(topics), duration_s=duration_s,
             sample_hz=sample_hz)
 
-    @mcp.tool(annotations=_ann("Teleop camera preview", read_only=True,
-                               idempotent=True))
+    @tool(annotations=_ann("Teleop camera preview", read_only=True,
+                           idempotent=True))
     async def orca_get_camera_preview() -> Image:
         """Grab a FRESH teleop camera frame (with hand-tracking overlay) as
         an image — use it to verify the camera sees the operator's hand
@@ -227,8 +243,8 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
                 "starting; retry in a moment or check orca_get_status.")
         return Image(data=base64.b64decode(jpeg), format="jpeg")
 
-    @mcp.tool(annotations=_ann("List poses/trajectories/demos",
-                               read_only=True, idempotent=True))
+    @tool(annotations=_ann("List poses/trajectories/demos",
+                           read_only=True, idempotent=True))
     async def orca_list_library() -> dict:
         """Everything applyable or replayable: poses (builtin + user),
         recorded trajectories, demo sequences. Pose names feed
@@ -247,8 +263,8 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
             "demos": demos,
         }
 
-    @mcp.tool(annotations=_ann("Operation status / wait", read_only=True,
-                               idempotent=True))
+    @tool(annotations=_ann("Operation status / wait", read_only=True,
+                           idempotent=True))
     async def orca_get_operation(
         wait_s: Annotated[float, Field(
             ge=0, le=300,
@@ -288,7 +304,7 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
 
     # ----- connection & safety --------------------------------------------------
 
-    @mcp.tool(annotations=_ann("Reconnect hardware", idempotent=True))
+    @tool(annotations=_ann("Reconnect hardware", idempotent=True))
     async def orca_reconnect() -> dict:
         """Tear down and re-run the hardware connect ladder (torque comes
         back DISABLED; no motion). Use after cable/power changes or when
@@ -306,8 +322,8 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
                      "expect DETECTING → CONNECTING → CONNECTED"),
         }
 
-    @mcp.tool(annotations=_ann("Enable/disable motor torque",
-                               destructive=True, idempotent=True))
+    @tool(annotations=_ann("Enable/disable motor torque",
+                           destructive=True, idempotent=True))
     async def orca_set_torque(
         enabled: Annotated[bool, Field(
             description="true energizes the motors (hand becomes stiff and "
@@ -345,8 +361,8 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
             payload = {"ok": True, "torque_enabled": False}
         return await with_state(state, payload)
 
-    @mcp.tool(annotations=_ann("Set motor current limit", destructive=True,
-                               idempotent=True))
+    @tool(annotations=_ann("Set motor current limit", destructive=True,
+                           idempotent=True))
     async def orca_set_max_current(
         ma: Annotated[int, Field(
             gt=0, le=2000,
@@ -384,8 +400,8 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
         return await with_state(
             state, {"ok": True, "control": result.get("control")})
 
-    @mcp.tool(annotations=_ann("Park the hand (neutral + torque off)",
-                               idempotent=True))
+    @tool(annotations=_ann("Park the hand (neutral + torque off)",
+                           idempotent=True))
     async def orca_park(
         neutral: Annotated[bool, Field(
             description="move to the neutral pose before de-energizing; "
@@ -450,8 +466,8 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
 
     # ----- motion ----------------------------------------------------------------
 
-    @mcp.tool(annotations=_ann("Set joint targets", destructive=True,
-                               idempotent=True))
+    @tool(annotations=_ann("Set joint targets", destructive=True,
+                           idempotent=True))
     async def orca_set_joints(
         angles: Annotated[dict[str, float], Field(
             min_length=1,
@@ -524,8 +540,8 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
         payload["verification"] = verification
         return await with_state(state, payload)
 
-    @mcp.tool(annotations=_ann("Apply a named pose", destructive=True,
-                               idempotent=True))
+    @tool(annotations=_ann("Apply a named pose", destructive=True,
+                           idempotent=True))
     async def orca_apply_pose(
         name: Annotated[str, Field(
             pattern=NAME_PATTERN,
@@ -567,8 +583,8 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
 
     # ----- library writes ----------------------------------------------------------
 
-    @mcp.tool(annotations=_ann("Save or capture a pose", destructive=True,
-                               idempotent=True))
+    @tool(annotations=_ann("Save or capture a pose", destructive=True,
+                           idempotent=True))
     async def orca_save_pose(
         name: Annotated[str, Field(pattern=NAME_PATTERN)],
         angles: Annotated[dict[str, float] | None, Field(
@@ -595,8 +611,8 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
         await backend.put(f"/api/poses/{name}", {"angles": angles})
         return {"ok": True, "name": name, "angles": angles}
 
-    @mcp.tool(annotations=_ann("Delete a pose or trajectory",
-                               destructive=True, idempotent=True))
+    @tool(annotations=_ann("Delete a pose or trajectory",
+                           destructive=True, idempotent=True))
     async def orca_delete_asset(
         kind: Literal["pose", "trajectory"],
         name: Annotated[str, Field(pattern=NAME_PATTERN)],
@@ -613,7 +629,7 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
 
     # ----- long-running operations ---------------------------------------------------
 
-    @mcp.tool(annotations=_ann("Start an operation", destructive=True))
+    @tool(annotations=_ann("Start an operation", destructive=True))
     async def orca_start_operation(
         kind: Literal["replay", "demo", "record", "calibrate", "tension"],
         name: Annotated[str | None, Field(
@@ -684,8 +700,8 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
                 "e-stop ABORTS WITHOUT SAVING")
         return await with_state(state, payload)
 
-    @mcp.tool(annotations=_ann("Stop/pause/resume operation",
-                               destructive=True, idempotent=True))
+    @tool(annotations=_ann("Stop/pause/resume operation",
+                           destructive=True, idempotent=True))
     async def orca_control_operation(
         action: Literal["stop", "pause", "resume"],
     ) -> dict:
@@ -701,7 +717,7 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
         return {"ok": True, "action": action,
                 "stopped": result.get("stopped")}
 
-    @mcp.tool(annotations=_ann("Answer an operation prompt"))
+    @tool(annotations=_ann("Answer an operation prompt"))
     async def orca_send_operation_input(
         value: Annotated[str, Field(
             description="answer to the operation's awaiting.prompt; for "
@@ -735,7 +751,7 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
 
     # ----- tactile -----------------------------------------------------------------
 
-    @mcp.tool(annotations=_ann("Configure tactile sensing", idempotent=True))
+    @tool(annotations=_ann("Configure tactile sensing", idempotent=True))
     async def orca_configure_tactile(
         mode: Annotated[Literal["resultant", "taxels", "combined"] | None,
                         Field(description="what the tactile stream carries: "
@@ -773,7 +789,7 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
 
     # ----- teleoperation --------------------------------------------------------------
 
-    @mcp.tool(annotations=_ann("Start teleop (preview)"))
+    @tool(annotations=_ann("Start teleop (preview)"))
     async def orca_teleop_start(
         source: Literal["mediapipe", "manus", "avp", "synthetic"],
         config: Annotated[dict | None, Field(
@@ -797,8 +813,8 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
                      "orca_teleop_engage"),
         }
 
-    @mcp.tool(annotations=_ann("ENGAGE teleop (hand follows tracking)",
-                               destructive=True, idempotent=True))
+    @tool(annotations=_ann("ENGAGE teleop (hand follows tracking)",
+                           destructive=True, idempotent=True))
     async def orca_teleop_engage(
         confirm: Annotated[bool, Field(
             description="required on real hardware; ignored on mock")]
@@ -823,7 +839,7 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
         return await with_state(
             state, {"ok": True, "session": result.get("session")})
 
-    @mcp.tool(annotations=_ann("Stop/disengage teleop", idempotent=True))
+    @tool(annotations=_ann("Stop/disengage teleop", idempotent=True))
     async def orca_teleop_stop(
         action: Literal["stop", "disengage"] = "stop",
     ) -> dict:
