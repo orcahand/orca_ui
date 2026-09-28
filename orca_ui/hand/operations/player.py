@@ -2,9 +2,9 @@
 
 The player owns frame pacing on the op thread and submits the latest frame
 through ``service.set_targets(source=OPERATION)`` — full validation, torque
-gate, and the ``joints.target`` echo apply. Effective rates above the
-command worker's MAX_APPLY_HZ (50) are downsampled by its latest-wins
-coalescing, which is kinematically benign for position streaming.
+gate, and the ``joints.target`` echo apply. The command worker re-samples that
+stream onto the joint-loop rate, so the frame rate here sets how faithfully the
+commanded path reaches the loop.
 """
 
 from __future__ import annotations
@@ -19,7 +19,9 @@ from orca_ui.library import CONTINUOUS, WAYPOINTS, LibraryError
 SPEEDS = (0.5, 1.0, 2.0)
 WAYPOINT_SPEED_DEG_S = 60.0   # cruise speed for synthesized waypoint segments
 MIN_SEGMENT_S = 0.3           # floor so near-identical waypoints still glide
-WAYPOINT_RATE_HZ = 25.0
+# Half the worker's feed rate — upsampling to the loop rate is its job, not
+# this one's, and submitting faster only adds echo traffic and lock churn.
+WAYPOINT_RATE_HZ = 100.0
 LEAD_IN_MIN_DEG = 2.0         # skip the approach glide when already at start
 PROGRESS_EVERY_S = 0.2
 MAX_LOOP_CYCLES = 1000
