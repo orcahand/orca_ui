@@ -1,9 +1,13 @@
 """Sampler threads: hardware state → StreamHub topics.
 
 Three cadences: fast (encoder-measured joints + tactile, in-memory reads),
-mid (motor-derived joint estimate + loop trim, one bus read), slow (temps,
-currents, stream stats). All rates come from settings and are decoupled from
+mid (loop trim, and the motor estimate on hands without a loop), slow (motor
+telemetry, stream stats). All rates come from settings and are decoupled from
 the hardware rates — orca_core's clients buffer the latest frame internally.
+
+Motor-bus reads share the servo bus with the joint loop's writes, so with a
+loop running they are confined to the slow tick, one per tick, and skipped
+entirely while the hand is being driven.
 """
 
 from __future__ import annotations
@@ -18,6 +22,10 @@ from orca_ui.streaming import topics as T
 from orca_ui.streaming.hub import StreamHub
 
 logger = logging.getLogger(__name__)
+
+# How long motor telemetry may go unread while the hand keeps moving before a
+# read is forced through anyway.
+MAX_TELEMETRY_STALENESS_S = 30.0
 
 
 def _clean_angles(angles: dict | None) -> dict | None:
@@ -67,6 +75,12 @@ class TelemetryService:
             _Sampler("telemetry-mid", 1.0 / settings.mid_hz, self._mid_tick),
             _Sampler("telemetry-slow", 1.0 / settings.slow_hz, self._slow_tick),
         ]
+        self._bus_reads = ("state", "temps")
+        self._bus_read_index = 0
+        # Start the staleness window now, so a hand already moving at startup
+        # isn't read immediately on a "never read" technicality.
+        self._last_bus_read = time.monotonic()
+        self._motor_health: dict[str, dict] = {"temps": {}, "currents": {}}
 
     def start(self) -> None:
         for sampler in self._samplers:
@@ -103,10 +117,10 @@ class TelemetryService:
         if session is None:
             return
 
-        if session.caps.motors:
-            estimate = _clean_angles(session.estimate_joints())
-            if estimate:
-                self._hub.publish(T.JOINTS_ESTIMATE, {"angles": estimate})
+        # The estimate costs a bus round trip, so with a loop running it rides
+        # the slow tick instead; without one there is no motion to stall.
+        if session.caps.motors and not session.caps.feedback_loop:
+            self._publish_estimate(session)
 
         if session.caps.feedback_loop:
             trim = _clean_angles(session.loop_correction())
@@ -119,14 +133,81 @@ class TelemetryService:
             return
 
         if session.caps.motors:
-            try:
-                temps = session.hand.get_motor_temp(as_dict=True)
-                currents = session.hand.get_motor_current(as_dict=True)
-                self._hub.publish(T.MOTORS_TELEMETRY, {
-                    "temps": {int(k): round(float(v), 1) for k, v in temps.items()},
-                    "currents": {int(k): round(float(v), 1) for k, v in currents.items()},
-                })
-            except Exception:
-                logger.debug("motor telemetry read failed", exc_info=True)
+            if not session.caps.feedback_loop:
+                self._publish_motor_health(session)
+            elif not self._hand_is_driven() or self._telemetry_is_stale():
+                self._bus_read_tick(session)
 
         self._hub.publish(T.STATS, self._service.stats())
+
+    # ----- motor-bus reads -----------------------------------------------------
+    #
+    # A bulk read holds the bus for a round trip per motor (~15 ms for 17), so
+    # one landing mid-motion freezes the hand for more than a loop cycle.
+
+    def _hand_is_driven(self) -> bool:
+        """True while something is actively commanding motion."""
+        try:
+            if self._service.worker.stats().get("ramping"):
+                return True
+        except Exception:
+            pass
+        manager = self._service.operation_manager
+        try:
+            return bool(manager and manager.active())
+        except Exception:
+            return False
+
+    def _telemetry_is_stale(self) -> bool:
+        """True once telemetry is old enough to be worth one hitch, so a long
+        replay or teleop session cannot hide an overheating motor."""
+        return (time.monotonic() - self._last_bus_read) > MAX_TELEMETRY_STALENESS_S
+
+    def _bus_read_tick(self, session) -> None:
+        """One read per tick: position and current share a register block,
+        temperature needs its own."""
+        which = self._bus_reads[self._bus_read_index % len(self._bus_reads)]
+        self._bus_read_index += 1
+        self._last_bus_read = time.monotonic()
+        if which == "state":
+            self._publish_motor_state(session)
+        else:
+            self._publish_motor_health(session, currents=False)
+
+    def _publish_motor_state(self, session) -> None:
+        """Joint estimate and currents, from one read."""
+        try:
+            estimate, currents = session.motor_snapshot()
+        except Exception:
+            logger.debug("motor state read failed", exc_info=True)
+            return
+        angles = _clean_angles(estimate)
+        if angles:
+            self._hub.publish(T.JOINTS_ESTIMATE, {"angles": angles})
+        if currents:
+            self._motor_health["currents"] = {
+                int(k): round(float(v), 1) for k, v in currents.items()}
+            self._hub.publish(T.MOTORS_TELEMETRY, dict(self._motor_health))
+
+    def _publish_estimate(self, session) -> None:
+        estimate = _clean_angles(session.estimate_joints())
+        if estimate:
+            self._hub.publish(T.JOINTS_ESTIMATE, {"angles": estimate})
+
+    def _publish_motor_health(self, session, temps: bool = True,
+                              currents: bool = True) -> None:
+        """Publish temps/currents, keeping the half this tick didn't read so the
+        payload always carries a complete table."""
+        try:
+            if temps:
+                self._motor_health["temps"] = {
+                    int(k): round(float(v), 1)
+                    for k, v in session.hand.get_motor_temp(as_dict=True).items()}
+            if currents:
+                self._motor_health["currents"] = {
+                    int(k): round(float(v), 1)
+                    for k, v in session.hand.get_motor_current(as_dict=True).items()}
+        except Exception:
+            logger.debug("motor telemetry read failed", exc_info=True)
+            return
+        self._hub.publish(T.MOTORS_TELEMETRY, dict(self._motor_health))
