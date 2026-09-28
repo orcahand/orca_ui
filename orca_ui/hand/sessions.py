@@ -26,6 +26,7 @@ from orca_core.hardware.joint_encoder_client import (
     EncodersNotAvailableError,
     JointEncoderClient,
 )
+from orca_core.hardware.sensing.types import LinkHealth
 from orca_core import JointFeedbackConnectError, OrcaHand, OrcaHandJointFeedback
 
 from orca_ui.hand.detection import HardwarePresence, probe_hardware
@@ -181,6 +182,34 @@ class HandSession:
     def encoder_stats(self):
         client = self._encoder_client or getattr(self.hand, "_encoder_client", None)
         return client.get_stats() if client else None
+
+    def encoder_reading(self):
+        """Latest raw encoder auto-stream frame, or None."""
+        client = self._encoder_client or getattr(self.hand, "_encoder_client", None)
+        return client.get_latest() if client else None
+
+    def sensing_link_health(self) -> dict:
+        """``{"encoder": LinkHealth, "tactile": LinkHealth}`` for whichever
+        sensing links this session has open (they may be the same port)."""
+        out: dict = {}
+        for name, getter in (("encoder", "get_encoder_link_health"),
+                             ("tactile", "get_tactile_link_health")):
+            fn = getattr(self.hand, getter, None)
+            if fn is None:
+                continue
+            try:
+                health = fn()
+            except Exception:
+                health = None
+            if health is not None:
+                out[name] = health
+        # Sensors-only sessions own the encoder link themselves.
+        if "encoder" not in out and self._encoder_client is not None:
+            link = self._encoder_client._link
+            out["encoder"] = LinkHealth(
+                connected=link.is_connected, port_dead=link.is_port_dead,
+                port_error=link.port_error, stats=link.get_link_stats())
+        return out
 
     # ----- lifecycle -------------------------------------------------------
 

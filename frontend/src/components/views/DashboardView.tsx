@@ -3,6 +3,7 @@
 
 import { useAppStore } from '../../state/appStore'
 import { EncoderPanel } from '../encoders/EncoderPanel'
+import { HealthSummary } from '../monitor/HealthSummary'
 import { MotorPanel } from '../motors/MotorPanel'
 import { TactilePanel } from '../tactile/TactilePanel'
 import { TeleopStatusCard } from '../teleop/TeleopStatusCard'
@@ -20,6 +21,7 @@ export function DashboardView() {
   return (
     <>
       <TeleopStatusCard />
+      <HealthSummary />
       {caps.tactile && <TactilePanel />}
       <div
         style={

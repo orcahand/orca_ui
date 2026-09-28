@@ -336,7 +336,7 @@ export interface PoseEntry {
 
 export interface TrajectoryEntry {
   name: string
-  type: 'continuous' | 'discrete_waypoints' | null
+  type: 'continuous' | 'discrete_waypoints' | 'motor_waypoints' | null
   frames: number
   frequency_hz: number | null
   duration_s: number | null
@@ -359,6 +359,36 @@ export interface PortInfo {
   kind: string | null
 }
 
+// ----- motor faults (motors.faults topic, orca_ui/hand/faults.py) -----------
+
+// Command adherence for the joint a motor drives: sustained target-vs-actual
+// deviation past a grace window counts as "not following".
+export interface MotorTracking {
+  following: boolean
+  deviation_deg: number | null
+  stall_s: number // current stall duration; 0 while following
+  stalls: number // stall events this session
+  stalled_total_s: number // cumulative not-following time this session
+}
+
+export interface MotorFaultEntry {
+  joint: string | null
+  errors: number // failed bus transactions this session
+  overloads: number // overload reboots this session
+  last_error: string | null
+  last_error_age_s: number | null
+  tracking: MotorTracking | null
+}
+
+export interface MotorsFaults {
+  motors: Record<string, MotorFaultEntry>
+  bus: {
+    errors: number
+    last_error: string | null
+    last_error_age_s: number | null
+  }
+}
+
 // ----- WS topics ------------------------------------------------------------
 
 export const TOPICS = {
@@ -374,7 +404,9 @@ export const TOPICS = {
   jointsTarget: 'joints.target',
   jointsCorrection: 'joints.correction',
   motorsTelemetry: 'motors.telemetry',
+  motorsFaults: 'motors.faults',
   stats: 'stats',
+  sensorsHealth: 'sensors.health',
   teleopState: 'teleop.state',
   teleopTargets: 'teleop.targets',
   teleopLog: 'teleop.log',
@@ -388,6 +420,56 @@ export interface ServerMessage {
   data: Record<string, unknown>
 }
 
+// ----- sensors.health (orca_ui/hand/telemetry.py SensorHealthMonitor) -------
+
+export type EncoderVerdict =
+  | 'live'
+  | 'parity'
+  | 'chip error'
+  | 'no encoder'
+  | 'no frames'
+
+export interface EncoderJointHealth {
+  slot: number
+  deg: number | null // raw-decoded chip angle (uncalibrated frame)
+  verdict: EncoderVerdict
+  reason: string
+}
+
+export interface SensingLinkHealth {
+  connected: boolean
+  port_dead: boolean
+  port_error: string | null
+  resyncs: number
+  bad_lrc: number
+}
+
+// 1 Hz electrical bring-up payload; null sections = capability absent.
+export interface SensorsHealth {
+  encoders: {
+    present: boolean
+    hz: number
+    error_byte: number | null
+    fresh_ms?: number | null
+    joints: Record<string, EncoderJointHealth>
+    live: number
+    total: number
+    // Joints whose measured stream is currently distrusted (joint ->
+    // "verdict: reason"): the backend drops them from joints.measured and
+    // everything falls back to the motor estimate until the sensor reads
+    // clean for restore_after_s consecutive seconds.
+    suppressed?: Record<string, string>
+    restore_after_s?: number
+  } | null
+  tactile: {
+    present: boolean
+    hz: number
+    stream_rearms: number | null
+    fingers: Record<string, { connected: boolean; taxels: number }>
+  } | null
+  links: Record<string, SensingLinkHealth>
+}
+
 export interface Stats {
   loop: Record<string, number | boolean> | null
   tactile: {
@@ -398,4 +480,50 @@ export interface Stats {
     stream_rearms: number
   } | null
   encoder: { frames_ok: number; last_freshness_ms: number } | null
+}
+
+// ----- calibration history --------------------------------------------------
+
+// One raw progress event from a calibration run (t = epoch seconds). The
+// magnet counts sampled at the two hardstops ride on the measured_rom_*
+// events so successive runs can be compared for encoder-magnet drift.
+export interface CalibrationEvent {
+  t: number
+  event: string
+  joint?: string
+  anchor_count?: number
+  anchor_angle_deg?: number
+  flex_count?: number
+  extend_count?: number
+  rom?: [number, number]
+  span_deg?: number
+  deviation_deg?: number
+  ratio?: number
+  // limit_recorded: motor-shaft position (rad) sampled at one hardstop.
+  motor?: number
+  limit?: number
+  bound?: 'lower' | 'upper'
+  error?: string
+  steps?: number
+  joints?: Record<string, string> | string[]
+  index?: number
+  total?: number
+}
+
+// ----- joint usage stats ----------------------------------------------------
+
+// Full stored trajectory (GET /api/trajectories/{name}) — the waypoint
+// editor's working copy. Continuous recordings carry `angles`, waypoint
+// recordings `waypoints`; rows follow metadata.joint_ids order.
+export interface TrajectoryData {
+  metadata: {
+    type: string
+    joint_ids?: string[]
+    hand_type?: string | null
+    created_at?: string
+    edited_at?: string
+    sampling_frequency_hz?: number
+  }
+  waypoints?: number[][]
+  angles?: number[][]
 }

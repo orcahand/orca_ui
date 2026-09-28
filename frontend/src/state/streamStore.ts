@@ -2,7 +2,7 @@
 // WS handler, fanned out to imperative subscribers on requestAnimationFrame.
 // High-rate data never passes through React state.
 
-import type { Finger, Vec3 } from '../api/types'
+import type { Finger, MotorsFaults, SensorsHealth, Vec3 } from '../api/types'
 import { RingBuffer } from './ringBuffer'
 
 export interface LatestFrames {
@@ -27,11 +27,17 @@ export interface LatestFrames {
   motors: {
     temps: Record<string, number>
     currents: Record<string, number>
+    // The motor family's rated max operating temperature (°C), from the
+    // backend; null until the first telemetry payload carries it.
+    maxTempC: number | null
+    // Per-motor fault table (bus errors + command adherence), 1 Hz.
+    faults: MotorsFaults | null
   }
   teleop: {
     preview: { jpeg: string; seq: number | null } | null
   }
   stats: Record<string, unknown> | null
+  health: SensorsHealth | null
 }
 
 export const latest: LatestFrames = {
@@ -46,9 +52,10 @@ export const latest: LatestFrames = {
     tTeleopTarget: 0,
   },
   tactile: { forces: null, taxels: null, tForces: 0, tTaxels: 0 },
-  motors: { temps: {}, currents: {} },
+  motors: { temps: {}, currents: {}, maxTempC: null, faults: null },
   teleop: { preview: null },
   stats: null,
+  health: null,
 }
 
 // ----- sparkline history (measured + target per joint, shared time ring) ----

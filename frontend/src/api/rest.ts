@@ -19,6 +19,7 @@ import type {
   TeleopSnapshot,
   TeleopSourceId,
   TeleopSourcesInfo,
+  TrajectoryData,
   TrajectoryEntry,
 } from './types'
 
@@ -149,6 +150,18 @@ export const api = {
 
   trajectories: () =>
     request<{ trajectories: TrajectoryEntry[] }>('/api/trajectories'),
+  trajectoryGet: (name: string) =>
+    request<TrajectoryData>(`/api/trajectories/${encodeURIComponent(name)}`),
+  trajectoryUpdate: (name: string, waypoints: number[][], saveAs?: string) =>
+    put<{ ok: boolean; name: string; frames: number }>(
+      `/api/trajectories/${encodeURIComponent(name)}`,
+      { waypoints, save_as: saveAs ?? null },
+    ),
+  trajectoryToMotor: (name: string, saveAs?: string) =>
+    post<{ ok: boolean; name: string; frames: number }>(
+      `/api/trajectories/${encodeURIComponent(name)}/to_motor`,
+      { save_as: saveAs ?? null },
+    ),
   trajectoryDelete: (name: string) =>
     del<{ ok: boolean }>(`/api/trajectories/${encodeURIComponent(name)}`),
   demos: () => request<{ demos: DemoEntry[] }>('/api/demos'),
