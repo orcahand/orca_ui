@@ -96,7 +96,8 @@ def run_detection(config, *, force: bool = False) -> HandDetection | None:
         return None
 
 
-def presence_from_detection(config, detection: HandDetection | None
+def presence_from_detection(config, detection: HandDetection | None, *,
+                            fallback_motor_scan: bool = True
                             ) -> HardwarePresence:
     """Resolve the ports this config's declared capabilities need, reading a
     detection result that has already been taken.
@@ -105,6 +106,11 @@ def presence_from_detection(config, detection: HandDetection | None
     ``"auto"`` fields consume the detection. Passing a detection taken
     against another config is fine and deliberate — a detection describes the
     hardware, not the config it was requested for.
+
+    ``fallback_motor_scan=False`` disables the last-resort VID scan for a
+    motor port. A supervisor pinned to one board passes False: the scan is
+    machine-global, and grabbing whatever adapter it finds is exactly the
+    cross-wiring a pin exists to prevent.
     """
     motor_override, tactile_override, encoder_override = _overrides(config)
 
@@ -125,7 +131,7 @@ def presence_from_detection(config, detection: HandDetection | None
         motor_port = motor_override
     else:
         motor_port = detection.motor_port if detection is not None else None
-        if motor_port is None:
+        if motor_port is None and fallback_motor_scan:
             try:
                 motor_port = auto_detect_port(config.motor_type)
             except Exception:

@@ -23,6 +23,10 @@ class UiSettings:
     # the user asked for.
     model_pinned: bool = True
     model_version: str | None = None
+    # Device path of the board this console is pinned to, or None for "first
+    # board to answer". Pinning is what makes two consoles on one machine
+    # deterministic: a pinned supervisor never opens another board's ports.
+    board: str | None = None
     mock: bool = False
     engage_feedback: bool = True
     motors_enabled: bool = True

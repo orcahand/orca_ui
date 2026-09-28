@@ -69,6 +69,10 @@ class StatusSnapshot:
     # True while a human has asked for the hardware back: the auto-connect
     # ladder is suspended and DISCONNECTED is a resting state, not a search.
     released: bool = False
+    # Device path of the board this console is pinned to; None = first board
+    # to answer. Rides along for the same reason model_pinned does: the
+    # picker shows which policy is in force.
+    board_pinned: str | None = None
 
     def as_dict(self) -> dict:
         caps = None
@@ -92,4 +96,5 @@ class StatusSnapshot:
             "side": self.side,
             "model_pinned": self.model_pinned,
             "released": self.released,
+            "board_pinned": self.board_pinned,
         }
