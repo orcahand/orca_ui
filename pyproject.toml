@@ -31,6 +31,7 @@ orca-dev = "orca_ui.core_source:main"
 dev = [
     "pytest>=8.3.5,<9.0.0",
     "pytest-timeout>=2.3,<3",
+    "pytest-xdist>=3.8,<4",
 ]
 # Only needed to (re)build the 3D hand asset bundle (scripts/build_hand_bundle.py).
 assets = [
