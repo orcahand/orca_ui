@@ -77,12 +77,12 @@ replaces reading your own diff:
   only runs in clones that set `core.hooksPath` — git will not ship active
   hooks — so it cannot be the only guard.
 - `tests/test_no_committed_dev_override.py` reads the *committed* files, so it
-  passes while your working tree is in dev mode and fails only if the override
-  is staged.
-- `.github/workflows/test.yml` runs that test on every pull request and
-  installs with `uv sync --locked`, which rejects an override however it is
-  spelled, since `pyproject.toml` and `uv.lock` then disagree. This is the
-  guard that catches a commit made on a machine without the hook.
+  passes while your working tree is in dev mode and fails only once the
+  override is committed.
+- `.github/workflows/test.yml` runs that test on every pull request. A PR into
+  `main` also installs with `uv sync --locked` against the published
+  `orca_core`, which a path source cannot satisfy. This is the guard that
+  catches a commit made on a machine without the hook.
 
 A branch that needs an unreleased `orca_core` does **not** get a source entry
 of its own. CI pairs it instead: `test.yml` checks `orca_core` out beside this
@@ -112,4 +112,5 @@ cd frontend && npm run build && cd ..
 uv build
 ```
 
-Rebuild the frontend before releasing so the committed bundle is current.
+The `orca_ui/webui` build output is committed and ships in the wheel; rebuild
+the frontend before releasing so it is current.

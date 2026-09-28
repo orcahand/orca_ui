@@ -19,8 +19,9 @@ The console drives real hardware that can damage itself and hurt whoever is
 holding it. A test earns its place here by catching a bug that would *hurt
 someone, break the hand, or break the frontend* — not by covering a line.
 
-The target is roughly **70 tests**. The suite is above that today, so a new
-test should displace an existing one rather than add to the count.
+The target is roughly **70 tests**. The suite is above that today; the cull
+happens as each area's tests are rewritten, so a new test should displace an
+existing one rather than add to the count.
 
 ### What belongs here
 
@@ -43,7 +44,8 @@ test should displace an existing one rather than add to the count.
 
 ### What does not
 
-- Developer tooling (which `orca_core` is installed, dev-mode overrides).
+- Developer tooling, beyond the one test that keeps a dev-mode override out
+  of a commit.
 - Exhaustive variants of a behaviour already covered once. One replay-pacing
   test, not eight.
 - Analytics and bookkeeping (usage stats, histograms, session naming).
@@ -51,8 +53,7 @@ test should displace an existing one rather than add to the count.
   e-stop registration, the torque gate, and the real-hardware confirm gate,
   and nothing else.
 - Installer and build plumbing (cloning, npm builds, remembered paths).
-- Asset sanity beyond the one check that the bundle's joints match
-  `orca_core`'s.
+- Asset sanity beyond checking that the bundle's joints match `orca_core`'s.
 
 ### Before adding a test
 
@@ -109,11 +110,12 @@ Three things enforce this, and none of them replaces reading the diff:
   runs in clones that set `core.hooksPath`, because git will not ship active
   hooks — so it can never be the only guard.
 - `tests/test_no_committed_dev_override.py` reads the committed files, so it
-  passes while your working tree is in dev mode.
-- `.github/workflows/test.yml` runs that test on every pull request and
-  installs with `uv sync --locked`, which rejects an override however it is
-  spelled, since `pyproject.toml` and `uv.lock` then disagree. This is the
-  guard that catches a commit made on a machine without the hook.
+  passes while your working tree is in dev mode and fails only once the
+  override is committed.
+- `.github/workflows/test.yml` runs that test on every pull request. A PR into
+  `main` also installs with `uv sync --locked` against the published
+  `orca_core`, which a path source cannot satisfy. This is the guard that
+  catches a commit made on a machine without the hook.
 
 A branch that needs an unreleased `orca_core` is paired in CI by checking the
 core out beside this repo, so it never needs a source entry of its own.

@@ -2,7 +2,7 @@
 // multi-joint coalescing, WS with REST fallback.
 //
 // Paced by rAF rather than a fixed timer so the setpoint stream matches the
-// rate the browser delivers pointer moves at. The joint loop runs a 100 Hz PI
+// rate the browser delivers pointer moves at. The joint loop runs its PI
 // against whatever setpoint it last received, so a setpoint that only steps
 // every 50 ms makes the loop chase a staircase and the joint ratchets
 // visibly. scripts/manual_control.py sends on every Tk motion event for the

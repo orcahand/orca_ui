@@ -177,21 +177,13 @@ function renderArrow(
 
   const strokeWidth = (2 + normalized * 2.5) * settings.thicknessMult
 
-  // The head is sized off the shaft, not off its own independent ramp. The
-  // old constants gave a head barely 1.5x the shaft across at the default
-  // thickness, so an arrow read as a plain line and its direction had to be
-  // inferred from which end was which. 2.8x the stroke length puts the head
-  // ~3.2x the shaft across, which is the usual proportion for an arrowhead.
-  // Clamped so a short arrow gets a small dart rather than becoming all head.
+  // Head sized off the shaft: 2.8x the stroke puts it ~3.2x the shaft across,
+  // the usual arrowhead proportion. Clamped so a short arrow keeps a shaft.
   const headLength = Math.min(strokeWidth * 2.8, arrowLength * 0.55)
   const drawHead = headLength > 1
 
-  // The shaft stops at the *base* of the head, not at its tip. It used to run
-  // the full length, and the round linecap then pushed a half-round bulge of
-  // strokeWidth/2 out through the point of the triangle — which is the stub
-  // that appeared to poke past every arrowhead. Ending at the base also means
-  // the cap is swallowed by the head instead of fighting it, and the small
-  // forward bulge conveniently covers the seam.
+  // The shaft stops at the base of the head, so its round linecap is covered
+  // by the head instead of poking out past the point.
   const shaftBack = drawHead ? headLength * Math.cos(HEAD_ANGLE) : 0
   const shaftX = endX - Math.cos(angle) * shaftBack
   const shaftY = endY - Math.sin(angle) * shaftBack

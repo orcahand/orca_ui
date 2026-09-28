@@ -12,6 +12,29 @@ from orca_ui.hand import supervisor as supervisor_mod
 from test_model_detection import build
 
 
+def test_a_maintenance_hand_connects_on_the_leased_port(monkeypatch):
+    """The lease resolved the motor port (scoped to a pinned board); the
+    maintenance hand must not re-resolve it machine-wide."""
+    import threading
+    from types import SimpleNamespace
+
+    import orca_core
+
+    from orca_ui.hand.operations import hand_ops
+
+    class FakeHand:
+        def __init__(self, config_path):
+            self.config = SimpleNamespace(port="auto")
+
+        def connect(self, interactive=False):
+            return True, "ok"
+
+    monkeypatch.setattr(orca_core, "OrcaHand", FakeHand)
+    hand = hand_ops.build_maintenance_hand("unused.yaml", threading.Event(),
+                                           motor_port="/dev/cu.usbmodemPINNED")
+    assert hand.config.port == "/dev/cu.usbmodemPINNED"
+
+
 def test_a_pinned_board_never_falls_back_to_another_hand(monkeypatch):
     sup, _ = build("orcahand-right")
     sup.select_board("/dev/cu.usbmodemPINNED")

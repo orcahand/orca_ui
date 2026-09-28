@@ -15,13 +15,9 @@
    every fill, border and glow built from it, while the alphas — which encode
    how loud each thing is meant to be next to its neighbours — stay put.
 
-   Near-duplicate literals were collapsed into one triple per role on the way
-   in: cyan-500 into cyan-400, emerald-500 into emerald-400, and the two
-   softer reds that are not the E-stop into --err-rgb. At the alphas in use
-   those pairs were indistinguishable, and carrying two shades of one intent
-   through two themes was not worth it. The .dir-* legend chips picked up the
-   same collapse, which incidentally fixed a real drift: they were labelling
-   the taxel direction colors with a shade the data never used.
+   One triple per role: at the alphas in use, a second shade of the same
+   intent is indistinguishable, and the .dir-* legend chips use the same
+   triples as the taxel direction colours they label.
 
    Light is "warm paper" — an off-white ground, white panels raised on it,
    ink-dark type, and accents darkened until each clears 4.5:1 against the

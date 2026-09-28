@@ -220,9 +220,12 @@ class HandSession:
             # All hand classes tolerate partial state; for sensors-only
             # sessions this also tears down the tactile link opened by
             # connect_sensors_only().
-            self.hand.disconnect()
+            result = self.hand.disconnect()
         except Exception:
             logger.exception("hand disconnect failed during session close")
+        else:
+            if isinstance(result, tuple) and len(result) == 2 and not result[0]:
+                logger.warning("hand disconnect incomplete: %s", result[1])
         for link in self._owned_links:
             try:
                 link.disconnect()
@@ -279,6 +282,23 @@ def connect_session(settings: UiSettings, config,
         + (f" {', '.join(busy)} is held by another process — close it and "
            "reconnect." if busy else "")
     )
+
+
+NO_TACTILE_SENSORS = "tactile port answered but no sensor responded on it"
+
+
+def _tactile_sensors_answered(hand) -> bool:
+    """False when the tactile link is up but the board reports no sensor.
+
+    orca_core's tactile client connects fine to a board with nothing on its
+    sensor slots and only fails once a stream is started, so a hand with a
+    dead or unplugged sensor chain would otherwise count as a touch hand.
+    """
+    client = getattr(hand, "_tactile_client", None)
+    if client is None:
+        return True
+    config = getattr(client, "_tactile_config", None)
+    return config is None or config.num_active_sensors > 0
 
 
 def _caps_from_hand(hand, declared: dict) -> Capabilities:
@@ -356,8 +376,7 @@ def _connect_with_motors(settings, config, declared, presence: HardwarePresence)
             # board when one is pinned. Left as "auto", connect() re-resolves
             # it machine-globally: ambiguous with two adapters attached, and
             # with a board pinned it must not look beyond that board at all.
-            # In-memory only; persist_resolved_driver diffs against the file,
-            # so a patched port is never written back.
+            # In-memory only: nothing writes the port back to the file.
             import copy
 
             if hand.config is config:
@@ -369,6 +388,15 @@ def _connect_with_motors(settings, config, declared, presence: HardwarePresence)
         except (JointFeedbackConnectError, RuntimeError) as e:
             attempts.append(f"{tier}: {e}")
             logger.warning("connect tier %s failed: %s", tier, e)
+            continue
+        if ok and tactile and not _tactile_sensors_answered(hand):
+            attempts.append(f"{tier}: {NO_TACTILE_SENSORS}")
+            logger.warning("connect tier %s: %s — continuing without tactile",
+                           tier, NO_TACTILE_SENSORS)
+            try:
+                hand.disconnect()
+            except Exception:
+                logger.exception("disconnect after a sensorless tactile tier failed")
             continue
         if ok:
             return HandSession(hand=hand, caps=_caps_from_hand(hand, declared),
@@ -405,6 +433,9 @@ def _connect_sensors_only(settings, config, declared, presence: HardwarePresence
 
     if declared["tactile"] and presence.sensing.tactile:
         ok, msg = hand.connect_sensors_only()
+        if ok and not _tactile_sensors_answered(hand):
+            ok, msg = False, NO_TACTILE_SENSORS
+            logger.warning("sensors-only connect: %s", NO_TACTILE_SENSORS)
         messages.append(msg)
         tactile_ok = ok
         if ok:

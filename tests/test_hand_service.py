@@ -450,3 +450,59 @@ def test_hand_info_says_whether_the_family_can_reboot(service):
     info = service.hand_info()
     client = service.session.hand.motor_client
     assert info["reboot_supported"] == hasattr(client, "reboot_motor")
+
+
+def test_a_touch_tier_with_no_answering_sensor_falls_to_the_next_tier(monkeypatch):
+    """A tactile board with nothing on its sensor slots connects, then fails
+    the moment a stream starts. The ladder must not call that a touch hand."""
+    from types import SimpleNamespace
+
+    from orca_core import HandDetection
+    from orca_core.hardware.sensing.serial_discovery import OrcaBoardInfo
+
+    from orca_ui.hand import sessions
+    from orca_ui.hand.detection import presence_from_detection
+    from orca_ui.hand.supervisor import load_config
+    from orca_ui.settings import UiSettings
+    from orca_core.hand_config import _resolve_config_path
+
+    config = load_config(_resolve_config_path(None, model_name="orcahand-touch-right"))
+    detection = HandDetection(
+        model_name="orcahand-touch-right", side="right", has_tactile=True,
+        has_encoders=False, motor_port="/dev/motor", sensing_port="/dev/oh",
+        identity=OrcaBoardInfo(role="motor", side="right", serial="ser-0000"))
+    presence = presence_from_detection(config, detection)
+    built = []
+
+    class FakeHand:
+        def __init__(self, tactile):
+            self.config = SimpleNamespace(port="/dev/motor")
+            self.disconnected = False
+            if tactile:
+                self._tactile_client = SimpleNamespace(
+                    _tactile_config=SimpleNamespace(num_active_sensors=0))
+
+        def connect(self, interactive=False):
+            return True, "ok"
+
+        def is_connected(self):
+            return True
+
+        def disconnect(self):
+            self.disconnected = True
+            return True, "closed"
+
+    def build(settings, config, feedback, tactile):
+        hand = FakeHand(tactile)
+        built.append(hand)
+        return hand
+
+    monkeypatch.setattr(sessions, "_build_hand", build)
+    declared = sessions.declared_capabilities(config, True, motors_enabled=True)
+
+    session = sessions._connect_with_motors(
+        UiSettings(config_path=config.config_path, open_browser=False),
+        config, declared, presence)
+
+    assert session.tier == "motors" and not session.caps.tactile
+    assert built[0].disconnected and session.hand is built[1]

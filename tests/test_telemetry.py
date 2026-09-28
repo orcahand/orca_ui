@@ -9,6 +9,7 @@ happen at all.
 from types import SimpleNamespace
 
 from orca_ui.hand.telemetry import (
+    MAX_TELEMETRY_STALENESS_S,
     MOTOR_TELEMETRY_MIN_INTERVAL_S,
     TelemetryService,
 )
@@ -158,6 +159,18 @@ def test_a_hand_without_a_loop_rate_limits_its_telemetry_reads():
     for _ in range(5):
         telemetry._slow_tick()
     assert session.hand.bus_reads == ["temp", "current"]
+
+
+def test_a_long_motion_still_gets_telemetry_eventually():
+    """Reads yield to motion, but not forever — an overheating motor during a
+    long replay must still surface."""
+    telemetry, session = _build(ramping=True)
+    telemetry._last_bus_read -= MAX_TELEMETRY_STALENESS_S + 1.0
+    telemetry._slow_tick()
+    assert session.hand.bus_reads == ["temp"]
+    # The forced read resets the clock: the next tick defers again.
+    telemetry._slow_tick()
+    assert session.hand.bus_reads == ["temp"]
 
 
 def test_the_loopless_read_returns_once_the_interval_has_passed():

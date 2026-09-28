@@ -13,9 +13,9 @@ plugged in later — is adopted rather than forced into the guess the CLI made
 against an empty bus.
 
 :meth:`HandSupervisor.select_model` is the other way in: a hand with no ORCA
-board to answer ``ORCA_ID?`` cannot be named by detection at all, so the
-operator names it instead and the choice is pinned exactly as ``--model``
-would have pinned it.
+board to answer ``ORCA_ID?`` can be told apart from an empty bus but never
+sided, so the operator names it instead and the choice is pinned exactly as
+``--model`` would have pinned it.
 """
 
 from __future__ import annotations
@@ -34,6 +34,8 @@ from orca_core.hand_config import (
     _resolve_config_path,
 )
 from orca_core.utils.utils import read_yaml
+
+from orca_core.hardware.sensing.serial_discovery import oh_board_ports
 
 from orca_ui.hand.boards import detect_pinned_board
 from orca_ui.hand.detection import (
@@ -281,7 +283,9 @@ class HandSupervisor(threading.Thread):
                 return self.model_name
             try:
                 config = load_config(
-                    self._config_path_for(model_name, model_version))
+                    self._config_path_for(
+                        model_name,
+                        model_version or self._settings.model_version))
             except Exception as e:
                 raise ModelSelectError(
                     f"could not load model {model_name!r}: {e}")
@@ -291,6 +295,9 @@ class HandSupervisor(threading.Thread):
             self._model_probes_left = 0
             self._install_config(config)
 
+        # Naming a model is an ask to run it, so it lifts a disconnect hold
+        # like select_board() does.
+        self._released = False
         self._teardown_session("model changed — reconnecting")
         self._backoff = DETECT_BACKOFF_START_S
         self._publish()
@@ -332,6 +339,9 @@ class HandSupervisor(threading.Thread):
         down, suspends health checks and reconnects, and acks. Blocks the
         calling (operation) thread until the hardware is actually free."""
         with self._lock:
+            if self._released:
+                raise RuntimeError(
+                    "hand released — reconnect before running an operation")
             if self._maintenance_kind is not None or self._in_maintenance:
                 raise RuntimeError("maintenance already active")
             self._maintenance_kind = kind
@@ -372,8 +382,13 @@ class HandSupervisor(threading.Thread):
         with self._lock:
             self._maintenance_kind = None
             self._in_maintenance = False
+            released = self._released
         self._backoff = DETECT_BACKOFF_START_S
-        self._set_state(HandState.DETECTING, "maintenance finished — reconnecting")
+        if released:
+            self._set_state(HandState.DISCONNECTED, RELEASED_MESSAGE, ports={})
+        else:
+            self._set_state(HandState.DETECTING,
+                            "maintenance finished — reconnecting")
         self._wake.set()
 
     def _config_path_for(self, model_name: str,
@@ -510,10 +525,24 @@ class HandSupervisor(threading.Thread):
             else:
                 detection = run_detection(self.config,
                                           force=not self._model_pinned)
+                if self._board_motor_bus_unresolved(detection):
+                    # A board answered but its motor CDC did not (held, or a
+                    # missed identity reply), so detection fell back to
+                    # whatever bare adapter was free: connecting now would
+                    # wire this board's sensors to another hand's motors.
+                    self._set_state(
+                        HandState.DETECTING,
+                        "controller board answered but its motor port did "
+                        "not — retrying")
+                    delay = self._backoff
+                    self._backoff = min(self._backoff * 1.5,
+                                        DETECT_BACKOFF_MAX_S)
+                    return delay
                 self._adopt_model(detection)
                 presence = presence_from_detection(self.config, detection)
+        config = self.config
         try:
-            session = connect_session(self._settings, self.config,
+            session = connect_session(self._settings, config,
                                       presence=presence)
         except SessionConnectError as e:
             detail = "; ".join(e.attempts) if e.attempts else str(e)
@@ -529,6 +558,13 @@ class HandSupervisor(threading.Thread):
             delay = self._backoff
             self._backoff = min(self._backoff * 1.5, DETECT_BACKOFF_MAX_S)
             return delay
+
+        if (self._released or self.config is not config
+                or self._board_pinned != pin):
+            # A disconnect, model change or board change landed while this
+            # connect was in flight: the session belongs to the old state.
+            self._close_stale_session(session)
+            return 0.1
 
         # Enforce the auto-connect contract physically, not just in the flag:
         # motor clients historically enabled torque inside connect().
@@ -557,6 +593,24 @@ class HandSupervisor(threading.Thread):
             logger.exception("session-ready hook failed")
             self._on_error(f"session init: {e}")
         return HEALTH_PERIOD_S
+
+    def _board_motor_bus_unresolved(self, detection: HandDetection | None) -> bool:
+        """True when a controller board identified itself but the motor port
+        detection resolved is not one of a board's own CDCs: a bare adapter
+        found by the fallback scan, i.e. some other hand's bus."""
+        if (not self._settings.motors_enabled or detection is None
+                or detection.identity is None):
+            return False
+        if detection.busy_ports:
+            return True
+        return (detection.motor_port is not None
+                and detection.motor_port not in set(oh_board_ports()))
+
+    def _close_stale_session(self, session: HandSession) -> None:
+        try:
+            session.close()
+        except Exception:
+            logger.exception("closing a superseded session failed")
 
     def _health_tick(self) -> float:
         session = self.session
@@ -692,6 +746,10 @@ class HandSupervisor(threading.Thread):
         if self._model_pinned or not names_a_hand(detection):
             return False
         if detection.model_name == self.model_name:
+            return False
+        if detection.identity is None and detection.side != self.config.type:
+            # A hand with no board cannot report its side, so detection
+            # defaulted it; the side in force was chosen by a human.
             return False
         if upgrade_only and not self._is_upgrade(detection):
             return False

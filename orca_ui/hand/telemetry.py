@@ -346,8 +346,12 @@ class TelemetryService:
                 if self._motor_telemetry_is_due():
                     self._last_motor_telemetry = time.monotonic()
                     self._publish_motor_health(session)
-            elif not self._hand_is_driven() or self._telemetry_is_stale():
+            elif not self._hand_is_driven():
                 self._bus_read_tick(session)
+            elif self._telemetry_is_stale():
+                # The one read motion may not defer: an overheating motor.
+                self._last_bus_read = time.monotonic()
+                self._publish_motor_health(session, currents=False)
 
         if (session.caps.motors and not session.caps.feedback_loop
                 and not self._estimate_is_wanted()):

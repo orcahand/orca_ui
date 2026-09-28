@@ -111,8 +111,7 @@ def _lead_in(service, joint_ids: list[str],
 
     Reads the session's joint source rather than the encoders alone: a hand
     without joint encoders has a calibrated motor estimate, which is what it
-    recorded from, and asking for measured angles there returns nothing —
-    which silently skipped the whole glide.
+    recorded from.
     """
     session = service.session
     sampled = (session.sampled_joints() or {}) if session else {}
@@ -312,6 +311,10 @@ class ReplayOperation(Operation):
             if self.params["loop"] and len(waypoints) > 1:
                 waypoints = waypoints + [list(waypoints[0])]
             frames, rate_hz, holds = _interpolate(waypoints)
+            if self.params["loop"] and len(holds) > 1:
+                # The closing waypoint is the next cycle's opening one, which
+                # is held there; holding it twice would double the dwell.
+                holds = holds[:-1]
         return play_frames(
             ctx, name=self.params["name"], joint_ids=joint_ids,
             frames=frames, rate_hz=rate_hz,
@@ -362,11 +365,8 @@ class DemoOperation(Operation):
         if self.params["loop"] and waypoints:
             waypoints.append(list(waypoints[0]))
         frames, rate_hz, _holds = _interpolate(waypoints)
-        # TODO: demos could hold at their keyframes too (play_frames takes
-        # ``holds``), and would land their poses more crisply for it. Left
-        # off deliberately: a demo is a continuous flourish rather than a set
-        # of separately captured poses, and pausing at every keyframe changes
-        # how the built-in sequences read.
+        # Demos do not hold at keyframes: they are continuous flourishes, not
+        # separately captured poses.
         return play_frames(
             ctx, name=self.params["name"], joint_ids=joint_ids,
             frames=frames, rate_hz=rate_hz, speed=1.0,

@@ -6,12 +6,12 @@ them — a slider at pointer rate, replay at its frame rate — and the joint lo
 still gets a fresh setpoint every cycle instead of a staircase to chase.
 
 Without that the steps are large and slow enough to feel: replay cruising at
-``WAYPOINT_SPEED_DEG_S`` (60 deg/s) at 25 Hz hands the 100 Hz PI a 2.4 deg step
-four cycles apart, and since the controller has no derivative term each edge
-becomes an instant ``Kp x step`` jump in the motor target — the joint ratchets
-at the command rate. ``apply_pose`` already avoids this by passing orca_core's
-``num_steps``/``step_size``; this does the same for streamed targets, whose
-frame spacing isn't known up front.
+``WAYPOINT_SPEED_DEG_S`` (60 deg/s) at 25 Hz hands the loop's PI a 2.4 deg
+step held for several cycles, and since the controller has no derivative term
+each edge becomes an instant ``Kp x step`` jump in the motor target — the
+joint ratchets at the command rate. ``apply_pose`` already avoids this by
+passing orca_core's ``num_steps``/``step_size``; this does the same for
+streamed targets, whose frame spacing isn't known up front.
 
 Long-running exclusive ops (go-to-neutral, pose apply) run on the same thread
 so they never interleave with target writes, and reset the ramp afterwards
@@ -26,11 +26,13 @@ import time
 from collections import deque
 from typing import Callable, Optional
 
+from orca_core.control.constants import DEFAULT_LOOP_HZ
+
 logger = logging.getLogger(__name__)
 
-# One setpoint per joint-loop cycle; must track orca_core's DEFAULT_LOOP_HZ,
-# since feeding slower leaves the loop re-using setpoints in between.
-FEED_HZ = 200.0
+# One setpoint per joint-loop cycle: feeding slower leaves the loop re-using
+# setpoints in between.
+FEED_HZ = float(DEFAULT_LOOP_HZ)
 
 # Command spacing is measured rather than assumed, so a 50 Hz replay and a
 # slider at pointer rate each ramp over their own inter-command gap. Clamped
@@ -62,10 +64,13 @@ class CommandWorker(threading.Thread):
         self._wake = threading.Event()
         self._stop_event = threading.Event()
 
-        # Active ramp: per-joint start and destination, plus when the
-        # destination was commanded and how far apart commands are arriving.
+        # Active ramp: per-joint start, destination and the time the
+        # destination was commanded. Each joint ramps on its own clock, so a
+        # command naming one joint never restarts another's ramp.
         self._from: dict[str, float] = {}
         self._to: dict[str, float] = {}
+        self._ramp_start: dict[str, float] = {}
+        # Time of the last command of any kind, for the period estimate.
         self._commanded_at = 0.0
         self._period = DEFAULT_COMMAND_PERIOD_S
         self._period_seeded = False
@@ -119,6 +124,7 @@ class CommandWorker(threading.Thread):
                 self._from[joint] = live.get(
                     joint, self._applied.get(joint, value))
                 self._to[joint] = value
+                self._ramp_start[joint] = now
             self._commanded_at = now
         self._wake.set()
 
@@ -138,6 +144,7 @@ class CommandWorker(threading.Thread):
         with self._lock:
             self._from.clear()
             self._to.clear()
+            self._ramp_start.clear()
             self._applied = {j: float(v) for j, v in (pose or {}).items()}
             self._commanded_at = 0.0
             self._period = DEFAULT_COMMAND_PERIOD_S
@@ -158,16 +165,15 @@ class CommandWorker(threading.Thread):
         span = self._period * RAMP_SLACK
         if span <= 0.0:
             return dict(self._to)
-        # Clamped both ways: the caller samples the clock before taking the
-        # lock, so a command landing in that window would otherwise give a
-        # negative alpha and extrapolate the joint backwards.
-        alpha = min(1.0, max(0.0, (now - self._commanded_at) / span))
-        if alpha >= 1.0:
-            return dict(self._to)
-        return {
-            joint: start + (self._to[joint] - start) * alpha
-            for joint, start in self._from.items()
-        }
+        pose = {}
+        for joint, start in self._from.items():
+            # Clamped both ways: the caller samples the clock before taking
+            # the lock, so a command landing in that window would otherwise
+            # give a negative alpha and extrapolate the joint backwards.
+            alpha = min(1.0, max(0.0, (now - self._ramp_start[joint]) / span))
+            target = self._to[joint]
+            pose[joint] = target if alpha >= 1.0 else start + (target - start) * alpha
+        return pose
 
     def _next_write(self, now: float) -> Optional[dict[str, float]]:
         """Next pose to write, or None when the ramp has nothing left to do."""
@@ -175,12 +181,11 @@ class CommandWorker(threading.Thread):
             if not self._to:
                 return None
             pose = self._pose_at(now)
-            if pose == self._to:
-                # Arrived: emit the commanded values exactly once, then stop
-                # tracking these joints so a later command for a different
-                # joint never rewrites this one's target.
-                self._from.clear()
-                self._to.clear()
+            # A joint that has arrived is emitted at its commanded value once,
+            # then dropped, so a later command for another joint never
+            # rewrites this one's target.
+            for joint in [j for j, v in pose.items() if v == self._to[j]]:
+                del self._from[joint], self._to[joint], self._ramp_start[joint]
             self._applied.update(pose)
             return pose
 

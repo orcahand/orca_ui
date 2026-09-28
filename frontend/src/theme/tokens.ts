@@ -1,5 +1,5 @@
-// Force-scale constants for the tactile displays. Colors used to live here
-// too; they are per-theme now and moved to palette.ts.
+// Force-scale constants for the tactile displays. Colours are per-theme and
+// live in palette.ts.
 
 // Per-taxel normalization, keyed by sensor model. 25.5 N is the *encoding*
 // full scale (fz is an unsigned byte * 0.1 N) — not what a taxel actually
@@ -35,6 +35,6 @@ export function maxTaxelForce(finger: string): number {
 // Resultant normalization, shared by the 2D dial and the 3D resultant arrow.
 // Unlike the taxels this is NOT per-model: the resultant is a single reading
 // of one byte per axis, so 25.5 N (uint8 fz * 0.1 N) is its full scale on
-// every sensor. Normalizing against 10 N pinned the dial at the edge well
-// before the sensor ran out of range.
+// every sensor, so the dial reaches its edge where the sensor runs out of
+// range.
 export const MAX_FORCE_SCALE = 25.5

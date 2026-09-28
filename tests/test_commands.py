@@ -109,7 +109,7 @@ def test_slow_source_ramps_across_the_whole_gap(worker, clock):
     worker.reset({"index_mcp": 0.0})
     for frame in (6.0, 12.0):
         worker.submit_targets({"index_mcp": frame})
-        _drain(worker, clock, 10)          # 100 ms of feed at 100 Hz
+        _drain(worker, clock, 10)          # 100 ms of feed
 
     worker.submit_targets({"index_mcp": 18.0})
     # The ramp spans RAMP_SLACK x the 100 ms gap, so it is still in flight when
@@ -187,6 +187,26 @@ def test_reset_drops_an_in_flight_ramp(worker, clock):
     worker.reset()
     clock.advance(DEFAULT_COMMAND_PERIOD_S)
     assert worker._next_write(clock.now) is None
+
+
+def test_a_command_for_one_joint_never_rewinds_another(worker, clock):
+    """Each joint ramps on its own clock. With a shared one, a thumb command
+    landing mid-way through an index ramp restarted the index ramp from its
+    start, and the bus was told to go back the way it came."""
+    worker.reset({"index_mcp": 0.0, "thumb_mcp": 0.0})
+    worker.submit_targets({"index_mcp": 0.0})
+    clock.advance(0.02)
+    worker.submit_targets({"index_mcp": 0.0})
+    clock.advance(0.02)
+    worker.submit_targets({"index_mcp": 40.0})
+    before = [pose["index_mcp"] for pose in _drain(worker, clock, 3, step=0.005)]
+    assert before == sorted(before) and 0.0 < before[-1] < 40.0
+
+    worker.submit_targets({"thumb_mcp": 5.0})
+    after = [pose["index_mcp"] for pose in _drain(worker, clock, 8, step=0.005)
+             if "index_mcp" in pose]
+    assert after[0] >= before[-1]
+    assert after == sorted(after) and after[-1] == 40.0
 
 
 def test_a_late_command_never_drives_the_joint_backwards(worker, clock):

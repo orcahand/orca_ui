@@ -55,8 +55,7 @@ export function FingerTaxelSvg({
   const handlesRef = useRef<TaxelHandles | null>(null)
   const lastFrameT = useRef(0)
   const taxelRadius = 5
-  // This finger's sensor model reaches its own peak force; normalizing every
-  // model against one number left the 87-taxel fingers stuck in dark grey.
+  // Each sensor model normalises against its own peak force.
   const maxForce = maxTaxelForce(finger)
 
   // Build the arrow pool once per layout; collect circle handles.

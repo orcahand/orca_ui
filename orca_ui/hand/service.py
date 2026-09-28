@@ -386,10 +386,16 @@ class HandService:
 
     def disconnect(self) -> dict:
         """Close the session and hold the ports free until Reconnect."""
+        manager = self._operation_manager
+        if manager is not None and manager.active():
+            raise ServiceError(
+                "an operation is running — stop it before disconnecting",
+                status_code=409)
         try:
             self.supervisor.disconnect()
         except HandBusyError as e:
             raise ServiceError(str(e), status_code=409)
+        self.worker.reset()
         return self.status()
 
     def reconnect(self) -> dict:
@@ -402,8 +408,7 @@ class HandService:
         """Motor vs joint-feedback calibration, and what recalibrating fixes.
 
         ``hint`` is set when the motors are calibrated but encoder anchors are
-        missing — the state every calibration recorded before the wrist joined
-        the loop lands in.
+        missing, so recalibrating those joints is what closes the loop on them.
         """
         state: dict = {"motors": None, "joint_feedback": None,
                        "missing_anchors": [], "hint": None}
@@ -530,10 +535,10 @@ class HandService:
         that was off at startup, or a different one plugged in since). Repoint
         everything keyed by model; the browser refetches ``/hand/info`` off
         the model field in the status stream."""
-        self._max_current = int(config.max_current)
         # Poses and recordings are per-model — a left hand's library must not
         # follow the right hand that replaced it.
         self.library = Library(self._library_root, model_name_of(config))
+        self._max_current = _current_or_none(config.max_current)
 
     def _session_ready(self, session: HandSession) -> None:
         # connect() builds a new controller on the config's gains, so last
@@ -1126,6 +1131,7 @@ class HandService:
     def rebase(self) -> None:
         session = self._require_feedback()
         session.hand.rebase_loop()
+        self.worker.reset()
 
     # ----- direct motor control (advanced diagnostics) -----------------------
     #
@@ -1138,7 +1144,7 @@ class HandService:
         """Per-motor position + latched hardware-error state.
 
         Reads happen under the loop-write fence (when a loop runs) so the
-        per-motor status round-trips don't interleave with 100 Hz writes on
+        per-motor status round-trips don't interleave with the loop's writes on
         the shared bus.
         """
         session = self._require_motors()
@@ -1276,6 +1282,7 @@ class HandService:
                 loop.resume_writes()
             except Exception:
                 logger.exception("resume_writes failed leaving direct motor mode")
+        self.worker.reset()
         self._publish_control_state()
 
     def set_motor_position(self, motor_id: int, position: float) -> dict:

@@ -6,6 +6,8 @@ different hand plugged in later — is adopted rather than forced into the
 guess the CLI made against an empty bus.
 """
 
+import dataclasses
+
 import pytest
 from orca_core import HandDetection
 from orca_core.hand_config import _resolve_config_path
@@ -104,6 +106,20 @@ def test_a_legacy_hand_is_adopted_despite_having_no_identity():
 
     assert sup.model_name == "orcahand-touch-right"
     assert [c.config_path for c in adopted] == [sup.config.config_path]
+
+
+def test_a_legacy_hand_never_changes_the_side_a_human_chose():
+    """Without a board there is no side to read: detection defaults it. A
+    left hand selected by the operator must not come back as right the
+    moment the choice is handed back to detection."""
+    sup, adopted = build("orcahand-left")
+    legacy_right = HandDetection(
+        model_name="orcahand-right", side="right",
+        has_tactile=False, has_encoders=False,
+        motor_port="/dev/cu.feetech", sensing_port=None, identity=None,
+    )
+    assert sup._adopt_model(legacy_right) is False
+    assert sup.model_name == "orcahand-left" and adopted == []
 
 
 def test_a_pinned_model_is_never_revised():
@@ -210,9 +226,53 @@ def test_presence_is_re_read_against_the_adopted_config():
 # ----- the connect path ------------------------------------------------------
 
 
+def test_a_board_with_a_held_port_is_waited_for_not_cross_wired(monkeypatch):
+    """With the board's motor CDC still held (just released by our own
+    teardown, or another process), detection credits the motors to whatever
+    bare adapter is free while the identity still comes from the board's
+    sensing CDC. Connecting that would drive another hand with this hand's
+    config. The connect must wait instead."""
+    sup, _ = build("orcahand-right")
+    partial = HandDetection(
+        model_name="orcahand-full-right", side="right",
+        has_tactile=True, has_encoders=True,
+        motor_port="/dev/cu.otheradapter", sensing_port="/dev/oh-sensing",
+        identity=MOTOR_BOARD, busy_ports=("/dev/oh-motor",),
+    )
+    connects = []
+    monkeypatch.setattr(supervisor_mod, "oh_board_ports", lambda: ["/dev/oh-motor", "/dev/oh-sensing"])
+    monkeypatch.setattr(supervisor_mod, "run_detection", lambda config, force=False: partial)
+    monkeypatch.setattr(supervisor_mod, "presence_from_detection",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("resolved a partial board")))
+    monkeypatch.setattr(supervisor_mod, "connect_session",
+                        lambda *a, **k: connects.append(1))
+
+    delay = sup._try_connect()
+
+    assert connects == [] and delay > 0
+    assert sup.model_name == "orcahand-right"
+    assert "motor port" in sup.status().message
+
+    # The same board with nothing reported busy, but a missed identity reply
+    # on its motor CDC: the motor port is a bare adapter, not a board CDC.
+    missed = dataclasses.replace(partial, busy_ports=())
+    monkeypatch.setattr(supervisor_mod, "run_detection", lambda config, force=False: missed)
+    assert sup._try_connect() > 0 and connects == []
+
+    # A board whose motor CDC answered connects normally.
+    whole = dataclasses.replace(missed, motor_port="/dev/oh-motor")
+    monkeypatch.setattr(supervisor_mod, "run_detection", lambda config, force=False: whole)
+    monkeypatch.setattr(supervisor_mod, "presence_from_detection", lambda *a, **k: None)
+    monkeypatch.setattr(supervisor_mod, "connect_session",
+                        lambda *a, **k: (_ for _ in ()).throw(supervisor_mod.SessionConnectError("stop here")))
+    sup._try_connect()
+    assert "stop here" in sup.status().message
+
+
 def test_connect_derives_the_model_before_connecting(monkeypatch):
     """The hand is turned on after the UI started: the connect attempt that
     finds it also decides which hand it is."""
+    monkeypatch.setattr(supervisor_mod, "oh_board_ports", lambda: ["/dev/motor", "/dev/oh"])
     sup, adopted = build("orcahand-right")
     seen = {}
 
