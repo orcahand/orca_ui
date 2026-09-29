@@ -66,6 +66,11 @@ class HandSession:
     _owned_links: list = field(default_factory=list)
     _encoder_client: JointEncoderClient | None = None
     _estimate_ok: bool | None = None  # lazily: is the motor calibration usable?
+    # Declared capabilities whose port answered but whose device refused: a
+    # sensor chain with nothing on it, an encoder stream the loop would not
+    # anchor against. Probing again cannot change any of these, so the
+    # supervisor must not treat finding the port as "it appeared".
+    refused: tuple[str, ...] = ()
 
     # ----- tactile ---------------------------------------------------------
 
@@ -367,6 +372,7 @@ def _connect_with_motors(settings, config, declared, presence: HardwarePresence)
         "encoder": presence.sensing.encoder,
     }
     attempts: list[str] = []
+    refused: set[str] = set()
     for feedback, tactile in ladder:
         tier = _tier_name(feedback, tactile)
         hand = _build_hand(settings, config, feedback, tactile)
@@ -386,10 +392,16 @@ def _connect_with_motors(settings, config, declared, presence: HardwarePresence)
         try:
             ok, msg = hand.connect(interactive=False)
         except (JointFeedbackConnectError, RuntimeError) as e:
+            if isinstance(e, JointFeedbackConnectError):
+                # The stream is there; the loop would not close on it (missing
+                # anchors, a dead slot). Only a calibration or a reconnect
+                # changes that, never another port probe.
+                refused.add("encoders")
             attempts.append(f"{tier}: {e}")
             logger.warning("connect tier %s failed: %s", tier, e)
             continue
         if ok and tactile and not _tactile_sensors_answered(hand):
+            refused.add("tactile")
             attempts.append(f"{tier}: {NO_TACTILE_SENSORS}")
             logger.warning("connect tier %s: %s — continuing without tactile",
                            tier, NO_TACTILE_SENSORS)
@@ -400,14 +412,16 @@ def _connect_with_motors(settings, config, declared, presence: HardwarePresence)
             continue
         if ok:
             return HandSession(hand=hand, caps=_caps_from_hand(hand, declared),
-                               tier=tier, message=msg, ports=ports)
+                               tier=tier, message=msg, ports=ports,
+                               refused=tuple(sorted(refused)))
         # OrcaHandTouch.connect leaves the motor bus up when only the sensor
         # failed — that IS the motors(-only or +feedback) tier, keep it.
         if hand.is_connected():
             logger.warning("connect tier %s partial: %s", tier, msg)
             return HandSession(hand=hand, caps=_caps_from_hand(hand, declared),
                                tier=_tier_name(feedback, False),
-                               message=msg, ports=ports)
+                               message=msg, ports=ports,
+                               refused=tuple(sorted(refused)))
         attempts.append(f"{tier}: {msg}")
         logger.warning("connect tier %s failed: %s", tier, msg)
 
