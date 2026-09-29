@@ -45,6 +45,17 @@ def parse_args(argv=None) -> argparse.Namespace:
                              "tactile sine signals). No hardware needed. Without "
                              "--config/--model this uses the bundled full-featured "
                              "mock model.")
+    parser.add_argument("--bare", action="store_true",
+                        help="Bare motor mode: scan the bus for whatever motors "
+                             "answer and bring them up for direct per-motor "
+                             "control, ID/baud programming and testing. For "
+                             "loose motors on a bench — no hand, no joints, no "
+                             "calibration, no sensing.")
+    parser.add_argument("--scan-all", action="store_true",
+                        help="With --bare, sweep every motor ID (0-253) and "
+                             "every baud rate up to 1M instead of the default "
+                             "IDs 0-25 at 1M. Minutes rather than seconds on "
+                             "Feetech, whose protocol cannot broadcast a ping.")
     parser.add_argument("--no-feedback", action="store_true",
                         help="Do not engage the closed-loop joint-feedback "
                              "controller even if the config enables it (sliders "
@@ -105,6 +116,9 @@ def resolve_config_path(args: argparse.Namespace) -> tuple[str, bool]:
             raise SystemExit(f"Config not found: {config_path}")
         return os.path.abspath(config_path), True
 
+    if args.bare:
+        return _resolve_bare_config(args), True
+
     if args.mock and not (args.model or args.side):
         # Bundled mock model, copied to a tempdir so runtime writes
         # (persisted ports, sensor offsets) never dirty the installed package.
@@ -135,6 +149,45 @@ def resolve_config_path(args: argparse.Namespace) -> tuple[str, bool]:
                          f"(model={model_name!r}, version={args.model_version!r}): {e}")
 
 
+def _resolve_bare_config(args) -> str:
+    """Scan the bus and synthesise a config for whatever answered.
+
+    Fails loudly with what was tried: a bare-mode start that silently fell
+    back to a packaged 17-motor model would drive a hand that is not there.
+    """
+    from orca_core.maintenance.motor_chain import resolve_port
+    from orca_ui.hand import bare as bare_mode
+
+    port = resolve_port(args.config or None)
+    if port is None:
+        raise SystemExit(
+            "--bare found no serial adapter. Plug the motor bus in, or name "
+            "its device path with --config /dev/cu.usbmodemXXXX.")
+    id_range = bare_mode.FULL_ID_RANGE if args.scan_all else bare_mode.DEFAULT_ID_RANGE
+    print(f"Scanning {port} for motors "
+          f"(IDs {id_range[0]}-{id_range[1]}"
+          f"{', every baud rate' if args.scan_all else ', 1M baud'})...",
+          file=sys.stderr)
+
+    def progress(motor_type: str, _phase: str, baud: int) -> None:
+        print(f"  {motor_type} @ {baud} baud...", file=sys.stderr)
+
+    scan = bare_mode.scan_bus(port, id_range=id_range,
+                              all_rates=args.scan_all, progress=progress)
+    print(bare_mode.describe(scan), file=sys.stderr)
+    if not scan.motors:
+        raise SystemExit(
+            "--bare found no motors. Check power and wiring, then retry with "
+            "--scan-all to sweep every ID and baud rate."
+            if not args.scan_all else
+            "--bare found no motors after a full sweep. Check power and wiring.")
+    if scan.mixed_baud:
+        raise SystemExit(
+            "Motors answered at more than one baud rate on the same bus, which "
+            "cannot be physically true. Scan again, or power-cycle the bus.")
+    return bare_mode.synthesize_config(scan)
+
+
 def build_settings(argv=None) -> UiSettings:
     args = parse_args(argv)
     config_path, model_pinned = resolve_config_path(args)
@@ -144,6 +197,7 @@ def build_settings(argv=None) -> UiSettings:
         model_version=args.model_version,
         board=None if args.mock else args.board,
         mock=args.mock,
+        bare=args.bare,
         engage_feedback=not args.no_feedback,
         motors_enabled=not args.no_motors,
         host=args.host,

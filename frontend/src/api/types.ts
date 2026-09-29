@@ -55,6 +55,10 @@ export interface StatusSnapshot {
   // rescan re-attempts the connection rather than looking for a port.
   refused?: string[]
   rescanning?: boolean
+  // Bare motor mode: loose motors brought up from a bus scan, with no hand
+  // behind them. Joints are one-to-one stand-ins for motors, so anything that
+  // poses a hand or commands a joint is hidden.
+  bare?: boolean
 }
 
 export interface ModelEntry {

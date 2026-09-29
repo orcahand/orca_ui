@@ -35,10 +35,14 @@ from orca_core.hand_config import (
 )
 from orca_core.utils.utils import read_yaml
 
-from orca_core.hardware.sensing.serial_discovery import oh_board_ports
+from orca_core.hardware.sensing.serial_discovery import (
+    SensingPorts,
+    oh_board_ports,
+)
 
 from orca_ui.hand.boards import detect_pinned_board
 from orca_ui.hand.detection import (
+    HardwarePresence,
     names_a_hand,
     presence_from_detection,
     probe_hardware,
@@ -224,6 +228,7 @@ class HandSupervisor(threading.Thread):
                     set(getattr(self._session, "refused", ()))
                     & set(self._missing_devices(caps)))),
                 rescanning=self._upgrade_probes_left > 0,
+                bare=self._settings.bare,
                 state=self._state,
                 capabilities=caps,
                 torque_enabled=self._torque_enabled,
@@ -422,13 +427,25 @@ class HandSupervisor(threading.Thread):
                 self.exit_maintenance()
             raise RuntimeError("supervisor did not release the hand in time")
         presence = None
-        if not self._settings.mock:
+        if self._settings.bare:
+            presence = self._bare_presence()
+        elif not self._settings.mock:
             # Ports are closed now — a probe finally sees the real picture.
             try:
                 presence = self._probe_hardware()
             except Exception:
                 logger.exception("maintenance port probe failed")
         return MaintenanceLease(kind=kind, presence=presence)
+
+    def _bare_presence(self) -> "HardwarePresence":
+        """Presence for bare motor mode, taken from the config rather than probed.
+
+        The bus scan at startup already resolved the port, family and rate, and
+        a bare config declares no sensing at all. Probing again could only
+        wander onto another adapter and contradict what the operator was shown.
+        """
+        return HardwarePresence(motor_port=self.config.port,
+                                sensing=SensingPorts(tactile=None, encoder=None))
 
     def _probe_hardware(self):
         """Port probe for a maintenance lease, scoped to the pinned board
@@ -564,7 +581,9 @@ class HandSupervisor(threading.Thread):
                         f"searching for board {pin}" if pin
                         else "searching for hardware")
         presence = None
-        if not self._settings.mock:
+        if self._settings.bare:
+            presence = self._bare_presence()
+        elif not self._settings.mock:
             # Nothing is connected, so every port is free and this detection
             # sees the whole hand — the one moment its answer is authoritative
             # about which model this is. Adopting it here also means the

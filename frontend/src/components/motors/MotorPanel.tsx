@@ -36,6 +36,7 @@ export function MotorPanel() {
   const control = useAppStore((s) => s.control)
   const setError = useAppStore((s) => s.setError)
   const gate = useControlGate()
+  const bare = status?.bare ?? false
 
   const [values, setValues] = useState<Record<string, number>>({})
   const [busy, setBusy] = useState(false)
@@ -158,7 +159,14 @@ export function MotorPanel() {
           {gate.reason} — manual control resumes when it releases
         </div>
       )}
-      {!locked && uncalibrated && (
+      {!locked && bare && (
+        <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 8 }}>
+          Bare motor mode — every motor found on the bus is listed below and
+          driven directly, in its own frame. There is no hand, so there are no
+          joints to command and nothing to calibrate.
+        </div>
+      )}
+      {!locked && !bare && uncalibrated && (
         <div style={{ fontSize: 10, color: 'var(--warn)', marginBottom: 8 }}>
           ⚠ NOT CALIBRATED — {handInfo.calibration.hint ?? 'the hand is not calibrated'}.
           Sliders are disabled: a joint target silently sends no motor
@@ -167,14 +175,14 @@ export function MotorPanel() {
           directly in the meantime.
         </div>
       )}
-      {!locked && !uncalibrated && !torqueOn && (
+      {!locked && !bare && !uncalibrated && !torqueOn && (
         <div style={{ fontSize: 10, color: 'var(--dimmer)', marginBottom: 8 }}>
           enable torque to command joints — sliders re-seed from the current
           pose on enable
         </div>
       )}
       <div>
-        {joints.map((joint) => (
+        {!bare && joints.map((joint) => (
           <SliderRow
             key={joint.id}
             joint={joint}

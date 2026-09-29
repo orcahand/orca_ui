@@ -49,8 +49,13 @@ export function AppHeader() {
 
   // Every tab is offered for every hand: the dashboard's own sections are
   // capability-gated one level down, so a motors-only hand gets a shorter
-  // page rather than no page.
-  const tabs = TABS
+  // page rather than no page. Bare motor mode is the exception — there is no
+  // hand to pose, no pose library worth keeping and nothing to calibrate, so
+  // only the two tabs that act on motors are offered.
+  const bare = status?.bare ?? false
+  const tabs = bare
+    ? TABS.filter((tab) => tab.id === 'dashboard' || tab.id === 'motors')
+    : TABS
 
   const state: HandState = !wsConnected
     ? 'disconnected'
