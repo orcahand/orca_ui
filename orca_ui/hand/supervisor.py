@@ -61,7 +61,7 @@ HEALTH_PERIOD_S = 2.0
 UPGRADE_PROBE_PERIOD_S = 10.0
 MOTOR_FAILURES_BEFORE_RECONNECT = 3
 
-UPGRADE_PROBE_ATTEMPTS = 3
+UPGRADE_PROBE_ATTEMPTS = 2
 """Probes for declared hardware the connect ladder could not reach, after
 which the supervisor stops looking until a human asks again.
 
@@ -70,8 +70,11 @@ console cannot fix by looking again — an uncalibrated encoder pass, an
 unplugged sensor chain, a board flashed without its sensing tier. Retrying
 forever means opening serial ports every
 :data:`UPGRADE_PROBE_PERIOD_S` for the life of the session, which is both
-noise in the log and traffic on a shared bus. So it tries a few times, then
-waits for :meth:`HandSupervisor.request_rescan`."""
+noise in the log and traffic on a shared bus.
+
+Two: one on the first health tick after connecting, one a period later to
+catch a device that was still coming up, and then the operator's call. More
+than that is a minute of scanning to reach the same answer."""
 
 MODEL_CONFIRM_PROBES = 3
 """Model re-checks to run after connecting at a model that could still be an
