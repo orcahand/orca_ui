@@ -174,6 +174,16 @@ export const api = {
       '/api/motors/direct/range',
       { id, low, high },
     ),
+  motorsDirectPoints: (id: number, points: number[] | null) =>
+    post<{ id: number; points: number[] | null }>('/api/motors/direct/points', {
+      id,
+      points,
+    }),
+  motorsDirectPlay: (id: number, enabled: boolean) =>
+    post<{ id: number; playing: boolean }>('/api/motors/direct/play', {
+      id,
+      enabled,
+    }),
   motorsDirectPosition: (id: number, position: number) =>
     post<{ id: number; position: number; previous: number }>(
       '/api/motors/direct/position',

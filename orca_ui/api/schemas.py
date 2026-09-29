@@ -104,6 +104,17 @@ class MotorRangeRequest(BaseModel):
     high: float | None = None
 
 
+class MotorPointsRequest(BaseModel):
+    id: int = Field(ge=0)
+    # None or empty clears the recording.
+    points: "list[float] | None" = None
+
+
+class MotorPlaybackRequest(BaseModel):
+    id: int = Field(ge=0)
+    enabled: bool
+
+
 class ZeroRequest(BaseModel):
     num_samples: int = Field(default=100, ge=1, le=2000)
 

@@ -176,6 +176,9 @@ export interface DirectMotorInfo {
   // only the current says whether the motor is still pushing.
   // The travel an operator found by hand, in radians, once recorded.
   range_rad?: [number, number] | null
+  // Points recorded by hand. One is a place to hold, two or more is a cycle.
+  points?: number[] | null
+  playing?: boolean
   current_ma?: number | null
   temp_c?: number | null
   hw_error: number | null

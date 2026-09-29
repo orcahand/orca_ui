@@ -303,6 +303,14 @@ def build_router(service: HandService) -> APIRouter:
     def motors_direct_range(body: schemas.MotorRangeRequest):
         return guard(service.set_motor_range, body.id, body.low, body.high)
 
+    @router.post("/motors/direct/points")
+    def motors_direct_points(body: schemas.MotorPointsRequest):
+        return guard(service.set_motor_points, body.id, body.points)
+
+    @router.post("/motors/direct/play")
+    def motors_direct_play(body: schemas.MotorPlaybackRequest):
+        return guard(service.set_motor_playback, body.id, body.enabled)
+
     # ----- poses / trajectories / demos --------------------------------------------
 
     @router.get("/poses")

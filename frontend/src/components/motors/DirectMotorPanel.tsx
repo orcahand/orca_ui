@@ -169,6 +169,7 @@ export function DirectMotorPanel({
               span={span}
               disabled={!armed || locked || !torqueOn}
               onError={fail}
+              onChanged={refresh}
             />
           ) : (
             <MotorRow
@@ -299,6 +300,11 @@ type RangeFind =
   | { phase: 'first' }
   | { phase: 'second'; first: number; travel: number; last: number }
 
+// Recording is simpler than finding a range: each press captures where the
+// motor is, and a raw reading is already a valid target. Only measuring the
+// distance between two ends needed the unwrapping.
+type Recording = { active: boolean; points: number[] }
+
 // One motor on the bench. Until a range is found the only useful action is
 // finding one: a raw angle over the servo's whole turn means nothing when the
 // motor is bolted to something that stops well short of it. Once found, the
@@ -308,11 +314,15 @@ function BenchMotorRow({
   span,
   disabled,
   onError,
+  onChanged,
 }: {
   motor: DirectMotorInfo
   span: [number, number]
   disabled: boolean
   onError: (error: unknown) => void
+  // Ranges, points and play state live on the server, so anything that writes
+  // them has to pull the snapshot again or the row keeps showing the old one.
+  onChanged: () => Promise<void> | void
 }) {
   const turn = Math.abs(span[1] - span[0])
   const range = motor.range_rad ?? null
@@ -324,6 +334,7 @@ function BenchMotorRow({
     mA: null,
   })
   const [find, setFind] = useState<RangeFind>({ phase: 'idle' })
+  const [rec, setRec] = useState<Recording>({ active: false, points: [] })
   const [target, setTarget] = useState<string>('')
   const [busy, setBusy] = useState(false)
   const findRef = useRef(find)
@@ -365,6 +376,7 @@ function BenchMotorRow({
     setBusy(true)
     try {
       await fn()
+      await onChanged()
     } catch (e) {
       onError(e)
     } finally {
@@ -416,6 +428,36 @@ function BenchMotorRow({
     void api.motorsDirectPosition(motor.id, rad).catch(onError)
   }
 
+  const points = motor.points ?? null
+  const playing = motor.playing ?? false
+
+  const startRecord = () =>
+    void call(async () => {
+      await api.motorsDirectPlay(motor.id, false)
+      await api.motorsDirectPoints(motor.id, null)
+      await api.motorsDirectTorque(motor.id, false)
+      setRec({ active: true, points: [] })
+    })
+
+  const addPoint = () =>
+    setRec((prev) => ({ ...prev, points: [...prev.points, position] }))
+
+  const finishRecord = () =>
+    void call(async () => {
+      const captured = rec.points
+      setRec({ active: false, points: [] })
+      await api.motorsDirectTorque(motor.id, true)
+      if (captured.length > 0) {
+        await api.motorsDirectPoints(motor.id, captured)
+      }
+    })
+
+  const cancelRecord = () =>
+    void call(async () => {
+      setRec({ active: false, points: [] })
+      await api.motorsDirectTorque(motor.id, true)
+    })
+
   const flags = motor.hw_error_flags
   const finding = find.phase !== 'idle'
 
@@ -424,7 +466,32 @@ function BenchMotorRow({
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ width: 52, color: 'var(--text)' }}>M{motor.id}</span>
 
-        {finding ? (
+        {rec.active ? (
+          <>
+            <span style={{ color: 'var(--warn)', flex: 1, minWidth: 200 }}>
+              Limp — move it to a position and record it. {rec.points.length}{' '}
+              recorded.{' '}
+              {rec.points.length === 1
+                ? 'One point is a place to hold.'
+                : rec.points.length > 1
+                  ? 'It will cycle between them.'
+                  : ''}
+            </span>
+            <button className="btn btn-primary" disabled={busy} onClick={addPoint}>
+              Record point
+            </button>
+            <button
+              className="btn btn-primary"
+              disabled={busy || rec.points.length === 0}
+              onClick={finishRecord}
+            >
+              Done
+            </button>
+            <button className="btn btn-secondary" disabled={busy} onClick={cancelRecord}>
+              Cancel
+            </button>
+          </>
+        ) : finding ? (
           <>
             <span style={{ color: 'var(--warn)', flex: 1, minWidth: 200 }}>
               {find.phase === 'first'
@@ -496,6 +563,47 @@ function BenchMotorRow({
           </>
         )}
       </div>
+
+      {!rec.active && !finding && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 4, alignItems: 'center',
+                      flexWrap: 'wrap' }}>
+          {points && points.length > 0 ? (
+            <>
+              <span style={{ color: 'var(--dim)' }}>
+                {points.length === 1
+                  ? '1 point recorded — holds there'
+                  : `${points.length} points recorded — cycles between them`}
+              </span>
+              <button
+                className={playing ? 'btn btn-danger' : 'btn btn-primary'}
+                disabled={busy || disabled}
+                title={playing ? 'stop the sequence' : 'run the recorded points'}
+                onClick={() =>
+                  void call(() => api.motorsDirectPlay(motor.id, !playing))
+                }
+              >
+                {playing ? 'Stop' : 'Play'}
+              </button>
+              <button
+                className="btn btn-secondary"
+                disabled={busy}
+                onClick={() => void call(() => api.motorsDirectPoints(motor.id, null))}
+              >
+                Clear points
+              </button>
+            </>
+          ) : (
+            <button
+              className="btn btn-secondary"
+              disabled={busy || disabled}
+              title="go limp, then capture positions by hand"
+              onClick={startRecord}
+            >
+              Record points
+            </button>
+          )}
+        </div>
+      )}
 
       <div
         style={{

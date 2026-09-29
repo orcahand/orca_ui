@@ -417,6 +417,8 @@ class TestBenchWrites:
         service._state_lock = threading.Lock()
         service._direct_motor_mode = True
         service._bench_ranges = {}
+        service._bench_points = {}
+        service._bench_playing = {}
         session = SimpleNamespace(hand=_Hand())
         service._require_torque = lambda: session
         service._require_manual_control = lambda: None
@@ -561,6 +563,8 @@ class TestFoundRange:
         service._state_lock = threading.Lock()
         service._direct_motor_mode = True
         service._bench_ranges = {}
+        service._bench_points = {}
+        service._bench_playing = {}
         session = SimpleNamespace(hand=_Hand())
         service._require_motors = lambda: session
         service._require_torque = lambda: session
@@ -641,3 +645,132 @@ class TestFoundRange:
                                       bare=False)
         with pytest.raises(ServiceError):
             service.set_motor_torque(1, False)
+
+
+class TestRecordedPoints:
+    """Points captured by hand, then replayed: one is a place to hold, two or
+    more is a cycle worth leaving running."""
+
+    def _service(self, position=-3.0):
+        from orca_ui.hand.service import HandService
+        from orca_ui.settings import UiSettings
+
+        writes: list = []
+        torque: list = []
+
+        class _Client:
+            position_range_rad = (-6.2816513263917, 0.0)
+
+        class _Hand:
+            motor_client = _Client()
+            config = SimpleNamespace(motor_ids=[1, 2])
+
+            def get_motor_pos(self, as_dict=False):
+                return {1: position, 2: position}
+
+            def write_motor_pos(self, ids, values):
+                writes.append((int(ids[0]), float(values[0])))
+
+            def enable_torque(self, ids=None):
+                torque.append((tuple(ids or ()), True))
+
+            def disable_torque(self, ids=None):
+                torque.append((tuple(ids or ()), False))
+
+        service = HandService.__new__(HandService)
+        service.settings = UiSettings(config_path="/nowhere/config.yaml", bare=True)
+        service._state_lock = threading.Lock()
+        service._direct_motor_mode = True
+        service._bench_ranges = {}
+        service._bench_points = {}
+        service._bench_playing = {}
+        service._bench_thread = None
+        service._bench_stop = threading.Event()
+        session = SimpleNamespace(hand=_Hand(),
+                                  caps=SimpleNamespace(motors=True))
+        service._require_motors = lambda: session
+        service._require_torque = lambda: session
+        service._require_manual_control = lambda: None
+        type(service).session = property(lambda self: session)
+        return service, writes, torque
+
+    def test_points_are_recorded_and_returned(self):
+        service, _, _ = self._service()
+
+        result = service.set_motor_points(1, [-3.0, -2.0, -1.0])
+
+        assert result["points"] == [-3.0, -2.0, -1.0]
+        assert service._bench_points[1] == [-3.0, -2.0, -1.0]
+
+    def test_a_point_outside_the_found_range_is_refused(self):
+        """Recording happens by hand, so a point can land outside a range set
+        earlier; catching it here beats discovering it mid-cycle."""
+        from orca_ui.hand.service import ServiceError
+
+        service, _, _ = self._service()
+        service.set_motor_range(1, -4.0, -2.0)
+
+        with pytest.raises(ServiceError) as caught:
+            service.set_motor_points(1, [-3.0, -1.0])
+        assert "outside the range found" in str(caught.value)
+        assert 1 not in service._bench_points
+
+    def test_playing_needs_points(self):
+        from orca_ui.hand.service import ServiceError
+
+        service, _, _ = self._service()
+        with pytest.raises(ServiceError) as caught:
+            service.set_motor_playback(1, True)
+        assert "no recorded points" in str(caught.value)
+
+    def test_a_cycle_advances_through_its_points(self):
+        service, writes, _ = self._service()
+        service.set_motor_points(1, [-3.0, -2.0])
+        service._bench_playing[1] = 0
+
+        service._bench_step()
+
+        assert writes == [(1, -3.0)]
+        assert service._bench_playing[1] == 1
+
+    def test_a_single_point_keeps_being_written(self):
+        """A motor pushed off a held point has to be driven back to it."""
+        service, writes, _ = self._service()
+        service.set_motor_points(1, [-3.0])
+        service._bench_playing[1] = 7   # any index
+
+        service._bench_step()
+
+        assert writes == [(1, -3.0)]
+
+    def test_clearing_points_stops_playback(self):
+        service, _, _ = self._service()
+        service.set_motor_points(1, [-3.0, -2.0])
+        service._bench_playing[1] = 0
+
+        service.set_motor_points(1, None)
+
+        assert 1 not in service._bench_playing
+        assert 1 not in service._bench_points
+
+    def test_a_hand_on_the_slider_stops_the_sequence(self):
+        """Otherwise the player fights the operator for the motor a second and
+        a half later."""
+        service, _, _ = self._service()
+        service.set_motor_points(1, [-3.0, -2.0])
+        service._bench_playing[1] = 0
+
+        service.set_motor_position(1, -2.5)
+
+        assert 1 not in service._bench_playing
+
+    def test_playback_is_bare_mode_only(self):
+        from orca_ui.hand.service import ServiceError
+        from orca_ui.settings import UiSettings
+
+        service, _, _ = self._service()
+        service.set_motor_points(1, [-3.0])
+        service.settings = UiSettings(config_path="/nowhere/config.yaml",
+                                      bare=False)
+        with pytest.raises(ServiceError):
+            service.set_motor_playback(1, True)
