@@ -652,9 +652,12 @@ class HandSupervisor(threading.Thread):
         self._upgrade_probes_left = (
             UPGRADE_PROBE_ATTEMPTS if probeable else 0)
         if session.caps.degraded and not probeable:
-            logger.info("%s missing but already refused by the hand — not "
-                        "probing; rescan re-attempts the connection",
-                        ", ".join(self._missing_devices(session.caps)))
+            # Warning, like the give-up notice: the console logs at WARNING
+            # and this explains why it will now sit still.
+            logger.warning(
+                "%s missing and already refused by the hand — not probing "
+                "for it; use the rescan control to re-attempt the connection",
+                ", ".join(self._missing_devices(session.caps)))
 
         state = HandState.DEGRADED if session.caps.degraded else HandState.CONNECTED
         self._set_state(state, f"[{session.tier}] {session.message}", session.ports)
