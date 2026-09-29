@@ -66,6 +66,23 @@ _MOVE_STEP_S = 0.02
 _MOVE_MIN_S = 0.5
 _MOVE_MAX_S = 3.0
 
+def _read_optional(hand, method: str) -> dict:
+    """One optional per-motor read, empty when the family cannot do it.
+
+    Current and temperature are extras on the bench panel: a family that does
+    not expose them must leave the rest of the snapshot intact.
+    """
+    fn = getattr(hand, method, None)
+    if fn is None:
+        return {}
+    try:
+        return {int(k): (None if v is None else float(v))
+                for k, v in (fn(as_dict=True) or {}).items()}
+    except Exception:
+        logger.debug("%s failed", method, exc_info=True)
+        return {}
+
+
 def _decode_hw_error(client, value: int | None) -> list[str] | None:
     """Names of the latched bits, in the connected family's own vocabulary."""
     decode = getattr(client, "decode_hardware_error", None)
@@ -1166,6 +1183,11 @@ class HandService:
         client = getattr(hand, "motor_client", None)
         with _bus_fence(hand):
             positions = hand.get_motor_pos(as_dict=True)
+            # A bench load test reads the stall off the current, not the
+            # position: the target is missed either way, and only the current
+            # says whether the motor is pushing or has given up.
+            currents = _read_optional(hand, "get_motor_current")
+            temps = _read_optional(hand, "get_motor_temp")
             read_error = getattr(client, "read_hardware_error", None)
             errors: dict = {}
             for mid in hand.config.motor_ids:
@@ -1179,14 +1201,23 @@ class HandService:
         motor_to_joint = hand.config.motor_to_joint_dict
         with self._state_lock:
             direct = self._direct_motor_mode
+        span = getattr(type(client), "position_range_rad", None)
         return {
             "direct_mode": direct,
-            "max_step_rad": MAX_DIRECT_MOTOR_STEP_RAD,
+            # A bench moves a loose motor across its whole travel in one go;
+            # the step cap exists to stop a slider yanking a tendon.
+            "max_step_rad": (None if self.settings.bare
+                             else MAX_DIRECT_MOTOR_STEP_RAD),
+            # The travel the family can actually reach, so a dial can be drawn
+            # over real angles instead of a guessed range.
+            "span_rad": list(span) if span else None,
             "motors": [
                 {
                     "id": int(mid),
                     "joint": str(motor_to_joint.get(mid, "")),
                     "position": float(positions[mid]),
+                    "current_ma": currents.get(mid),
+                    "temp_c": temps.get(mid),
                     "hw_error": errors[mid],
                     "hw_error_flags": _decode_hw_error(client, errors[mid]),
                 }
@@ -1317,11 +1348,21 @@ class HandService:
         if not math.isfinite(position):
             raise ServiceError("position must be finite")
         current = float(hand.get_motor_pos(as_dict=True)[motor_id])
-        if abs(position - current) > MAX_DIRECT_MOTOR_STEP_RAD:
+        if (not self.settings.bare
+                and abs(position - current) > MAX_DIRECT_MOTOR_STEP_RAD):
             raise ServiceError(
                 f"refusing a {abs(position - current):.2f} rad move — direct "
                 f"moves are capped at {MAX_DIRECT_MOTOR_STEP_RAD} rad from "
                 "the current position")
+        span = getattr(type(getattr(hand, "motor_client", None)),
+                       "position_range_rad", None)
+        if span is not None and not (span[0] <= position <= span[1]):
+            # Out of range does not fail at the servo, it clamps to whichever
+            # end is nearer — so an unreachable target reads as a hard drive
+            # into a stop rather than as a rejected command.
+            raise ServiceError(
+                f"{position:.3f} rad is outside this motor's travel "
+                f"({span[0]:.3f} to {span[1]:.3f} rad)")
         # The hardware motor client divides positions by its scale — needs
         # an array, not a list.
         hand.write_motor_pos([motor_id], np.asarray([position]))

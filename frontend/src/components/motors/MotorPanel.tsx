@@ -194,7 +194,12 @@ export function MotorPanel() {
           />
         ))}
       </div>
-      <DirectMotorPanel torqueOn={torqueOn} locked={locked} forceOpen={uncalibrated} />
+      <DirectMotorPanel
+        torqueOn={torqueOn}
+        locked={locked}
+        forceOpen={uncalibrated}
+        bench={bare}
+      />
     </Panel>
   )
 }

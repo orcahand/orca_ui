@@ -5,6 +5,9 @@ tests here care about two things: that the scan asks the cheap question first,
 and that the config it synthesises is one orca_core will actually accept.
 """
 
+import threading
+from types import SimpleNamespace
+
 import pytest
 
 from orca_ui.hand import bare
@@ -383,3 +386,76 @@ class TestJointCommandsAreRefused:
         with pytest.raises(Exception) as caught:
             service.set_targets({"index_mcp": 0.0})
         assert "bare motor mode" not in str(caught.value)
+
+
+class TestBenchWrites:
+    """Direct writes on a bench: the whole travel in one move, and a refusal
+    rather than a clamp for anything outside it."""
+
+    def _service(self, bare_mode: bool, position: float = -3.0):
+        from orca_ui.hand.service import HandService
+        from orca_ui.settings import UiSettings
+
+        class _Client:
+            position_range_rad = (-6.2816513263917, 0.0)
+
+        writes: list = []
+
+        class _Hand:
+            motor_client = _Client()
+            config = SimpleNamespace(motor_ids=[1])
+
+            def get_motor_pos(self, as_dict=False):
+                return {1: position}
+
+            def write_motor_pos(self, ids, values):
+                writes.append((list(ids), [float(v) for v in values]))
+
+        service = HandService.__new__(HandService)
+        service.settings = UiSettings(config_path="/nowhere/config.yaml",
+                                      bare=bare_mode)
+        service._state_lock = threading.Lock()
+        service._direct_motor_mode = True
+        session = SimpleNamespace(hand=_Hand())
+        service._require_torque = lambda: session
+        service._require_manual_control = lambda: None
+        return service, writes
+
+    def test_a_bench_move_may_cross_the_whole_travel(self):
+        """The 0.8 rad cap exists so a slider cannot yank a tendon. A loose
+        motor has no tendon, and a load test needs the far end."""
+        service, writes = self._service(True, position=-3.0)
+
+        service.set_motor_position(1, -0.1)
+
+        assert writes == [([1], [-0.1])]
+
+    def test_a_hand_still_gets_the_cap(self):
+        from orca_ui.hand.service import ServiceError
+
+        service, writes = self._service(False, position=-3.0)
+
+        with pytest.raises(ServiceError) as caught:
+            service.set_motor_position(1, -0.1)
+
+        assert "capped" in str(caught.value)
+        assert writes == []
+
+    def test_a_target_outside_the_travel_is_refused_not_clamped(self):
+        """The servo does not reject an out-of-range count, it clamps to the
+        nearer end — so an unreachable target would drive into a stop."""
+        from orca_ui.hand.service import ServiceError
+
+        service, writes = self._service(True, position=-3.0)
+
+        with pytest.raises(ServiceError) as caught:
+            service.set_motor_position(1, 1.5)
+
+        assert "outside this motor's travel" in str(caught.value)
+        assert writes == []
+
+    def test_both_ends_of_the_travel_are_reachable(self):
+        for target in (-6.28, 0.0):
+            service, writes = self._service(True, position=-3.0)
+            service.set_motor_position(1, target)
+            assert writes and writes[0][1] == [target]

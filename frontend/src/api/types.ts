@@ -171,13 +171,23 @@ export interface DirectMotorInfo {
   id: number
   joint: string
   position: number // radians
+  // Present draw and case temperature where the family reports them. On a
+  // bench these are how a stall reads: the target is missed either way, and
+  // only the current says whether the motor is still pushing.
+  current_ma?: number | null
+  temp_c?: number | null
   hw_error: number | null
   hw_error_flags: string[] | null
 }
 
 export interface DirectMotorSnapshot {
   direct_mode: boolean
-  max_step_rad: number
+  // null in bare motor mode: the cap exists so a slider cannot yank a tendon,
+  // and a loose motor on a bench has none.
+  max_step_rad: number | null
+  // The travel this motor family can reach, in radians. null for a family with
+  // no single-turn limit.
+  span_rad?: [number, number] | null
   motors: DirectMotorInfo[]
 }
 
