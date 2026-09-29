@@ -20,7 +20,7 @@ import time
 
 from orca_ui.hand.operations.base import OpContext, Operation
 from orca_ui.hand.states import ControlSource
-from orca_ui.library import CONTINUOUS, WAYPOINTS, LibraryError
+from orca_ui.library import CONTINUOUS, MOTOR_WAYPOINTS, WAYPOINTS, LibraryError
 
 DEFAULT_FREQUENCY_HZ = 50.0
 MAX_FREQUENCY_HZ = 60.0   # both joint-source read paths keep up past this
@@ -43,7 +43,17 @@ class RecordOperation(Operation):
         session = service.session
         if session is None:
             raise ServiceError("hand not connected", status_code=503)
-        if session.joint_source() is None:
+        mode = params.get("mode", "continuous")
+        if mode not in ("continuous", "waypoints", "motor_waypoints"):
+            raise ServiceError(
+                "mode must be 'continuous', 'waypoints' or 'motor_waypoints'")
+        if mode == "motor_waypoints":
+            # Raw motor positions — needs the motor bus, not a joint source.
+            if not session.caps.motors:
+                raise ServiceError(
+                    "motor-waypoint recording needs the motor bus",
+                    status_code=409)
+        elif session.joint_source() is None:
             if session.caps.motors:
                 raise ServiceError(
                     "recording on a hand without joint encoders needs a "
@@ -52,10 +62,6 @@ class RecordOperation(Operation):
             raise ServiceError(
                 "recording needs a joint-angle source: joint encoders, or "
                 "motors with a completed calibration", status_code=409)
-
-        mode = params.get("mode", "continuous")
-        if mode not in ("continuous", "waypoints"):
-            raise ServiceError("mode must be 'continuous' or 'waypoints'")
         frequency = float(params.get("frequency", DEFAULT_FREQUENCY_HZ))
         if not 1.0 <= frequency <= MAX_FREQUENCY_HZ:
             raise ServiceError(
@@ -91,13 +97,31 @@ class RecordOperation(Operation):
             except ServiceError:
                 pass  # sensors-only session: nothing to disable
 
+        config = service.supervisor.config
+
+        if self.params["mode"] == "motor_waypoints":
+            # Raw motor positions (radians). One bus read per capture —
+            # waypoint cadence, never streaming.
+            motor_ids = [int(m) for m in config.motor_ids]
+            metadata = {
+                "created_at": time.strftime("%Y%m%d_%H%M%S"),
+                "motor_ids": motor_ids,
+                "hand_type": config.type,
+            }
+
+            def sample_motors() -> list[float]:
+                positions = session.hand.get_motor_pos(as_dict=True)
+                return [float(positions[m]) for m in motor_ids]
+
+            return self._record_waypoints(ctx, metadata, sample_motors,
+                                          traj_type=MOTOR_WAYPOINTS)
+
         source = session.joint_source()
         if source is None:
             raise ServiceError(
                 "recording needs a joint-angle source: joint encoders, or "
                 "motors with a completed calibration", status_code=409)
 
-        config = service.supervisor.config
         joint_ids = list(config.joint_ids)
         metadata = {
             "created_at": time.strftime("%Y%m%d_%H%M%S"),
@@ -115,8 +139,8 @@ class RecordOperation(Operation):
         return self._record_continuous(ctx, metadata, sample)
 
     def _record_waypoints(self, ctx: OpContext, metadata: dict,
-                          sample) -> dict:
-        metadata["type"] = WAYPOINTS
+                          sample, traj_type: str = WAYPOINTS) -> dict:
+        metadata["type"] = traj_type
         waypoints: list[list[float]] = []
         ctx.set_phase("recording", detail="0 waypoints")
         while True:
