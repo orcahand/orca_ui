@@ -777,3 +777,40 @@ class TestRecordedPoints:
                                       bare=False)
         with pytest.raises(ServiceError):
             service.set_motor_playback(1, True)
+
+
+class TestMultiTurnFamilies:
+    """A multi-turn family declares no travel, which range finding does not
+    need: the range comes from what the operator does by hand either way."""
+
+    def test_a_family_with_no_declared_travel_still_gets_a_fallback_span(self):
+        """The synthesised config still needs joint ranges, so a family with no
+        single-turn limit gets one revolution rather than nothing."""
+        lo, hi = bare.travel_span_deg("dynamixel")
+        assert (lo, hi) == bare.FALLBACK_ROM_DEG
+        assert hi - lo == 360
+
+    def test_a_range_is_accepted_without_a_declared_travel(self, monkeypatch):
+        """Nothing to validate against means the operator's limits stand."""
+        from orca_ui.hand.service import HandService
+        from orca_ui.settings import UiSettings
+
+        class _Client:
+            position_range_rad = None      # multi-turn
+
+        class _Hand:
+            motor_client = _Client()
+            config = SimpleNamespace(motor_ids=[5])
+
+        service = HandService.__new__(HandService)
+        service.settings = UiSettings(config_path="/nowhere/config.yaml", bare=True)
+        service._state_lock = threading.Lock()
+        service._bench_ranges = {}
+        service._bench_points = {}
+        service._bench_playing = {}
+        service._require_motors = lambda: SimpleNamespace(hand=_Hand())
+
+        # Well outside any single turn, which is legitimate on a multi-turn bus.
+        result = service.set_motor_range(5, 8.0, 12.0)
+
+        assert result["range_rad"] == [8.0, 12.0]

@@ -106,13 +106,7 @@ export function DirectMotorPanel({
       </summary>
       <div style={{ padding: '6px 0 0 0' }}>
         <div style={{ color: 'var(--warn)', marginBottom: 6 }}>
-          {bench && !span ? (
-            <>
-              This motor family has no single-turn limit, so there is no fixed
-              travel to find a range within. Nudging from the current position
-              is what is offered instead.
-            </>
-          ) : bench ? (
+          {bench ? (
             <>
               Find each motor&apos;s range first: the servo goes limp, you turn
               it to each end by hand, and the two limits you set become the
@@ -162,7 +156,7 @@ export function DirectMotorPanel({
           </button>
         </div>
         {snapshot?.motors.map((motor) =>
-          bench && span ? (
+          bench ? (
             <BenchMotorRow
               key={motor.id}
               motor={motor}
@@ -288,10 +282,13 @@ motor's power wiring.`}
 // turn. Accumulating the unwrapped travel is what lets a range found by hand
 // mean something: it gives the real distance between the two ends and, from
 // its sign, which way the operator went.
-function unwrapStep(prev: number, next: number, turn: number): number {
-  let delta = next - prev
-  if (delta > turn / 2) delta -= turn
-  else if (delta < -turn / 2) delta += turn
+function unwrapStep(prev: number, next: number, turn: number | null): number {
+  const delta = next - prev
+  // A multi-turn family counts revolutions, so its reading is already
+  // continuous and there is nothing to undo.
+  if (turn === null) return delta
+  if (delta > turn / 2) return delta - turn
+  if (delta < -turn / 2) return delta + turn
   return delta
 }
 
@@ -317,14 +314,17 @@ function BenchMotorRow({
   onChanged,
 }: {
   motor: DirectMotorInfo
-  span: [number, number]
+  // The family's declared travel, when it has one. A multi-turn family does
+  // not, which changes nothing here: the range comes from the operator either
+  // way, and there is no wrap to undo.
+  span: [number, number] | null
   disabled: boolean
   onError: (error: unknown) => void
   // Ranges, points and play state live on the server, so anything that writes
   // them has to pull the snapshot again or the row keeps showing the old one.
   onChanged: () => Promise<void> | void
 }) {
-  const turn = Math.abs(span[1] - span[0])
+  const turn = span ? Math.abs(span[1] - span[0]) : null
   const range = motor.range_rad ?? null
 
   // Live position and current at the bench rate, so a stall is visible while
@@ -365,8 +365,8 @@ function BenchMotorRow({
   const currentMa = live.mA ?? motor.current_ma ?? null
 
   // Degrees within the found range: 0 at the end the operator set first.
-  const lo = range ? Math.min(range[0], range[1]) : span[0]
-  const hi = range ? Math.max(range[0], range[1]) : span[1]
+  const lo = range ? Math.min(range[0], range[1]) : (span?.[0] ?? 0)
+  const hi = range ? Math.max(range[0], range[1]) : (span?.[1] ?? 0)
   const spanDeg = ((hi - lo) * 180) / Math.PI
   const posDeg = ((position - lo) * 180) / Math.PI
   const parsed = Number.parseFloat(target)
@@ -615,9 +615,10 @@ function BenchMotorRow({
         }}
       >
         <span>
-          at {range ? `${posDeg.toFixed(1)}° of ${spanDeg.toFixed(1)}°` : `${(
-            ((position - span[0]) * 180) / Math.PI
-          ).toFixed(1)}° raw`}
+          at{' '}
+          {range
+            ? `${posDeg.toFixed(1)}° of ${spanDeg.toFixed(1)}°`
+            : `${((position * 180) / Math.PI).toFixed(1)}° raw`}
         </span>
         {currentMa != null && (
           <span title="present draw — pinned high against a target it has not reached is the load it cannot move">
