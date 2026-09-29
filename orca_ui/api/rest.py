@@ -3,7 +3,7 @@ FastAPI's threadpool, never on the event loop."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 
 from orca_ui.api import schemas
 from orca_ui.hand.service import HandService, ServiceError
@@ -55,10 +55,60 @@ def build_router(service: HandService) -> APIRouter:
         out.sort(key=lambda x: (x["kind"] is None, x["device"]))
         return out
 
+    @router.get("/models")
+    def models():
+        return service.models()
+
+    @router.post("/model/select")
+    def model_select(body: schemas.ModelSelectRequest):
+        """Pin the hand config by name (or null = back to auto-detection).
+
+        The hands that need this are the ones detection cannot name: without
+        an ORCA controller board to answer, every hand resolves to the
+        default model whatever it actually is.
+        """
+        return guard(service.select_model, body.name, body.version)
+
+    @router.get("/boards")
+    def boards():
+        """Every board on this machine and the pin in force. Probes free
+        serial ports, so it can take a moment; busy ports are listed, never
+        disturbed."""
+        return service.boards()
+
+    @router.post("/board/select")
+    def board_select(body: schemas.BoardSelectRequest):
+        """Pin this console to one board (or null = first to answer).
+
+        The reason to pin: with two consoles and two hands on one machine,
+        first-to-answer is a coin toss. A pinned console probes and opens
+        only its own board's ports.
+        """
+        return guard(service.select_board, body.device)
+
+    @router.post("/rescan")
+    def rescan():
+        """Probe again for declared hardware this session did not get.
+
+        The automatic probes stop after a few tries so a hand that is simply
+        short-handed is not scanned for the life of the session; this re-arms
+        them, keeping the session up.
+        """
+        return {"ok": True, "status": service.rescan()}
+
     @router.post("/reconnect")
     def reconnect():
-        service.supervisor.request_reconnect()
-        return {"ok": True}
+        # Also lifts a /disconnect hold — this is the way back from one.
+        return {"ok": True, "status": service.reconnect()}
+
+    @router.post("/disconnect")
+    def disconnect():
+        """Close the session and leave the ports free (torque off).
+
+        Not the same as the connect ladder losing the hand: nothing
+        reconnects until /reconnect asks it to.
+        """
+        return {"ok": True, "status": guard(service.disconnect)}
 
     # ----- operations / e-stop ----------------------------------------------------
 
@@ -177,10 +227,19 @@ def build_router(service: HandService) -> APIRouter:
         guard(service.go_neutral)
         return {"ok": True}
 
+    @router.get("/control/gains")
+    def control_gains_state():
+        return guard(service.gains_state)
+
     @router.post("/control/gains")
     def control_gains(body: schemas.GainsRequest):
         guard(service.set_gains, body.kp, body.ki, body.correction_max_deg,
-              body.i_clamp_deg)
+              body.joints)
+        return {"ok": True, "control": service.control_state()}
+
+    @router.post("/control/gains/reset")
+    def control_gains_reset(body: schemas.GainsResetRequest | None = None):
+        guard(service.reset_gains, body.joints if body else None)
         return {"ok": True, "control": service.control_state()}
 
     @router.post("/control/max_current")
@@ -188,12 +247,39 @@ def build_router(service: HandService) -> APIRouter:
         guard(service.set_max_current, body.ma)
         return {"ok": True, "control": service.control_state()}
 
+    @router.post("/control/pose_source")
+    def control_pose_source(body: schemas.PoseSourceRequest):
+        return {"ok": True, "control": guard(service.set_pose_source, body.mode)}
+
     @router.post("/control/rebase")
     def control_rebase():
         guard(service.rebase)
         return {"ok": True}
 
     # ----- direct motor control (advanced diagnostics) ---------------------------
+
+    @router.get("/motors/gains")
+    def motors_gains():
+        return {"ok": True, "gains": guard(service.read_servo_gains)}
+
+    @router.post("/motors/{motor_id}/gains")
+    def motors_set_gains(motor_id: int, body: schemas.ServoGainsRequest):
+        gains = guard(service.set_servo_gains, motor_id, body.model_dump())
+        return {"ok": True, "gains": gains}
+
+    @router.get("/motors/profile")
+    def motors_profile():
+        return {"ok": True, "profile": guard(service.read_servo_profile)}
+
+    @router.post("/motors/{motor_id}/profile")
+    def motors_set_profile(motor_id: int, body: schemas.ServoProfileRequest):
+        profile = guard(service.set_servo_profile, motor_id, body.model_dump())
+        return {"ok": True, "profile": profile}
+
+    @router.post("/motors/{motor_id}/reboot")
+    def motor_reboot(motor_id: int):
+        """Clear a latched hardware error. Comes back with torque off."""
+        return guard(service.reboot_motor, motor_id)
 
     @router.get("/motors/direct")
     def motors_direct_snapshot():
@@ -234,6 +320,124 @@ def build_router(service: HandService) -> APIRouter:
     @router.get("/trajectories")
     def trajectories_list():
         return {"trajectories": service.library.list_trajectories()}
+
+    def _library_call(fn, *args, **kwargs):
+        from orca_ui.library import LibraryError
+        try:
+            return fn(*args, **kwargs)
+        except LibraryError as e:
+            raise ServiceError(str(e), status_code=e.status_code)
+
+    @router.get("/trajectories/{name}")
+    def trajectory_get(name: str):
+        return guard(_library_call, service.library.load_trajectory, name)
+
+    @router.put("/trajectories/{name}")
+    def trajectory_update(name: str, body: schemas.TrajectoryUpdateRequest):
+        # Waypoint editor save: replace the waypoints of an existing
+        # waypoint recording (optionally under a new name), each angle
+        # clamped to its joint's ROM. Continuous recordings are sampled
+        # motion — there is no meaningful per-frame hand edit.
+        def apply():
+            from datetime import datetime, timezone
+
+            from orca_ui.library import WAYPOINTS
+
+            data = _library_call(service.library.load_trajectory, name)
+            meta = data.get("metadata") or {}
+            if meta.get("type") != WAYPOINTS:
+                raise ServiceError(
+                    "only waypoint recordings are editable — continuous "
+                    "recordings are sampled motion", status_code=409)
+            joint_ids = list(meta.get("joint_ids")
+                             or service.supervisor.config.joint_ids)
+            if not body.waypoints:
+                raise ServiceError("a trajectory needs at least one waypoint")
+            roms = service.supervisor.config.joint_roms_dict
+            clean = []
+            for index, waypoint in enumerate(body.waypoints):
+                if len(waypoint) != len(joint_ids):
+                    raise ServiceError(
+                        f"waypoint {index + 1}: expected {len(joint_ids)} "
+                        f"joint values, got {len(waypoint)}")
+                row = []
+                for joint, value in zip(joint_ids, waypoint):
+                    angle = float(value)
+                    rom = roms.get(joint)
+                    if rom is not None:
+                        angle = min(max(angle, float(rom[0])), float(rom[1]))
+                    row.append(round(angle, 3))
+                clean.append(row)
+            data["waypoints"] = clean
+            meta["edited_at"] = datetime.now(
+                timezone.utc).astimezone().isoformat(timespec="seconds")
+            data["metadata"] = meta
+            target = body.save_as or name
+            _library_call(service.library.save_trajectory, target, data,
+                          overwrite=target == name)
+            return {"ok": True, "name": target, "frames": len(clean)}
+
+        return guard(apply)
+
+    @router.post("/trajectories/{name}/to_motor")
+    def trajectory_to_motor(name: str,
+                            body: schemas.TrajectoryToMotorRequest):
+        # Translate a joint-space waypoint recording into raw motor
+        # positions via the calibrated joint<->motor map. Refused without a
+        # completed calibration — the map does not exist without one.
+        def convert():
+            import time as _time
+
+            from orca_ui.library import MOTOR_WAYPOINTS, WAYPOINTS
+
+            session = service.session
+            if session is None:
+                raise ServiceError("hand not connected", status_code=503)
+            hand = session.hand
+            if not getattr(hand, "calibrated", False):
+                raise ServiceError(
+                    "joint->motor translation needs a calibrated hand — "
+                    "calibrate first", status_code=409)
+            data = _library_call(service.library.load_trajectory, name)
+            meta = data.get("metadata") or {}
+            if meta.get("type") != WAYPOINTS:
+                raise ServiceError(
+                    "only joint waypoint recordings can be translated to "
+                    "motor space", status_code=409)
+            config = service.supervisor.config
+            joint_ids = list(meta.get("joint_ids") or config.joint_ids)
+            motor_ids = [int(m) for m in config.motor_ids]
+            rows = []
+            for index, waypoint in enumerate(data.get("waypoints") or []):
+                pose = {j: float(v) for j, v in zip(joint_ids, waypoint)
+                        if v is not None}
+                motor_pos = hand._joint_to_motor_pos(pose)
+                row = []
+                for idx, motor_id in enumerate(motor_ids):
+                    value = motor_pos[idx]
+                    if value is None:
+                        raise ServiceError(
+                            f"waypoint {index + 1}: motor {motor_id} has no "
+                            "calibrated joint<->motor mapping — recalibrate "
+                            "that joint first", status_code=409)
+                    row.append(round(float(value), 5))
+                rows.append(row)
+            if not rows:
+                raise ServiceError("trajectory contains no waypoints")
+            target = body.save_as or f"{name}_motor"
+            _library_call(service.library.save_trajectory, target, {
+                "metadata": {
+                    "type": MOTOR_WAYPOINTS,
+                    "motor_ids": motor_ids,
+                    "hand_type": config.type,
+                    "created_at": _time.strftime("%Y%m%d_%H%M%S"),
+                    "translated_from": name,
+                },
+                "waypoints": rows,
+            })
+            return {"ok": True, "name": target, "frames": len(rows)}
+
+        return guard(convert)
 
     @router.delete("/trajectories/{name}")
     def trajectory_delete(name: str):

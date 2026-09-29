@@ -13,6 +13,21 @@ class JointTargets(BaseModel):
     angles: dict[str, float]
 
 
+class ModelSelectRequest(BaseModel):
+    """Which hand config to run. ``name`` null hands the choice back to
+    hardware detection; ``version`` defaults to the model's newest."""
+
+    name: Optional[str] = None
+    version: Optional[str] = None
+
+
+class BoardSelectRequest(BaseModel):
+    """Which board this console owns. ``device`` null returns the choice to
+    first-to-answer; otherwise a device path from ``GET /api/boards``."""
+
+    device: Optional[str] = None
+
+
 class TorqueRequest(BaseModel):
     # Reserved for future per-motor control; today torque toggles hand-wide.
     motor_ids: Optional[list[int]] = None
@@ -22,11 +37,46 @@ class GainsRequest(BaseModel):
     kp: float = Field(ge=0)
     ki: float = Field(ge=0)
     correction_max_deg: float = Field(gt=0)
-    i_clamp_deg: Optional[float] = Field(default=None, gt=0)
+    # null = every loop-controlled joint; a joint list writes exactly those.
+    joints: Optional[list[str]] = None
+
+
+class GainsResetRequest(BaseModel):
+    """Restore the config gains; null joints = every loop-controlled joint."""
+
+    joints: Optional[list[str]] = None
 
 
 class MaxCurrentRequest(BaseModel):
     ma: int = Field(gt=0, le=2000)
+
+
+class ServoGainsRequest(BaseModel):
+    """Servo position-PID and feedforward gains. Omitted fields are left as
+    they are on the motor, so one gain can be nudged without restating the
+    rest. Ranges match the X-series registers (unsigned 16-bit, and the
+    e-manual's 0..16383 limit on the PID terms)."""
+
+    kp: int | None = Field(default=None, ge=0, le=16383)
+    ki: int | None = Field(default=None, ge=0, le=16383)
+    kd: int | None = Field(default=None, ge=0, le=16383)
+    ff_1st: int | None = Field(default=None, ge=0, le=16383)
+    ff_2nd: int | None = Field(default=None, ge=0, le=16383)
+
+
+class ServoProfileRequest(BaseModel):
+    """Trajectory limits in SI units. 0 disables a limit: no speed cap, or
+    instantaneous acceleration. Omitted fields are left as they are."""
+
+    velocity_rad_s: float | None = Field(default=None, ge=0, le=100)
+    acceleration_rad_s2: float | None = Field(default=None, ge=0, le=10000)
+
+
+class PoseSourceRequest(BaseModel):
+    """Which stream the 3D model follows. "auto" tracks the torque state:
+    motor estimate while limp, commanded targets once torqued."""
+
+    mode: Literal["auto", "estimate", "target"]
 
 
 class TactileModeRequest(BaseModel):
@@ -92,3 +142,23 @@ class TeleopConfigRequest(BaseModel):
     keys are filtered by the manager)."""
 
     config: dict = Field(default_factory=dict)
+
+
+class TrajectoryToMotorRequest(BaseModel):
+    """Translate a joint waypoint recording to motor space; ``save_as``
+    names the copy (default: <name>_motor)."""
+
+    save_as: Optional[str] = Field(default=None, max_length=64,
+                                   pattern=r"^[A-Za-z0-9_\-]+$")
+
+
+class TrajectoryUpdateRequest(BaseModel):
+    """Waypoint-editor save: full replacement waypoint list (row order =
+    the recording's joint_ids). ``save_as`` writes a copy under a new name
+    instead of overwriting."""
+
+    waypoints: list[list[float]]
+    save_as: Optional[str] = Field(default=None, max_length=64,
+                                   pattern=r"^[A-Za-z0-9_\-]+$")
+
+

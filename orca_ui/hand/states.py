@@ -56,6 +56,33 @@ class StatusSnapshot:
     message: str
     ports: dict
     since: float
+    # Which hand config is in force. Streamed because it is not fixed for the
+    # process: with no model pinned on the command line, the supervisor
+    # re-derives it from the hardware, and the browser refetches /hand/info
+    # when it sees this change.
+    model: str = ""
+    side: str = ""
+    # False while the model is still detection's to revise; True once the
+    # command line or the browser named one. The picker shows which of the
+    # two is in force, so it rides along here rather than being polled.
+    model_pinned: bool = True
+    # True while a human has asked for the hardware back: the auto-connect
+    # ladder is suspended and DISCONNECTED is a resting state, not a search.
+    released: bool = False
+    # Device path of the board this console is pinned to; None = first board
+    # to answer. Rides along for the same reason model_pinned does: the
+    # picker shows which policy is in force.
+    board_pinned: str | None = None
+    # Device classes the config declares that this session did not get, and
+    # whether the supervisor is still probing for them. It stops after a few
+    # attempts, so the UI offers an explicit rescan instead of implying the
+    # console is still looking.
+    missing: tuple[str, ...] = ()
+    # Of those, the ones the hand itself refused (port answered, device did
+    # not) as opposed to simply absent. The two need different words in the
+    # UI and only the absent ones are worth probing for.
+    refused: tuple[str, ...] = ()
+    rescanning: bool = False
 
     def as_dict(self) -> dict:
         caps = None
@@ -75,4 +102,12 @@ class StatusSnapshot:
             "message": self.message,
             "ports": dict(self.ports),
             "since": self.since,
+            "model": self.model,
+            "side": self.side,
+            "model_pinned": self.model_pinned,
+            "released": self.released,
+            "board_pinned": self.board_pinned,
+            "missing": list(self.missing),
+            "refused": list(self.refused),
+            "rescanning": self.rescanning,
         }

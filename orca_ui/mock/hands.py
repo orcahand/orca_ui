@@ -151,7 +151,7 @@ def _synthetic_calibration(hand) -> None:
         joint: JointEncoderCal(enc_at_anchor_count=_MOCK_ANCHOR_COUNT)
         for joint in JOINT_TO_ENCODER_SLOT
         if joint in config.joint_to_motor_map
-        and (select_all or joint in configured or joint == "wrist")
+        and (select_all or joint in configured)
     }
 
     hand.calibration = dataclasses.replace(

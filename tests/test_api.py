@@ -7,6 +7,7 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
+from orca_ui.hand import zeroing
 from orca_ui.mock import materialize_mock_model
 from orca_ui.server import create_app
 from orca_ui.settings import UiSettings
@@ -127,7 +128,33 @@ def test_tactile_zero_persists_offsets(client):
     with open(calib_path) as f:
         calib = yaml.safe_load(f)
     assert "sensor_offsets" in calib
+
+    # The resultant baseline is persisted separately: it is one [fx, fy, fz]
+    # per finger read off the resultant stream, not the sum of that finger's
+    # taxel offsets (which would be tens of N on a 25.5 N full scale).
+    resultants = calib["resultant_offsets"]
+    for finger, vec in resultants.items():
+        assert len(vec) == 3
+        assert max(abs(v) for v in vec) < 26.0
+        assert vec != [sum(axis) for axis in zip(*calib["sensor_offsets"][finger])]
+
+    # One noise gate per taxel, measured from the same frames.
+    gates = calib["taxel_noise_gates"]
+    for finger, per_taxel in gates.items():
+        assert len(per_taxel) == len(calib["sensor_offsets"][finger])
+        assert all(g > 0 for g in per_taxel)
+
+    # Restoring on reconnect applies all three, unchanged.
+    zeroing.apply_saved_offsets(session)
+    tactile = session.tactile_client
+    assert tactile.taxel_offsets == calib["sensor_offsets"]
+    assert tactile.resultant_offsets == resultants
+    assert tactile.taxel_noise_gates == gates
+
     assert client.post("/api/tactile/clear_zero").status_code == 200
+    assert tactile.taxel_offsets is None
+    assert tactile.resultant_offsets is None
+    assert tactile.taxel_noise_gates is None
 
 
 def test_gains_endpoint_updates_control_state(client):
@@ -136,6 +163,37 @@ def test_gains_endpoint_updates_control_state(client):
                                  "correction_max_deg": 45.0})
     assert response.status_code == 200
     assert response.json()["control"]["gains"]["kp"] == 1.5
+
+
+def test_per_joint_gains_endpoints(client):
+    listing = client.get("/api/control/gains").json()
+    tunable = [entry["joint"] for entry in listing["joints"]]
+    assert "wrist" in tunable  # the wrist is a loop joint like any other
+    assert not any(entry["modified"] for entry in listing["joints"])
+    joint = tunable[0]
+
+    response = client.post("/api/control/gains",
+                           json={"kp": 3.0, "ki": 2.0,
+                                 "correction_max_deg": 20.0,
+                                 "joints": [joint]})
+    assert response.status_code == 200
+    assert response.json()["control"]["joint_gains"][joint]["kp"] == 3.0
+    entry = next(e for e in client.get("/api/control/gains").json()["joints"]
+                 if e["joint"] == joint)
+    assert entry == {"joint": joint, "modified": True, "kp": 3.0,
+                     "ki": 2.0, "correction_max_deg": 20.0}
+
+    # A joint with no PI channel has no gains to set.
+    rejected = client.post("/api/control/gains",
+                           json={"kp": 3.0, "ki": 2.0,
+                                 "correction_max_deg": 20.0,
+                                 "joints": ["nonexistent_joint"]})
+    assert rejected.status_code == 400
+
+    reset = client.post("/api/control/gains/reset", json={"joints": None})
+    assert reset.status_code == 200
+    assert (reset.json()["control"]["joint_gains"]
+            == listing["config_gains"])
 
 
 def test_model_metadata_hints_when_bundle_missing(client):
@@ -162,3 +220,30 @@ def test_mock_joint_sweep_endpoint(client):
     assert _wait_for(moved, timeout=3.0)
     response = client.post("/api/mock/joint_sweep", json={"joint": None})
     assert response.json()["sweeping"] is None
+
+
+def test_spa_shell_is_revalidated_not_heuristically_cached(client):
+    """index.html names the content-hashed bundle. Served without an explicit
+    Cache-Control, browsers cache it heuristically and a soft reload after a
+    rebuild silently keeps running the old JS."""
+    response = client.get("/")
+    if response.status_code == 503:
+        pytest.skip("frontend not built")
+    assert response.headers.get("cache-control") == "no-cache"
+
+
+def test_stats_expose_the_command_feed(client):
+    """The feed counter is how you tell interpolation is actually live: diff it
+    during motion and it should climb at FEED_HZ, not the source rate."""
+    from orca_ui.hand.commands import FEED_HZ
+
+    command = client.get("/api/stats").json()["command"]
+    assert command["feed_hz"] == FEED_HZ
+    assert command["writes"] == 0
+    assert command["ramping"] is False
+
+    assert client.post("/api/torque/enable").status_code == 200
+    assert client.post("/api/joints/target",
+                       json={"angles": {"index_mcp": 12.0}}).status_code == 200
+    assert _wait_for(
+        lambda: client.get("/api/stats").json()["command"]["writes"] > 0)

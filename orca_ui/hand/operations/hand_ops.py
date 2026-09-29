@@ -38,16 +38,20 @@ def request_stop(hand) -> None:
 
 
 def build_maintenance_hand(config_path: str, stop_event: threading.Event,
-                           retry_s: float = 2.0):
+                           retry_s: float = 2.0, motor_port: str | None = None):
     """Fresh motor-only OrcaHand for a maintenance operation.
 
-    Always the plain class — never the feedback subclass, whose 100 Hz loop
+    Always the plain class — never the feedback subclass, whose joint loop
     refuses to calibrate. Port-open is retried briefly to absorb the OS
     serial release latency after the supervisor closed the session.
     """
     from orca_core import OrcaHand
 
     hand = OrcaHand(config_path=config_path)
+    if motor_port and getattr(hand.config, "port", None) == "auto":
+        # The lease already resolved the motor port, scoped to the pinned
+        # board when one is pinned; connect() must not look beyond it.
+        object.__setattr__(hand.config, "port", motor_port)
     deadline = time.monotonic() + retry_s
     last_message = ""
     while True:

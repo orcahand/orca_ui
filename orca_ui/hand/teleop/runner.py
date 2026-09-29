@@ -58,7 +58,9 @@ def resolve_command(settings) -> tuple[list[str] | None, str]:
         return None, f"no pyproject.toml in {teleop_dir}"
     if shutil.which("uv") is None:
         return None, "uv not on PATH"
-    prefix = ["uv", "run", "--project", teleop_dir,
+    # --frozen: use the checkout's lock as-is. Otherwise every launch revalidates
+    # orca_teleop's direct-URL wheels against github.com and a DNS blip kills the spawn.
+    prefix = ["uv", "run", "--project", teleop_dir, "--frozen",
               "--extra", "mediapipe", "--extra", "adaptive", STREAMER_SCRIPT]
     return prefix, f"uv run --project {teleop_dir}"
 

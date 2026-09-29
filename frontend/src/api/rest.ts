@@ -1,10 +1,12 @@
 // Thin fetch wrappers over the REST API. Errors carry the backend's detail.
 
 import type {
+  BoardsInfo,
   DemoEntry,
   DirectMotorSnapshot,
   HandInfo,
   ModelMetadata,
+  ModelsInfo,
   OperationLogPayload,
   OperationSnapshot,
   PortInfo,
@@ -17,7 +19,14 @@ import type {
   TeleopSnapshot,
   TeleopSourceId,
   TeleopSourcesInfo,
+  TrajectoryData,
   TrajectoryEntry,
+  ServoGains,
+  PoseSource,
+  ServoGainsMap,
+  ServoProfile,
+  ServoProfileMap,
+  ControlState,
 } from './types'
 
 export class ApiError extends Error {
@@ -69,7 +78,47 @@ export const api = {
   stats: () => request<Stats>('/api/stats'),
   ports: () => request<PortInfo[]>('/api/ports'),
   taxelGeometry: () => request<TaxelGeometry>('/api/tactile/geometry'),
-  reconnect: () => post('/api/reconnect'),
+  // Re-arm the probes for declared hardware this session did not get. Keeps
+  // the session up, unlike reconnect.
+  rescan: () =>
+    post<{ ok: boolean; status: StatusSnapshot }>('/api/rescan'),
+  reconnect: () => post<{ status: StatusSnapshot }>('/api/reconnect'),
+  // Closes the session and holds the ports free; only reconnect() lifts it.
+  disconnect: () => post<{ status: StatusSnapshot }>('/api/disconnect'),
+
+  // Scans free serial ports on the backend, so it can take a moment.
+  boards: () => request<BoardsInfo>('/api/boards'),
+  // device null hands the choice back to "first board to answer".
+  selectBoard: (device: string | null) =>
+    post<BoardsInfo>('/api/board/select', { device }),
+  // Clears a latched hardware error. The motor returns with torque off.
+  rebootMotor: (id: number) =>
+    post<{
+      motor: number
+      joint: string | null
+      // null: the motor did not answer the read-back after the reboot.
+      cleared: boolean | null
+      read_back: boolean
+      hw_error_flags: string[] | null
+    }>(`/api/motors/${id}/reboot`),
+
+  // Read straight off the motors: gains are RAM and a power cycle clears
+  // them, so what was last typed is not evidence of what they hold.
+  servoGains: () =>
+    request<{ gains: ServoGainsMap }>('/api/motors/gains'),
+  // Omitted fields are left alone on the motor.
+  setServoGains: (id: number, gains: Partial<ServoGains>) =>
+    post<{ gains: ServoGainsMap }>(`/api/motors/${id}/gains`, gains),
+
+  servoProfile: () =>
+    request<{ profile: ServoProfileMap }>('/api/motors/profile'),
+  setServoProfile: (id: number, profile: Partial<ServoProfile>) =>
+    post<{ profile: ServoProfileMap }>(`/api/motors/${id}/profile`, profile),
+
+  models: () => request<ModelsInfo>('/api/models'),
+  // name null hands the choice back to hardware detection.
+  selectModel: (name: string | null, version?: string | null) =>
+    post<ModelsInfo>('/api/model/select', { name, version: version ?? null }),
 
   operation: () =>
     request<{ operation: OperationSnapshot | null }>('/api/operation'),
@@ -94,13 +143,20 @@ export const api = {
   jointsTarget: (angles: Record<string, number>) =>
     post('/api/joints/target', { angles }),
   jointsNeutral: () => post('/api/joints/neutral'),
+  // joints omitted = every loop-controlled joint; a joint list writes
+  // exactly those and leaves the rest as they are.
   setGains: (gains: {
     kp: number
     ki: number
     correction_max_deg: number
-    i_clamp_deg?: number
+    joints?: string[]
   }) => post('/api/control/gains', gains),
+  // Restore the config gains; joints omitted = every loop-controlled joint.
+  resetGains: (joints?: string[]) =>
+    post('/api/control/gains/reset', { joints: joints ?? null }),
   setMaxCurrent: (ma: number) => post('/api/control/max_current', { ma }),
+  setPoseSource: (mode: PoseSource) =>
+    post<{ control: ControlState }>('/api/control/pose_source', { mode }),
   rebase: () => post('/api/control/rebase'),
 
   motorsDirect: () => request<DirectMotorSnapshot>('/api/motors/direct'),
@@ -130,6 +186,20 @@ export const api = {
 
   trajectories: () =>
     request<{ trajectories: TrajectoryEntry[] }>('/api/trajectories'),
+  trajectoryGet: (name: string) =>
+    request<TrajectoryData>(`/api/trajectories/${encodeURIComponent(name)}`),
+  trajectoryUpdate: (name: string, waypoints: number[][], saveAs?: string) =>
+    put<{ ok: boolean; name: string; frames: number }>(
+      `/api/trajectories/${encodeURIComponent(name)}`,
+      { waypoints, save_as: saveAs ?? null },
+    ),
+  // Translate a joint waypoint recording into raw motor positions through the
+  // calibrated joint<->motor map; saved as <name>_motor unless saveAs is given.
+  trajectoryToMotor: (name: string, saveAs?: string) =>
+    post<{ ok: boolean; name: string; frames: number }>(
+      `/api/trajectories/${encodeURIComponent(name)}/to_motor`,
+      { save_as: saveAs ?? null },
+    ),
   trajectoryDelete: (name: string) =>
     del<{ ok: boolean }>(`/api/trajectories/${encodeURIComponent(name)}`),
   demos: () => request<{ demos: DemoEntry[] }>('/api/demos'),

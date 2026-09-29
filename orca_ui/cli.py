@@ -7,6 +7,7 @@ concrete ``config.yaml`` path via :class:`~orca_ui.settings.UiSettings`.
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import sys
 
@@ -31,6 +32,14 @@ def parse_args(argv=None) -> argparse.Namespace:
                              "latest).")
     parser.add_argument("--side", choices=["right", "left"], default=None,
                         help="Shorthand for --model orcahand-<side>.")
+    parser.add_argument("--board", type=str, default=None, metavar="DEVICE",
+                        help="Pin the console to one board by device path "
+                             "(e.g. /dev/cu.usbmodemXXXX — its motor CDC, or a "
+                             "legacy motor adapter). Default: connect to the "
+                             "first board that answers. Pin it when running "
+                             "one console per hand on the same machine, so "
+                             "each keeps to its own board; also changeable "
+                             "from the header picker while running.")
     parser.add_argument("--mock", action="store_true",
                         help="Simulate the hand in-memory (motors, joint encoders, "
                              "tactile sine signals). No hardware needed. Without "
@@ -79,8 +88,14 @@ def parse_args(argv=None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def resolve_config_path(args: argparse.Namespace) -> str:
-    """Turn --config/--model/--side/--mock into a concrete config.yaml path."""
+def resolve_config_path(args: argparse.Namespace) -> tuple[str, bool]:
+    """Turn --config/--model/--side/--mock into a concrete config.yaml path.
+
+    Returns ``(path, pinned)``. ``pinned`` is False when nothing on the
+    command line named a model: the path is then only a best guess from
+    whatever answered at startup, and the supervisor keeps re-deriving it
+    from the hardware for as long as the process runs.
+    """
     if args.config:
         # Accept either a config.yaml file or the directory containing it.
         config_path = args.config
@@ -88,19 +103,22 @@ def resolve_config_path(args: argparse.Namespace) -> str:
             config_path = os.path.join(config_path, "config.yaml")
         if not os.path.isfile(config_path):
             raise SystemExit(f"Config not found: {config_path}")
-        return os.path.abspath(config_path)
+        return os.path.abspath(config_path), True
 
     if args.mock and not (args.model or args.side):
         # Bundled mock model, copied to a tempdir so runtime writes
         # (persisted ports, sensor offsets) never dirty the installed package.
         from orca_ui.mock import materialize_mock_model
-        return materialize_mock_model()
+        return materialize_mock_model(), True
 
     model_name = args.model or (f"orcahand-{args.side}" if args.side else None)
+    pinned = model_name is not None
     if model_name is None:
         # Plug-and-play: nothing was specified, so ask the connected board which
         # hand it is. detect_hand() degrades to the default model when nothing is
-        # plugged in, so this never blocks a headless/no-hardware start.
+        # plugged in, so this never blocks a headless/no-hardware start — and
+        # because the model stays unpinned, the supervisor revises this guess
+        # as soon as a board answers.
         try:
             from orca_core.hand_factory import detect_hand
             model_name = detect_hand().model_name
@@ -111,7 +129,7 @@ def resolve_config_path(args: argparse.Namespace) -> str:
     from orca_core.hand_config import _resolve_config_path
     try:
         return _resolve_config_path(
-            None, model_version=args.model_version, model_name=model_name)
+            None, model_version=args.model_version, model_name=model_name), pinned
     except Exception as e:
         raise SystemExit(f"Could not resolve bundled model "
                          f"(model={model_name!r}, version={args.model_version!r}): {e}")
@@ -119,8 +137,12 @@ def resolve_config_path(args: argparse.Namespace) -> str:
 
 def build_settings(argv=None) -> UiSettings:
     args = parse_args(argv)
+    config_path, model_pinned = resolve_config_path(args)
     return UiSettings(
-        config_path=resolve_config_path(args),
+        config_path=config_path,
+        model_pinned=model_pinned,
+        model_version=args.model_version,
+        board=None if args.mock else args.board,
         mock=args.mock,
         engage_feedback=not args.no_feedback,
         motors_enabled=not args.no_motors,
@@ -137,21 +159,38 @@ def build_settings(argv=None) -> UiSettings:
     )
 
 
+def configure_logging() -> None:
+    """WARNING and above on stderr.
+
+    Explicit because the console installs a root-logger handler of its own
+    (the bus-error monitor), which would otherwise stop Python from putting
+    its default one in place on the first warning.
+    """
+    logging.basicConfig(level=logging.WARNING)
+
+
 def main(argv=None) -> None:
     import uvicorn
     from orca_ui.console import install_stdout_dedupe
+    from orca_ui.core_source import resolve as resolve_core_source
     from orca_ui.server import create_app
 
+    configure_logging()
     settings = build_settings(argv)
 
     mode = "MOCK — no hardware" if settings.mock else "hardware"
     if settings.mock is False and not settings.motors_enabled:
         mode += ", sensors only (--no-motors)"
+    # Which orca_core is driving the hardware is invisible otherwise: a dev
+    # checkout and the release it was cut from carry the same version string.
+    core = resolve_core_source()
     rule = "─" * 62
+    provisional = "" if settings.model_pinned else "  (re-detected while running)"
     print(f"\n{rule}\n"
           f"  ORCA UI   http://localhost:{settings.port}\n"
-          f"  config    {settings.config_path}\n"
+          f"  config    {settings.config_path}{provisional}\n"
           f"  mode      {mode}\n"
+          f"  core      {core.summary()}\n"
           f"{rule}\n")
 
     # orca_core prints hardware diagnostics; the connect ladder would repeat

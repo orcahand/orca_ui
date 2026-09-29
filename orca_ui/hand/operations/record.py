@@ -1,4 +1,8 @@
-"""Trajectory recording: sample measured joints while the hand is posed by hand.
+"""Trajectory recording: sample joint angles while the hand is posed by hand.
+
+Angles come from the session's joint source: encoder-measured on hands that
+have joint encoders, otherwise the calibrated motor-derived estimate — so
+motor-only hands record too, once they are calibrated.
 
 Torque is disabled at start and NEVER re-enabled by this operation (the
 "torque is never auto-enabled" rule). The op owns the control source so a
@@ -16,10 +20,10 @@ import time
 
 from orca_ui.hand.operations.base import OpContext, Operation
 from orca_ui.hand.states import ControlSource
-from orca_ui.library import CONTINUOUS, WAYPOINTS, LibraryError
+from orca_ui.library import CONTINUOUS, MOTOR_WAYPOINTS, WAYPOINTS, LibraryError
 
 DEFAULT_FREQUENCY_HZ = 50.0
-MAX_FREQUENCY_HZ = 60.0   # the encoder read path is fresh well past this
+MAX_FREQUENCY_HZ = 60.0   # both joint-source read paths keep up past this
 MAX_FRAMES = 30_000       # 10 min @ 50 Hz
 SAVE_VALUES = {"save", "stop & save", "stop_and_save"}
 
@@ -39,14 +43,25 @@ class RecordOperation(Operation):
         session = service.session
         if session is None:
             raise ServiceError("hand not connected", status_code=503)
-        if not session.caps.encoders:
-            raise ServiceError(
-                "recording needs joint encoders (measured joint angles)",
-                status_code=409)
-
         mode = params.get("mode", "continuous")
-        if mode not in ("continuous", "waypoints"):
-            raise ServiceError("mode must be 'continuous' or 'waypoints'")
+        if mode not in ("continuous", "waypoints", "motor_waypoints"):
+            raise ServiceError(
+                "mode must be 'continuous', 'waypoints' or 'motor_waypoints'")
+        if mode == "motor_waypoints":
+            # Raw motor positions — needs the motor bus, not a joint source.
+            if not session.caps.motors:
+                raise ServiceError(
+                    "motor-waypoint recording needs the motor bus",
+                    status_code=409)
+        elif session.joint_source() is None:
+            if session.caps.motors:
+                raise ServiceError(
+                    "recording on a hand without joint encoders needs a "
+                    "completed calibration (joint angles are estimated from "
+                    "motor positions)", status_code=409)
+            raise ServiceError(
+                "recording needs a joint-angle source: joint encoders, or "
+                "motors with a completed calibration", status_code=409)
         frequency = float(params.get("frequency", DEFAULT_FREQUENCY_HZ))
         if not 1.0 <= frequency <= MAX_FREQUENCY_HZ:
             raise ServiceError(
@@ -83,15 +98,40 @@ class RecordOperation(Operation):
                 pass  # sensors-only session: nothing to disable
 
         config = service.supervisor.config
+
+        if self.params["mode"] == "motor_waypoints":
+            # Raw motor positions (radians). One bus read per capture —
+            # waypoint cadence, never streaming.
+            motor_ids = [int(m) for m in config.motor_ids]
+            metadata = {
+                "created_at": time.strftime("%Y%m%d_%H%M%S"),
+                "motor_ids": motor_ids,
+                "hand_type": config.type,
+            }
+
+            def sample_motors() -> list[float]:
+                positions = session.hand.get_motor_pos(as_dict=True)
+                return [float(positions[m]) for m in motor_ids]
+
+            return self._record_waypoints(ctx, metadata, sample_motors,
+                                          traj_type=MOTOR_WAYPOINTS)
+
+        source = session.joint_source()
+        if source is None:
+            raise ServiceError(
+                "recording needs a joint-angle source: joint encoders, or "
+                "motors with a completed calibration", status_code=409)
+
         joint_ids = list(config.joint_ids)
         metadata = {
             "created_at": time.strftime("%Y%m%d_%H%M%S"),
             "joint_ids": joint_ids,
             "hand_type": config.type,
+            "joint_source": source,
         }
 
         def sample() -> list[float]:
-            measured = session.measured_joints() or {}
+            measured = session.sampled_joints() or {}
             return [float(measured.get(j, 0.0)) for j in joint_ids]
 
         if self.params["mode"] == "waypoints":
@@ -99,8 +139,8 @@ class RecordOperation(Operation):
         return self._record_continuous(ctx, metadata, sample)
 
     def _record_waypoints(self, ctx: OpContext, metadata: dict,
-                          sample) -> dict:
-        metadata["type"] = WAYPOINTS
+                          sample, traj_type: str = WAYPOINTS) -> dict:
+        metadata["type"] = traj_type
         waypoints: list[list[float]] = []
         ctx.set_phase("recording", detail="0 waypoints")
         while True:

@@ -22,8 +22,13 @@ export function PoseGrid({
 }) {
   const gate = useControlGate()
   const torqueOn = useAppStore((s) => s.control?.torque_enabled ?? false)
-  const encoders = useAppStore(
-    (s) => s.status?.capabilities?.encoders ?? false,
+  // Capture needs a joint-angle source: encoders, or motors (calibrated
+  // motor-derived estimate; the backend rejects uncalibrated hands).
+  const canCapture = useAppStore(
+    (s) =>
+      Boolean(
+        s.status?.capabilities?.encoders || s.status?.capabilities?.motors,
+      ),
   )
   const setError = useAppStore((s) => s.setError)
   const [capturing, setCapturing] = useState(false)
@@ -105,10 +110,10 @@ export function PoseGrid({
               <div className="capture-form-actions">
                 <button
                   className="btn btn-primary"
-                  disabled={!nameValid || !encoders}
+                  disabled={!nameValid || !canCapture}
                   title={
-                    !encoders
-                      ? 'capture needs joint encoders (measured pose)'
+                    !canCapture
+                      ? 'capture needs a joint-angle source (encoders or motors)'
                       : !nameValid
                         ? 'letters, digits, _ and - only (max 64)'
                         : undefined

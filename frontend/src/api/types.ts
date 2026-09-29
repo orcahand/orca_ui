@@ -31,10 +31,82 @@ export interface StatusSnapshot {
   message: string
   ports: Record<string, string | null>
   since: number
+  // Hand config currently in force. Not fixed for the session: unless a model
+  // was pinned on the command line, the backend re-derives it from whatever
+  // is plugged in, so a swapped hand shows up as a change here.
+  model: string
+  side: string
+  // False while the model is still detection's to revise, true once the
+  // command line or the picker named one.
+  model_pinned: boolean
+  // True while someone has taken the hardware back: the connect ladder is
+  // suspended, so `disconnected` is a resting state rather than a search.
+  released: boolean
+  // Device path of the board this console is pinned to, or null for "first
+  // board to answer". Pinned means the backend never opens another board's
+  // ports — the way two consoles on one machine each keep to their own hand.
+  board_pinned: string | null
+  // Device classes the config declares that this session did not get, and
+  // whether the backend is still probing for them. It gives up after a few
+  // attempts, so the UI offers an explicit rescan rather than implying it is
+  // still looking.
+  missing?: string[]
+  // Of those, the ones whose port answered while the device did not, so a
+  // rescan re-attempts the connection rather than looking for a port.
+  refused?: string[]
+  rescanning?: boolean
+}
+
+export interface ModelEntry {
+  name: string
+  version: string // '' for a model outside orca_core's bundle
+  side: 'left' | 'right'
+  tactile: boolean
+  encoders: boolean
+  config_path: string
+  // False for a --config path: shown as current, but it has no model name to
+  // be selected back by.
+  selectable: boolean
+}
+
+export interface ModelsInfo {
+  models: ModelEntry[]
+  selected: string
+  pinned: boolean
+  // Detection needs a bus to ask — mock mode has none.
+  auto_available: boolean
+  config_path: string
+}
+
+// One selectable board from GET /api/boards: an ORCA controller board (both
+// CDCs grouped by the identity they report) or a legacy motor adapter.
+export interface BoardEntry {
+  device: string // the pin key: motor CDC, or the adapter path
+  kind: 'oh_board' | 'motor_adapter'
+  side: 'left' | 'right' | null
+  hand_id: string | null
+  // Model the board's provisioned config declares; null when it doesn't.
+  model_name: string | null
+  ports: string[]
+  // Held open by some *other* process (e.g. a second console) — silent under
+  // probing, so side/identity are unknown.
+  busy: boolean
+  // Held by this console's own live session.
+  held_by_console: boolean
+}
+
+export interface BoardsInfo {
+  boards: BoardEntry[]
+  // Pinned device path, or null = first board to answer.
+  selected: string | null
+  // False in mock mode: no serial ports to scan or pin.
+  available: boolean
 }
 
 export interface JointInfo {
   id: string
+  // Motor driving this joint, or null when the config maps none.
+  motor_id: number | null
   rom: [number, number] // degrees
   neutral: number
   encoder_backed: boolean
@@ -43,24 +115,52 @@ export interface JointInfo {
   encoder_calibrated: boolean | null
   // true: the feedback loop closes on this joint. false: the loop skipped it
   // at connect (incomplete motor/encoder calibration) — it runs open-loop
-  // until recalibrated. null: no loop at this tier, or the loop never
-  // targets it by design (e.g. the wrist).
+  // until recalibrated. null: no loop at this tier, or the joint has no
+  // encoder to close on.
   loop_controlled: boolean | null
+}
+
+export interface CalibrationInfo {
+  // Motor limits + ratios recorded. null when no motor session.
+  motors: boolean | null
+  // Motors calibrated AND every encoder-backed joint anchored.
+  joint_feedback: boolean | null
+  // Encoder-backed joints with no anchor — they run open-loop.
+  missing_anchors: string[]
+  // Set when recalibrating would capture the missing anchors.
+  hint: string | null
 }
 
 // Who owns the joint-target channel. TELEOP is reserved for orca_teleop.
 export type ControlSource = 'manual' | 'operation' | 'teleop'
 
+export interface JointGains {
+  kp: number
+  ki: number
+  correction_max_deg: number
+}
+
 export interface ControlState {
   torque_enabled: boolean
   max_current: number
-  gains: { kp: number; ki: number; correction_max_deg: number }
+  // The one gain set every loop joint shares, or null when they differ.
+  gains: JointGains | null
+  // Live gains per loop-controlled joint, read back from the controller.
+  joint_gains: Record<string, JointGains>
+  // What connect() installed from config.yaml — what Reset returns to.
+  config_gains: Record<string, JointGains>
   tactile_mode: TactileMode
   control_source: ControlSource
   // Human-readable owner label, e.g. "manual", "replay", or the op kind.
   control_owner: string
   // Raw motor-space control armed: loop writes paused, joint targets 409.
   direct_motor_mode: boolean
+  // Which stream the 3D model follows. "auto" tracks the torque state:
+  // motor estimate while limp (polled), commanded targets once torqued (no
+  // polling, so reads stop competing with commands for the bus).
+  pose_source: PoseSource
+  // What "auto" resolved to right now; equals pose_source when pinned.
+  effective_pose_source: 'estimate' | 'target'
 }
 
 export interface DirectMotorInfo {
@@ -77,12 +177,27 @@ export interface DirectMotorSnapshot {
   motors: DirectMotorInfo[]
 }
 
+// Which orca_core the backend imported. `development` is true for a local
+// checkout or a git branch — i.e. not a released build.
+export interface CoreSourceInfo {
+  version: string
+  kind: 'released' | 'local' | 'git' | 'unknown'
+  branch: string | null
+  dirty: boolean
+  development: boolean
+  summary: string
+}
+
 export interface HandInfo {
   model_name: string
   side: 'left' | 'right'
   mock: boolean
   joints: JointInfo[]
+  calibration: CalibrationInfo
   control: ControlState
+  core?: CoreSourceInfo
+  // False on a motor family with no reboot instruction; the reboot control hides.
+  reboot_supported?: boolean
   finger_to_sensor_id?: Record<Finger, number>
   tactile?: { active_sensors: Finger[]; num_taxels: Record<Finger, number> }
 }
@@ -238,7 +353,7 @@ export interface PoseEntry {
 
 export interface TrajectoryEntry {
   name: string
-  type: 'continuous' | 'discrete_waypoints' | null
+  type: 'continuous' | 'discrete_waypoints' | 'motor_waypoints' | null
   frames: number
   frequency_hz: number | null
   duration_s: number | null
@@ -261,6 +376,85 @@ export interface PortInfo {
   kind: string | null
 }
 
+// ----- motor faults (motors.faults topic, orca_ui/hand/faults.py) -----------
+
+// Command adherence for the joint a motor drives: sustained target-vs-actual
+// deviation past a grace window counts as "not following".
+export interface MotorTracking {
+  following: boolean
+  deviation_deg: number | null
+  stall_s: number // current stall duration; 0 while following
+  stalls: number // stall events this session
+  stalled_total_s: number // cumulative not-following time this session
+}
+
+// A latched Hardware Error Status, classified by what to do about it. Every
+// latched bit disables the motor identically (it answers the bus and ACKs
+// torque enable, but never energizes) — `kind` is what separates a fault you
+// wait out from one you go and fix.
+export type HwErrorKind = 'thermal' | 'power' | 'load' | 'encoder' | 'unknown'
+
+export interface HwErrorInfo {
+  flags: string[]
+  kind: HwErrorKind
+  disabled: boolean // always true today; the motor will not move until reboot
+  needs_cooling: boolean // separate from kind: a motor can latch both
+  temperature_c: number | null
+  headline: string
+  advice: string
+  disabled_note: string
+}
+
+export interface MotorFaultEntry {
+  joint: string | null
+  errors: number // failed bus transactions this session
+  overloads: number // overload reboots this session
+  last_error: string | null
+  last_error_age_s: number | null
+  tracking: MotorTracking | null
+  hw_error_flags?: string[]
+  // null when nothing is latched.
+  hw_error?: HwErrorInfo | null
+  // Did this motor answer the last error sweep? null before the first one:
+  // "not asked yet" is not "not answering".
+  answering?: boolean | null
+}
+
+// The servo's own position-PID and feedforward gains (X-series registers
+// 80-91). Distinct from the host outer-loop PI in the Control Loop panel:
+// these close the loop inside the motor. null when the family cannot report
+// them.
+export interface ServoGains {
+  kp: number | null
+  ki: number | null
+  kd: number | null
+  ff_1st: number | null
+  ff_2nd: number | null
+}
+
+export type ServoGainsMap = Record<string, ServoGains | null>
+
+// Trajectory limits the servo shapes its own motion with. 0 disables a limit.
+// Non-zero values rate-limit streamed targets too, not just point-to-point
+// moves — a safety property for teleop, an unwanted lag inside a tuned loop.
+export interface ServoProfile {
+  velocity_rad_s: number | null
+  acceleration_rad_s2: number | null
+}
+
+export type ServoProfileMap = Record<string, ServoProfile | null>
+
+export type PoseSource = 'auto' | 'estimate' | 'target'
+
+export interface MotorsFaults {
+  motors: Record<string, MotorFaultEntry>
+  bus: {
+    errors: number
+    last_error: string | null
+    last_error_age_s: number | null
+  }
+}
+
 // ----- WS topics ------------------------------------------------------------
 
 export const TOPICS = {
@@ -276,7 +470,9 @@ export const TOPICS = {
   jointsTarget: 'joints.target',
   jointsCorrection: 'joints.correction',
   motorsTelemetry: 'motors.telemetry',
+  motorsFaults: 'motors.faults',
   stats: 'stats',
+  sensorsHealth: 'sensors.health',
   teleopState: 'teleop.state',
   teleopTargets: 'teleop.targets',
   teleopLog: 'teleop.log',
@@ -290,6 +486,56 @@ export interface ServerMessage {
   data: Record<string, unknown>
 }
 
+// ----- sensors.health (orca_ui/hand/telemetry.py SensorHealthMonitor) -------
+
+export type EncoderVerdict =
+  | 'live'
+  | 'parity'
+  | 'chip error'
+  | 'no encoder'
+  | 'no frames'
+
+export interface EncoderJointHealth {
+  slot: number
+  deg: number | null // raw-decoded chip angle (uncalibrated frame)
+  verdict: EncoderVerdict
+  reason: string
+}
+
+export interface SensingLinkHealth {
+  connected: boolean
+  port_dead: boolean
+  port_error: string | null
+  resyncs: number
+  bad_lrc: number
+}
+
+// 1 Hz electrical bring-up payload; null sections = capability absent.
+export interface SensorsHealth {
+  encoders: {
+    present: boolean
+    hz: number
+    error_byte: number | null
+    fresh_ms?: number | null
+    joints: Record<string, EncoderJointHealth>
+    live: number
+    total: number
+    // Joints whose measured stream is currently distrusted (joint ->
+    // "verdict: reason"): the backend drops them from joints.measured and
+    // everything falls back to the motor estimate until the sensor reads
+    // clean for restore_after_s consecutive seconds.
+    suppressed?: Record<string, string>
+    restore_after_s?: number
+  } | null
+  tactile: {
+    present: boolean
+    hz: number
+    stream_rearms: number | null
+    fingers: Record<string, { connected: boolean; taxels: number }>
+  } | null
+  links: Record<string, SensingLinkHealth>
+}
+
 export interface Stats {
   loop: Record<string, number | boolean> | null
   tactile: {
@@ -300,4 +546,69 @@ export interface Stats {
     stream_rearms: number
   } | null
   encoder: { frames_ok: number; last_freshness_ms: number } | null
+}
+
+// Something the operator has to act on, surfaced on the run's `extra` while
+// it goes and kept on its result. One entry per joint per kind.
+export interface CalibrationProblem {
+  kind: 'no_motion' | 'travel' | 'rejected' | 'timeout' | 'faulted'
+  joint: string
+  severity: 'error' | 'warn'
+  headline: string
+  advice: string
+  motor?: number
+  direction?: string
+  moved_deg?: number
+  travel_deg?: number
+  expected_deg?: number
+  flags?: string[]
+  temperature_c?: number | null
+  fault_kind?: string
+  needs_cooling?: boolean
+}
+
+// ----- calibration history --------------------------------------------------
+
+// One raw progress event from a calibration run (t = epoch seconds). The
+// magnet counts sampled at the two hardstops ride on the measured_rom_*
+// events so successive runs can be compared for encoder-magnet drift.
+export interface CalibrationEvent {
+  t: number
+  event: string
+  joint?: string
+  anchor_count?: number
+  anchor_angle_deg?: number
+  flex_count?: number
+  extend_count?: number
+  rom?: [number, number]
+  span_deg?: number
+  deviation_deg?: number
+  ratio?: number
+  // limit_recorded: motor-shaft position (rad) sampled at one hardstop.
+  motor?: number
+  limit?: number
+  bound?: 'lower' | 'upper'
+  error?: string
+  steps?: number
+  joints?: Record<string, string> | string[]
+  index?: number
+  total?: number
+}
+
+// ----- joint usage stats ----------------------------------------------------
+
+// Full stored trajectory (GET /api/trajectories/{name}) — the waypoint
+// editor's working copy. Continuous recordings carry `angles`, waypoint
+// recordings `waypoints`; rows follow metadata.joint_ids order.
+export interface TrajectoryData {
+  metadata: {
+    type: string
+    joint_ids?: string[]
+    hand_type?: string | null
+    created_at?: string
+    edited_at?: string
+    sampling_frequency_hz?: number
+  }
+  waypoints?: number[][]
+  angles?: number[][]
 }

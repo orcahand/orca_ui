@@ -6,8 +6,8 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from orca_ui.hand.operations.player import (
-    MIN_SEGMENT_S, WAYPOINT_RATE_HZ, WAYPOINT_SPEED_DEG_S, _interpolate)
+from orca_ui.hand.operations import player
+from orca_ui.hand.operations.player import WAYPOINT_RATE_HZ, _interpolate
 from orca_ui.mock import materialize_mock_model
 from orca_ui.server import create_app
 from orca_ui.settings import UiSettings
@@ -258,16 +258,66 @@ def _waypoint_trajectory(client, name, waypoints):
     return joint_ids
 
 
+def test_arrival_is_within_tolerance_or_no_longer_approaching():
+    """A hold ends when the hand is at the pose, or has stopped getting
+    closer: a tendon joint short of its target must not run every hold to
+    the cap, and no reading means no confirmation."""
+    target = {"index_mcp": 30.0, "thumb_mcp": 10.0}
+    assert player._arrived({"index_mcp": 29.0, "thumb_mcp": 10.5}, target, None)
+    assert not player._arrived({"index_mcp": 20.0, "thumb_mcp": 10.0}, target, None)
+    still = {"index_mcp": 20.1, "thumb_mcp": 10.0}
+    assert player._arrived(still, target, {"index_mcp": 20.0, "thumb_mcp": 10.0})
+    assert not player._arrived({"index_mcp": 24.0, "thumb_mcp": 10.0}, target,
+                               {"index_mcp": 20.0, "thumb_mcp": 10.0})
+    assert not player._arrived(None, target, None)
+    assert not player._arrived({"wrist": 0.0}, target, None)
+
+
+def test_recording_refuses_a_motors_only_hand_without_calibration():
+    """The motor estimate is meaningless before calibration, so a recording
+    made from it would replay to arbitrary angles."""
+    from types import SimpleNamespace
+
+    from orca_ui.hand.operations.record import RecordOperation
+    from orca_ui.hand.service import ServiceError
+
+    session = SimpleNamespace(joint_source=lambda: None,
+                              caps=SimpleNamespace(motors=True, encoders=False))
+    with pytest.raises(ServiceError) as excinfo:
+        RecordOperation.validate(SimpleNamespace(session=session), {})
+    assert excinfo.value.status_code == 409
+    assert "calibration" in str(excinfo.value)
+
+
+def test_looped_waypoint_replay_holds_each_pose_once_per_cycle():
+    waypoints = [[0.0, 0.0], [30.0, 0.0], [30.0, 30.0]]
+    _, _, holds = player._interpolate(waypoints + [list(waypoints[0])])
+    assert len(holds) == 4
+    assert len(holds[:-1]) == len(waypoints)
+
+
+def _segment_frames(travel_deg: float) -> int:
+    """Frames the player synthesizes for one segment, at the pacing in force.
+
+    Read through the module so the suite-wide pacing scale is visible here.
+    """
+    segment_s = max(travel_deg / player.WAYPOINT_SPEED_DEG_S, player.MIN_SEGMENT_S)
+    return int(segment_s * WAYPOINT_RATE_HZ)
+
+
 def test_interpolate_paces_segments_by_travel():
-    # 60 deg of travel at the cruise speed -> a 1 s segment.
-    frames, rate = _interpolate([[0.0, 0.0], [60.0, 0.0]])
+    # Travel over the minimum segment is paced at the cruise speed. The frame
+    # list opens on the first waypoint, so it carries one more than the segment.
+    frames, rate, holds = _interpolate([[0.0, 0.0], [60.0, 0.0]])
     assert rate == WAYPOINT_RATE_HZ
-    assert len(frames) == int(60.0 / WAYPOINT_SPEED_DEG_S * WAYPOINT_RATE_HZ)
+    assert len(frames) == _segment_frames(60.0) + 1
+    # Both waypoints are hold points: the opening pose is held like every other.
+    assert holds == [0, len(frames) - 1]
     # A tiny adjustment still glides over the minimum segment duration.
-    tiny, _ = _interpolate([[0.0, 0.0], [0.5, 0.0]])
-    assert len(tiny) == int(MIN_SEGMENT_S * WAYPOINT_RATE_HZ)
+    tiny, _, _ = _interpolate([[0.0, 0.0], [0.5, 0.0]])
+    assert len(tiny) == int(player.MIN_SEGMENT_S * WAYPOINT_RATE_HZ) + 1
     # None (unrecorded joint) passes through untouched.
-    sparse, _ = _interpolate([[0.0, None], [60.0, None]])
+    sparse, _, _ = _interpolate([[0.0, None], [60.0, None]])
     assert all(row[1] is None for row in sparse)
 
 
@@ -281,20 +331,21 @@ def test_looped_waypoint_replay_closes_the_cycle(client):
     _waypoint_trajectory(client, "ring2", [closed, opened])
     client.post("/api/torque/enable")
 
-    # One-shot: a single 1 s segment (60 deg at cruise speed).
+    # One-shot: a single segment of 60 deg at cruise speed.
     client.post("/api/operation/replay/start",
                 json={"params": {"name": "ring2"}})
     snapshot = _wait_op_state(client, "done")
     one_way = snapshot["result"]["frames"]
-    assert one_way == int(60.0 / WAYPOINT_SPEED_DEG_S * WAYPOINT_RATE_HZ)
+    assert one_way == _segment_frames(60.0) + 1
 
-    # Looped: the return glide doubles the cycle -> 2.0 s in the detail.
+    # Looped: the synthesized return glide doubles the cycle.
     client.post("/api/operation/replay/start",
                 json={"params": {"name": "ring2", "loop": True}})
     detail = _wait_for(lambda: (
         d := ((_operation(client) or {}).get("detail") or ""))
         and "@" in d and d)
-    assert "2.0s" in detail, detail
+    cycle_s = (2 * _segment_frames(60.0) + 1) / WAYPOINT_RATE_HZ
+    assert f"{cycle_s:.1f}s" in detail, detail
     client.post("/api/operation/stop")
     _wait_op_state(client, "done")
 
@@ -347,3 +398,144 @@ def test_demo_loop_runs_until_stopped(client):
     # Control returns to manual afterwards.
     assert client.post("/api/joints/target",
                        json={"angles": {"index_mcp": 0.0}}).status_code == 200
+
+
+# ----- stepped playback and motor-space waypoints -------------------------
+
+
+def test_stepped_frames_interpolates_and_splits_a_violent_segment():
+    """``steps`` sets the commands per segment; ``max_step`` splits a segment
+    that would jump further than a raw motor command may, which is what keeps
+    "no interpolation" from flinging a motor across its range."""
+    frames = player._stepped_frames([[0.0], [1.0]], 3)
+    assert [round(f[0], 3) for f in frames] == [0.0, 0.25, 0.5, 0.75, 1.0]
+
+    # 0 steps is a straight jump to each point...
+    assert player._stepped_frames([[0.0], [1.0]], 0) == [[0.0], [1.0]]
+    # ...unless the jump exceeds max_step, which auto-splits it.
+    split = player._stepped_frames([[0.0], [1.0]], 0, max_step=0.3)
+    assert len(split) == 5 and split[-1] == [1.0]
+    assert max(abs(b[0] - a[0]) for a, b in zip(split, split[1:])) <= 0.3 + 1e-9
+
+    # A joint some waypoints omit stays absent until the endpoint.
+    gapped = player._stepped_frames([[0.0, None], [1.0, 2.0]], 1)
+    assert gapped[1][1] is None and gapped[-1][1] == 2.0
+
+
+def test_stepped_replay_commands_each_step_at_the_asked_period(client):
+    """The two knobs: interp_steps sets how many commands span a segment,
+    step_period_s sets the seconds between them."""
+    joint_ids = _waypoint_trajectory(client, "stepped", [
+        [0.0] * len(_joint_ids(client)),
+        [10.0] + [0.0] * (len(_joint_ids(client)) - 1),
+    ])
+    assert joint_ids
+    client.post("/api/torque/enable")
+
+    response = client.post("/api/operation/replay/start", json={"params": {
+        "name": "stepped", "interp_steps": 4, "step_period_s": 0.02}})
+    assert response.status_code == 200, response.text
+    snapshot = _wait_op_state(client, "done")
+    # The opening waypoint, four intermediate steps, and the endpoint.
+    assert snapshot["result"]["frames"] == 6
+
+
+def test_stepped_pacing_is_refused_where_it_means_nothing(client):
+    """A continuous recording carries its own timing, and a step period
+    without steps has nothing to pace."""
+    _synthetic_trajectory(client, name="cont", frames=10)
+    client.post("/api/torque/enable")
+
+    response = client.post("/api/operation/replay/start", json={"params": {
+        "name": "cont", "interp_steps": 3}})
+    assert response.status_code == 400 and "continuous" in response.text
+
+    _waypoint_trajectory(client, "wp", [[0.0] * len(_joint_ids(client))] * 2)
+    response = client.post("/api/operation/replay/start", json={"params": {
+        "name": "wp", "step_period_s": 0.1}})
+    assert response.status_code == 400 and "interp_steps" in response.text
+
+    response = client.post("/api/operation/replay/start", json={"params": {
+        "name": "wp", "interp_steps": 500}})
+    assert response.status_code == 400 and "interp_steps" in response.text
+
+
+def test_both_waypoint_modes_park_for_a_capture_prompt(client):
+    """The transport bar shows the capture controls only for a recording that
+    parks in awaiting_input, so a mode that does must say so — without this
+    there is no way to capture a motor waypoint at all."""
+    for mode in ("waypoints", "motor_waypoints"):
+        response = client.post("/api/operation/record/start", json={"params": {
+            "mode": mode, "name": f"prompt_{mode}"}})
+        assert response.status_code == 200, response.text
+        snapshot = _wait_op_state(client, "awaiting_input")
+        assert snapshot["params"]["mode"] == mode
+        options = [o.lower() for o in snapshot["awaiting"]["options"]]
+        assert "capture" in options
+        client.post("/api/operation/stop")
+        _wait_op_state(client, "done")
+
+
+def test_motor_waypoints_record_then_replay_in_motor_space(client):
+    """Raw motor positions: recorded off the bus, replayed as direct motor
+    stepping under the loop-write fence."""
+    response = client.post("/api/operation/record/start", json={"params": {
+        "mode": "motor_waypoints", "name": "mw"}})
+    assert response.status_code == 200, response.text
+    _wait_for(lambda: (_operation(client) or {}).get("phase") == "recording")
+    for _ in range(2):
+        client.post("/api/operation/input", json={"value": "capture"})
+    _wait_for(lambda: "2 waypoints" in ((_operation(client) or {}).get("detail") or ""))
+    client.post("/api/operation/input", json={"value": "save"})
+    _wait_op_state(client, "done")
+
+    saved = client.get("/api/trajectories/mw").json()
+    assert saved["metadata"]["type"] == "motor_waypoints"
+    assert saved["metadata"]["motor_ids"]
+    assert "joint_ids" not in saved["metadata"]
+
+    client.post("/api/torque/enable")
+    response = client.post("/api/operation/replay/start", json={"params": {
+        "name": "mw", "interp_steps": 0, "step_period_s": 0.02}})
+    assert response.status_code == 200, response.text
+    snapshot = _wait_op_state(client, "done")
+    assert snapshot["result"]["frames"] == 2
+    # Direct motor mode is armed for the run and disarmed afterwards.
+    assert client.get("/api/hand/info").json()["control"]["direct_motor_mode"] is False
+
+
+def test_motor_replay_refuses_a_mismatched_motor_order(client):
+    service = client.app.state.service
+    service.library.save_trajectory("wrongmotors", {
+        "metadata": {"type": "motor_waypoints", "created_at": "test",
+                     "motor_ids": [99, 98],
+                     "hand_type": service.supervisor.config.type},
+        "waypoints": [[0.0, 0.0], [0.1, 0.1]],
+    })
+    client.post("/api/torque/enable")
+    response = client.post("/api/operation/replay/start",
+                           json={"params": {"name": "wrongmotors"}})
+    assert response.status_code == 400 and "motor order" in response.text
+
+
+def test_translating_a_joint_recording_to_motor_space(client):
+    """The conversion needs the calibrated joint<->motor map, so it is refused
+    on anything but a joint waypoint recording."""
+    joint_ids = _joint_ids(client)
+    _waypoint_trajectory(client, "src", [
+        [0.0] * len(joint_ids), [5.0] + [0.0] * (len(joint_ids) - 1)])
+
+    response = client.post("/api/trajectories/src/to_motor", json={})
+    assert response.status_code == 200, response.text
+    assert response.json()["name"] == "src_motor"
+
+    converted = client.get("/api/trajectories/src_motor").json()
+    assert converted["metadata"]["type"] == "motor_waypoints"
+    assert converted["metadata"]["translated_from"] == "src"
+    motor_ids = [j["motor_id"] for j in client.get("/api/hand/info").json()["joints"]]
+    assert converted["metadata"]["motor_ids"] == sorted(set(motor_ids))
+    assert len(converted["waypoints"]) == 2
+
+    _synthetic_trajectory(client, name="cont2", frames=5)
+    response = client.post("/api/trajectories/cont2/to_motor", json={})
+    assert response.status_code == 409 and "waypoint" in response.text

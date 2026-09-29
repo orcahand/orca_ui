@@ -1,6 +1,7 @@
-// Tension card: full wind → ramp → hold → release flow. The phase stepper
-// mirrors the transport-bar state; while the motors hold, the awaiting_input
-// options (Release) render as a prominent button.
+// Tension on its own: full wind → ramp → hold → release flow. The phase
+// stepper mirrors the transport-bar state; while the motors hold, the
+// awaiting_input options (Release) take over the card as the hold callout —
+// that hold is the only moment the user has to do something with their hands.
 
 import { api } from '../../api/rest'
 import { useAppStore } from '../../state/appStore'
@@ -9,6 +10,7 @@ import {
   useOperationStore,
   useStartGate,
 } from '../../state/operationStore'
+import { TensionHoldCallout, TensionSteps } from './TensionGuide'
 
 const PHASES = ['winding', 'ramp', 'holding', 'released']
 
@@ -29,33 +31,35 @@ export function TensionCard() {
   const start = () =>
     void api.operationStart('tension', { move_motors: true }).catch(fail)
 
+  const awaiting = active?.state === 'awaiting_input' ? active.awaiting : null
+
   return (
     <div className="setup-card">
-      <div className="setup-card-title">Tension</div>
-      <p className="setup-card-hint">
-        Winds the tendons until the motors stall, ramps the current down,
-        then holds while you tension the spools by hand. Release ends the
-        hold and switches torque off.
+      <div className="setup-card-title">Tension the tendons</div>
+      <p className="setup-copy">
+        The motors wind the tendons in and hold them there while you tighten
+        the spools by hand.
       </p>
       {active ? (
         <>
           <PhaseStepper current={active.phase} />
-          {active.detail && (
-            <div className="setup-card-detail">{active.detail}</div>
+          {awaiting ? (
+            <TensionHoldCallout options={awaiting.options} />
+          ) : (
+            <>
+              {active.detail && (
+                <div className="setup-card-detail">{active.detail}</div>
+              )}
+              <TensionSteps started />
+            </>
           )}
-          {active.state === 'awaiting_input' &&
-            active.awaiting?.options.map((option) => (
-              <button
-                key={option}
-                className="btn btn-info setup-release"
-                onClick={() => void api.operationInput(option).catch(fail)}
-              >
-                {option}
-              </button>
-            ))}
         </>
       ) : (
         <>
+          <TensionSteps />
+          <div className="setup-note">
+            Always calibrate afterwards — tensioning changes the tendon lengths.
+          </div>
           <div>
             <button
               className="btn btn-primary"

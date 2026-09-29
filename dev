@@ -1,0 +1,27 @@
+#!/bin/sh
+# Switch which orca_core this checkout runs against — the same thing as
+# `uv run orca-dev`, but able to run before the project venv does.
+#
+# `uv run` syncs the project before it spawns anything, so `uv run orca-dev`
+# cannot start while the committed orca_core pin is unresolvable — which is
+# exactly when you need it to turn dev mode on. This calls the same code with
+# a bare interpreter, so it works from a fresh clone with no venv at all.
+#
+#   ./dev              report, and offer your local orca_core checkout
+#   ./dev local [PATH] use a local checkout (found automatically; PATH only
+#                      for an unusual location, once)
+#   ./dev branch NAME  track a branch of the orca_core repo, no checkout needed
+#   ./dev release      back to the published package
+#   ./dev status       which orca_core is installed
+#
+# Once the project resolves, `uv run orca-dev ...` does the same thing.
+
+cd "$(dirname "$0")" || exit 1
+
+PY=$(command -v python3 || command -v python)
+if [ -z "$PY" ]; then
+    echo "dev: no python3 on PATH — install Python 3.10+ and retry." >&2
+    exit 1
+fi
+
+exec "$PY" -m orca_ui.core_source "$@"
