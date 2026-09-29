@@ -369,6 +369,66 @@ def build_router(service: HandService) -> APIRouter:
 
         return guard(apply)
 
+    @router.post("/trajectories/{name}/to_motor")
+    def trajectory_to_motor(name: str,
+                            body: schemas.TrajectoryToMotorRequest):
+        # Translate a joint-space waypoint recording into raw motor
+        # positions via the calibrated joint<->motor map. Refused without a
+        # completed calibration — the map does not exist without one.
+        def convert():
+            import time as _time
+
+            from orca_ui.library import MOTOR_WAYPOINTS, WAYPOINTS
+
+            session = service.session
+            if session is None:
+                raise ServiceError("hand not connected", status_code=503)
+            hand = session.hand
+            if not getattr(hand, "calibrated", False):
+                raise ServiceError(
+                    "joint->motor translation needs a calibrated hand — "
+                    "calibrate first", status_code=409)
+            data = _library_call(service.library.load_trajectory, name)
+            meta = data.get("metadata") or {}
+            if meta.get("type") != WAYPOINTS:
+                raise ServiceError(
+                    "only joint waypoint recordings can be translated to "
+                    "motor space", status_code=409)
+            config = service.supervisor.config
+            joint_ids = list(meta.get("joint_ids") or config.joint_ids)
+            motor_ids = [int(m) for m in config.motor_ids]
+            rows = []
+            for index, waypoint in enumerate(data.get("waypoints") or []):
+                pose = {j: float(v) for j, v in zip(joint_ids, waypoint)
+                        if v is not None}
+                motor_pos = hand._joint_to_motor_pos(pose)
+                row = []
+                for idx, motor_id in enumerate(motor_ids):
+                    value = motor_pos[idx]
+                    if value is None:
+                        raise ServiceError(
+                            f"waypoint {index + 1}: motor {motor_id} has no "
+                            "calibrated joint<->motor mapping — recalibrate "
+                            "that joint first", status_code=409)
+                    row.append(round(float(value), 5))
+                rows.append(row)
+            if not rows:
+                raise ServiceError("trajectory contains no waypoints")
+            target = body.save_as or f"{name}_motor"
+            _library_call(service.library.save_trajectory, target, {
+                "metadata": {
+                    "type": MOTOR_WAYPOINTS,
+                    "motor_ids": motor_ids,
+                    "hand_type": config.type,
+                    "created_at": _time.strftime("%Y%m%d_%H%M%S"),
+                    "translated_from": name,
+                },
+                "waypoints": rows,
+            })
+            return {"ok": True, "name": target, "frames": len(rows)}
+
+        return guard(convert)
+
     @router.delete("/trajectories/{name}")
     def trajectory_delete(name: str):
         guard(service.delete_trajectory, name)
