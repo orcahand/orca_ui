@@ -73,21 +73,25 @@ _MODELS: tuple[MotorModel, ...] = (
         current_scale_ma=1.0,
         max_current_ma=910.0,
         source=("orca_core DynamixelClient (current_scale_ma, max_current_ma); "
-                "Current Limit read back as 910 on hardware"),
+                "Current Limit read back as 910 on hardware; confirmed by the "
+                "operator as the finger-joint motor"),
     ),
     MotorModel(
         key="dxl-1080",
-        # orca_core labels 1080 'XC430-T240BB-T'. That name is unconfirmed —
-        # keep the number in the label so a human picks by what the servo says
-        # rather than by a name that may be wrong.
-        label="Dynamixel XC430 (reports model 1080)",
+        # W240 and T240BB-T are two names for the same motor, which is why
+        # orca_core and the parts list disagree without either being wrong.
+        # Both are in the label so a search for either finds it.
+        label="Dynamixel XC430-W240 / T240BB-T",
         family=DYNAMIXEL,
         model_numbers=(1080,),
+        # No current sensor, so no Goal Current register: the wrist runs in
+        # multi-turn position instead of current-based position.
         has_current_control=False,
         current_scale_ma=None,
         max_current_ma=None,
         source=("orca_core MODELS_WITHOUT_CURRENT_CONTROL; Current Limit and "
-                "Goal Current both read back as 0 on hardware"),
+                "Goal Current both read back as 0 on hardware; confirmed by "
+                "the operator as the wrist motor"),
     ),
     MotorModel(
         key="feetech-hls",
