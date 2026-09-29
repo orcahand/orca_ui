@@ -459,3 +459,67 @@ class TestBenchWrites:
             service, writes = self._service(True, position=-3.0)
             service.set_motor_position(1, target)
             assert writes and writes[0][1] == [target]
+
+
+class TestBenchTelemetry:
+    """A bench watches the current while a motor pushes, so the usual pacing
+    (one read per ten seconds on a loopless hand) is useless here."""
+
+    def _sampler(self, bare_mode: bool):
+        from orca_ui.hand.telemetry import TelemetryService
+
+        published: list = []
+        sampler = TelemetryService.__new__(TelemetryService)
+        sampler._motor_health = {}
+        sampler._last_bench_read = float("-inf")
+        sampler._hub = SimpleNamespace(
+            publish=lambda topic, payload: published.append((topic, payload)))
+        sampler._service = SimpleNamespace(
+            settings=SimpleNamespace(bare=bare_mode))
+
+        class _Hand:
+            motor_client = SimpleNamespace(max_operating_temp_c=70.0)
+
+            def get_motor_pos(self, as_dict=False):
+                return {1: -3.0, 2: -1.5}
+
+            def get_motor_current(self, as_dict=False):
+                return {1: 120.0, 2: 45.0}
+
+        session = SimpleNamespace(hand=_Hand(),
+                                  caps=SimpleNamespace(motors=True))
+        return sampler, session, published
+
+    def test_position_and_current_are_published_together(self):
+        """Position alone cannot tell a motor pushing at its ceiling from one
+        that has given up."""
+        sampler, session, published = self._sampler(True)
+
+        sampler._bench_tick(session)
+
+        assert len(published) == 1
+        _topic, payload = published[0]
+        assert payload["positions"] == {1: -3.0, 2: -1.5}
+        assert payload["currents"] == {1: 120.0, 2: 45.0}
+
+    def test_the_rate_is_capped(self):
+        """Back-to-back fast ticks must not turn into a bus read each."""
+        from orca_ui.hand.telemetry import BENCH_TELEMETRY_HZ
+
+        sampler, session, published = self._sampler(True)
+        sampler._bench_tick(session)
+        sampler._bench_tick(session)  # immediately again
+
+        assert len(published) == 1
+        assert BENCH_TELEMETRY_HZ >= 10
+
+    def test_a_read_failure_is_survivable(self):
+        sampler, session, published = self._sampler(True)
+
+        def boom(as_dict=False):
+            raise OSError("bus")
+
+        session.hand.get_motor_current = boom
+        sampler._bench_tick(session)
+
+        assert published == []

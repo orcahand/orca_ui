@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../../api/rest'
 import type { DirectMotorInfo, DirectMotorSnapshot } from '../../api/types'
+import { useStreamFrame } from '../../hooks/useStreamFrame'
 import { useAppStore } from '../../state/appStore'
 
 const SLIDER_HALF_RANGE_RAD = 0.5 // slider span around the anchor position
@@ -310,7 +311,26 @@ function BenchMotorRow({
   disabled: boolean
   onError: (error: unknown) => void
 }) {
-  const actualDeg = radToDeg(motor.position, span)
+  // Live position and current at the bench rate, so a stall is visible while
+  // it happens rather than on the next Refresh. Falls back to the snapshot
+  // until the first frame lands.
+  const [live, setLive] = useState<{ pos: number | null; mA: number | null }>({
+    pos: null,
+    mA: null,
+  })
+  const lastLive = useRef('')
+  useStreamFrame((frames) => {
+    const pos = frames.motors.positions?.[String(motor.id)]
+    const mA = frames.motors.currents?.[String(motor.id)]
+    const key = `${pos ?? ''}|${mA ?? ''}`
+    if (key === lastLive.current) return
+    lastLive.current = key
+    setLive({ pos: pos ?? null, mA: mA ?? null })
+  })
+
+  const position = live.pos ?? motor.position
+  const currentMa = live.mA ?? motor.current_ma ?? null
+  const actualDeg = radToDeg(position, span)
   const [target, setTarget] = useState<string>(actualDeg.toFixed(1))
   const [commanded, setCommanded] = useState<number | null>(null)
   // A reference the operator sets by hand, so "how far did it turn" is
@@ -389,8 +409,13 @@ function BenchMotorRow({
               : `${Math.abs(error ?? 0).toFixed(1)}° short of ${commanded.toFixed(1)}°`}
           </span>
         )}
-        {motor.current_ma != null && (
-          <span>{motor.current_ma.toFixed(0)} mA</span>
+        {currentMa != null && (
+          <span
+            style={{ color: arrived === false ? 'var(--warn)' : undefined }}
+            title="present draw — pinned high against a missed target is the load it cannot move"
+          >
+            {currentMa.toFixed(0)} mA
+          </span>
         )}
         {motor.temp_c != null && <span>{motor.temp_c.toFixed(0)} °C</span>}
         {flags && flags.length > 0 && (

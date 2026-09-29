@@ -233,6 +233,9 @@ function dispatch(message: ServerMessage): void {
     case TOPICS.motorsTelemetry:
       latest.motors.temps = data.temps as Record<string, number>
       latest.motors.currents = data.currents as Record<string, number>
+      latest.motors.positions =
+        (data.positions as Record<string, number> | undefined) ??
+        latest.motors.positions
       latest.motors.maxTempC =
         (data.max_temp_c as number | undefined) ?? latest.motors.maxTempC
       markDirty()
