@@ -18,6 +18,7 @@ ID in turn.
 from __future__ import annotations
 
 import logging
+import math
 import os
 import tempfile
 import time
@@ -42,13 +43,27 @@ PREFERRED_BAUD = 1_000_000
 DEFAULT_ID_RANGE = (0, 25)
 FULL_ID_RANGE = (0, 253)
 
-# Position span given to each pseudo-joint, in degrees. Bare mode drives motors
-# directly and never through the joint mapping, so this only has to be wide
-# enough not to clamp anything; it describes no real range of motion.
-PSEUDO_JOINT_ROM_DEG = (-180.0, 180.0)
+# Fallback span for a family that declares no single-turn limit (Dynamixel is
+# multi-turn, so its range is open). One revolution is what a bench test wants.
+FALLBACK_ROM_DEG = (-360.0, 0.0)
 # No calibration exists and nothing is known about what a motor is attached to,
 # so the ceiling starts low enough to stall harmlessly against a finger.
 BARE_MAX_CURRENT_MA = 150
+
+
+def travel_span_deg(motor_type: str) -> tuple[float, float]:
+    """The span a motor of this family can actually reach, in degrees.
+
+    Taken from the client rather than assumed: Feetech's single turn lives
+    entirely in negative radians, so a symmetric guess around zero maps to raw
+    counts outside 0..4095. Those clamp to one end of travel, which on a
+    torque-enabled motor means driving it into its stop.
+    """
+    span = motor_client_class(motor_type).position_range_rad
+    if span is None:
+        return FALLBACK_ROM_DEG
+    lo, hi = (math.degrees(v) for v in span)
+    return (round(lo, 3), round(hi, 3))
 
 
 def pseudo_joint(motor_id: int) -> str:
@@ -197,6 +212,7 @@ def synthesize_config(scan: BareScan, *, side: str = "right") -> str:
     if not scan.motors:
         raise ValueError("no motors found: nothing to synthesise a config from")
     joints = [pseudo_joint(m.motor_id) for m in scan.motors]
+    rom = travel_span_deg(scan.motor_type)
     config = {
         "port": scan.port,
         "motor_type": scan.motor_type,
@@ -210,8 +226,11 @@ def synthesize_config(scan: BareScan, *, side: str = "right") -> str:
         "joint_to_motor_map": {
             pseudo_joint(m.motor_id): m.motor_id for m in scan.motors
         },
-        "joint_roms": {joint: list(PSEUDO_JOINT_ROM_DEG) for joint in joints},
-        "neutral_position": {joint: 0 for joint in joints},
+        # The reachable span, not a guess: a joint range the motor cannot
+        # reach turns every command into a clamp against a hard stop.
+        "joint_roms": {joint: list(rom) for joint in joints},
+        # Mid-travel, which is reachable from anywhere and is never a stop.
+        "neutral_position": {joint: round(sum(rom) / 2, 3) for joint in joints},
         # Nothing to calibrate: there is no hardstop to find on a loose motor.
         "calibration_sequence": [],
     }

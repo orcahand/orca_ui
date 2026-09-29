@@ -792,6 +792,14 @@ class HandService:
         ``joints.target`` echo apply to every source; only the current
         control-source owner may write."""
         session = self._require_torque()
+        if self.settings.bare:
+            # Bare mode's joints are one-to-one stand-ins for motors, not a
+            # hand. There is no calibration behind them, so a joint target maps
+            # to whatever the mapping guesses — which on a single-turn family
+            # lands outside the reachable span and clamps against a hard stop.
+            raise ServiceError(
+                "bare motor mode has no joints to command — use direct motor "
+                "control", status_code=409)
         with self._state_lock:
             current = self._control_source
             owner = self._control_owner_label

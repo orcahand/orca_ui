@@ -292,3 +292,94 @@ class TestBareSettings:
         with _pytest.raises(SystemExit) as caught:
             cli._resolve_bare_config(cli.parse_args(["--bare"]))
         assert "no serial adapter" in str(caught.value)
+
+
+class TestReachableSpan:
+    """A pseudo-joint range the motor cannot reach is not cosmetic: the raw
+    count falls outside the servo's counts, clamps to one end of travel, and a
+    torque-enabled motor drives into its stop."""
+
+    def test_the_span_comes_from_the_client(self):
+        from orca_core.hardware.motor_factory import motor_client_class
+
+        for family in ("feetech", "dynamixel"):
+            lo, hi = bare.travel_span_deg(family)
+            declared = motor_client_class(family).position_range_rad
+            assert lo < hi
+            if declared is not None:
+                import math
+                assert lo == pytest.approx(math.degrees(declared[0]), abs=0.01)
+                assert hi == pytest.approx(math.degrees(declared[1]), abs=0.01)
+
+    def test_a_single_turn_family_gets_its_own_sign(self):
+        """Feetech's whole travel is negative radians. A range symmetric about
+        zero would put half of every command out of reach."""
+        lo, hi = bare.travel_span_deg("feetech")
+        assert hi <= 0 and lo < 0
+        assert 359 <= (hi - lo) <= 361
+
+    def test_the_synthesised_range_is_reachable(self):
+        from orca_core.hardware.motor_factory import motor_client_class
+        from orca_core.hand_factory import load_hand
+        import math
+
+        scan = bare.BareScan(port="/dev/cu.usbmodemXXXX")
+        scan.motors = [bare.FoundMotor(1, 1_000_000, "STS3215", "feetech")]
+        hand = load_hand(config_path=bare.synthesize_config(scan))
+
+        lo_deg, hi_deg = hand.config.joint_roms_dict["motor_01"]
+        lo_rad, hi_rad = motor_client_class("feetech").position_range_rad
+        assert math.radians(lo_deg) >= lo_rad - 1e-3
+        assert math.radians(hi_deg) <= hi_rad + 1e-3
+
+    def test_neutral_is_mid_travel_not_an_end_stop(self):
+        from orca_core.hand_factory import load_hand
+
+        scan = bare.BareScan(port="/dev/cu.usbmodemXXXX")
+        scan.motors = [bare.FoundMotor(1, 1_000_000, "STS3215", "feetech")]
+        hand = load_hand(config_path=bare.synthesize_config(scan))
+
+        lo, hi = hand.config.joint_roms_dict["motor_01"]
+        assert hand.config.neutral_position["motor_01"] == pytest.approx(
+            (lo + hi) / 2, abs=0.01)
+
+
+class TestJointCommandsAreRefused:
+    """Bare mode's joints stand in for motors and have no calibration behind
+    them, so a joint target maps to whatever the mapping guesses. Hiding the
+    sliders is not enough — the command path has to refuse."""
+
+    def _service(self, bare_mode: bool):
+        from orca_ui.hand.service import HandService
+        from orca_ui.settings import UiSettings
+
+        service = HandService.__new__(HandService)
+        service.settings = UiSettings(config_path="/nowhere/config.yaml",
+                                      bare=bare_mode)
+        return service
+
+    def test_bare_mode_refuses_a_joint_target(self, monkeypatch):
+        from orca_ui.hand.service import ServiceError
+
+        service = self._service(True)
+        monkeypatch.setattr(type(service), "_require_torque",
+                            lambda self: object(), raising=False)
+
+        with pytest.raises(ServiceError) as caught:
+            service.set_targets({"motor_01": 0.0})
+
+        assert "bare motor mode" in str(caught.value)
+        assert "direct motor control" in str(caught.value)
+
+    def test_a_normal_hand_still_accepts_them(self, monkeypatch):
+        """The guard must key on bare mode, not on the hand being uncalibrated:
+        a real uncalibrated hand still has joints worth commanding."""
+        service = self._service(False)
+        monkeypatch.setattr(type(service), "_require_torque",
+                            lambda self: object(), raising=False)
+
+        # Past the bare guard it fails for its own reasons (no session state),
+        # which is enough: the refusal is not the bare-mode one.
+        with pytest.raises(Exception) as caught:
+            service.set_targets({"index_mcp": 0.0})
+        assert "bare motor mode" not in str(caught.value)
