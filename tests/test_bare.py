@@ -691,7 +691,10 @@ class TestRecordedPoints:
         service._require_motors = lambda: session
         service._require_torque = lambda: session
         service._require_manual_control = lambda: None
-        type(service).session = property(lambda self: session)
+        # `session` is a property reading through the supervisor; give it one
+        # rather than patching the class, which would leak into every other
+        # test in the run.
+        service.supervisor = SimpleNamespace(session=session)
         return service, writes, torque
 
     def test_points_are_recorded_and_returned(self):
