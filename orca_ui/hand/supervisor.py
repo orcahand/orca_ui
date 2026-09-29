@@ -739,7 +739,10 @@ class HandSupervisor(threading.Thread):
             self._upgrade_probes_left -= 1
             if self._upgrade_probes_left == 0:
                 missing = self._missing_devices(session.caps)
-                logger.info(
+                # Warning, not info: the console configures logging at
+                # WARNING, and this is the one line that tells an operator
+                # the search has ended and the next move is theirs.
+                logger.warning(
                     "%s still missing after %d probes — no longer looking; "
                     "use the rescan control once it is plugged in or "
                     "calibrated", ", ".join(missing) or "hardware",

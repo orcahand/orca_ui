@@ -49,16 +49,23 @@ def supervisor(monkeypatch):
     return sup, probes
 
 
-def test_probing_stops_after_a_few_tries(supervisor):
+def test_probing_stops_after_a_few_tries(supervisor, caplog):
     sup, probes = supervisor
     session = _Session()
     sup._upgrade_probes_left = UPGRADE_PROBE_ATTEMPTS
 
-    for _ in range(UPGRADE_PROBE_ATTEMPTS + 5):
-        sup._rescan(session)
+    import logging
+    with caplog.at_level(logging.WARNING, logger="orca_ui.hand.supervisor"):
+        for _ in range(UPGRADE_PROBE_ATTEMPTS + 5):
+            sup._rescan(session)
 
     assert len(probes) == UPGRADE_PROBE_ATTEMPTS
     assert sup._upgrade_probes_left == 0
+    # Said once, at a level the console actually prints (it configures
+    # logging at WARNING), naming what is missing and whose move it is.
+    gave_up = [r for r in caplog.records if "no longer looking" in r.getMessage()]
+    assert len(gave_up) == 1
+    assert "tactile, encoders" in gave_up[0].getMessage()
 
 
 def test_a_rescan_request_looks_again_without_dropping_the_session(supervisor):
