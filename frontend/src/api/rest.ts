@@ -193,6 +193,13 @@ export const api = {
       `/api/trajectories/${encodeURIComponent(name)}`,
       { waypoints, save_as: saveAs ?? null },
     ),
+  // Translate a joint waypoint recording into raw motor positions through the
+  // calibrated joint<->motor map; saved as <name>_motor unless saveAs is given.
+  trajectoryToMotor: (name: string, saveAs?: string) =>
+    post<{ ok: boolean; name: string; frames: number }>(
+      `/api/trajectories/${encodeURIComponent(name)}/to_motor`,
+      { save_as: saveAs ?? null },
+    ),
   trajectoryDelete: (name: string) =>
     del<{ ok: boolean }>(`/api/trajectories/${encodeURIComponent(name)}`),
   demos: () => request<{ demos: DemoEntry[] }>('/api/demos'),

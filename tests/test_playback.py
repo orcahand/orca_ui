@@ -398,3 +398,144 @@ def test_demo_loop_runs_until_stopped(client):
     # Control returns to manual afterwards.
     assert client.post("/api/joints/target",
                        json={"angles": {"index_mcp": 0.0}}).status_code == 200
+
+
+# ----- stepped playback and motor-space waypoints -------------------------
+
+
+def test_stepped_frames_interpolates_and_splits_a_violent_segment():
+    """``steps`` sets the commands per segment; ``max_step`` splits a segment
+    that would jump further than a raw motor command may, which is what keeps
+    "no interpolation" from flinging a motor across its range."""
+    frames = player._stepped_frames([[0.0], [1.0]], 3)
+    assert [round(f[0], 3) for f in frames] == [0.0, 0.25, 0.5, 0.75, 1.0]
+
+    # 0 steps is a straight jump to each point...
+    assert player._stepped_frames([[0.0], [1.0]], 0) == [[0.0], [1.0]]
+    # ...unless the jump exceeds max_step, which auto-splits it.
+    split = player._stepped_frames([[0.0], [1.0]], 0, max_step=0.3)
+    assert len(split) == 5 and split[-1] == [1.0]
+    assert max(abs(b[0] - a[0]) for a, b in zip(split, split[1:])) <= 0.3 + 1e-9
+
+    # A joint some waypoints omit stays absent until the endpoint.
+    gapped = player._stepped_frames([[0.0, None], [1.0, 2.0]], 1)
+    assert gapped[1][1] is None and gapped[-1][1] == 2.0
+
+
+def test_stepped_replay_commands_each_step_at_the_asked_period(client):
+    """The two knobs: interp_steps sets how many commands span a segment,
+    step_period_s sets the seconds between them."""
+    joint_ids = _waypoint_trajectory(client, "stepped", [
+        [0.0] * len(_joint_ids(client)),
+        [10.0] + [0.0] * (len(_joint_ids(client)) - 1),
+    ])
+    assert joint_ids
+    client.post("/api/torque/enable")
+
+    response = client.post("/api/operation/replay/start", json={"params": {
+        "name": "stepped", "interp_steps": 4, "step_period_s": 0.02}})
+    assert response.status_code == 200, response.text
+    snapshot = _wait_op_state(client, "done")
+    # The opening waypoint, four intermediate steps, and the endpoint.
+    assert snapshot["result"]["frames"] == 6
+
+
+def test_stepped_pacing_is_refused_where_it_means_nothing(client):
+    """A continuous recording carries its own timing, and a step period
+    without steps has nothing to pace."""
+    _synthetic_trajectory(client, name="cont", frames=10)
+    client.post("/api/torque/enable")
+
+    response = client.post("/api/operation/replay/start", json={"params": {
+        "name": "cont", "interp_steps": 3}})
+    assert response.status_code == 400 and "continuous" in response.text
+
+    _waypoint_trajectory(client, "wp", [[0.0] * len(_joint_ids(client))] * 2)
+    response = client.post("/api/operation/replay/start", json={"params": {
+        "name": "wp", "step_period_s": 0.1}})
+    assert response.status_code == 400 and "interp_steps" in response.text
+
+    response = client.post("/api/operation/replay/start", json={"params": {
+        "name": "wp", "interp_steps": 500}})
+    assert response.status_code == 400 and "interp_steps" in response.text
+
+
+def test_both_waypoint_modes_park_for_a_capture_prompt(client):
+    """The transport bar shows the capture controls only for a recording that
+    parks in awaiting_input, so a mode that does must say so — without this
+    there is no way to capture a motor waypoint at all."""
+    for mode in ("waypoints", "motor_waypoints"):
+        response = client.post("/api/operation/record/start", json={"params": {
+            "mode": mode, "name": f"prompt_{mode}"}})
+        assert response.status_code == 200, response.text
+        snapshot = _wait_op_state(client, "awaiting_input")
+        assert snapshot["params"]["mode"] == mode
+        options = [o.lower() for o in snapshot["awaiting"]["options"]]
+        assert "capture" in options
+        client.post("/api/operation/stop")
+        _wait_op_state(client, "done")
+
+
+def test_motor_waypoints_record_then_replay_in_motor_space(client):
+    """Raw motor positions: recorded off the bus, replayed as direct motor
+    stepping under the loop-write fence."""
+    response = client.post("/api/operation/record/start", json={"params": {
+        "mode": "motor_waypoints", "name": "mw"}})
+    assert response.status_code == 200, response.text
+    _wait_for(lambda: (_operation(client) or {}).get("phase") == "recording")
+    for _ in range(2):
+        client.post("/api/operation/input", json={"value": "capture"})
+    _wait_for(lambda: "2 waypoints" in ((_operation(client) or {}).get("detail") or ""))
+    client.post("/api/operation/input", json={"value": "save"})
+    _wait_op_state(client, "done")
+
+    saved = client.get("/api/trajectories/mw").json()
+    assert saved["metadata"]["type"] == "motor_waypoints"
+    assert saved["metadata"]["motor_ids"]
+    assert "joint_ids" not in saved["metadata"]
+
+    client.post("/api/torque/enable")
+    response = client.post("/api/operation/replay/start", json={"params": {
+        "name": "mw", "interp_steps": 0, "step_period_s": 0.02}})
+    assert response.status_code == 200, response.text
+    snapshot = _wait_op_state(client, "done")
+    assert snapshot["result"]["frames"] == 2
+    # Direct motor mode is armed for the run and disarmed afterwards.
+    assert client.get("/api/hand/info").json()["control"]["direct_motor_mode"] is False
+
+
+def test_motor_replay_refuses_a_mismatched_motor_order(client):
+    service = client.app.state.service
+    service.library.save_trajectory("wrongmotors", {
+        "metadata": {"type": "motor_waypoints", "created_at": "test",
+                     "motor_ids": [99, 98],
+                     "hand_type": service.supervisor.config.type},
+        "waypoints": [[0.0, 0.0], [0.1, 0.1]],
+    })
+    client.post("/api/torque/enable")
+    response = client.post("/api/operation/replay/start",
+                           json={"params": {"name": "wrongmotors"}})
+    assert response.status_code == 400 and "motor order" in response.text
+
+
+def test_translating_a_joint_recording_to_motor_space(client):
+    """The conversion needs the calibrated joint<->motor map, so it is refused
+    on anything but a joint waypoint recording."""
+    joint_ids = _joint_ids(client)
+    _waypoint_trajectory(client, "src", [
+        [0.0] * len(joint_ids), [5.0] + [0.0] * (len(joint_ids) - 1)])
+
+    response = client.post("/api/trajectories/src/to_motor", json={})
+    assert response.status_code == 200, response.text
+    assert response.json()["name"] == "src_motor"
+
+    converted = client.get("/api/trajectories/src_motor").json()
+    assert converted["metadata"]["type"] == "motor_waypoints"
+    assert converted["metadata"]["translated_from"] == "src"
+    motor_ids = [j["motor_id"] for j in client.get("/api/hand/info").json()["joints"]]
+    assert converted["metadata"]["motor_ids"] == sorted(set(motor_ids))
+    assert len(converted["waypoints"]) == 2
+
+    _synthetic_trajectory(client, name="cont2", frames=5)
+    response = client.post("/api/trajectories/cont2/to_motor", json={})
+    assert response.status_code == 409 and "waypoint" in response.text
