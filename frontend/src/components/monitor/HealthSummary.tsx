@@ -265,12 +265,11 @@ export function HealthSummary() {
                   ? [
                       'Calibrate the encoder pass — the loop will not close ' +
                         'without an anchor per joint.',
-                      'Then press Rescan in the Motors tab to re-attempt ' +
-                        'the connection.',
+                      'Then press Rescan above to re-attempt the connection.',
                     ]
                   : [
-                      "Check the sensing cable at the controller board.",
-                      'Then press Rescan in the Motors tab.',
+                      'Check the sensing cable at the controller board.',
+                      'Then press Rescan above.',
                     ],
               },
             ]}
@@ -333,7 +332,7 @@ export function HealthSummary() {
                 reason: absentWhy('tactile'),
                 checks: [
                   'Check the sensor chain at the connector board.',
-                  'Then press Rescan in the Motors tab.',
+                  'Then press Rescan above.',
                 ],
               },
             ]}
