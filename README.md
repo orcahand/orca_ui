@@ -1,5 +1,15 @@
 # ORCA Hand Console
 
+> ## ⚠️ New version — run `uv sync`
+>
+> ```bash
+> git pull
+> uv sync
+> ```
+>
+> This release needs `orca_core` 0.5.0. `uv sync` is what installs it. Without
+> it the console will not start.
+
 Web interface for the [ORCA Hand](https://www.orcahand.com): live sensor
 visualization (tactile taxels + joint encoders), motor control, a 3D hand
 view, pose/trajectory playback, and the hand's lifecycle operations
