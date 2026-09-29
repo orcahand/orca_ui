@@ -197,78 +197,54 @@ def test_a_rescan_for_an_absent_device_only_re_arms_the_probes(supervisor):
     assert sup._upgrade_probes_left == UPGRADE_PROBE_ATTEMPTS
 
 
-def test_a_stale_encoder_stream_counts_as_refused_too():
-    """orca_core raises a plain RuntimeError when the stream is there but too
-    stale or chip-flagged to anchor against, and a typed error only when the
-    anchors are missing. Keying on the type left the common case looking like
-    absent hardware, which restarted the session every probe period."""
-    from types import SimpleNamespace
-
-    from orca_core import JointFeedbackConnectError
-
-    from orca_ui.hand import sessions
-
-    built = []
-
-    def make(errors):
-        class FakeHand:
-            def __init__(self, tactile):
-                self.config = SimpleNamespace(port="/dev/motor")
-                self._tactile = tactile
-
-            def connect(self, interactive=False):
-                if errors and built.count("x") < len(errors):
-                    built.append("x")
-                    raise errors[len(built) - 1]
-                return True, "ok"
-
-            def is_connected(self):
-                return True
-
-            def disconnect(self):
-                return True, "closed"
-
-        return FakeHand
-
-    for error in (RuntimeError("stale stream"),
-                  JointFeedbackConnectError("no anchors")):
-        built.clear()
-        cls = make([error, error])
-        sessions_built = []
-
-        def build(settings, config, feedback, tactile, cls=cls,
-                  sink=sessions_built):
-            hand = cls(tactile)
-            sink.append((feedback, tactile))
-            return hand
-
-        session = _connect_with_fake(sessions, build)
-        assert "encoders" in session.refused, error
-
-
-def _connect_with_fake(sessions, build):
-    """Run the real ladder against fake hands, with both sensing tiers
-    declared and both ports present."""
-    from types import SimpleNamespace
-
+def _ladder_refusals(monkeypatch, error):
+    """Run the real connect ladder against fake hands whose sensing tiers all
+    fail with ``error``, and report what it recorded as refused."""
     from orca_core.hand_config import _resolve_config_path
 
+    from orca_ui.hand import sessions
     from orca_ui.hand.supervisor import load_config
     from orca_ui.settings import UiSettings
 
-    import pytest as _pytest
+    class FakeHand:
+        def __init__(self, sensing):
+            self.config = SimpleNamespace(port="/dev/motor")
+            self._sensing = sensing
 
+        def connect(self, interactive=False):
+            if self._sensing:
+                raise error
+            return True, "motors up"
+
+        def is_connected(self):
+            return True
+
+        def disconnect(self):
+            return True, "closed"
+
+    monkeypatch.setattr(
+        sessions, "_build_hand",
+        lambda settings, config, feedback, tactile: FakeHand(feedback or tactile))
     config = load_config(_resolve_config_path(None, model_name="orcahand-full-right"))
     presence = SimpleNamespace(
         motor_port="/dev/motor",
         sensing=SimpleNamespace(tactile="/dev/oh", encoder="/dev/oh",
                                 tactile_baudrate=None))
     declared = sessions.declared_capabilities(config, True, motors_enabled=True)
-    original = sessions._build_hand
-    sessions._build_hand = build
-    try:
-        return sessions._connect_with_motors(
-            UiSettings(config_path=config.config_path, open_browser=False),
-            config, declared, presence)
-    finally:
-        sessions._build_hand = original
+    session = sessions._connect_with_motors(
+        UiSettings(config_path=config.config_path, open_browser=False),
+        config, declared, presence)
+    return session.refused
+
+
+def test_a_stale_encoder_stream_counts_as_refused_too(monkeypatch):
+    """orca_core raises a plain RuntimeError when the stream is there but too
+    stale or chip-flagged to anchor against, and the typed error only when the
+    anchors are missing. Keying on the type left the common case looking like
+    absent hardware, which rebuilt the session every probe period."""
+    from orca_core import JointFeedbackConnectError
+
+    for error in (RuntimeError("stale stream"),
+                  JointFeedbackConnectError("no anchors")):
+        refused = _ladder_refusals(monkeypatch, error)
+        assert "encoders" in refused and "tactile" in refused, error
