@@ -2,7 +2,7 @@
 // and one section per capability the session actually got. Nothing here is
 // gated on the hand having sensors — a motors-only hand still has motors to
 // show, and the health strip is the only place the console says how many of
-// each device answered. The scene stays mounted with no session at all
+// each device answered. The scene holds its place with no session at all
 // (maintenance, released hardware) so the page never goes blank.
 
 import { useAppStore } from '../../state/appStore'
