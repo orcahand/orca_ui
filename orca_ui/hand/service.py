@@ -398,6 +398,12 @@ class HandService:
         self.worker.reset()
         return self.status()
 
+    def rescan(self) -> dict:
+        """Look again for declared hardware this session did not get, without
+        dropping the session."""
+        self.supervisor.request_rescan()
+        return self.status()
+
     def reconnect(self) -> dict:
         """Drop the session and redial; lifts a disconnect hold."""
         self.supervisor.request_reconnect()

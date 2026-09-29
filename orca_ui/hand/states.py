@@ -73,6 +73,16 @@ class StatusSnapshot:
     # to answer. Rides along for the same reason model_pinned does: the
     # picker shows which policy is in force.
     board_pinned: str | None = None
+    # Device classes the config declares that this session did not get, and
+    # whether the supervisor is still probing for them. It stops after a few
+    # attempts, so the UI offers an explicit rescan instead of implying the
+    # console is still looking.
+    missing: tuple[str, ...] = ()
+    # Of those, the ones the hand itself refused (port answered, device did
+    # not) as opposed to simply absent. The two need different words in the
+    # UI and only the absent ones are worth probing for.
+    refused: tuple[str, ...] = ()
+    rescanning: bool = False
 
     def as_dict(self) -> dict:
         caps = None
@@ -97,4 +107,7 @@ class StatusSnapshot:
             "model_pinned": self.model_pinned,
             "released": self.released,
             "board_pinned": self.board_pinned,
+            "missing": list(self.missing),
+            "refused": list(self.refused),
+            "rescanning": self.rescanning,
         }

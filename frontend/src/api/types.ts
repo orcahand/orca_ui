@@ -46,6 +46,15 @@ export interface StatusSnapshot {
   // board to answer". Pinned means the backend never opens another board's
   // ports — the way two consoles on one machine each keep to their own hand.
   board_pinned: string | null
+  // Device classes the config declares that this session did not get, and
+  // whether the backend is still probing for them. It gives up after a few
+  // attempts, so the UI offers an explicit rescan rather than implying it is
+  // still looking.
+  missing?: string[]
+  // Of those, the ones whose port answered while the device did not, so a
+  // rescan re-attempts the connection rather than looking for a port.
+  refused?: string[]
+  rescanning?: boolean
 }
 
 export interface ModelEntry {
@@ -406,6 +415,9 @@ export interface MotorFaultEntry {
   hw_error_flags?: string[]
   // null when nothing is latched.
   hw_error?: HwErrorInfo | null
+  // Did this motor answer the last error sweep? null before the first one:
+  // "not asked yet" is not "not answering".
+  answering?: boolean | null
 }
 
 // The servo's own position-PID and feedforward gains (X-series registers
