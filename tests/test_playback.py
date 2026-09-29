@@ -460,6 +460,22 @@ def test_stepped_pacing_is_refused_where_it_means_nothing(client):
     assert response.status_code == 400 and "interp_steps" in response.text
 
 
+def test_both_waypoint_modes_park_for_a_capture_prompt(client):
+    """The transport bar shows the capture controls only for a recording that
+    parks in awaiting_input, so a mode that does must say so — without this
+    there is no way to capture a motor waypoint at all."""
+    for mode in ("waypoints", "motor_waypoints"):
+        response = client.post("/api/operation/record/start", json={"params": {
+            "mode": mode, "name": f"prompt_{mode}"}})
+        assert response.status_code == 200, response.text
+        snapshot = _wait_op_state(client, "awaiting_input")
+        assert snapshot["params"]["mode"] == mode
+        options = [o.lower() for o in snapshot["awaiting"]["options"]]
+        assert "capture" in options
+        client.post("/api/operation/stop")
+        _wait_op_state(client, "done")
+
+
 def test_motor_waypoints_record_then_replay_in_motor_space(client):
     """Raw motor positions: recorded off the bus, replayed as direct motor
     stepping under the loop-write fence."""

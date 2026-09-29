@@ -178,7 +178,9 @@ function PlaybackBar({ operation }: { operation: OperationSnapshot }) {
 function RecordBar({ operation }: { operation: OperationSnapshot }) {
   const mode = String(operation.params.mode ?? 'continuous')
   const frequency = operation.params.frequency
-  const waypoints = mode === 'waypoints'
+  // Both waypoint modes park in awaiting_input for their capture prompt;
+  // only a continuous recording streams on its own.
+  const waypoints = mode === 'waypoints' || mode === 'motor_waypoints'
   const awaiting =
     operation.state === 'awaiting_input' ? operation.awaiting : null
 
