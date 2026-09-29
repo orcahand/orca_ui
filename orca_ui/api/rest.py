@@ -3,7 +3,7 @@ FastAPI's threadpool, never on the event loop."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 
 from orca_ui.api import schemas
 from orca_ui.hand.service import HandService, ServiceError
@@ -237,12 +237,39 @@ def build_router(service: HandService) -> APIRouter:
         guard(service.set_max_current, body.ma)
         return {"ok": True, "control": service.control_state()}
 
+    @router.post("/control/pose_source")
+    def control_pose_source(body: schemas.PoseSourceRequest):
+        return {"ok": True, "control": guard(service.set_pose_source, body.mode)}
+
     @router.post("/control/rebase")
     def control_rebase():
         guard(service.rebase)
         return {"ok": True}
 
     # ----- direct motor control (advanced diagnostics) ---------------------------
+
+    @router.get("/motors/gains")
+    def motors_gains():
+        return {"ok": True, "gains": guard(service.read_servo_gains)}
+
+    @router.post("/motors/{motor_id}/gains")
+    def motors_set_gains(motor_id: int, body: schemas.ServoGainsRequest):
+        gains = guard(service.set_servo_gains, motor_id, body.model_dump())
+        return {"ok": True, "gains": gains}
+
+    @router.get("/motors/profile")
+    def motors_profile():
+        return {"ok": True, "profile": guard(service.read_servo_profile)}
+
+    @router.post("/motors/{motor_id}/profile")
+    def motors_set_profile(motor_id: int, body: schemas.ServoProfileRequest):
+        profile = guard(service.set_servo_profile, motor_id, body.model_dump())
+        return {"ok": True, "profile": profile}
+
+    @router.post("/motors/{motor_id}/reboot")
+    def motor_reboot(motor_id: int):
+        """Clear a latched hardware error. Comes back with torque off."""
+        return guard(service.reboot_motor, motor_id)
 
     @router.get("/motors/direct")
     def motors_direct_snapshot():
@@ -283,6 +310,64 @@ def build_router(service: HandService) -> APIRouter:
     @router.get("/trajectories")
     def trajectories_list():
         return {"trajectories": service.library.list_trajectories()}
+
+    def _library_call(fn, *args, **kwargs):
+        from orca_ui.library import LibraryError
+        try:
+            return fn(*args, **kwargs)
+        except LibraryError as e:
+            raise ServiceError(str(e), status_code=e.status_code)
+
+    @router.get("/trajectories/{name}")
+    def trajectory_get(name: str):
+        return guard(_library_call, service.library.load_trajectory, name)
+
+    @router.put("/trajectories/{name}")
+    def trajectory_update(name: str, body: schemas.TrajectoryUpdateRequest):
+        # Waypoint editor save: replace the waypoints of an existing
+        # waypoint recording (optionally under a new name), each angle
+        # clamped to its joint's ROM. Continuous recordings are sampled
+        # motion — there is no meaningful per-frame hand edit.
+        def apply():
+            from datetime import datetime, timezone
+
+            from orca_ui.library import WAYPOINTS
+
+            data = _library_call(service.library.load_trajectory, name)
+            meta = data.get("metadata") or {}
+            if meta.get("type") != WAYPOINTS:
+                raise ServiceError(
+                    "only waypoint recordings are editable — continuous "
+                    "recordings are sampled motion", status_code=409)
+            joint_ids = list(meta.get("joint_ids")
+                             or service.supervisor.config.joint_ids)
+            if not body.waypoints:
+                raise ServiceError("a trajectory needs at least one waypoint")
+            roms = service.supervisor.config.joint_roms_dict
+            clean = []
+            for index, waypoint in enumerate(body.waypoints):
+                if len(waypoint) != len(joint_ids):
+                    raise ServiceError(
+                        f"waypoint {index + 1}: expected {len(joint_ids)} "
+                        f"joint values, got {len(waypoint)}")
+                row = []
+                for joint, value in zip(joint_ids, waypoint):
+                    angle = float(value)
+                    rom = roms.get(joint)
+                    if rom is not None:
+                        angle = min(max(angle, float(rom[0])), float(rom[1]))
+                    row.append(round(angle, 3))
+                clean.append(row)
+            data["waypoints"] = clean
+            meta["edited_at"] = datetime.now(
+                timezone.utc).astimezone().isoformat(timespec="seconds")
+            data["metadata"] = meta
+            target = body.save_as or name
+            _library_call(service.library.save_trajectory, target, data,
+                          overwrite=target == name)
+            return {"ok": True, "name": target, "frames": len(clean)}
+
+        return guard(apply)
 
     @router.delete("/trajectories/{name}")
     def trajectory_delete(name: str):

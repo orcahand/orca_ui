@@ -51,6 +51,34 @@ class MaxCurrentRequest(BaseModel):
     ma: int = Field(gt=0, le=2000)
 
 
+class ServoGainsRequest(BaseModel):
+    """Servo position-PID and feedforward gains. Omitted fields are left as
+    they are on the motor, so one gain can be nudged without restating the
+    rest. Ranges match the X-series registers (unsigned 16-bit, and the
+    e-manual's 0..16383 limit on the PID terms)."""
+
+    kp: int | None = Field(default=None, ge=0, le=16383)
+    ki: int | None = Field(default=None, ge=0, le=16383)
+    kd: int | None = Field(default=None, ge=0, le=16383)
+    ff_1st: int | None = Field(default=None, ge=0, le=16383)
+    ff_2nd: int | None = Field(default=None, ge=0, le=16383)
+
+
+class ServoProfileRequest(BaseModel):
+    """Trajectory limits in SI units. 0 disables a limit: no speed cap, or
+    instantaneous acceleration. Omitted fields are left as they are."""
+
+    velocity_rad_s: float | None = Field(default=None, ge=0, le=100)
+    acceleration_rad_s2: float | None = Field(default=None, ge=0, le=10000)
+
+
+class PoseSourceRequest(BaseModel):
+    """Which stream the 3D model follows. "auto" tracks the torque state:
+    motor estimate while limp, commanded targets once torqued."""
+
+    mode: Literal["auto", "estimate", "target"]
+
+
 class TactileModeRequest(BaseModel):
     mode: Literal["resultant", "taxels", "combined"]
 
@@ -114,3 +142,15 @@ class TeleopConfigRequest(BaseModel):
     keys are filtered by the manager)."""
 
     config: dict = Field(default_factory=dict)
+
+
+class TrajectoryUpdateRequest(BaseModel):
+    """Waypoint-editor save: full replacement waypoint list (row order =
+    the recording's joint_ids). ``save_as`` writes a copy under a new name
+    instead of overwriting."""
+
+    waypoints: list[list[float]]
+    save_as: Optional[str] = Field(default=None, max_length=64,
+                                   pattern=r"^[A-Za-z0-9_\-]+$")
+
+

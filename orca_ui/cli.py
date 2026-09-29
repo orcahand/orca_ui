@@ -7,6 +7,7 @@ concrete ``config.yaml`` path via :class:`~orca_ui.settings.UiSettings`.
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import sys
 
@@ -158,12 +159,23 @@ def build_settings(argv=None) -> UiSettings:
     )
 
 
+def configure_logging() -> None:
+    """WARNING and above on stderr.
+
+    Explicit because the console installs a root-logger handler of its own
+    (the bus-error monitor), which would otherwise stop Python from putting
+    its default one in place on the first warning.
+    """
+    logging.basicConfig(level=logging.WARNING)
+
+
 def main(argv=None) -> None:
     import uvicorn
     from orca_ui.console import install_stdout_dedupe
     from orca_ui.core_source import resolve as resolve_core_source
     from orca_ui.server import create_app
 
+    configure_logging()
     settings = build_settings(argv)
 
     mode = "MOCK — no hardware" if settings.mock else "hardware"

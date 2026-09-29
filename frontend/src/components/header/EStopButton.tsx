@@ -1,7 +1,7 @@
-// The E-stop. No confirm dialog — POST /api/estop is never-raising and
+// The E-stop. No confirm dialog: POST /api/estop is never-raising and
 // state-aware server-side (stops the op, disables torque where a session
-// exists, stops the mock sweeper). Disabled only while the backend is
-// unreachable.
+// exists, stops the mock sweeper). It is only ever an E-stop — torque is
+// enabled from the motors panel, never from this slot.
 
 import { api } from '../../api/rest'
 import { useAppStore } from '../../state/appStore'

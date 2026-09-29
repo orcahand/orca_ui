@@ -16,13 +16,17 @@ const SEND_THROTTLE_MS = 80
 export function DirectMotorPanel({
   torqueOn,
   locked,
+  forceOpen = false,
 }: {
   torqueOn: boolean
   locked: boolean
+  // Open by default and stay expanded: the hand isn't calibrated, so this
+  // is the only way to move a motor until Setup → Calibrate runs.
+  forceOpen?: boolean
 }) {
   const control = useAppStore((s) => s.control)
   const setError = useAppStore((s) => s.setError)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(forceOpen)
   const [snapshot, setSnapshot] = useState<DirectMotorSnapshot | null>(null)
   const [values, setValues] = useState<Record<number, number>>({})
   const [busy, setBusy] = useState(false)
@@ -47,6 +51,13 @@ export function DirectMotorPanel({
     if (open) void refresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
+
+  // handInfo (and so forceOpen) can resolve after this panel already
+  // mounted closed; re-open the moment calibration state says it's needed.
+  // Does not fight a manual collapse — only fires when forceOpen flips on.
+  useEffect(() => {
+    if (forceOpen) setOpen(true)
+  }, [forceOpen])
 
   // Best-effort disarm when the section closes or the panel unmounts.
   useEffect(() => {
@@ -76,8 +87,16 @@ export function DirectMotorPanel({
       onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}
       style={{ marginTop: 10, fontSize: 10 }}
     >
-      <summary style={{ cursor: 'pointer', color: 'var(--dimmer)' }}>
-        Direct motor control (advanced)
+      <summary
+        style={{
+          cursor: 'pointer',
+          color: forceOpen ? 'var(--warn)' : 'var(--dimmer)',
+          fontWeight: forceOpen ? 600 : undefined,
+        }}
+      >
+        {forceOpen
+          ? 'Direct motor control — use this, the hand is not calibrated'
+          : 'Direct motor control (advanced)'}
       </summary>
       <div style={{ padding: '6px 0 0 0' }}>
         <div style={{ color: 'var(--warn)', marginBottom: 6 }}>

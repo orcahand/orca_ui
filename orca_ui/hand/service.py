@@ -9,9 +9,15 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Callable
+import time
+from typing import Callable, TYPE_CHECKING
+
+import numpy as np
 
 from orca_core import JointGains
+
+if TYPE_CHECKING:
+    from orca_core.hardware.motor_client import ServoGains, ServoProfile
 
 from pathlib import Path
 
@@ -19,6 +25,7 @@ from orca_ui.core_source import resolve_cached as resolve_core_source
 from orca_ui.hand import zeroing
 from orca_ui.hand.commands import CommandWorker
 from orca_ui.hand.presets import BUILTIN_POSES, BUILTIN_SEQUENCES
+from orca_ui.hand.faults import classify_hw_error
 from orca_ui.hand.models import ModelEntry, available_models, describe
 from orca_ui.hand.sessions import HandSession
 from orca_ui.hand.states import ControlSource
@@ -48,21 +55,32 @@ TACTILE_MODES = {
 # per command — sliders nudge, they don't teleport.
 MAX_DIRECT_MOTOR_STEP_RAD = 0.8
 
-# Dynamixel X-series Hardware Error Status bits. Any latched bit makes the
-# motor refuse to energize until rebooted. The UI decodes the bits to human-readable names for display.
-_HW_ERROR_BITS = (
-    (0x01, "input_voltage"),
-    (0x04, "overheating"),
-    (0x08, "motor_encoder"),
-    (0x10, "electrical_shock"),
-    (0x20, "overload"),
-)
+# Dynamixel firmware restart: the motor is off the bus until it finishes,
+# so a read-back any sooner just times out and looks like a failed reboot.
+MOTOR_REBOOT_SETTLE_S = 0.5
 
+# One-shot moves (apply pose, go neutral): distance-scaled glide instead of a
+# fixed duration, so a far target never starts at whip speed.
+_MOVE_SPEED_DEG_S = 90.0
+_MOVE_STEP_S = 0.02
+_MOVE_MIN_S = 0.5
+_MOVE_MAX_S = 3.0
 
-def _decode_hw_error(value: int | None) -> list[str] | None:
-    if value is None:
+def _decode_hw_error(client, value: int | None) -> list[str] | None:
+    """Names of the latched bits, in the connected family's own vocabulary."""
+    decode = getattr(client, "decode_hardware_error", None)
+    if decode is None or value is None:
         return None
-    return [name for bit, name in _HW_ERROR_BITS if value & bit]
+    return list(decode(value))
+
+
+def _bus_fence(hand):
+    """The joint loop's write fence when a loop runs, else nothing: a bus
+    transaction outside it interleaves with the loop's sync writes."""
+    from contextlib import nullcontext
+
+    fence = getattr(hand, "_loop_writes_paused", None)
+    return fence() if fence is not None else nullcontext()
 
 
 def _gain_entry(kp: float, ki: float, correction_max_deg: float) -> dict:
@@ -110,6 +128,12 @@ def _encoder_sensed_joints(config) -> list[str]:
     return [joint for joint in available if joint in configured_set]
 
 
+POSE_SOURCE_AUTO = "auto"
+POSE_SOURCE_ESTIMATE = "estimate"
+POSE_SOURCE_TARGET = "target"
+POSE_SOURCES = (POSE_SOURCE_AUTO, POSE_SOURCE_ESTIMATE, POSE_SOURCE_TARGET)
+
+
 class HandService:
     def __init__(
         self,
@@ -132,6 +156,7 @@ class HandService:
         self._operation_manager = None   # attached post-construction (server.py)
         self._sweeper = None             # mock-only dev sweeper, for estop
         self._teleop_manager = None      # attached post-construction (server.py)
+        self._telemetry = None           # attached in server.py
         # Gains connect() installed from config.yaml — what "reset" restores.
         # Live gains are read back from the controller, never shadowed here.
         self._config_gains: dict[str, dict] = {}
@@ -150,6 +175,21 @@ class HandService:
         # None until the motor family is known: config.yaml may leave the
         # limit to the family, and the connected hand's config carries it.
         self._max_current = _current_or_none(self.supervisor.config.max_current)
+        # What config.yaml asked for — the value "default" restores to, kept
+        # separately because set_max_current overwrites the live one.
+        self._config_max_current = self._max_current
+        # Servo gains the operator has explicitly chosen, per motor. Empty
+        # until someone sets one: gains nobody picked must not be overwritten
+        # with our idea of a default.
+        # Keyed by model name, so a swapped hand never inherits another's.
+        self._servo_gains: dict[str, dict[int, "ServoGains"]] = {}
+        # Same rule for trajectory limits: only what the operator picked.
+        self._servo_profiles: dict[str, dict[int, "ServoProfile"]] = {}
+        # Which stream the 3D model follows, and whether the motor estimate is
+        # polled at all. "auto" reads the motors while they are limp and stops
+        # once torque is on, so commands are not competing with reads for the
+        # bus; the two explicit modes pin it either way.
+        self._pose_source = POSE_SOURCE_AUTO
 
         self._library_root = (
             Path(settings.library_dir) if settings.library_dir
@@ -205,6 +245,9 @@ class HandService:
         joints = [
             {
                 "id": joint,
+                # Which motor drives it — the only place the UI can turn a
+                # motor id from telemetry back into something a human names.
+                "motor_id": config.joint_to_motor_map.get(joint),
                 "rom": [float(v) for v in config.joint_roms_dict[joint]],
                 "neutral": float(config.neutral_position.get(joint, 0.0)),
                 "encoder_backed": joint in encoder_backed,
@@ -229,6 +272,8 @@ class HandService:
                 session, encoder_backed, encoder_calibrated),
             "control": self.control_state(),
             "core": resolve_core_source().as_dict(),
+            "reboot_supported": bool(session is not None and hasattr(
+                getattr(session.hand, "motor_client", None), "reboot_motor")),
         }
         mapping = getattr(config, "finger_to_sensor_id", None)
         if mapping:
@@ -400,12 +445,47 @@ class HandService:
         except Exception:
             return {}
 
+    def effective_pose_source(self) -> str:
+        """Which stream the model should follow right now.
+
+        Derived from the torque flag every time it is asked rather than
+        latched on a transition, so anything that drops torque -- an e-stop, a
+        failed write, an operation ending -- reverts within one tick without
+        needing its own hook.
+        """
+        with self._state_lock:
+            mode = self._pose_source
+        if mode != POSE_SOURCE_AUTO:
+            return mode
+        try:
+            torqued = bool(self.supervisor.status().torque_enabled)
+        except Exception:
+            torqued = False
+        return POSE_SOURCE_TARGET if torqued else POSE_SOURCE_ESTIMATE
+
+    def set_pose_source(self, mode: str) -> dict:
+        """Pin the model to a stream, or hand it back to the torque state."""
+        if mode not in POSE_SOURCES:
+            raise ServiceError(
+                f"pose source must be one of {', '.join(POSE_SOURCES)}")
+        with self._state_lock:
+            self._pose_source = mode
+        self._publish_control_state()
+        return self.control_state()
+
     def control_state(self) -> dict:
         joint_gains = self._live_gains()
+        # Resolved outside the lock: effective_pose_source takes it too.
+        effective_source = self.effective_pose_source()
         with self._state_lock:
             return {
                 "torque_enabled": self.supervisor.status().torque_enabled,
                 "max_current": self._max_current,
+                # config.yaml's ceiling — what the panel's "default" button
+                # returns to (mirrors config_gains below).
+                "config_max_current": self._config_max_current,
+                # Lowest ceiling orca_core accepts (see max_current_floor).
+                "max_current_floor": self.max_current_floor(),
                 # The one gain set every loop joint shares, or null when the
                 # joints are tuned individually.
                 "gains": _uniform_gains(joint_gains),
@@ -417,6 +497,8 @@ class HandService:
                 "control_source": self._control_source.value,
                 "control_owner": self._control_owner_label,
                 "direct_motor_mode": self._direct_motor_mode,
+                "pose_source": self._pose_source,
+                "effective_pose_source": effective_source,
             }
 
     def stats(self) -> dict:
@@ -569,6 +651,9 @@ class HandService:
     def attach_operation_manager(self, manager) -> None:
         self._operation_manager = manager
 
+    def attach_telemetry(self, telemetry) -> None:
+        self._telemetry = telemetry
+
     def attach_sweeper(self, sweeper) -> None:
         self._sweeper = sweeper
 
@@ -640,13 +725,24 @@ class HandService:
         from orca_ui.streaming import topics as T
         self._publish_topic(T.CONTROL_STATE, self.control_state())
 
-    def enable_torque(self) -> dict:
+    def enable_torque(self, *, from_operation: bool = False) -> dict:
+        """``from_operation`` skips the manual-control gate: the running
+        operation owns the control source, so a demo enabling torque for
+        itself is not a second client fighting the owner."""
         session = self._require_motors()
-        self._require_manual_control()
+        if not from_operation:
+            self._require_manual_control()
         if session.caps.feedback_loop:
             # Re-anchor first so enabling torque never lurches toward a stale
             # target (the hand may have been posed by hand while limp).
             session.hand.rebase_loop()
+        # Goal Current lives in the motors' RAM, so a reboot or a power cycle
+        # drops it and the console's ceiling would be one it never applied.
+        # Written before torque so the ceiling is in place the moment the
+        # motors energize.
+        self._apply_current_ceiling(session)
+        self._apply_servo_gains(session)
+        self._apply_servo_profiles(session)
         session.hand.enable_torque()
         self.supervisor.set_torque_flag(True)
         seed = self._current_pose(session)
@@ -705,7 +801,16 @@ class HandService:
         unknown = set(angles) - known
         if unknown:
             raise ServiceError(f"unknown joints: {sorted(unknown)}")
-        clean = {j: float(v) for j, v in angles.items()}
+        # Clamped here, not left to orca_core: the echo, the interpolator and
+        # adherence tracking must all see the value the hand is really sent.
+        roms = session.hand.config.joint_roms_dict
+        clean = {}
+        for joint, value in angles.items():
+            value = float(value)
+            rom = roms.get(joint)
+            if rom is not None:
+                value = min(max(value, float(rom[0])), float(rom[1]))
+            clean[joint] = value
         self.worker.submit_targets(clean)
         with self._state_lock:
             self._targets.update(clean)
@@ -721,13 +826,29 @@ class HandService:
     def go_neutral(self) -> None:
         session = self._require_torque()
         self._require_manual_control()
-        self.worker.submit_op(session.hand.set_neutral_position)
+        neutral = {j: float(v)
+                   for j, v in session.hand.config.neutral_position.items()}
+        num_steps = self._move_steps(session, neutral)
+        self.worker.submit_op(
+            lambda: session.hand.set_neutral_position(
+                num_steps=num_steps, step_size=_MOVE_STEP_S))
         with self._state_lock:
-            self._targets.update({
-                j: float(v)
-                for j, v in session.hand.config.neutral_position.items()
-            })
+            self._targets.update(neutral)
         self._publish_targets()
+
+    def _move_steps(self, session, target: dict[str, float]) -> int:
+        """Interpolation step count for a one-shot move, scaled to the
+        distance so a far pose glides instead of snapping: the fixed-duration
+        default turns a 90° travel into a tendon-whipping start."""
+        try:
+            current = session.sampled_joints() or {}
+        except Exception:
+            current = {}
+        jump = max((abs(v - current[j]) for j, v in target.items()
+                    if j in current), default=0.0)
+        duration = min(_MOVE_MAX_S,
+                       max(_MOVE_MIN_S, jump / _MOVE_SPEED_DEG_S))
+        return max(1, round(duration / _MOVE_STEP_S))
 
     # ----- feedback-loop gains -------------------------------------------------
     #
@@ -826,6 +947,168 @@ class HandService:
                                  if joint not in controlled],
         }
 
+    def max_current_floor(self) -> int:
+        """Lowest ceiling orca_core will accept: its config validation refuses
+        a max_current below the calibration current (calibration would then
+        stall against its own limit). Published so the UI's control can stop
+        at the floor instead of learning about it from a failed write.
+
+        0 while the calibration current is still the motor family's
+        ``default`` — no floor is known until a session names the family.
+        """
+        return _current_or_none(
+            getattr(self.supervisor.config, "calibration_current", 0)) or 0
+
+    def _apply_current_ceiling(self, session) -> None:
+        """Push the live ceiling to the motors.
+
+        The console never calls ``init_joints``, which is what writes Goal
+        Current on the scripted paths, so without this the motors keep
+        whatever they powered up with — their Current Limit — while the panel
+        reports the configured value.
+        """
+        with self._state_lock:
+            ma = self._max_current
+        # None while config.yaml leaves the limit to the motor family: the
+        # hand already powered up on the family's own value, so there is
+        # nothing of ours to push.
+        if ma is None:
+            return
+        try:
+            with _bus_fence(session.hand):
+                session.hand.set_max_current(ma)
+        except Exception:
+            logger.warning("could not apply the %d mA current ceiling", ma,
+                           exc_info=True)
+
+    def _apply_servo_gains(self, session) -> None:
+        """Re-apply the operator's chosen gains.
+
+        Gains are RAM registers, so a power cycle clears them and the panel
+        would otherwise report values the motors no longer hold. Untouched
+        motors are left alone.
+        """
+        with self._state_lock:
+            gains = dict(self._servo_gains.get(self.supervisor.model_name, {}))
+        if not gains:
+            return
+        try:
+            with _bus_fence(session.hand):
+                session.hand.set_servo_gains(gains)
+        except Exception:
+            logger.warning("could not apply servo gains", exc_info=True)
+
+    def _apply_servo_profiles(self, session) -> None:
+        """Re-apply the operator's chosen trajectory limits (RAM, like gains)."""
+        with self._state_lock:
+            profiles = dict(self._servo_profiles.get(self.supervisor.model_name, {}))
+        if not profiles:
+            return
+        try:
+            with _bus_fence(session.hand):
+                session.hand.set_servo_profile(profiles)
+        except Exception:
+            logger.warning("could not apply servo profiles", exc_info=True)
+
+    def read_servo_profile(self) -> dict:
+        """Read the trajectory limits off the motors, in SI units."""
+        session = self._require_motors()
+        try:
+            with _bus_fence(session.hand):
+                profiles = session.hand.get_servo_profile()
+        except Exception as e:
+            raise ServiceError(f"could not read servo profile: {e}",
+                               status_code=502)
+        return {
+            str(motor_id): (None if entry is None else {
+                "velocity_rad_s": entry.velocity_rad_s,
+                "acceleration_rad_s2": entry.acceleration_rad_s2,
+            })
+            for motor_id, entry in profiles.items()
+        }
+
+    def set_servo_profile(self, motor_id: int, fields: dict) -> dict:
+        """Write trajectory limits on one motor and read the result back."""
+        from orca_core.hardware.motor_client import ServoProfile
+
+        session = self._require_motors()
+        motor_id = int(motor_id)
+        if motor_id not in set(session.hand.config.motor_ids):
+            raise ServiceError(f"unknown motor {motor_id}", status_code=404)
+        named = {k: v for k, v in fields.items() if v is not None}
+        if not named:
+            raise ServiceError("no profile values given")
+        try:
+            with _bus_fence(session.hand):
+                session.hand.set_servo_profile({motor_id: ServoProfile(**named)})
+        except Exception as e:
+            raise ServiceError(f"profile write failed: {e}", status_code=502)
+        result = self.read_servo_profile()
+        if result.get(str(motor_id)) is None:
+            raise ServiceError(
+                "this motor family does not expose servo trajectory limits",
+                status_code=501)
+        with self._state_lock:
+            store = self._servo_profiles.setdefault(self.supervisor.model_name, {})
+            previous = store.get(motor_id)
+            merged = named if previous is None else {
+                **{k: v for k, v in previous.__dict__.items() if v is not None},
+                **named,
+            }
+            store[motor_id] = ServoProfile(**merged)
+        return result
+
+    def read_servo_gains(self) -> dict:
+        """Read the gains off the motors — hardware truth, not what was typed.
+
+        One bus transaction, so this is on-demand rather than on a timer.
+        """
+        session = self._require_motors()
+        try:
+            with _bus_fence(session.hand):
+                gains = session.hand.get_servo_gains()
+        except Exception as e:
+            raise ServiceError(f"could not read servo gains: {e}",
+                               status_code=502)
+        return {
+            str(motor_id): (None if entry is None else {
+                "kp": entry.kp, "ki": entry.ki, "kd": entry.kd,
+                "ff_1st": entry.ff_1st, "ff_2nd": entry.ff_2nd,
+            })
+            for motor_id, entry in gains.items()
+        }
+
+    def set_servo_gains(self, motor_id: int, fields: dict) -> dict:
+        """Write the named gain fields on one motor and read the result back."""
+        from orca_core.hardware.motor_client import ServoGains
+
+        session = self._require_motors()
+        motor_id = int(motor_id)
+        if motor_id not in set(session.hand.config.motor_ids):
+            raise ServiceError(f"unknown motor {motor_id}", status_code=404)
+        named = {k: v for k, v in fields.items() if v is not None}
+        if not named:
+            raise ServiceError("no gain values given")
+        entry = ServoGains(**named)
+        try:
+            with _bus_fence(session.hand):
+                session.hand.set_servo_gains({motor_id: entry})
+        except Exception as e:
+            raise ServiceError(f"gain write failed: {e}", status_code=502)
+        result = self.read_servo_gains()
+        if result.get(str(motor_id)) is None:
+            raise ServiceError("this motor family does not expose servo gains",
+                               status_code=501)
+        with self._state_lock:
+            store = self._servo_gains.setdefault(self.supervisor.model_name, {})
+            previous = store.get(motor_id)
+            merged = named if previous is None else {
+                **{k: v for k, v in previous.__dict__.items() if v is not None},
+                **named,
+            }
+            store[motor_id] = ServoGains(**merged)
+        return result
+
     def set_max_current(self, ma: int) -> None:
         import dataclasses
 
@@ -838,7 +1121,8 @@ class HandService:
             config = dataclasses.replace(session.hand.config, max_current=ma)
         except Exception as e:
             raise ServiceError(f"hand config rejected {ma} mA: {e}")
-        session.hand.set_max_current(ma)
+        with _bus_fence(session.hand):
+            session.hand.set_max_current(ma)
         session.hand.config = config
         with self._state_lock:
             self._max_current = ma
@@ -863,15 +1147,12 @@ class HandService:
         per-motor status round-trips don't interleave with the loop's writes on
         the shared bus.
         """
-        from contextlib import nullcontext
-
         session = self._require_motors()
         hand = session.hand
-        fence = getattr(hand, "_loop_writes_paused", None)
-        with (fence() if fence is not None else nullcontext()):
+        client = getattr(hand, "motor_client", None)
+        with _bus_fence(hand):
             positions = hand.get_motor_pos(as_dict=True)
-            read_error = getattr(
-                getattr(hand, "_motor_client", None), "read_hardware_error", None)
+            read_error = getattr(client, "read_hardware_error", None)
             errors: dict = {}
             for mid in hand.config.motor_ids:
                 err = None
@@ -893,15 +1174,85 @@ class HandService:
                     "joint": str(motor_to_joint.get(mid, "")),
                     "position": float(positions[mid]),
                     "hw_error": errors[mid],
-                    "hw_error_flags": _decode_hw_error(errors[mid]),
+                    "hw_error_flags": _decode_hw_error(client, errors[mid]),
                 }
                 for mid in hand.config.motor_ids
             ],
         }
 
-    def set_direct_motor_mode(self, enabled: bool) -> dict:
+    def reboot_motor(self, motor_id: int) -> dict:
+        """Clear a motor's latched hardware error with a Protocol 2.0 reboot.
+
+        The only way back from a latched Hardware Error Status short of
+        power-cycling the hand: the motor keeps answering the bus and keeps
+        acknowledging torque enable, but its power stage stays inhibited
+        until it is rebooted. Comes back with torque off, and torque is not
+        re-enabled here — if the fault is a supply or wiring one it latches
+        again on the next command, and that should happen under a deliberate
+        torque enable rather than silently inside a recovery call.
+        """
         session = self._require_motors()
         self._require_manual_control()
+        if self.supervisor.status().torque_enabled:
+            # A rebooted motor comes back limp while the rest stay torqued,
+            # and the streams keep writing to it while it restarts.
+            raise ServiceError("disable torque before rebooting a motor",
+                               status_code=409)
+        hand = session.hand
+        motor_id = int(motor_id)
+        if motor_id not in set(hand.config.motor_ids):
+            raise ServiceError(f"unknown motor {motor_id}", status_code=404)
+
+        client = getattr(hand, "motor_client", None)
+        reboot = getattr(client, "reboot_motor", None)
+        if reboot is None:
+            raise ServiceError("this motor family has no reboot instruction",
+                               status_code=501)
+
+        with _bus_fence(hand):
+            try:
+                reboot(motor_id)
+            except Exception as e:
+                raise ServiceError(f"reboot failed: {e}", status_code=502)
+            # The motor is off the bus for a moment while its firmware
+            # restarts; read back only after it can answer again.
+            time.sleep(MOTOR_REBOOT_SETTLE_S)
+            read_error = getattr(client, "read_hardware_error", None)
+            error = None
+            if read_error is not None:
+                try:
+                    error = read_error(motor_id)
+                except Exception:
+                    error = None
+
+        flags = _decode_hw_error(client, error)
+        joint = hand.config.motor_to_joint_dict.get(motor_id)
+        info = classify_hw_error(flags, motor=motor_id, joint=joint)
+        # Drop the cached latch so the dashboard updates on this reply rather
+        # than waiting out the next sweep.
+        telemetry = getattr(self, "_telemetry", None)
+        forget = getattr(telemetry, "forget_hw_error", None)
+        if forget is not None:
+            forget(motor_id)
+        return {
+            "motor": motor_id,
+            "joint": joint,
+            # None when the motor did not answer the read-back: unknown is
+            # not the same as clear.
+            "cleared": None if error is None else not flags,
+            "read_back": error is not None,
+            "hw_error": error,
+            "hw_error_flags": flags,
+            "info": info,
+        }
+
+    def set_direct_motor_mode(self, enabled: bool, *,
+                              from_operation: bool = False) -> dict:
+        """``from_operation`` skips the manual-control gate: a motor-space
+        replay owns the control source and arms/disarms around its run."""
+        session = self._require_motors()
+        if not from_operation:
+            self._require_manual_control()
         if not enabled:
             self._exit_direct_motor_mode()
             return {"direct_mode": False}
@@ -957,7 +1308,9 @@ class HandService:
                 f"refusing a {abs(position - current):.2f} rad move — direct "
                 f"moves are capped at {MAX_DIRECT_MOTOR_STEP_RAD} rad from "
                 "the current position")
-        hand.write_motor_pos([motor_id], [position])
+        # The hardware motor client divides positions by its scale — needs
+        # an array, not a list.
+        hand.write_motor_pos([motor_id], np.asarray([position]))
         return {"id": motor_id, "position": position, "previous": current}
 
     # ----- poses & demos -------------------------------------------------------
@@ -1023,9 +1376,10 @@ class HandService:
             raise ServiceError(f"no pose named {name!r}", status_code=404)
         if not angles:
             raise ServiceError(f"pose {name!r} is empty")
+        num_steps = self._move_steps(session, angles)
         self.worker.submit_op(
             lambda: session.hand.set_joint_positions(
-                angles, num_steps=25, step_size=0.02))
+                angles, num_steps=num_steps, step_size=_MOVE_STEP_S))
         with self._state_lock:
             self._targets.update(angles)
         self._publish_targets()
