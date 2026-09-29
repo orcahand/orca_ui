@@ -814,3 +814,127 @@ class TestMultiTurnFamilies:
         result = service.set_motor_range(5, 8.0, 12.0)
 
         assert result["range_rad"] == [8.0, 12.0]
+
+
+class TestMotorDeclarations:
+    """A servo answers a read of Goal Current with a plain zero whether or not
+    the register exists, so nothing on the bus can say it is safe to write.
+    The operator declares the model, and the servo's reported number checks it."""
+
+    def _service(self, reported=None):
+        from orca_ui.hand.service import HandService
+        from orca_ui.settings import UiSettings
+
+        written: list = []
+
+        class _Client:
+            position_range_rad = None
+            _model_numbers = dict(reported or {})
+
+            def write_desired_current(self, ids, values):
+                written.append((list(ids), [float(v) for v in values]))
+
+        class _Hand:
+            motor_client = _Client()
+            config = SimpleNamespace(motor_ids=[1, 2])
+
+        service = HandService.__new__(HandService)
+        service.settings = UiSettings(config_path="/nowhere/config.yaml", bare=True)
+        service._state_lock = threading.Lock()
+        service._bench_declared = {}
+        session = SimpleNamespace(hand=_Hand())
+        service._require_motors = lambda: session
+        return service, session, written
+
+    def test_an_undeclared_motor_gets_no_current_write(self):
+        """Fail closed: the motor keeps whatever ceiling it powered up with."""
+        service, session, written = self._service()
+
+        service._apply_declared_ceiling(session, 150.0)
+
+        assert written == []
+
+    def test_a_declared_current_motor_is_written(self):
+        service, session, written = self._service()
+        service.declare_motor(1, "xc330-t288", "index")
+
+        service._apply_declared_ceiling(session, 150.0)
+
+        assert written == [([1], [150.0])]
+
+    def test_a_model_without_the_register_is_left_alone(self):
+        service, session, written = self._service()
+        service.declare_motor(1, "dxl-1080", "wrist")
+        service.declare_motor(2, "xc330-t288", "index")
+
+        service._apply_declared_ceiling(session, 150.0)
+
+        assert written == [([2], [150.0])]
+
+    def test_the_ceiling_is_capped_by_the_model(self):
+        service, session, written = self._service()
+        service.declare_motor(1, "xc330-t288", "")
+
+        service._apply_declared_ceiling(session, 5000.0)
+
+        assert written == [([1], [910.0])]
+
+    def test_a_declaration_the_servo_contradicts_is_flagged(self):
+        """Only a human can say whether the label or the wiring is wrong, so
+        the disagreement is reported rather than resolved."""
+        service, _, _ = self._service(reported={1: 1080})
+
+        result = service.declare_motor(1, "xc330-t288", "index")
+
+        assert result["mismatch"] is True
+        assert result["reported_model_number"] == 1080
+        assert result["identified"]["key"] == "dxl-1080"
+
+    def test_a_declaration_the_servo_agrees_with_is_not_flagged(self):
+        service, _, _ = self._service(reported={1: 1220})
+
+        result = service.declare_motor(1, "xc330-t288", "index")
+
+        assert result["mismatch"] is False
+
+    def test_an_unrecognised_number_cannot_contradict_anything(self):
+        """A model nobody has added to the table is not evidence against the
+        operator, it is just silence."""
+        service, _, _ = self._service(reported={1: 4242})
+
+        result = service.declare_motor(1, "xc330-t288", "index")
+
+        assert result["mismatch"] is False
+        assert result["identified"] is None
+
+    def test_nicknames_survive_a_model_change(self):
+        service, _, _ = self._service()
+        service.declare_motor(1, "xc330-t288", "thumb spool")
+
+        result = service.declare_motor(1, "dxl-1080", "thumb spool")
+
+        assert result["nickname"] == "thumb spool"
+
+    def test_an_unknown_model_key_is_refused(self):
+        from orca_ui.hand.service import ServiceError
+
+        service, _, _ = self._service()
+        with pytest.raises(ServiceError):
+            service.declare_motor(1, "not-a-model", "")
+
+    def test_every_catalogue_entry_says_where_its_numbers_came_from(self):
+        """A wrong entry writes to a register the motor may not have, so each
+        one has to be auditable."""
+        from orca_ui.hand import motor_models
+
+        for model in motor_models.catalogue():
+            assert model.source
+            if model.has_current_control:
+                assert model.max_current_ma and model.current_scale_ma
+
+    def test_the_unknown_entry_claims_nothing(self):
+        from orca_ui.hand import motor_models
+
+        assert motor_models.UNKNOWN.has_current_control is False
+        assert motor_models.get(None) is motor_models.UNKNOWN
+        assert motor_models.get("nonsense") is motor_models.UNKNOWN

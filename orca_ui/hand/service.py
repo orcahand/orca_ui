@@ -29,6 +29,7 @@ from orca_ui.hand.presets import BUILTIN_POSES, BUILTIN_SEQUENCES
 from orca_ui.hand.faults import classify_hw_error
 from orca_ui.hand.models import ModelEntry, available_models, describe
 from orca_ui.hand.sessions import HandSession
+from orca_ui.hand import motor_models
 from orca_ui.hand.states import ControlSource
 from orca_ui.hand.supervisor import (
     HandBusyError,
@@ -179,6 +180,10 @@ class HandService:
         # Points recorded by hand, per motor, in motor radians. One point is a
         # place to hold; two or more is a cycle to run between.
         self._bench_points: dict[int, list[float]] = {}
+        # What the operator says is plugged in, per motor: a nickname and a
+        # model key. Undeclared motors are driven as if they had no current
+        # register, because a servo cannot be asked.
+        self._bench_declared: dict[int, dict] = {}
         self._bench_playing: dict[int, int] = {}   # motor id -> next index
         self._bench_thread: threading.Thread | None = None
         self._bench_stop = threading.Event()
@@ -1023,10 +1028,43 @@ class HandService:
             return
         try:
             with _bus_fence(session.hand):
-                session.hand.set_max_current(ma)
+                if self.settings.bare:
+                    self._apply_declared_ceiling(session, ma)
+                else:
+                    session.hand.set_max_current(ma)
         except Exception:
             logger.warning("could not apply the %d mA current ceiling", ma,
                            exc_info=True)
+
+    def _apply_declared_ceiling(self, session, ma: float) -> None:
+        """Write Goal Current only to motors declared to have the register.
+
+        An undeclared motor is left alone. A servo answers a read of Goal
+        Current with a plain zero whether or not the register exists, so
+        nothing on the bus can tell us it is safe to write — only the operator
+        can, and until they do the motor keeps its power-up ceiling.
+        """
+        client = getattr(session.hand, "motor_client", None)
+        write = getattr(client, "write_desired_current", None)
+        if write is None:
+            return
+        targets, skipped = [], []
+        for motor_id in session.hand.config.motor_ids:
+            model = motor_models.get(
+                self._bench_declared.get(int(motor_id), {}).get("model"))
+            if not model.has_current_control:
+                skipped.append(int(motor_id))
+                continue
+            ceiling = model.max_current_ma
+            targets.append((int(motor_id),
+                            min(ma, ceiling) if ceiling else ma))
+        if skipped:
+            logger.info("no current ceiling written to motors %s — not "
+                        "declared as having a current register",
+                        ", ".join(str(m) for m in skipped))
+        if targets:
+            write([m for m, _ in targets],
+                  np.asarray([v for _, v in targets], dtype=float))
 
     def _apply_servo_gains(self, session) -> None:
         """Re-apply the operator's chosen gains.
@@ -1234,6 +1272,8 @@ class HandService:
                     "position": float(positions[mid]),
                     "range_rad": (list(self._bench_ranges[int(mid)])
                                   if int(mid) in self._bench_ranges else None),
+                    **(self._declaration(session, int(mid))
+                       if self.settings.bare else {}),
                     "points": list(self._bench_points.get(int(mid), [])) or None,
                     "playing": int(mid) in self._bench_playing,
                     "current_ma": currents.get(mid),
@@ -1402,6 +1442,60 @@ class HandService:
                 f"travel ({span[0]:.3f} to {span[1]:.3f} rad)")
         self._bench_ranges[motor_id] = (low, high)
         return {"id": motor_id, "range_rad": [low, high]}
+
+    def declare_motor(self, motor_id: int, model_key: "str | None",
+                      nickname: "str | None") -> dict:
+        """Record what the operator says is at this ID.
+
+        The declaration is checked against the model number the servo reports.
+        A disagreement is returned rather than resolved here: only a human can
+        say whether the label or the wiring is wrong.
+        """
+        session = self._require_motors()
+        if not self.settings.bare:
+            raise ServiceError(
+                "motor declarations are a bare-mode bench control",
+                status_code=409)
+        motor_id = int(motor_id)
+        if motor_id not in session.hand.config.motor_ids:
+            raise ServiceError(f"unknown motor id {motor_id}")
+        if model_key is not None and model_key not in motor_models.BY_KEY:
+            raise ServiceError(f"unknown motor model {model_key!r}")
+        name = (nickname or "").strip()[:40]
+        self._bench_declared[motor_id] = {
+            "model": model_key or motor_models.UNKNOWN_KEY,
+            "nickname": name,
+        }
+        return {"id": motor_id, **self._declaration(session, motor_id)}
+
+    def _reported_model_number(self, session, motor_id: int) -> "int | None":
+        client = getattr(session.hand, "motor_client", None)
+        numbers = getattr(client, "_model_numbers", None) or {}
+        value = numbers.get(int(motor_id))
+        return int(value) if value is not None else None
+
+    def _declaration(self, session, motor_id: int) -> dict:
+        """What is declared for this motor, and whether the servo agrees."""
+        declared = self._bench_declared.get(int(motor_id), {})
+        model = motor_models.get(declared.get("model"))
+        reported = self._reported_model_number(session, motor_id)
+        identified = motor_models.for_model_number(reported)
+        mismatch = (
+            model.key != motor_models.UNKNOWN_KEY
+            and identified is not None
+            and identified.key != model.key
+        )
+        return {
+            "nickname": declared.get("nickname") or "",
+            "model": motor_models.as_dict(model),
+            "reported_model_number": reported,
+            "identified": (motor_models.as_dict(identified)
+                           if identified is not None else None),
+            "mismatch": mismatch,
+        }
+
+    def motor_model_catalogue(self) -> list[dict]:
+        return [motor_models.as_dict(m) for m in motor_models.catalogue()]
 
     def set_motor_points(self, motor_id: int,
                          points: "list[float] | None") -> dict:

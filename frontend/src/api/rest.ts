@@ -6,6 +6,7 @@ import type {
   DirectMotorSnapshot,
   HandInfo,
   ModelMetadata,
+  MotorModelInfo,
   ModelsInfo,
   OperationLogPayload,
   OperationSnapshot,
@@ -174,6 +175,18 @@ export const api = {
       '/api/motors/direct/range',
       { id, low, high },
     ),
+  motorsModels: () =>
+    request<{ models: MotorModelInfo[] }>('/api/motors/models'),
+  motorsDirectDeclare: (
+    id: number,
+    model: string | null,
+    nickname: string | null,
+  ) =>
+    post<Record<string, unknown>>('/api/motors/direct/declare', {
+      id,
+      model,
+      nickname,
+    }),
   motorsDirectPoints: (id: number, points: number[] | null) =>
     post<{ id: number; points: number[] | null }>('/api/motors/direct/points', {
       id,

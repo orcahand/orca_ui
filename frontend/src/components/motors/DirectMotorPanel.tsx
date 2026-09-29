@@ -7,7 +7,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../../api/rest'
-import type { DirectMotorInfo, DirectMotorSnapshot } from '../../api/types'
+import type {
+  DirectMotorInfo,
+  DirectMotorSnapshot,
+  MotorModelInfo,
+} from '../../api/types'
 import { useStreamFrame } from '../../hooks/useStreamFrame'
 import { useAppStore } from '../../state/appStore'
 
@@ -33,10 +37,19 @@ export function DirectMotorPanel({
   const setError = useAppStore((s) => s.setError)
   const [open, setOpen] = useState(forceOpen)
   const [snapshot, setSnapshot] = useState<DirectMotorSnapshot | null>(null)
+  const [models, setModels] = useState<MotorModelInfo[]>([])
   const [values, setValues] = useState<Record<number, number>>({})
   const [busy, setBusy] = useState(false)
   const armed = control?.direct_motor_mode ?? false
   const span = snapshot?.span_rad ?? null
+
+  useEffect(() => {
+    if (!bench) return
+    void api
+      .motorsModels()
+      .then((r) => setModels(r.models))
+      .catch(() => setModels([]))
+  }, [bench])
 
   const fail = (error: unknown) =>
     setError(String((error as Error).message ?? error))
@@ -164,6 +177,7 @@ export function DirectMotorPanel({
               disabled={!armed || locked || !torqueOn}
               onError={fail}
               onChanged={refresh}
+              models={models}
             />
           ) : (
             <MotorRow
@@ -312,6 +326,7 @@ function BenchMotorRow({
   disabled,
   onError,
   onChanged,
+  models,
 }: {
   motor: DirectMotorInfo
   // The family's declared travel, when it has one. A multi-turn family does
@@ -323,6 +338,7 @@ function BenchMotorRow({
   // Ranges, points and play state live on the server, so anything that writes
   // them has to pull the snapshot again or the row keeps showing the old one.
   onChanged: () => Promise<void> | void
+  models: MotorModelInfo[]
 }) {
   const turn = span ? Math.abs(span[1] - span[0]) : null
   const range = motor.range_rad ?? null
@@ -464,7 +480,12 @@ function BenchMotorRow({
   return (
     <div style={{ borderTop: '1px solid var(--border)', padding: '6px 0' }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <span style={{ width: 52, color: 'var(--text)' }}>M{motor.id}</span>
+        <span style={{ width: 92, color: 'var(--text)' }} title={`motor ID ${motor.id}`}>
+          M{motor.id}
+          {motor.nickname ? (
+            <span style={{ color: 'var(--dim)' }}> {motor.nickname}</span>
+          ) : null}
+        </span>
 
         {rec.active ? (
           <>
@@ -601,6 +622,61 @@ function BenchMotorRow({
             >
               Record points
             </button>
+          )}
+        </div>
+      )}
+
+      {!rec.active && !finding && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 4, alignItems: 'center',
+                      flexWrap: 'wrap', fontSize: 10 }}>
+          <span style={{ color: 'var(--dimmer)' }}>is a</span>
+          <select
+            value={motor.model?.key ?? 'unknown'}
+            disabled={busy}
+            title={motor.model?.source ?? 'declare what is plugged in here'}
+            onChange={(e) =>
+              void call(() =>
+                api.motorsDirectDeclare(motor.id, e.target.value,
+                                        motor.nickname ?? null),
+              )
+            }
+          >
+            {models.map((m) => (
+              <option key={m.key} value={m.key}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            placeholder="nickname"
+            defaultValue={motor.nickname ?? ''}
+            disabled={busy}
+            title="a name for this motor on the bench"
+            onBlur={(e) =>
+              void call(() =>
+                api.motorsDirectDeclare(motor.id,
+                                        motor.model?.key ?? null,
+                                        e.target.value),
+              )
+            }
+            style={{ width: 110 }}
+          />
+          {motor.reported_model_number != null && (
+            <span style={{ color: 'var(--dimmer)' }}>
+              reports {motor.reported_model_number}
+            </span>
+          )}
+          {motor.mismatch && (
+            <span style={{ color: 'var(--err)' }}>
+              ⚠ the servo reports {motor.identified?.label ?? 'another model'} —
+              one of these is wrong
+            </span>
+          )}
+          {!motor.model?.has_current_control && (
+            <span style={{ color: 'var(--warn)' }}>
+              no current ceiling written
+            </span>
           )}
         </div>
       )}

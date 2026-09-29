@@ -167,6 +167,21 @@ export interface ControlState {
   effective_pose_source: 'estimate' | 'target'
 }
 
+// Control-table facts for a model a bench knows how to drive. `source` says
+// where the numbers came from, because a wrong one writes to a register the
+// motor may not have.
+export interface MotorModelInfo {
+  key: string
+  label: string
+  family: string
+  model_numbers: number[]
+  has_current_control: boolean
+  current_scale_ma: number | null
+  max_current_ma: number | null
+  source: string
+  verifiable: boolean
+}
+
 export interface DirectMotorInfo {
   id: number
   joint: string
@@ -174,6 +189,13 @@ export interface DirectMotorInfo {
   // Present draw and case temperature where the family reports them. On a
   // bench these are how a stall reads: the target is missed either way, and
   // only the current says whether the motor is still pushing.
+  // What the operator declared is plugged in here, and whether the servo's
+  // own reported model number agrees with it.
+  nickname?: string
+  model?: MotorModelInfo
+  reported_model_number?: number | null
+  identified?: MotorModelInfo | null
+  mismatch?: boolean
   // The travel an operator found by hand, in radians, once recorded.
   range_rad?: [number, number] | null
   // Points recorded by hand. One is a place to hold, two or more is a cycle.

@@ -115,6 +115,12 @@ class MotorPlaybackRequest(BaseModel):
     enabled: bool
 
 
+class MotorDeclareRequest(BaseModel):
+    id: int = Field(ge=0)
+    model: "str | None" = None
+    nickname: "str | None" = None
+
+
 class ZeroRequest(BaseModel):
     num_samples: int = Field(default=100, ge=1, le=2000)
 
