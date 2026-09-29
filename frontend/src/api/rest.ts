@@ -78,6 +78,10 @@ export const api = {
   stats: () => request<Stats>('/api/stats'),
   ports: () => request<PortInfo[]>('/api/ports'),
   taxelGeometry: () => request<TaxelGeometry>('/api/tactile/geometry'),
+  // Re-arm the probes for declared hardware this session did not get. Keeps
+  // the session up, unlike reconnect.
+  rescan: () =>
+    post<{ ok: boolean; status: StatusSnapshot }>('/api/rescan'),
   reconnect: () => post<{ status: StatusSnapshot }>('/api/reconnect'),
   // Closes the session and holds the ports free; only reconnect() lifts it.
   disconnect: () => post<{ status: StatusSnapshot }>('/api/disconnect'),

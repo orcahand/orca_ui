@@ -86,6 +86,16 @@ def build_router(service: HandService) -> APIRouter:
         """
         return guard(service.select_board, body.device)
 
+    @router.post("/rescan")
+    def rescan():
+        """Probe again for declared hardware this session did not get.
+
+        The automatic probes stop after a few tries so a hand that is simply
+        short-handed is not scanned for the life of the session; this re-arms
+        them, keeping the session up.
+        """
+        return {"ok": True, "status": service.rescan()}
+
     @router.post("/reconnect")
     def reconnect():
         # Also lifts a /disconnect hold — this is the way back from one.
