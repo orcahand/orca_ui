@@ -392,11 +392,15 @@ def _connect_with_motors(settings, config, declared, presence: HardwarePresence)
         try:
             ok, msg = hand.connect(interactive=False)
         except (JointFeedbackConnectError, RuntimeError) as e:
-            if isinstance(e, JointFeedbackConnectError):
-                # The stream is there; the loop would not close on it (missing
-                # anchors, a dead slot). Only a calibration or a reconnect
-                # changes that, never another port probe.
+            if feedback:
+                # The stream is there and the loop would not close on it:
+                # missing anchors raise JointFeedbackConnectError, a stale or
+                # chip-flagged stream raises RuntimeError from the anchor
+                # retry. Either way only a calibration or a fresh connection
+                # can change the answer, never another port probe.
                 refused.add("encoders")
+            if tactile:
+                refused.add("tactile")
             attempts.append(f"{tier}: {e}")
             logger.warning("connect tier %s failed: %s", tier, e)
             continue
@@ -417,6 +421,12 @@ def _connect_with_motors(settings, config, declared, presence: HardwarePresence)
         # OrcaHandTouch.connect leaves the motor bus up when only the sensor
         # failed — that IS the motors(-only or +feedback) tier, keep it.
         if hand.is_connected():
+            # The motor bus is up and only the sensor failed, with its port
+            # right there: that is a refusal, not an absence.
+            if tactile:
+                refused.add("tactile")
+            if feedback:
+                refused.add("encoders")
             logger.warning("connect tier %s partial: %s", tier, msg)
             return HandSession(hand=hand, caps=_caps_from_hand(hand, declared),
                                tier=_tier_name(feedback, False),
