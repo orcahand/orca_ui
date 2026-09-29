@@ -261,6 +261,9 @@ class TelemetryService:
         # Classified form of the same, keyed by motor id.
         self._hw_error_info: dict[int, dict] = {}
         self._hw_errors_warned: set[int] = set()
+        # Which motors answered the last error sweep. None until the first
+        # one: "we have not asked" is not the same as "nothing answered".
+        self._motor_answering: "dict[int, bool] | None" = None
         self._last_hw_error_sweep = 0.0
 
     def start(self) -> None:
@@ -576,6 +579,13 @@ class TelemetryService:
         raw = self._read_hardware_errors(client, hand)
         if raw is None:
             return
+        # A motor that did not answer reads None. This is the only per-motor
+        # liveness signal on the bus: a bulk position read returns a full
+        # array and leaves a silent motor's stale value in place.
+        self._motor_answering = {
+            int(mid): raw.get(int(mid)) is not None
+            for mid in hand.config.motor_ids
+        }
         motor_to_joint = hand.config.motor_to_joint_dict
         found: dict[int, list[str]] = {}
         classified: dict[int, dict] = {}
@@ -653,6 +663,7 @@ class TelemetryService:
                 self._hw_errors = {}
                 self._hw_error_info = {}
                 self._hw_errors_warned = set()
+                self._motor_answering = None
         bus = self._bus_errors.snapshot()
         tracking = self._tracking.snapshot()
         config = getattr(getattr(self._service, "supervisor", None),
@@ -672,6 +683,8 @@ class TelemetryService:
             entry["joint"] = joint
             entry["tracking"] = tracking.get(joint) if joint else None
             entry["hw_error_flags"] = self._hw_errors.get(mid) or []
+            # True/False once swept, None while never asked.
+            entry["answering"] = (self._motor_answering or {}).get(mid)
             # Classified: which kind of latch, and what to do about it. The
             # dashboard needs this to tell a power latch from a hot motor.
             entry["hw_error"] = self._hw_error_info.get(mid)

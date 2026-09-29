@@ -47,12 +47,10 @@ export function AppHeader() {
   const view = useAppStore((s) => s.view)
   const setView = useAppStore((s) => s.setView)
 
-  // A sensorless hand has nothing to chart, so the Dashboard tab disappears
-  // and the 3D view becomes the front page (App.tsx redirects the view).
-  // While capabilities are unknown (no session yet) the tab stays visible.
-  const caps = status?.capabilities
-  const hasSensors = !caps || caps.tactile || caps.encoders
-  const tabs = hasSensors ? TABS : TABS.filter((tab) => tab.id !== 'dashboard')
+  // Every tab is offered for every hand: the dashboard's own sections are
+  // capability-gated one level down, so a motors-only hand gets a shorter
+  // page rather than no page.
+  const tabs = TABS
 
   const state: HandState = !wsConnected
     ? 'disconnected'

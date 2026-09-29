@@ -236,3 +236,61 @@ def test_every_family_bit_name_has_a_kind_and_a_reboot_less_note():
     note = classify_hw_error(["overload"], can_reboot=False)["disabled_note"]
     assert "power-cycled" in note and "rebooted" not in note
     assert classify_hw_error(["overload"])["can_reboot"] is True
+
+
+class _SilentMotorClient(_BatchSweepClient):
+    """A bus where one motor does not answer the error read at all."""
+
+    def __init__(self, flags_by_motor, silent):
+        super().__init__(flags_by_motor)
+        self.silent = set(silent)
+
+    def read_hardware_errors(self, motor_ids):
+        self.batches += 1
+        return {int(mid): (None if int(mid) in self.silent else int(mid))
+                for mid in motor_ids}
+
+
+class TestMotorLiveness:
+    """The error sweep is the only per-motor liveness signal on the bus: a
+    bulk position read fills a silent motor's slot with its stale value."""
+
+    def _sampler(self, silent, motor_ids=(1, 2)):
+        from orca_ui.hand.telemetry import TelemetryService
+
+        sampler = TelemetryService.__new__(TelemetryService)
+        sampler._hw_errors = {}
+        sampler._hw_error_info = {}
+        sampler._hw_errors_warned = set()
+        sampler._last_hw_error_sweep = -1e6
+        sampler._motor_health = {}
+        sampler._motor_answering = None
+
+        client = _SilentMotorClient({}, silent)
+        config = SimpleNamespace(
+            motor_ids=list(motor_ids),
+            motor_to_joint_dict={1: "index_mcp", 2: "middle_mcp"},
+        )
+        session = SimpleNamespace(
+            hand=SimpleNamespace(motor_client=client, config=config))
+        return sampler, session
+
+    def test_a_sweep_records_which_motors_answered(self, monkeypatch):
+        sampler, session = self._sampler(silent=(2,))
+        monkeypatch.setattr(sampler, "_hand_is_driven", lambda: False,
+                            raising=False)
+        sampler._sweep_hardware_errors(session)
+
+        assert sampler._motor_answering == {1: True, 2: False}
+
+    def test_liveness_stays_unknown_until_the_bus_is_readable(self, monkeypatch):
+        """No sweep result means no claim: a motor must not read as absent
+        because nobody has asked it yet."""
+        sampler, session = self._sampler(silent=())
+        monkeypatch.setattr(sampler, "_hand_is_driven", lambda: False,
+                            raising=False)
+        monkeypatch.setattr(session.hand.motor_client, "read_hardware_errors",
+                            lambda ids: (_ for _ in ()).throw(OSError("bus")))
+        sampler._sweep_hardware_errors(session)
+
+        assert sampler._motor_answering is None
