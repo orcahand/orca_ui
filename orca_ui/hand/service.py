@@ -8,6 +8,7 @@ status code the REST layer forwards verbatim.
 from __future__ import annotations
 
 import logging
+import math
 import threading
 import time
 from typing import Callable, TYPE_CHECKING
@@ -167,6 +168,9 @@ class HandService:
         self._state_lock = threading.Lock()
         self._targets: dict[str, float] = {}
         self._direct_motor_mode = False
+        # Ranges found by hand on the bench, per motor, in motor radians as
+        # (low, high). A motor with one recorded is commanded only inside it.
+        self._bench_ranges: dict[int, tuple[float, float]] = {}
         self._tactile_mode = "combined"
         self._control_source = ControlSource.MANUAL
         self._control_owner_label = ControlSource.MANUAL.value
@@ -1216,6 +1220,8 @@ class HandService:
                     "id": int(mid),
                     "joint": str(motor_to_joint.get(mid, "")),
                     "position": float(positions[mid]),
+                    "range_rad": (list(self._bench_ranges[int(mid)])
+                                  if int(mid) in self._bench_ranges else None),
                     "current_ma": currents.get(mid),
                     "temp_c": temps.get(mid),
                     "hw_error": errors[mid],
@@ -1330,10 +1336,61 @@ class HandService:
         self.worker.reset()
         self._publish_control_state()
 
+    def set_motor_torque(self, motor_id: int, enabled: bool) -> dict:
+        """Torque one motor on or off, leaving the rest of the chain alone.
+
+        Range finding needs the motor limp enough to turn by hand while its
+        neighbours stay as they are, which the whole-hand torque control
+        cannot express.
+        """
+        session = self._require_motors()
+        self._require_manual_control()
+        if not self.settings.bare:
+            raise ServiceError(
+                "per-motor torque is a bare-mode bench control", status_code=409)
+        motor_id = int(motor_id)
+        if motor_id not in session.hand.config.motor_ids:
+            raise ServiceError(f"unknown motor id {motor_id}")
+        hand = session.hand
+        if enabled:
+            hand.enable_torque([motor_id])
+        else:
+            hand.disable_torque([motor_id])
+        return {"id": motor_id, "torque_enabled": bool(enabled)}
+
+    def set_motor_range(self, motor_id: int,
+                        low: float | None, high: float | None) -> dict:
+        """Record (or clear, with None) the travel found by hand for one motor."""
+        session = self._require_motors()
+        if not self.settings.bare:
+            raise ServiceError(
+                "motor ranges are a bare-mode bench control", status_code=409)
+        motor_id = int(motor_id)
+        if motor_id not in session.hand.config.motor_ids:
+            raise ServiceError(f"unknown motor id {motor_id}")
+        if low is None or high is None:
+            self._bench_ranges.pop(motor_id, None)
+            return {"id": motor_id, "range_rad": None}
+        low, high = float(low), float(high)
+        if not (math.isfinite(low) and math.isfinite(high)):
+            raise ServiceError("range limits must be finite")
+        if low > high:
+            low, high = high, low
+        if high - low < 1e-3:
+            raise ServiceError(
+                "the two limits are the same position — move the motor "
+                "between setting them")
+        span = getattr(type(getattr(session.hand, "motor_client", None)),
+                       "position_range_rad", None)
+        if span is not None and (low < span[0] - 1e-6 or high > span[1] + 1e-6):
+            raise ServiceError(
+                f"range {low:.3f}..{high:.3f} rad is outside the motor's "
+                f"travel ({span[0]:.3f} to {span[1]:.3f} rad)")
+        self._bench_ranges[motor_id] = (low, high)
+        return {"id": motor_id, "range_rad": [low, high]}
+
     def set_motor_position(self, motor_id: int, position: float) -> dict:
         """Raw motor-space position write (radians) for one motor."""
-        import math
-
         session = self._require_torque()
         self._require_manual_control()
         with self._state_lock:
@@ -1354,6 +1411,12 @@ class HandService:
                 f"refusing a {abs(position - current):.2f} rad move — direct "
                 f"moves are capped at {MAX_DIRECT_MOTOR_STEP_RAD} rad from "
                 "the current position")
+        found = self._bench_ranges.get(motor_id)
+        if found is not None and not (found[0] <= position <= found[1]):
+            raise ServiceError(
+                f"{position:.3f} rad is outside the range found for this "
+                f"motor ({found[0]:.3f} to {found[1]:.3f} rad) — clear the "
+                "range to command past it")
         span = getattr(type(getattr(hand, "motor_client", None)),
                        "position_range_rad", None)
         if span is not None and not (span[0] <= position <= span[1]):

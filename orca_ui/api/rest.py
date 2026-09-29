@@ -293,6 +293,16 @@ def build_router(service: HandService) -> APIRouter:
     def motors_direct_position(body: schemas.DirectMotorPositionRequest):
         return guard(service.set_motor_position, body.id, body.position)
 
+    # Bench range finding: loosen one motor, let a human take it to each end,
+    # then command only inside what they found.
+    @router.post("/motors/direct/torque")
+    def motors_direct_torque(body: schemas.MotorTorqueRequest):
+        return guard(service.set_motor_torque, body.id, body.enabled)
+
+    @router.post("/motors/direct/range")
+    def motors_direct_range(body: schemas.MotorRangeRequest):
+        return guard(service.set_motor_range, body.id, body.low, body.high)
+
     # ----- poses / trajectories / demos --------------------------------------------
 
     @router.get("/poses")

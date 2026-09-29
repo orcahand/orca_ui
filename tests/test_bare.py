@@ -416,6 +416,7 @@ class TestBenchWrites:
                                       bare=bare_mode)
         service._state_lock = threading.Lock()
         service._direct_motor_mode = True
+        service._bench_ranges = {}
         session = SimpleNamespace(hand=_Hand())
         service._require_torque = lambda: session
         service._require_manual_control = lambda: None
@@ -523,3 +524,120 @@ class TestBenchTelemetry:
         sampler._bench_tick(session)
 
         assert published == []
+
+
+class TestFoundRange:
+    """A range the operator found by hand is the only meaningful frame for a
+    motor bolted to something: the servo's full turn is not what it can travel."""
+
+    def _service(self, position=-3.0):
+        from orca_ui.hand.service import HandService
+        from orca_ui.settings import UiSettings
+
+        torque: list = []
+        writes: list = []
+
+        class _Client:
+            position_range_rad = (-6.2816513263917, 0.0)
+
+        class _Hand:
+            motor_client = _Client()
+            config = SimpleNamespace(motor_ids=[1, 2])
+
+            def get_motor_pos(self, as_dict=False):
+                return {1: position, 2: position}
+
+            def write_motor_pos(self, ids, values):
+                writes.append([float(v) for v in values])
+
+            def enable_torque(self, ids=None):
+                torque.append((tuple(ids or ()), True))
+
+            def disable_torque(self, ids=None):
+                torque.append((tuple(ids or ()), False))
+
+        service = HandService.__new__(HandService)
+        service.settings = UiSettings(config_path="/nowhere/config.yaml", bare=True)
+        service._state_lock = threading.Lock()
+        service._direct_motor_mode = True
+        service._bench_ranges = {}
+        session = SimpleNamespace(hand=_Hand())
+        service._require_motors = lambda: session
+        service._require_torque = lambda: session
+        service._require_manual_control = lambda: None
+        return service, torque, writes
+
+    def test_one_motor_can_be_loosened_alone(self):
+        """Range finding needs this motor limp while its neighbours stay put,
+        which whole-hand torque cannot express."""
+        service, torque, _ = self._service()
+
+        service.set_motor_torque(2, False)
+
+        assert torque == [((2,), False)]
+
+    def test_a_recorded_range_bounds_later_commands(self):
+        service, _, writes = self._service()
+        service.set_motor_range(1, -4.0, -2.0)
+
+        service.set_motor_position(1, -3.0)
+        assert writes == [[-3.0]]
+
+        from orca_ui.hand.service import ServiceError
+        with pytest.raises(ServiceError) as caught:
+            service.set_motor_position(1, -1.0)
+        assert "outside the range found" in str(caught.value)
+        assert writes == [[-3.0]]
+
+    def test_limits_may_be_given_in_either_order(self):
+        """The operator sets whichever end they reach first."""
+        service, _, _ = self._service()
+
+        result = service.set_motor_range(1, -2.0, -4.0)
+
+        assert result["range_rad"] == [-4.0, -2.0]
+
+    def test_clearing_puts_the_motor_back_on_its_full_travel(self):
+        service, _, writes = self._service()
+        service.set_motor_range(1, -4.0, -2.0)
+
+        service.set_motor_range(1, None, None)
+        service.set_motor_position(1, -1.0)
+
+        assert writes == [[-1.0]]
+
+    def test_two_limits_at_the_same_place_are_refused(self):
+        """A zero-width range would make the slider meaningless."""
+        from orca_ui.hand.service import ServiceError
+
+        service, _, _ = self._service()
+        with pytest.raises(ServiceError) as caught:
+            service.set_motor_range(1, -3.0, -3.0)
+        assert "same position" in str(caught.value)
+
+    def test_a_range_outside_the_travel_is_refused(self):
+        from orca_ui.hand.service import ServiceError
+
+        service, _, _ = self._service()
+        with pytest.raises(ServiceError) as caught:
+            service.set_motor_range(1, -8.0, -2.0)
+        assert "outside the motor's travel" in str(caught.value)
+
+    def test_the_range_rides_along_in_the_snapshot(self):
+        service, _, _ = self._service()
+        service.set_motor_range(1, -4.0, -2.0)
+
+        assert service._bench_ranges[1] == (-4.0, -2.0)
+        assert 2 not in service._bench_ranges
+
+    def test_per_motor_torque_is_bare_mode_only(self):
+        """On a hand, loosening one motor mid-chain is not a bench convenience,
+        it drops a tendon."""
+        from orca_ui.hand.service import ServiceError
+        from orca_ui.settings import UiSettings
+
+        service, _, _ = self._service()
+        service.settings = UiSettings(config_path="/nowhere/config.yaml",
+                                      bare=False)
+        with pytest.raises(ServiceError):
+            service.set_motor_torque(1, False)

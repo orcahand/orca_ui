@@ -13,25 +13,6 @@ import { useAppStore } from '../../state/appStore'
 
 const SLIDER_HALF_RANGE_RAD = 0.5 // slider span around the anchor position
 const SEND_THROTTLE_MS = 80
-// A commanded angle this close to the reading counts as arrived. Wider than the
-// servo's own resolution so a motor holding under load does not read as missing.
-const ARRIVED_DEG = 2.0
-
-// Absolute angle over the motor's travel: 0 at one end, 360 at the other. The
-// servo's own frame is used rather than an offset from wherever the motor
-// happened to sit, so every value on the dial is reachable. An offset zero
-// would put half the dial outside the travel on a motor that started
-// mid-range, and an unreachable command clamps against a hard stop.
-function radToDeg(rad: number, span: [number, number]): number {
-  const [lo, hi] = span
-  return ((rad - lo) / (hi - lo)) * 360
-}
-
-function degToRad(deg: number, span: [number, number]): number {
-  const [lo, hi] = span
-  return lo + (deg / 360) * (hi - lo)
-}
-
 export function DirectMotorPanel({
   torqueOn,
   locked,
@@ -128,16 +109,19 @@ export function DirectMotorPanel({
           {bench && !span ? (
             <>
               This motor family has no single-turn limit, so there is no fixed
-              travel to lay a 0 to 360° dial over. Nudging from the current
-              position is what is offered instead.
+              travel to find a range within. Nudging from the current position
+              is what is offered instead.
             </>
           ) : bench ? (
             <>
-              Absolute angle over each motor&apos;s full travel, 0 to 360°.
-              Commit a target with <strong>Go</strong> and the servo holds it
-              under its current limit. If it stops short, the error stays open
-              and the current sits at the ceiling — that is the load it cannot
-              move. Raise the ceiling in the Motors tab to push further.
+              Find each motor&apos;s range first: the servo goes limp, you turn
+              it to each end by hand, and the two limits you set become the
+              slider. Travel is counted as you turn, so going past the
+              encoder&apos;s boundary still adds up and the direction you went
+              is what the slider follows. After that the slider drives the
+              motor as it moves, and a typed angle goes there on Go. Watch the
+              current: pinned high against a target it has not reached is the
+              load this motor cannot move.
             </>
           ) : (
             <>
@@ -297,9 +281,28 @@ motor's power wiring.`}
   )
 }
 
-// One motor on the bench: command an absolute angle, watch whether it gets
-// there. The stall is the point — a missed target with the current pinned at
-// the ceiling is the load this motor cannot move.
+
+// A single-turn magnetic encoder reports an angle, not a turn count, so
+// turning the shaft past its boundary by hand makes the reading jump a whole
+// turn. Accumulating the unwrapped travel is what lets a range found by hand
+// mean something: it gives the real distance between the two ends and, from
+// its sign, which way the operator went.
+function unwrapStep(prev: number, next: number, turn: number): number {
+  let delta = next - prev
+  if (delta > turn / 2) delta -= turn
+  else if (delta < -turn / 2) delta += turn
+  return delta
+}
+
+type RangeFind =
+  | { phase: 'idle' }
+  | { phase: 'first' }
+  | { phase: 'second'; first: number; travel: number; last: number }
+
+// One motor on the bench. Until a range is found the only useful action is
+// finding one: a raw angle over the servo's whole turn means nothing when the
+// motor is bolted to something that stops well short of it. Once found, the
+// slider spans exactly that travel and drives the motor as it moves.
 function BenchMotorRow({
   motor,
   span,
@@ -311,109 +314,205 @@ function BenchMotorRow({
   disabled: boolean
   onError: (error: unknown) => void
 }) {
+  const turn = Math.abs(span[1] - span[0])
+  const range = motor.range_rad ?? null
+
   // Live position and current at the bench rate, so a stall is visible while
-  // it happens rather than on the next Refresh. Falls back to the snapshot
-  // until the first frame lands.
+  // it happens rather than on the next Refresh.
   const [live, setLive] = useState<{ pos: number | null; mA: number | null }>({
     pos: null,
     mA: null,
   })
-  const lastLive = useRef('')
+  const [find, setFind] = useState<RangeFind>({ phase: 'idle' })
+  const [target, setTarget] = useState<string>('')
+  const [busy, setBusy] = useState(false)
+  const findRef = useRef(find)
+  findRef.current = find
+
   useStreamFrame((frames) => {
     const pos = frames.motors.positions?.[String(motor.id)]
     const mA = frames.motors.currents?.[String(motor.id)]
-    const key = `${pos ?? ''}|${mA ?? ''}`
-    if (key === lastLive.current) return
-    lastLive.current = key
-    setLive({ pos: pos ?? null, mA: mA ?? null })
+    if (pos !== undefined || mA !== undefined) {
+      setLive((prev) =>
+        prev.pos === (pos ?? null) && prev.mA === (mA ?? null)
+          ? prev
+          : { pos: pos ?? null, mA: mA ?? null },
+      )
+    }
+    // Accumulate travel between the two limits, so a turn past the encoder
+    // boundary still adds up and its sign still says which way we went.
+    const state = findRef.current
+    if (state.phase === 'second' && pos !== undefined) {
+      const step = unwrapStep(state.last, pos, turn)
+      if (step !== 0) {
+        setFind({ ...state, travel: state.travel + step, last: pos })
+      }
+    }
   })
 
   const position = live.pos ?? motor.position
   const currentMa = live.mA ?? motor.current_ma ?? null
-  const actualDeg = radToDeg(position, span)
-  const [target, setTarget] = useState<string>(actualDeg.toFixed(1))
-  const [commanded, setCommanded] = useState<number | null>(null)
-  // A reference the operator sets by hand, so "how far did it turn" is
-  // readable without doing arithmetic. Display only: commands stay absolute,
-  // because an offset zero cannot promise the dial is reachable.
-  const [mark, setMark] = useState<number | null>(null)
 
+  // Degrees within the found range: 0 at the end the operator set first.
+  const lo = range ? Math.min(range[0], range[1]) : span[0]
+  const hi = range ? Math.max(range[0], range[1]) : span[1]
+  const spanDeg = ((hi - lo) * 180) / Math.PI
+  const posDeg = ((position - lo) * 180) / Math.PI
   const parsed = Number.parseFloat(target)
-  const valid = Number.isFinite(parsed) && parsed >= 0 && parsed <= 360
-  const error = commanded === null ? null : commanded - actualDeg
-  const arrived = error !== null && Math.abs(error) <= ARRIVED_DEG
+  const valid = Number.isFinite(parsed) && parsed >= 0 && parsed <= spanDeg
 
-  const go = () => {
-    if (!valid) return
-    setCommanded(parsed)
-    void api.motorsDirectPosition(motor.id, degToRad(parsed, span)).catch(onError)
+  const call = async (fn: () => Promise<unknown>) => {
+    setBusy(true)
+    try {
+      await fn()
+    } catch (e) {
+      onError(e)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const startFind = () =>
+    void call(async () => {
+      await api.motorsDirectRange(motor.id, null, null)
+      await api.motorsDirectTorque(motor.id, false)
+      setFind({ phase: 'first' })
+    })
+
+  const setFirst = () =>
+    setFind({ phase: 'second', first: position, travel: 0, last: position })
+
+  const setSecond = () =>
+    void call(async () => {
+      const state = findRef.current
+      if (state.phase !== 'second') return
+      const second = state.first + state.travel
+      await api.motorsDirectRange(
+        motor.id,
+        Math.min(state.first, second),
+        Math.max(state.first, second),
+      )
+      await api.motorsDirectTorque(motor.id, true)
+      setFind({ phase: 'idle' })
+      setTarget('')
+    })
+
+  const cancelFind = () =>
+    void call(async () => {
+      await api.motorsDirectTorque(motor.id, true)
+      setFind({ phase: 'idle' })
+    })
+
+  const clearRange = () =>
+    void call(async () => {
+      await api.motorsDirectRange(motor.id, null, null)
+      setTarget('')
+    })
+
+  // Slide-to-move: the range is known and bounded, so there is no reason to
+  // make the operator press Go for every nudge.
+  const sendDeg = (deg: number) => {
+    const rad = lo + (deg * Math.PI) / 180
+    void api.motorsDirectPosition(motor.id, rad).catch(onError)
   }
 
   const flags = motor.hw_error_flags
+  const finding = find.phase !== 'idle'
+
   return (
     <div style={{ borderTop: '1px solid var(--border)', padding: '6px 0' }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <span style={{ width: 84, color: 'var(--text)' }}>M{motor.id}</span>
-        <input
-          type="range"
-          min={0}
-          max={360}
-          step={0.5}
-          value={valid ? parsed : actualDeg}
-          disabled={disabled}
-          onChange={(e) => setTarget(e.target.value)}
-          style={{ flex: 1, minWidth: 140 }}
-        />
-        <input
-          type="number"
-          min={0}
-          max={360}
-          step={0.5}
-          value={target}
-          disabled={disabled}
-          onChange={(e) => setTarget(e.target.value)}
-          style={{ width: 66 }}
-        />
-        <span style={{ color: 'var(--dimmer)' }}>deg</span>
-        <button
-          className="btn btn-primary"
-          disabled={disabled || !valid}
-          title={valid ? 'command this angle and hold it'
-            : 'enter an angle between 0 and 360'}
-          onClick={go}
-        >
-          Go
-        </button>
-        <button
-          className="btn btn-secondary"
-          disabled={disabled}
-          title="mark where it is now, so the readout shows how far it has turned"
-          onClick={() => setMark(actualDeg)}
-        >
-          Mark zero
-        </button>
+        <span style={{ width: 52, color: 'var(--text)' }}>M{motor.id}</span>
+
+        {finding ? (
+          <>
+            <span style={{ color: 'var(--warn)', flex: 1, minWidth: 200 }}>
+              {find.phase === 'first'
+                ? 'Limp — turn it to one end of its travel, then set the first limit.'
+                : `Now turn it to the other end. ${Math.abs(
+                    (find.travel * 180) / Math.PI,
+                  ).toFixed(1)}° travelled ${find.travel >= 0 ? 'forward' : 'back'}.`}
+            </span>
+            <button
+              className="btn btn-primary"
+              disabled={busy}
+              onClick={find.phase === 'first' ? setFirst : setSecond}
+            >
+              {find.phase === 'first' ? 'Set first limit' : 'Set second limit'}
+            </button>
+            <button className="btn btn-secondary" disabled={busy} onClick={cancelFind}>
+              Cancel
+            </button>
+          </>
+        ) : !range ? (
+          <>
+            <span style={{ color: 'var(--dim)', flex: 1, minWidth: 200 }}>
+              No range found — the servo&apos;s full turn is rarely what this
+              motor can actually travel.
+            </span>
+            <button className="btn btn-primary" disabled={busy || disabled} onClick={startFind}>
+              Find range
+            </button>
+          </>
+        ) : (
+          <>
+            <input
+              type="range"
+              min={0}
+              max={spanDeg}
+              step={0.5}
+              value={valid ? parsed : Math.max(0, Math.min(spanDeg, posDeg))}
+              disabled={disabled}
+              onChange={(e) => {
+                setTarget(e.target.value)
+                sendDeg(Number.parseFloat(e.target.value))
+              }}
+              style={{ flex: 1, minWidth: 140 }}
+            />
+            <input
+              type="number"
+              min={0}
+              max={Math.round(spanDeg * 10) / 10}
+              step={0.5}
+              value={target}
+              disabled={disabled}
+              placeholder={posDeg.toFixed(1)}
+              onChange={(e) => setTarget(e.target.value)}
+              style={{ width: 66 }}
+            />
+            <span style={{ color: 'var(--dimmer)' }}>
+              / {spanDeg.toFixed(1)}°
+            </span>
+            <button
+              className="btn btn-primary"
+              disabled={disabled || !valid}
+              onClick={() => sendDeg(parsed)}
+            >
+              Go
+            </button>
+            <button className="btn btn-secondary" disabled={busy} onClick={clearRange}>
+              Clear range
+            </button>
+          </>
+        )}
       </div>
-      <div style={{ display: 'flex', gap: 12, marginTop: 4, flexWrap: 'wrap',
-                    color: 'var(--dim)' }}>
-        <span>at {actualDeg.toFixed(1)}°</span>
-        {mark !== null && (
-          <span title={`marked at ${mark.toFixed(1)}°`}>
-            {(actualDeg - mark >= 0 ? '+' : '') + (actualDeg - mark).toFixed(1)}°
-            from mark
-          </span>
-        )}
-        {commanded !== null && (
-          <span style={{ color: arrived ? 'var(--ok)' : 'var(--warn)' }}>
-            {arrived
-              ? `holding ${commanded.toFixed(1)}°`
-              : `${Math.abs(error ?? 0).toFixed(1)}° short of ${commanded.toFixed(1)}°`}
-          </span>
-        )}
+
+      <div
+        style={{
+          display: 'flex',
+          gap: 12,
+          marginTop: 4,
+          flexWrap: 'wrap',
+          color: 'var(--dim)',
+        }}
+      >
+        <span>
+          at {range ? `${posDeg.toFixed(1)}° of ${spanDeg.toFixed(1)}°` : `${(
+            ((position - span[0]) * 180) / Math.PI
+          ).toFixed(1)}° raw`}
+        </span>
         {currentMa != null && (
-          <span
-            style={{ color: arrived === false ? 'var(--warn)' : undefined }}
-            title="present draw — pinned high against a missed target is the load it cannot move"
-          >
+          <span title="present draw — pinned high against a target it has not reached is the load it cannot move">
             {currentMa.toFixed(0)} mA
           </span>
         )}

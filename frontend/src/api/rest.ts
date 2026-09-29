@@ -162,6 +162,18 @@ export const api = {
   motorsDirect: () => request<DirectMotorSnapshot>('/api/motors/direct'),
   motorsDirectMode: (enabled: boolean) =>
     post<{ direct_mode: boolean }>('/api/motors/direct/mode', { enabled }),
+  // Bench range finding: loosen one motor so a human can turn it, then
+  // record the two ends they found.
+  motorsDirectTorque: (id: number, enabled: boolean) =>
+    post<{ id: number; torque_enabled: boolean }>('/api/motors/direct/torque', {
+      id,
+      enabled,
+    }),
+  motorsDirectRange: (id: number, low: number | null, high: number | null) =>
+    post<{ id: number; range_rad: [number, number] | null }>(
+      '/api/motors/direct/range',
+      { id, low, high },
+    ),
   motorsDirectPosition: (id: number, position: number) =>
     post<{ id: number; position: number; previous: number }>(
       '/api/motors/direct/position',

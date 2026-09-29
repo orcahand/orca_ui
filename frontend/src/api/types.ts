@@ -174,6 +174,8 @@ export interface DirectMotorInfo {
   // Present draw and case temperature where the family reports them. On a
   // bench these are how a stall reads: the target is missed either way, and
   // only the current says whether the motor is still pushing.
+  // The travel an operator found by hand, in radians, once recorded.
+  range_rad?: [number, number] | null
   current_ma?: number | null
   temp_c?: number | null
   hw_error: number | null
