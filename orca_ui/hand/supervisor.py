@@ -61,6 +61,18 @@ HEALTH_PERIOD_S = 2.0
 UPGRADE_PROBE_PERIOD_S = 10.0
 MOTOR_FAILURES_BEFORE_RECONNECT = 3
 
+UPGRADE_PROBE_ATTEMPTS = 3
+"""Probes for declared hardware the connect ladder could not reach, after
+which the supervisor stops looking until a human asks again.
+
+A device that is declared but absent is usually absent for a reason the
+console cannot fix by looking again — an uncalibrated encoder pass, an
+unplugged sensor chain, a board flashed without its sensing tier. Retrying
+forever means opening serial ports every
+:data:`UPGRADE_PROBE_PERIOD_S` for the life of the session, which is both
+noise in the log and traffic on a shared bus. So it tries a few times, then
+waits for :meth:`HandSupervisor.request_rescan`."""
+
 MODEL_CONFIRM_PROBES = 3
 """Model re-checks to run after connecting at a model that could still be an
 understatement. A hand that has just been powered on can answer on the motor
@@ -137,6 +149,9 @@ class HandSupervisor(threading.Thread):
         # Mock mode has no bus to ask, so its model is its own answer.
         self._model_pinned = bool(settings.model_pinned or settings.mock)
         self._model_probes_left = 0
+        # Probes left for hardware the config declares but this session did
+        # not get; re-armed by request_rescan().
+        self._upgrade_probes_left = 0
         # Board pin: None = first board to answer. Read/written under the
         # GIL only (str swap), like _model_pinned.
         self._board_pinned: str | None = settings.board or None
@@ -179,11 +194,23 @@ class HandSupervisor(threading.Thread):
     def model_name(self) -> str:
         return model_name_of(self.config)
 
+    def _missing_devices(self, caps) -> tuple[str, ...]:
+        """Device classes the config declares that this session did not get,
+        in the order the badges read."""
+        if caps is None:
+            return ()
+        return tuple(
+            name for name in ("motors", "tactile", "encoders")
+            if self._declared.get(name) and not getattr(caps, name, False)
+        )
+
     def status(self) -> StatusSnapshot:
         config = self.config
         with self._lock:
             caps = self._session.caps if self._session else None
             return StatusSnapshot(
+                missing=self._missing_devices(caps),
+                rescanning=self._upgrade_probes_left > 0,
                 state=self._state,
                 capabilities=caps,
                 torque_enabled=self._torque_enabled,
@@ -201,6 +228,20 @@ class HandSupervisor(threading.Thread):
         with self._lock:
             self._torque_enabled = enabled
         self._publish()
+
+    def request_rescan(self) -> None:
+        """Look again for declared hardware this session did not get.
+
+        The automatic probes stop after :data:`UPGRADE_PROBE_ATTEMPTS` so a
+        permanently short-handed hand is not scanned forever; this is how an
+        operator says "I plugged it in / calibrated it, try again" without
+        dropping the session the way a reconnect would.
+        """
+        self._upgrade_probes_left = UPGRADE_PROBE_ATTEMPTS
+        # Probe on the next health tick rather than waiting out the period.
+        self._last_upgrade_probe = 0.0
+        self._publish()
+        self._wake.set()
 
     def request_reconnect(self) -> None:
         """Drop the session and redial. Also the way back from
@@ -583,6 +624,10 @@ class HandSupervisor(threading.Thread):
         self._model_probes_left = (
             0 if self._model_pinned or self._model_is_maximal()
             else MODEL_CONFIRM_PROBES)
+        # A fresh session gets a fresh allowance: hardware missing from the
+        # last one may be present now.
+        self._upgrade_probes_left = (
+            UPGRADE_PROBE_ATTEMPTS if session.caps.degraded else 0)
 
         state = HandState.DEGRADED if session.caps.degraded else HandState.CONNECTED
         self._set_state(state, f"[{session.tier}] {session.message}", session.ports)
@@ -623,7 +668,9 @@ class HandSupervisor(threading.Thread):
             self._teardown_session(reason)
             return 0.1  # go straight back to detection
 
-        if not self._settings.mock:
+        probes_left = (self._model_probes_left > 0
+                       or self._upgrade_probes_left > 0)
+        if not self._settings.mock and probes_left:
             now = time.time()
             if now - self._last_upgrade_probe > UPGRADE_PROBE_PERIOD_S:
                 self._last_upgrade_probe = now
@@ -682,10 +729,22 @@ class HandSupervisor(threading.Thread):
         after connecting; see :data:`MODEL_CONFIRM_PROBES`.
         """
         confirming_model = self._model_probes_left > 0
-        if not (session.caps.degraded or confirming_model):
+        looking_for_missing = (session.caps.degraded
+                               and self._upgrade_probes_left > 0)
+        if not (looking_for_missing or confirming_model):
             return None
         if confirming_model:
             self._model_probes_left -= 1
+        if looking_for_missing:
+            self._upgrade_probes_left -= 1
+            if self._upgrade_probes_left == 0:
+                missing = self._missing_devices(session.caps)
+                logger.info(
+                    "%s still missing after %d probes — no longer looking; "
+                    "use the rescan control once it is plugged in or "
+                    "calibrated", ", ".join(missing) or "hardware",
+                    UPGRADE_PROBE_ATTEMPTS)
+                self._publish()
         try:
             pin = self._board_pinned
             detection = (detect_pinned_board(pin) if pin
@@ -693,7 +752,7 @@ class HandSupervisor(threading.Thread):
             if confirming_model and self._adopt_model(detection, upgrade_only=True):
                 return ("hand reports more hardware than the model declared — "
                         f"switching to {self.model_name}")
-            if not session.caps.degraded:
+            if not looking_for_missing:
                 return None
             presence = presence_from_detection(self.config, detection,
                                                fallback_motor_scan=pin is None)

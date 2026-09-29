@@ -19,10 +19,29 @@ export function MotorsView() {
   const rates = useAppStore((s) => s.rates)
   const setError = useAppStore((s) => s.setError)
   const [reconnecting, setReconnecting] = useState(false)
+  const [rescanRequested, setRescanRequested] = useState(false)
 
   const caps = status?.capabilities
   const measuredHz = rates[TOPICS.jointsMeasured] ?? 0
   const taxelHz = rates[TOPICS.tactileTaxels] ?? 0
+
+  // Declared-but-absent hardware. The backend stops probing for it after a
+  // few tries, so this is the operator saying "it is there now, look again"
+  // without dropping the session.
+  const missing = status?.missing ?? []
+  const rescanning = status?.rescanning ?? false
+
+  const rescan = async () => {
+    setRescanRequested(true)
+    try {
+      await api.rescan()
+      setError(null)
+    } catch (error) {
+      setError(String((error as Error).message ?? error))
+    } finally {
+      setRescanRequested(false)
+    }
+  }
 
   const reconnect = async () => {
     setReconnecting(true)
@@ -37,13 +56,33 @@ export function MotorsView() {
   }
 
   const toolbar = (
-    <button
-      className="btn btn-secondary"
-      disabled={reconnecting}
-      onClick={() => void reconnect()}
-    >
-      Reconnect
-    </button>
+    <>
+      {missing.length > 0 && (
+        <button
+          className="btn btn-secondary"
+          disabled={rescanning || rescanRequested}
+          title={
+            rescanning
+              ? `looking for ${missing.join(' + ')} now`
+              : `probe again for ${missing.join(' + ')} — the backend stopped ` +
+                'looking after a few tries. Plug it in, or calibrate the ' +
+                'encoder pass, then rescan.'
+          }
+          onClick={() => void rescan()}
+        >
+          {rescanning
+            ? `rescanning for ${missing.join(' + ')}…`
+            : `rescan for missing ${missing.join(' + ')}`}
+        </button>
+      )}
+      <button
+        className="btn btn-secondary"
+        disabled={reconnecting}
+        onClick={() => void reconnect()}
+      >
+        Reconnect
+      </button>
+    </>
   )
 
   return (

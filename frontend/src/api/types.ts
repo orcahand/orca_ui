@@ -46,6 +46,12 @@ export interface StatusSnapshot {
   // board to answer". Pinned means the backend never opens another board's
   // ports — the way two consoles on one machine each keep to their own hand.
   board_pinned: string | null
+  // Device classes the config declares that this session did not get, and
+  // whether the backend is still probing for them. It gives up after a few
+  // attempts, so the UI offers an explicit rescan rather than implying it is
+  // still looking.
+  missing?: string[]
+  rescanning?: boolean
 }
 
 export interface ModelEntry {
