@@ -197,6 +197,13 @@ class HandSupervisor(threading.Thread):
     def model_name(self) -> str:
         return model_name_of(self.config)
 
+    def _probeable_devices(self, session) -> tuple[str, ...]:
+        """Missing devices a probe could still find: the ones whose port was
+        absent, not the ones whose device answered and refused."""
+        refused = set(getattr(session, "refused", ()))
+        return tuple(name for name in self._missing_devices(session.caps)
+                     if name not in refused)
+
     def _missing_devices(self, caps) -> tuple[str, ...]:
         """Device classes the config declares that this session did not get,
         in the order the badges read."""
@@ -240,9 +247,19 @@ class HandSupervisor(threading.Thread):
         operator says "I plugged it in / calibrated it, try again" without
         dropping the session the way a reconnect would.
         """
+        session = self.session
+        refused = set(getattr(session, "refused", ())) if session else set()
         self._upgrade_probes_left = UPGRADE_PROBE_ATTEMPTS
         # Probe on the next health tick rather than waiting out the period.
         self._last_upgrade_probe = 0.0
+        if refused:
+            # No probe can undo a refusal — the tier has to be attempted
+            # again, which means a fresh connection. This is the operator
+            # saying "I calibrated it / plugged it in, try properly".
+            self._released = False
+            self._teardown_session(
+                f"rescan: re-attempting {', '.join(sorted(refused))}")
+            self._backoff = DETECT_BACKOFF_START_S
         self._publish()
         self._wake.set()
 
@@ -627,10 +644,17 @@ class HandSupervisor(threading.Thread):
         self._model_probes_left = (
             0 if self._model_pinned or self._model_is_maximal()
             else MODEL_CONFIRM_PROBES)
-        # A fresh session gets a fresh allowance: hardware missing from the
-        # last one may be present now.
+        # A fresh session gets a fresh allowance, but only for devices a probe
+        # could actually find. A sensor chain that answered with nothing, or an
+        # encoder stream the loop refused, needs a calibration or a reconnect —
+        # scanning for it just churns the ports.
+        probeable = self._probeable_devices(session)
         self._upgrade_probes_left = (
-            UPGRADE_PROBE_ATTEMPTS if session.caps.degraded else 0)
+            UPGRADE_PROBE_ATTEMPTS if probeable else 0)
+        if session.caps.degraded and not probeable:
+            logger.info("%s missing but already refused by the hand — not "
+                        "probing; rescan re-attempts the connection",
+                        ", ".join(self._missing_devices(session.caps)))
 
         state = HandState.DEGRADED if session.caps.degraded else HandState.CONNECTED
         self._set_state(state, f"[{session.tier}] {session.message}", session.ports)
@@ -766,11 +790,18 @@ class HandSupervisor(threading.Thread):
             logger.exception("upgrade probe failed")
             return None
         caps = session.caps
-        if ((self._declared["motors"] and not caps.motors and presence.motor_port)
-                or (self._declared["tactile"] and not caps.tactile
-                    and presence.sensing.tactile)
-                or (self._declared["encoders"] and not caps.encoders
-                    and presence.sensing.encoder)):
+        # A capability the device itself refused is not something a port probe
+        # can resolve: the port is right there, and reconnecting on the
+        # strength of finding it is what turned this into a loop.
+        refused = set(getattr(session, "refused", ()))
+
+        def appeared(name: str, present) -> bool:
+            return bool(self._declared[name] and not getattr(caps, name)
+                        and present and name not in refused)
+
+        if (appeared("motors", presence.motor_port)
+                or appeared("tactile", presence.sensing.tactile)
+                or appeared("encoders", presence.sensing.encoder)):
             return "missing hardware appeared — upgrading"
         return None
 

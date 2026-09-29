@@ -29,8 +29,9 @@ class _Caps:
 
 
 class _Session:
-    def __init__(self, **kwargs):
+    def __init__(self, refused=(), **kwargs):
         self.caps = _Caps(**kwargs)
+        self.refused = tuple(refused)
 
 
 @pytest.fixture()
@@ -139,3 +140,58 @@ def test_the_health_tick_stops_probing_once_the_allowance_is_spent(supervisor,
     sup.request_rescan()
     sup._health_tick()
     assert len(probes) == 2
+
+
+def test_a_refused_device_is_never_called_reappeared(supervisor, monkeypatch):
+    """The port of a refused device is right where it always was. Treating
+    finding it as "the hardware appeared" tore the session down and rebuilt
+    it every probe period, which is the reconnect loop this guards against."""
+    sup, probes = supervisor
+    present = SimpleNamespace(
+        motor_port="/dev/motor",
+        sensing=SimpleNamespace(tactile="/dev/oh", encoder="/dev/oh"))
+    monkeypatch.setattr(supervisor_mod, "presence_from_detection",
+                        lambda *a, **k: present)
+
+    # Refused by the hand: the ports answer, the devices did not.
+    sup._upgrade_probes_left = UPGRADE_PROBE_ATTEMPTS
+    assert sup._rescan(_Session(refused=("tactile", "encoders"))) is None
+
+    # Genuinely absent before and present now: that is a real upgrade.
+    sup._upgrade_probes_left = UPGRADE_PROBE_ATTEMPTS
+    assert sup._rescan(_Session()) == "missing hardware appeared — upgrading"
+
+
+def test_nothing_probeable_means_nothing_is_probed(supervisor):
+    """A hand whose every missing device was refused gets no allowance at all,
+    so it never opens a port looking for what it has already been told."""
+    sup, probes = supervisor
+    sup._upgrade_probes_left = 0
+    assert sup._probeable_devices(_Session(refused=("tactile", "encoders"))) == ()
+    assert sup._probeable_devices(_Session(refused=("tactile",))) == ("encoders",)
+    assert sup._probeable_devices(_Session()) == ("tactile", "encoders")
+
+
+def test_a_rescan_on_refused_hardware_re_attempts_the_connection(supervisor):
+    """A probe cannot undo a refusal; only connecting again can. The request
+    therefore drops the session instead of scanning ports."""
+    sup, _ = supervisor
+    sup._session = _Session(refused=("encoders",))
+    torn = []
+    sup._teardown_session = lambda reason: torn.append(reason)
+
+    sup.request_rescan()
+
+    assert torn and "encoders" in torn[0]
+
+
+def test_a_rescan_for_an_absent_device_only_re_arms_the_probes(supervisor):
+    sup, _ = supervisor
+    sup._session = _Session()
+    torn = []
+    sup._teardown_session = lambda reason: torn.append(reason)
+
+    sup.request_rescan()
+
+    assert torn == []
+    assert sup._upgrade_probes_left == UPGRADE_PROBE_ATTEMPTS
