@@ -248,3 +248,28 @@ def test_a_stale_encoder_stream_counts_as_refused_too(monkeypatch):
                   JointFeedbackConnectError("no anchors")):
         refused = _ladder_refusals(monkeypatch, error)
         assert "encoders" in refused and "tactile" in refused, error
+
+
+def test_the_status_payload_separates_refused_from_merely_absent(supervisor):
+    """The front page words the two differently — "not connected" invites
+    checking a cable, a refusal points at calibration — so both sets have to
+    survive the trip to the browser."""
+    sup, _ = supervisor
+    sup._session = _Session(refused=("encoders",))
+
+    payload = sup.status().as_dict()
+
+    assert payload["missing"] == ["tactile", "encoders"]
+    assert payload["refused"] == ["encoders"]
+
+
+def test_a_device_the_hand_has_is_never_reported_refused(supervisor):
+    """A refusal recorded on an earlier rung is spent once the device is up;
+    reporting it would put a stale warning on a working sensor."""
+    sup, _ = supervisor
+    sup._session = _Session(refused=("encoders",), encoders=True)
+
+    payload = sup.status().as_dict()
+
+    assert payload["missing"] == ["tactile"]
+    assert payload["refused"] == []

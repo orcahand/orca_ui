@@ -62,7 +62,9 @@ export function HealthSummary() {
   const status = useAppStore((s) => s.status)
   const joints = useAppStore((s) => s.handInfo?.joints)
 
-  // Which motor ids answer telemetry reads (temps/currents payloads).
+  // Which motor ids answered the last per-motor error sweep. A bulk read
+  // cannot tell us this: it returns a full array and leaves a silent motor's
+  // stale value in place, which is why this used to read N/N forever.
   const [motorsAnswering, setMotorsAnswering] = useState<string[] | null>(null)
   const lastIds = useRef('')
   // Whole degrees only: the strip re-renders on change and the raw reading
@@ -71,16 +73,16 @@ export function HealthSummary() {
   const [maxTempC, setMaxTempC] = useState<number | null>(null)
   const lastTemps = useRef('')
   useStreamFrame((frames) => {
-    const ids = Array.from(
-      new Set([
-        ...Object.keys(frames.motors.temps),
-        ...Object.keys(frames.motors.currents),
-      ]),
-    ).sort((a, b) => Number(a) - Number(b))
-    const json = ids.join(',')
+    const entries = Object.entries(frames.motors.faults?.motors ?? {})
+    const swept = entries.filter(([, m]) => m.answering != null)
+    const ids = swept
+      .filter(([, m]) => m.answering)
+      .map(([id]) => id)
+      .sort((a, b) => Number(a) - Number(b))
+    const json = swept.length > 0 ? ids.join(',') : 'unswept'
     if (json !== lastIds.current) {
       lastIds.current = json
-      setMotorsAnswering(ids.length > 0 ? ids : null)
+      setMotorsAnswering(swept.length > 0 ? ids : null)
     }
 
     const rounded: Record<string, number> = {}
@@ -100,6 +102,18 @@ export function HealthSummary() {
 
   const enc = health.encoders
   const tac = health.tactile
+  // Declared hardware this session did not get. Absent and refused read
+  // differently: one may still turn up, the other answered and said no.
+  const missing = new Set(status?.missing ?? [])
+  const refused = new Set(status?.refused ?? [])
+  // How many encoder-backed joints this config declares, so an absent
+  // stream is counted against what the hand should have rather than against
+  // the encoder hardware's fixed slot count.
+  const encoderBackedTotal = (joints ?? []).filter((j) => j.encoder_backed).length
+  const absentWhy = (name: string) =>
+    refused.has(name)
+      ? 'the hand answered on its port but the device did not'
+      : 'declared by the config but nothing answered'
   const motorJoints = (joints ?? []).filter(
     (j) => j.motor_id !== null && j.motor_id !== undefined,
   )
@@ -124,6 +138,10 @@ export function HealthSummary() {
     ok += tacConnected
     total += FINGERS.length
   }
+  // Declared but absent still counts against the total: a hand that should
+  // have encoders and has none is not a hand in perfect health.
+  if (missing.has('encoders') && !enc) total += encoderBackedTotal
+  if (missing.has('tactile') && !tac) total += FINGERS.length
   if (total === 0) return null
 
   const pct = Math.round((100 * ok) / total)
@@ -229,11 +247,45 @@ export function HealthSummary() {
           />
         </>
       )}
+      {!enc && missing.has('encoders') && (
+        <>
+          {sep}
+          <Segment
+            text={`encoders 0/${encoderBackedTotal} — ${
+              refused.has('encoders') ? 'refused' : 'not connected'
+            }`}
+            ok={false}
+            diagnoses={[
+              {
+                subject: 'joint encoder stream',
+                state: refused.has('encoders') ? 'refused' : 'not connected',
+                ok: false,
+                reason: absentWhy('encoders'),
+                checks: refused.has('encoders')
+                  ? [
+                      'Calibrate the encoder pass — the loop will not close ' +
+                        'without an anchor per joint.',
+                      'Then press Rescan in the Motors tab to re-attempt ' +
+                        'the connection.',
+                    ]
+                  : [
+                      "Check the sensing cable at the controller board.",
+                      'Then press Rescan in the Motors tab.',
+                    ],
+              },
+            ]}
+          />
+        </>
+      )}
       {showMotors && (
         <>
           {sep}
           <Segment
-            text={`motors ${motorsAnswering?.length ?? '--'}/${motorTotal}`}
+            text={
+              motorsAnswering === null
+                ? `motors ${motorTotal} configured`
+                : `motors ${motorsAnswering.length}/${motorTotal}`
+            }
             ok={(motorsAnswering?.length ?? 0) === motorTotal}
             diagnoses={motorDiagnoses}
           />
@@ -265,10 +317,35 @@ export function HealthSummary() {
           />
         </>
       )}
+      {!tac && missing.has('tactile') && (
+        <>
+          {sep}
+          <Segment
+            text={`tactile 0/${FINGERS.length} — ${
+              refused.has('tactile') ? 'refused' : 'not connected'
+            }`}
+            ok={false}
+            diagnoses={[
+              {
+                subject: 'tactile sensor chain',
+                state: refused.has('tactile') ? 'refused' : 'not connected',
+                ok: false,
+                reason: absentWhy('tactile'),
+                checks: [
+                  'Check the sensor chain at the connector board.',
+                  'Then press Rescan in the Motors tab.',
+                ],
+              },
+            ]}
+          />
+        </>
+      )}
       <span style={{ marginLeft: 'auto' }}>
         <Segment
           text={
-            linksDirty.length === 0
+            links.length === 0
+              ? 'no sensing links'
+              : linksDirty.length === 0
               ? 'links clean'
               : linksDirty
                   .map(([name, l]) =>
@@ -280,7 +357,7 @@ export function HealthSummary() {
                   )
                   .join(' · ')
           }
-          ok={linksDirty.length === 0}
+          ok={links.length === 0 || linksDirty.length === 0}
           diagnoses={linkDiagnoses}
           align="right"
         />

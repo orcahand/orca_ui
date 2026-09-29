@@ -220,6 +220,9 @@ class HandSupervisor(threading.Thread):
             caps = self._session.caps if self._session else None
             return StatusSnapshot(
                 missing=self._missing_devices(caps),
+                refused=tuple(sorted(
+                    set(getattr(self._session, "refused", ()))
+                    & set(self._missing_devices(caps)))),
                 rescanning=self._upgrade_probes_left > 0,
                 state=self._state,
                 capabilities=caps,
