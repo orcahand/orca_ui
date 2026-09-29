@@ -95,15 +95,23 @@ _MODELS: tuple[MotorModel, ...] = (
     ),
     MotorModel(
         key="feetech-hls",
-        label="Feetech HLS series",
+        label="Feetech HLS series (generic)",
         family=FEETECH,
-        # The scan reports names rather than numbers for this family, so a
-        # declaration here cannot be cross-checked yet.
+        # orca_core maps 4106 to HLS3930 and both 6922 and 5130 to HLS3915.
+        # Left empty deliberately: this entry covers the family rather than one
+        # model, so it must not claim to identify any particular number.
         model_numbers=(),
         has_current_control=True,
-        current_scale_ma=1.0,
+        # 6.5 mA per register unit, from orca_core's HLS register table.
+        current_scale_ma=6.5,
+        # The family default, not the register maximum. The register accepts up
+        # to 2047 units, which is 13.3 A — a stall figure, not something to
+        # hand a bench as a ceiling. Per-model limits need measuring.
         max_current_ma=900.0,
-        source="orca_core FeetechClient class attributes",
+        source=("current_scale_ma from orca_core HLS.CURRENT_SCALE_MA (6.5); "
+                "max_current_ma is FeetechClient.default_max_current_ma (900), "
+                "NOT the register maximum of 13305 mA. Per-model ceilings for "
+                "HLS3606M / HLS3930M / HLS2915M are not yet confirmed"),
     ),
 )
 
