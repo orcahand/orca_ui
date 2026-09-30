@@ -6,6 +6,7 @@ import type {
   DirectMotorSnapshot,
   HandInfo,
   ModelMetadata,
+  MotorModelInfo,
   ModelsInfo,
   OperationLogPayload,
   OperationSnapshot,
@@ -105,7 +106,11 @@ export const api = {
   // Read straight off the motors: gains are RAM and a power cycle clears
   // them, so what was last typed is not evidence of what they hold.
   servoGains: () =>
-    request<{ gains: ServoGainsMap }>('/api/motors/gains'),
+    // gain_max is the family's register width, reported rather than assumed:
+    // X-series gains are two bytes, HLS gains one.
+    request<{ gains: ServoGainsMap; gain_max: number | null }>(
+      '/api/motors/gains',
+    ),
   // Omitted fields are left alone on the motor.
   setServoGains: (id: number, gains: Partial<ServoGains>) =>
     post<{ gains: ServoGainsMap }>(`/api/motors/${id}/gains`, gains),
@@ -162,6 +167,40 @@ export const api = {
   motorsDirect: () => request<DirectMotorSnapshot>('/api/motors/direct'),
   motorsDirectMode: (enabled: boolean) =>
     post<{ direct_mode: boolean }>('/api/motors/direct/mode', { enabled }),
+  // Bench range finding: loosen one motor so a human can turn it, then
+  // record the two ends they found.
+  motorsDirectTorque: (id: number, enabled: boolean) =>
+    post<{ id: number; torque_enabled: boolean }>('/api/motors/direct/torque', {
+      id,
+      enabled,
+    }),
+  motorsDirectRange: (id: number, low: number | null, high: number | null) =>
+    post<{ id: number; range_rad: [number, number] | null }>(
+      '/api/motors/direct/range',
+      { id, low, high },
+    ),
+  motorsModels: () =>
+    request<{ models: MotorModelInfo[] }>('/api/motors/models'),
+  motorsDirectDeclare: (
+    id: number,
+    model: string | null,
+    nickname: string | null,
+  ) =>
+    post<Record<string, unknown>>('/api/motors/direct/declare', {
+      id,
+      model,
+      nickname,
+    }),
+  motorsDirectPoints: (id: number, points: number[] | null) =>
+    post<{ id: number; points: number[] | null }>('/api/motors/direct/points', {
+      id,
+      points,
+    }),
+  motorsDirectPlay: (id: number, enabled: boolean) =>
+    post<{ id: number; playing: boolean }>('/api/motors/direct/play', {
+      id,
+      enabled,
+    }),
   motorsDirectPosition: (id: number, position: number) =>
     post<{ id: number; position: number; previous: number }>(
       '/api/motors/direct/position',

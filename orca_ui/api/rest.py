@@ -260,7 +260,8 @@ def build_router(service: HandService) -> APIRouter:
 
     @router.get("/motors/gains")
     def motors_gains():
-        return {"ok": True, "gains": guard(service.read_servo_gains)}
+        return {"ok": True, "gains": guard(service.read_servo_gains),
+                "gain_max": service.servo_gain_max()}
 
     @router.post("/motors/{motor_id}/gains")
     def motors_set_gains(motor_id: int, body: schemas.ServoGainsRequest):
@@ -292,6 +293,32 @@ def build_router(service: HandService) -> APIRouter:
     @router.post("/motors/direct/position")
     def motors_direct_position(body: schemas.DirectMotorPositionRequest):
         return guard(service.set_motor_position, body.id, body.position)
+
+    # Bench range finding: loosen one motor, let a human take it to each end,
+    # then command only inside what they found.
+    @router.post("/motors/direct/torque")
+    def motors_direct_torque(body: schemas.MotorTorqueRequest):
+        return guard(service.set_motor_torque, body.id, body.enabled)
+
+    @router.post("/motors/direct/range")
+    def motors_direct_range(body: schemas.MotorRangeRequest):
+        return guard(service.set_motor_range, body.id, body.low, body.high)
+
+    @router.post("/motors/direct/points")
+    def motors_direct_points(body: schemas.MotorPointsRequest):
+        return guard(service.set_motor_points, body.id, body.points)
+
+    @router.get("/motors/models")
+    def motors_models():
+        return {"models": service.motor_model_catalogue()}
+
+    @router.post("/motors/direct/declare")
+    def motors_direct_declare(body: schemas.MotorDeclareRequest):
+        return guard(service.declare_motor, body.id, body.model, body.nickname)
+
+    @router.post("/motors/direct/play")
+    def motors_direct_play(body: schemas.MotorPlaybackRequest):
+        return guard(service.set_motor_playback, body.id, body.enabled)
 
     # ----- poses / trajectories / demos --------------------------------------------
 

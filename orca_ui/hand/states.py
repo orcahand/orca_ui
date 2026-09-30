@@ -83,6 +83,10 @@ class StatusSnapshot:
     # UI and only the absent ones are worth probing for.
     refused: tuple[str, ...] = ()
     rescanning: bool = False
+    # Bare motor mode: the config was synthesised from a bus scan, so there is
+    # no hand behind it. Views that pose a hand or map joints are meaningless
+    # here and the browser hides them.
+    bare: bool = False
 
     def as_dict(self) -> dict:
         caps = None
@@ -110,4 +114,5 @@ class StatusSnapshot:
             "missing": list(self.missing),
             "refused": list(self.refused),
             "rescanning": self.rescanning,
+            "bare": self.bare,
         }

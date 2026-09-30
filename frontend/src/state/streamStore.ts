@@ -27,6 +27,9 @@ export interface LatestFrames {
   motors: {
     temps: Record<string, number>
     currents: Record<string, number>
+    // Raw motor positions in radians, published only in bare motor mode where
+    // there is no joint estimate to derive them from.
+    positions: Record<string, number>
     // The motor family's rated max operating temperature (°C), from the
     // backend; null until the first telemetry payload carries it.
     maxTempC: number | null
@@ -52,7 +55,8 @@ export const latest: LatestFrames = {
     tTeleopTarget: 0,
   },
   tactile: { forces: null, taxels: null, tForces: 0, tTaxels: 0 },
-  motors: { temps: {}, currents: {}, maxTempC: null, faults: null },
+  motors: { temps: {}, currents: {}, positions: {}, maxTempC: null,
+            faults: null },
   teleop: { preview: null },
   stats: null,
   health: null,

@@ -92,6 +92,35 @@ class DirectMotorPositionRequest(BaseModel):
     position: float  # motor position in radians; step-clamped server-side
 
 
+class MotorTorqueRequest(BaseModel):
+    id: int = Field(ge=0)
+    enabled: bool
+
+
+class MotorRangeRequest(BaseModel):
+    id: int = Field(ge=0)
+    # Both None clears the range and puts the motor back on its full travel.
+    low: float | None = None
+    high: float | None = None
+
+
+class MotorPointsRequest(BaseModel):
+    id: int = Field(ge=0)
+    # None or empty clears the recording.
+    points: "list[float] | None" = None
+
+
+class MotorPlaybackRequest(BaseModel):
+    id: int = Field(ge=0)
+    enabled: bool
+
+
+class MotorDeclareRequest(BaseModel):
+    id: int = Field(ge=0)
+    model: "str | None" = None
+    nickname: "str | None" = None
+
+
 class ZeroRequest(BaseModel):
     num_samples: int = Field(default=100, ge=1, le=2000)
 
