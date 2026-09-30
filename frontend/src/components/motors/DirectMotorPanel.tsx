@@ -17,6 +17,12 @@ import { useAppStore } from '../../state/appStore'
 
 const SLIDER_HALF_RANGE_RAD = 0.5 // slider span around the anchor position
 const SEND_THROTTLE_MS = 80
+// Samples kept for the current readout. Present current is the instantaneous
+// phase current of a PWM-driven coil, so one sample at the bench rate lands
+// anywhere on the waveform: read raw it looks like noise. A second of them
+// shows what the motor is actually drawing, and the peak beside it shows the
+// transient a cap does not catch.
+const CURRENT_WINDOW = 20
 export function DirectMotorPanel({
   torqueOn,
   locked,
@@ -382,25 +388,45 @@ function BenchMotorRow({
 
   // Live position and current at the bench rate, so a stall is visible while
   // it happens rather than on the next Refresh.
-  const [live, setLive] = useState<{ pos: number | null; mA: number | null }>({
-    pos: null,
-    mA: null,
-  })
+  const [live, setLive] = useState<{
+    pos: number | null
+    mA: number | null
+    tempC: number | null
+  }>({ pos: null, mA: null, tempC: null })
   const [find, setFind] = useState<RangeFind>({ phase: 'idle' })
   const [rec, setRec] = useState<Recording>({ active: false, points: [] })
   const [target, setTarget] = useState<string>('')
   const [busy, setBusy] = useState(false)
   const findRef = useRef(find)
   findRef.current = find
+  const currentWindow = useRef<number[]>([])
+  const [currentStats, setCurrentStats] =
+    useState<{ mean: number; peak: number } | null>(null)
 
   useStreamFrame((frames) => {
     const pos = frames.motors.positions?.[String(motor.id)]
     const mA = frames.motors.currents?.[String(motor.id)]
-    if (pos !== undefined || mA !== undefined) {
-      setLive((prev) =>
-        prev.pos === (pos ?? null) && prev.mA === (mA ?? null)
+    const tempC = frames.motors.temps?.[String(motor.id)]
+    if (mA !== undefined) {
+      const w = currentWindow.current
+      w.push(mA)
+      if (w.length > CURRENT_WINDOW) w.shift()
+      const mean = w.reduce((a, b) => a + b, 0) / w.length
+      const peak = Math.max(...w)
+      setCurrentStats((prev) =>
+        prev && Math.round(prev.mean) === Math.round(mean) &&
+        Math.round(prev.peak) === Math.round(peak)
           ? prev
-          : { pos: pos ?? null, mA: mA ?? null },
+          : { mean, peak },
+      )
+    }
+    if (pos !== undefined || mA !== undefined || tempC !== undefined) {
+      setLive((prev) =>
+        prev.pos === (pos ?? null) &&
+        prev.mA === (mA ?? null) &&
+        prev.tempC === (tempC ?? null)
+          ? prev
+          : { pos: pos ?? null, mA: mA ?? null, tempC: tempC ?? null },
       )
     }
     // Accumulate travel between the two limits, so a turn past the encoder
@@ -416,6 +442,7 @@ function BenchMotorRow({
 
   const position = live.pos ?? motor.position
   const currentMa = live.mA ?? motor.current_ma ?? null
+  const tempC = live.tempC ?? motor.temp_c ?? null
 
   // Degrees within the found range: 0 at the end the operator set first.
   const lo = range ? Math.min(range[0], range[1]) : (span?.[0] ?? 0)
@@ -733,12 +760,23 @@ function BenchMotorRow({
             ? `${posDeg.toFixed(1)}° of ${spanDeg.toFixed(1)}°`
             : `${((position * 180) / Math.PI).toFixed(1)}° raw`}
         </span>
-        {currentMa != null && (
-          <span title="present draw — pinned high against a target it has not reached is the load it cannot move">
-            {currentMa.toFixed(0)} mA
+        {currentStats != null ? (
+          <span title={
+            'mean over the last second, then the peak in that window. ' +
+            'Present current is the instantaneous phase current of a PWM ' +
+            'coil, so a single sample is not meaningful. A cap holds the ' +
+            'mean; the peak rides above it during a move, which is the ' +
+            'current loop catching up rather than the cap failing.'
+          }>
+            {currentStats.mean.toFixed(0)} mA
+            <span style={{ color: 'var(--dimmer)' }}>
+              {' '}peak {currentStats.peak.toFixed(0)}
+            </span>
           </span>
-        )}
-        {motor.temp_c != null && <span>{motor.temp_c.toFixed(0)} °C</span>}
+        ) : currentMa != null ? (
+          <span>{currentMa.toFixed(0)} mA</span>
+        ) : null}
+        {tempC != null && <span>{tempC.toFixed(0)} °C</span>}
         {flags && flags.length > 0 && (
           <span style={{ color: 'var(--err)' }}>{flags.join(' + ')}</span>
         )}

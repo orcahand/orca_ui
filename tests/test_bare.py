@@ -475,6 +475,7 @@ class TestBenchTelemetry:
         sampler = TelemetryService.__new__(TelemetryService)
         sampler._motor_health = {}
         sampler._last_bench_read = float("-inf")
+        sampler._last_bench_temp = float("-inf")
         sampler._hub = SimpleNamespace(
             publish=lambda topic, payload: published.append((topic, payload)))
         sampler._service = SimpleNamespace(
@@ -488,6 +489,9 @@ class TestBenchTelemetry:
 
             def get_motor_current(self, as_dict=False):
                 return {1: 120.0, 2: 45.0}
+
+            def get_motor_temp(self, as_dict=False):
+                return {1: 31.0, 2: 32.0}
 
         session = SimpleNamespace(hand=_Hand(),
                                   caps=SimpleNamespace(motors=True))
@@ -1083,22 +1087,35 @@ class TestFeetechIdentification:
                 assert model.ceiling_ma <= model.stall_current_ma, model.key
 
 
-class TestManualCeilingRespectsDeclarations:
-    """The declaration exists so a motor is never handed more than its model
-    tolerates. Applying that only at connect would leave the obvious way to
-    set a ceiling as the one way around it."""
+class TestBenchTemperature:
+    """The loopless hand's ordinary telemetry is held to one read every ten
+    seconds, which on a bench reads as a temperature that only moves when
+    something is clicked."""
 
-    def test_a_typed_ceiling_is_clamped_to_the_declared_model(self):
-        service, session, written = TestMotorDeclarations()._service()
-        service.declare_motor(1, "hls2915m", "index")
+    def test_temperature_rides_the_bench_tick(self):
+        sampler, session, published = TestBenchTelemetry()._sampler(True)
 
-        service._apply_declared_ceiling(session, 900.0)
+        sampler._bench_tick(session)
 
-        assert written == [([1], [500.0])]
+        _topic, payload = published[0]
+        assert payload["temps"] == {1: 31.0, 2: 32.0}
 
-    def test_an_undeclared_motor_is_still_left_alone(self):
-        service, session, written = TestMotorDeclarations()._service()
+    def test_it_is_read_far_slower_than_current(self):
+        """A bus round trip of its own, for a quantity that moves over
+        minutes."""
+        from orca_ui.hand.telemetry import BENCH_TELEMETRY_HZ, BENCH_TEMP_HZ
 
-        service._apply_declared_ceiling(session, 900.0)
+        assert BENCH_TEMP_HZ < BENCH_TELEMETRY_HZ
 
-        assert written == []
+    def test_a_temperature_read_failure_does_not_lose_the_rest(self):
+        """Position and current are the reason the tick exists."""
+        sampler, session, published = TestBenchTelemetry()._sampler(True)
+
+        def boom(as_dict=False):
+            raise OSError("bus")
+
+        session.hand.get_motor_temp = boom
+        sampler._bench_tick(session)
+
+        _topic, payload = published[0]
+        assert payload["positions"] and payload["currents"]

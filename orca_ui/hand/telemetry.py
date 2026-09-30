@@ -48,6 +48,11 @@ HW_ERROR_SWEEP_S = 10.0
 # joint loop does at 200 Hz.
 BENCH_TELEMETRY_HZ = 20.0
 
+# Temperature rides the same tick but far slower: it moves over minutes, and
+# it is a bus round trip of its own. Slow enough to cost nothing, fast enough
+# that a motor heating under load is visible while it happens.
+BENCH_TEMP_HZ = 1.0
+
 # Minimum gap between motor-bus telemetry reads on a hand with no joint loop.
 # There is no loop to contend with, but the bus is half-duplex: every read
 # blocks commands for its whole round trip, and temperature moves over minutes,
@@ -250,6 +255,7 @@ class TelemetryService:
         # the panel should not sit empty for a whole interval after connect.
         self._last_motor_telemetry = float("-inf")
         self._last_bench_read = float("-inf")
+        self._last_bench_temp = float("-inf")
         self._motor_health: dict[str, dict] = {"temps": {}, "currents": {}}
         self._sensor_health = SensorHealthMonitor()
         # Joints whose encoder is currently distrusted (joint -> "verdict:
@@ -325,8 +331,10 @@ class TelemetryService:
     def _bench_tick(self, session) -> None:
         """Position and current for bare motors, fast enough to watch a stall.
 
-        Temperature is left to the slow tick: it moves over minutes and costs
-        another bus round trip.
+        Temperature rides along at its own slower rate. The loopless hand's
+        ordinary telemetry is held to one read every ten seconds, which on a
+        bench reads as a temperature that only moves when something is
+        clicked.
         """
         now = time.monotonic()
         if now - self._last_bench_read < 1.0 / BENCH_TELEMETRY_HZ:
@@ -341,6 +349,14 @@ class TelemetryService:
         except Exception:
             logger.debug("bench telemetry read failed", exc_info=True)
             return
+        if now - self._last_bench_temp >= 1.0 / BENCH_TEMP_HZ:
+            try:
+                self._motor_health["temps"] = {
+                    int(k): round(float(v), 1)
+                    for k, v in hand.get_motor_temp(as_dict=True).items()}
+                self._last_bench_temp = now
+            except Exception:
+                logger.debug("bench temperature read failed", exc_info=True)
         self._motor_health["positions"] = {
             int(k): round(float(v), 4) for k, v in positions.items()}
         self._motor_health["currents"] = {
