@@ -525,11 +525,14 @@ function BenchMotorRow({
   const finishRecord = () =>
     void call(async () => {
       const captured = rec.points
-      setRec({ active: false, points: [] })
-      await api.motorsDirectTorque(motor.id, true)
+      // Store first, clear second. Clearing up front threw the recording away
+      // whenever the store was refused, leaving nothing on screen and no way
+      // back to the points the operator had just captured by hand.
       if (captured.length > 0) {
         await api.motorsDirectPoints(motor.id, captured)
       }
+      await api.motorsDirectTorque(motor.id, true)
+      setRec({ active: false, points: [] })
     })
 
   const cancelRecord = () =>

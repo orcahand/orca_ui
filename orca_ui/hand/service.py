@@ -1541,7 +1541,7 @@ class HandService:
         if not all(math.isfinite(p) for p in values):
             raise ServiceError("recorded points must be finite")
         for value in values:
-            self._check_reachable(session.hand, motor_id, value)
+            self._check_within_travel(session.hand, value)
         self._bench_points[motor_id] = values
         return {"id": motor_id, "points": values}
 
@@ -1639,21 +1639,35 @@ class HandService:
                     self._bench_playing[motor_id] = index + 1
         return True
 
-    def _check_reachable(self, hand, motor_id: int, position: float) -> None:
-        """Refuse a target the motor cannot reach, rather than letting the
-        client clamp it to whichever end of travel is nearer."""
-        found = self._bench_ranges.get(int(motor_id))
-        if found is not None and not (found[0] <= position <= found[1]):
-            raise ServiceError(
-                f"{position:.3f} rad is outside the range found for this "
-                f"motor ({found[0]:.3f} to {found[1]:.3f} rad) — clear the "
-                "range to command past it")
+    def _check_within_travel(self, hand, position: float) -> None:
+        """Refuse a target the motor physically cannot reach.
+
+        Out of range does not fail at the servo, it clamps to whichever end is
+        nearer, so an unreachable target reads as a hard drive into a stop
+        rather than as a rejected command.
+        """
         span = getattr(type(getattr(hand, "motor_client", None)),
                        "position_range_rad", None)
         if span is not None and not (span[0] <= position <= span[1]):
             raise ServiceError(
                 f"{position:.3f} rad is outside this motor's travel "
                 f"({span[0]:.3f} to {span[1]:.3f} rad)")
+
+    def _check_reachable(self, hand, motor_id: int, position: float) -> None:
+        """As above, and also inside the range the operator found by hand.
+
+        Only for a target somebody typed or dragged. A recorded point is a
+        place the motor was physically put, so it is reachable by definition
+        and is checked against travel alone — the found range bounds the
+        slider, it does not decide where a recording may have been made.
+        """
+        found = self._bench_ranges.get(int(motor_id))
+        if found is not None and not (found[0] <= position <= found[1]):
+            raise ServiceError(
+                f"{position:.3f} rad is outside the range found for this "
+                f"motor ({found[0]:.3f} to {found[1]:.3f} rad) — clear the "
+                "range to command past it")
+        self._check_within_travel(hand, position)
 
     def set_motor_position(self, motor_id: int, position: float) -> dict:
         """Raw motor-space position write (radians) for one motor."""

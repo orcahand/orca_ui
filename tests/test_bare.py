@@ -712,18 +712,39 @@ class TestRecordedPoints:
         assert result["points"] == [-3.0, -2.0, -1.0]
         assert service._bench_points[1] == [-3.0, -2.0, -1.0]
 
-    def test_a_point_outside_the_found_range_is_refused(self):
-        """Recording happens by hand, so a point can land outside a range set
-        earlier; catching it here beats discovering it mid-cycle."""
+    def test_a_point_outside_the_found_range_is_still_recorded(self):
+        """Recording happens by hand: a point is somewhere the motor was
+        physically put, so it is reachable whatever the slider's range says.
+        Refusing the set threw away a recording the operator had just made."""
+        service, _, _ = self._service()
+        service.set_motor_range(1, -4.0, -2.0)
+
+        result = service.set_motor_points(1, [-3.0, -1.0])
+
+        assert result["points"] == [-3.0, -1.0]
+
+    def test_a_point_outside_the_motor_travel_is_still_refused(self):
+        """Travel is physics, not preference."""
+        from orca_ui.hand.service import ServiceError
+
+        service, _, _ = self._service()
+        service._require_motors().hand.motor_client.position_range_rad = (
+            -6.2816513263917, 0.0)
+
+        with pytest.raises(ServiceError) as caught:
+            service.set_motor_points(1, [-3.0, 2.0])
+        assert "outside this motor's travel" in str(caught.value)
+
+    def test_a_typed_target_is_still_bounded_by_the_range(self):
+        """The found range still governs what may be commanded by hand."""
         from orca_ui.hand.service import ServiceError
 
         service, _, _ = self._service()
         service.set_motor_range(1, -4.0, -2.0)
 
         with pytest.raises(ServiceError) as caught:
-            service.set_motor_points(1, [-3.0, -1.0])
+            service.set_motor_position(1, -1.0)
         assert "outside the range found" in str(caught.value)
-        assert 1 not in service._bench_points
 
     def test_playing_needs_points(self):
         from orca_ui.hand.service import ServiceError
