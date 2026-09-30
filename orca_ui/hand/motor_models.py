@@ -158,11 +158,10 @@ _MODELS: tuple[MotorModel, ...] = (
         key="hls2915m",
         label="Feetech HLS2915M-C001",
         family=FEETECH,
-        # The datasheet does not give the number this model reports, and the
-        # finger motors on the hand to hand report 6922, which orca_core
-        # labels HLS3915. Until one of those is confirmed, a declaration of
-        # this model cannot be cross-checked.
-        model_numbers=(),
+        # Confirmed by the operator against the hand: the finger motors report
+        # 6922. orca_core labels that number HLS3915, which is the same motor
+        # under a different name; 5130 appears in orca_core's table for it too.
+        model_numbers=(6922, 5130),
         has_current_control=True,
         current_scale_ma=HLS_CURRENT_SCALE_MA,
         # Stall, the hard clamp. Sustained draw here cooks the motor.
@@ -175,7 +174,8 @@ _MODELS: tuple[MotorModel, ...] = (
         source=("HL-2915-C001 product specification A/0, 2026-01-18: rated "
                 "current 500 mA, stall current 1.5 A at 12 V, stall torque "
                 "14.2 kg.cm; registers from the HLS memory table (44 capped "
-                "by 28, 6.5 mA/unit, modes 0-3)"),
+                "by 28, 6.5 mA/unit, modes 0-3); model number 6922 read off "
+                "the finger motors and confirmed by the operator"),
     ),
     MotorModel(
         key="hls3930m",
@@ -194,28 +194,6 @@ _MODELS: tuple[MotorModel, ...] = (
                 "current 800 mA, stall current 2.8 A at 12 V, stall torque "
                 "35 kg.cm; registers from the HLS memory table (44 capped "
                 "by 28, 6.5 mA/unit, modes 0-3)"),
-    ),
-    MotorModel(
-        key="hls-6922",
-        # Labelled by its number, like the Dynamixel wrist was before it was
-        # confirmed: orca_core calls 6922 HLS3915, which is not on the parts
-        # list, while the list names HLS2915M for this position. Whichever is
-        # right, the number is what the servo actually says.
-        label="Feetech HLS (reports 6922)",
-        family=FEETECH,
-        model_numbers=(6922, 5130),
-        has_current_control=True,
-        current_scale_ma=HLS_CURRENT_SCALE_MA,
-        max_current_ma=13305.5,
-        # No datasheet identified for this number yet, so the conservative
-        # HLS2915M figures stand in. Its own Protection Current reads 450
-        # raw (2925 mA), which is a fault threshold rather than a rating.
-        rated_current_ma=500.0,
-        stall_current_ma=1500.0,
-        operating_modes=(0, 1, 2, 3),
-        source=("model number read off the finger motors; limits are "
-                "HLS2915M-C001's pending confirmation of which datasheet "
-                "this number belongs to"),
     ),
     MotorModel(
         key="feetech-hls",
