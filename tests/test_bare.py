@@ -1040,3 +1040,36 @@ class TestControlTableFacts:
         for model in motor_models.catalogue():
             if model.key != motor_models.UNKNOWN_KEY:
                 assert model.operating_modes, model.key
+
+
+class TestFeetechIdentification:
+    """Read off a real chain: the wrist reports 4106 and the finger motors
+    6922, so Feetech declarations can be cross-checked after all."""
+
+    def test_the_wrist_number_identifies_its_model(self):
+        from orca_ui.hand import motor_models
+
+        assert motor_models.for_model_number(4106).key == "hls3930m"
+
+    def test_the_finger_number_identifies_something(self):
+        from orca_ui.hand import motor_models
+
+        assert motor_models.for_model_number(6922) is not None
+
+    def test_no_entry_claims_a_number_it_cannot_justify(self):
+        """HLS2915M-C001's datasheet gives no reported number, so the entry
+        must not claim one and silently contradict a servo."""
+        from orca_ui.hand import motor_models
+
+        assert motor_models.get("hls2915m").model_numbers == ()
+        assert motor_models.get("hls2915m").verifiable is False
+
+    def test_the_protection_register_is_never_used_as_a_ceiling(self):
+        """Register 28 reads 450 raw (2925 mA) on a motor that stalls at
+        1.5 A: it is a trip point, not a rating. Every catalogued ceiling has
+        to sit below the motor's own stall figure."""
+        from orca_ui.hand import motor_models
+
+        for model in motor_models.catalogue():
+            if model.ceiling_ma and model.stall_current_ma:
+                assert model.ceiling_ma <= model.stall_current_ma, model.key

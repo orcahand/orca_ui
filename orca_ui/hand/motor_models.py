@@ -99,8 +99,11 @@ UNKNOWN = MotorModel(
 #   33  Operating Mode      RW  0 position, 1 speed, 2 current, 3 PWM
 #   44  Goal Torque         RW  -2047..2047, 6.5 mA/unit, caps running current
 #   69  Present Current     R   6.5 mA/unit
-# So the family always has current control, and the per-motor ceiling is
-# readable from register 28 rather than assumed from the model.
+# So the family always has current control. Register 28 is NOT a thermal
+# ceiling, though: read off a real chain it holds 450 raw (2925 mA) on motors
+# that stall at 1.5 A, and 1000 raw (6500 mA) on one that stalls at 2.8 A.
+# It is the overcurrent trip point, set roughly twice stall so that stalling
+# does not trip it, and a bench must not mistake it for a rating.
 HLS_CURRENT_SCALE_MA = 6.5
 
 # Confirmed by reading the control table off a real chain on 2026-09-29:
@@ -155,9 +158,10 @@ _MODELS: tuple[MotorModel, ...] = (
         key="hls2915m",
         label="Feetech HLS2915M-C001",
         family=FEETECH,
-        # The datasheet does not give the number the servo reports, and the
-        # bus has not been read for it yet, so a declaration of this model
-        # cannot be cross-checked.
+        # The datasheet does not give the number this model reports, and the
+        # finger motors on the hand to hand report 6922, which orca_core
+        # labels HLS3915. Until one of those is confirmed, a declaration of
+        # this model cannot be cross-checked.
         model_numbers=(),
         has_current_control=True,
         current_scale_ma=HLS_CURRENT_SCALE_MA,
@@ -177,7 +181,9 @@ _MODELS: tuple[MotorModel, ...] = (
         key="hls3930m",
         label="Feetech HLS3930M-C001",
         family=FEETECH,
-        model_numbers=(),
+        # Read off the wrist, where the parts list puts this model, and
+        # orca_core labels 4106 HLS3930. Both agree, so it can be checked.
+        model_numbers=(4106,),
         has_current_control=True,
         current_scale_ma=HLS_CURRENT_SCALE_MA,
         max_current_ma=13305.5,
@@ -188,6 +194,28 @@ _MODELS: tuple[MotorModel, ...] = (
                 "current 800 mA, stall current 2.8 A at 12 V, stall torque "
                 "35 kg.cm; registers from the HLS memory table (44 capped "
                 "by 28, 6.5 mA/unit, modes 0-3)"),
+    ),
+    MotorModel(
+        key="hls-6922",
+        # Labelled by its number, like the Dynamixel wrist was before it was
+        # confirmed: orca_core calls 6922 HLS3915, which is not on the parts
+        # list, while the list names HLS2915M for this position. Whichever is
+        # right, the number is what the servo actually says.
+        label="Feetech HLS (reports 6922)",
+        family=FEETECH,
+        model_numbers=(6922, 5130),
+        has_current_control=True,
+        current_scale_ma=HLS_CURRENT_SCALE_MA,
+        max_current_ma=13305.5,
+        # No datasheet identified for this number yet, so the conservative
+        # HLS2915M figures stand in. Its own Protection Current reads 450
+        # raw (2925 mA), which is a fault threshold rather than a rating.
+        rated_current_ma=500.0,
+        stall_current_ma=1500.0,
+        operating_modes=(0, 1, 2, 3),
+        source=("model number read off the finger motors; limits are "
+                "HLS2915M-C001's pending confirmation of which datasheet "
+                "this number belongs to"),
     ),
     MotorModel(
         key="feetech-hls",
