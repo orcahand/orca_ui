@@ -1,27 +1,70 @@
 #!/bin/sh
-# Switch which orca_core this checkout runs against — the same thing as
-# `uv run orca-dev`, but able to run before the project venv does.
+# Flip which orca_core this checkout runs against. Sticks until flipped back.
 #
-# `uv run` syncs the project before it spawns anything, so `uv run orca-dev`
-# cannot start while the committed orca_core pin is unresolvable — which is
-# exactly when you need it to turn dev mode on. This calls the same code with
-# a bare interpreter, so it works from a fresh clone with no venv at all.
+#   ./dev               which one is live, and offer to flip (in a terminal)
+#   ./dev local [DIR]   a local checkout, live-editable (default ../orca_core)
+#   ./dev release       the published package
 #
-#   ./dev              report, and offer your local orca_core checkout
-#   ./dev local [PATH] use a local checkout (found automatically; PATH only
-#                      for an unusual location, once)
-#   ./dev branch NAME  track a branch of the orca_core repo, no checkout needed
-#   ./dev release      back to the published package
-#   ./dev status       which orca_core is installed
-#
-# Once the project resolves, `uv run orca-dev ...` does the same thing.
+# `local` links the checkout into .venv, puts it ahead of the installed package
+# on sys.path, and installs any of its dependencies the venv does not satisfy.
+# Nothing tracked changes, so nothing can reach a commit; `uv run` and an IDE
+# on .venv both see the flip. Recreating .venv drops it, back to the release.
 
 cd "$(dirname "$0")" || exit 1
 
-PY=$(command -v python3 || command -v python)
-if [ -z "$PY" ]; then
-    echo "dev: no python3 on PATH — install Python 3.10+ and retry." >&2
-    exit 1
-fi
+SHIM=.venv/orca-core-dev  # keep in sync with SHIM_DIR in orca_ui/core_source.py
+PY=.venv/bin/python
 
-exec "$PY" -m orca_ui.core_source "$@"
+[ -x "$PY" ] || uv sync -q || exit 1
+PTH=$("$PY" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')/_orca_core_dev.pth
+
+status() {
+    "$PY" -c 'from orca_ui.core_source import resolve; print(resolve().summary())'
+}
+
+use_local() {
+    core=$(cd "${1:-../orca_core}" 2>/dev/null && pwd)
+    if ! grep -qE '^name *= *"orca[-_]core"' "$core/pyproject.toml" 2>/dev/null; then
+        echo "dev: no orca_core checkout at ${1:-../orca_core}" >&2
+        exit 1
+    fi
+    # Installs only what the venv does not already satisfy.
+    uv pip install -q --python "$PY" -r "$core/pyproject.toml" || exit 1
+    mkdir -p "$SHIM"
+    ln -sfn "$core/orca_core" "$SHIM/orca_core"
+    "$PY" -c 'import os, sys; open(sys.argv[1], "w").write("import sys; sys.path.insert(0, %r)\n" % os.path.abspath(sys.argv[2]))' "$PTH" "$SHIM"
+}
+
+use_release() {
+    rm -f "$PTH"
+    rm -rf "$SHIM"
+}
+
+confirm() {
+    printf '%s [y/N] ' "$1"
+    read -r answer
+    case "$answer" in [yY]*) return 0 ;; *) return 1 ;; esac
+}
+
+case "${1:-}" in
+    local)   use_local "$2" ;;
+    release) use_release ;;
+    "")
+        status
+        [ -t 0 ] && [ -t 1 ] || exit 0
+        if [ -f "$PTH" ]; then
+            confirm "Switch back to the released package?" || exit 0
+            use_release
+        else
+            branch=$(git -C ../orca_core branch --show-current 2>/dev/null)
+            confirm "Switch to your local checkout at ../orca_core${branch:+ ($branch)}?" || exit 0
+            use_local
+        fi
+        ;;
+    *)
+        sed -n '2,11s/^# \{0,1\}//p' "$0"
+        exit 2
+        ;;
+esac
+
+status

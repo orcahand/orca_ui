@@ -25,7 +25,7 @@ scripts/check-urdf.mjs`.
 
 The suite runs against whichever `orca_core` is installed. A failure that
 appears only on your machine is usually the console disagreeing with an
-unreleased `orca_core` — check `./dev status` first. The header's DEV CORE
+unreleased `orca_core`. The header's DEV CORE
 badge and the startup banner both name the source that is actually imported.
 
 ## Frontend
@@ -40,7 +40,8 @@ git add orca_ui/webui
 ```
 
 The pre-commit hook stops you committing frontend sources without a rebuilt
-bundle.
+bundle. Git does not ship active hooks, so turn it on once per clone:
+`git config core.hooksPath .githooks`.
 
 Everything static the UI serves has to live in `frontend/public/` — the build
 runs with `emptyOutDir`, so a file that exists only in `orca_ui/webui/` is
@@ -50,44 +51,34 @@ needed it goes quiet.
 ## Working against an unreleased orca_core
 
 `pyproject.toml` depends on the published `orca_core`, which is what a plain
-clone installs and what the wheel declares. To develop against a local
-checkout:
+clone runs. To flip this checkout onto a local one:
 
 ```bash
-./dev local          # point at the sibling ../orca_core (found automatically)
-./dev branch NAME    # or track a branch of the orca_core repo, no checkout
+./dev local          # the sibling ../orca_core, live-editable
+./dev local DIR      # a checkout or worktree somewhere else
 ./dev release        # back to the published package
-./dev status         # which one is live right now
+./dev                # which one is live, and offer to flip
 ```
 
-`./dev` rather than `uv run orca-dev` because `uv run` syncs before it spawns,
-so it cannot start while the committed pin is unresolvable — which is exactly
-when dev mode is needed. Once the project resolves, either works.
+The flip sticks until you flip back. It links the checkout into `.venv` and
+puts it ahead of the installed package on `sys.path`, so `uv run`, `uv sync`
+and an IDE pointed at `.venv` all see it, and nothing tracked changes.
+Recreating `.venv` drops it, back to the release.
 
-`uv` has no local-only override file, so `./dev local` writes a
-`[tool.uv.sources]` entry into the **tracked** `pyproject.toml` and `uv.lock`.
-A relative path is a fact about one machine: committed, it makes the project
-unresolvable everywhere else, and `uv lock` fails outright on a clone with no
-sibling `orca_core`.
+`./dev local` also installs whatever the checkout's own dependencies need that
+the venv does not already satisfy, so a core that adds or bumps one just works.
+`uv sync` removes those again, since the lock does not list them; re-run
+`./dev local` if an import fails afterwards.
 
-So it must never reach a commit. Three things enforce that, and none of them
-replaces reading your own diff:
+Do not add a `[tool.uv.sources]` entry for `orca_core` instead. A path is a
+fact about one machine: committed, it makes the project unresolvable
+everywhere else. `tests/test_no_committed_dev_override.py` fails on one in
+`HEAD`, and CI installs PRs into `main` with `uv sync --locked`.
 
-- `.githooks/pre-commit` refuses the commit and tells you what to unstage. It
-  only runs in clones that set `core.hooksPath` — git will not ship active
-  hooks — so it cannot be the only guard.
-- `tests/test_no_committed_dev_override.py` reads the *committed* files, so it
-  passes while your working tree is in dev mode and fails only once the
-  override is committed.
-- `.github/workflows/test.yml` runs that test on every pull request. A PR into
-  `main` also installs with `uv sync --locked` against the published
-  `orca_core`, which a path source cannot satisfy. This is the guard that
-  catches a commit made on a machine without the hook.
-
-A branch that needs an unreleased `orca_core` does **not** get a source entry
-of its own. CI pairs it instead: `test.yml` checks `orca_core` out beside this
-repo, preferring a branch of the same name as the PR's head or base and
-falling back to `main`. Give the two branches the same name and they are
+A branch that needs an unreleased `orca_core` is paired in CI instead:
+`test.yml` checks `orca_core` out beside this repo, preferring a branch of the
+same name as the PR's head or base and falling back to `main`, and runs the
+suite against it. Give the two branches the same name and they are
 tested together.
 
 ## 3D asset bundle
