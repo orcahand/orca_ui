@@ -188,7 +188,15 @@ export function ServoTuningPanel() {
         style={{ width: 62 }}
         placeholder={fmt(shown)}
         value={drafts[id]?.[key] ?? ''}
-        disabled={shown === undefined || busy === id}
+        // null is a register this family does not have, not one that is
+        // merely unset: a Feetech position loop is PID with no feedforward,
+        // and offering the field would only produce a refusal.
+        disabled={shown === undefined || shown === null || busy === id}
+        title={
+          shown === null
+            ? 'this motor family does not have this register'
+            : undefined
+        }
         onChange={(e) =>
           setDrafts((d) => ({
             ...d,
