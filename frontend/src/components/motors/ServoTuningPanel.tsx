@@ -182,36 +182,41 @@ export function ServoTuningPanel() {
     integer: boolean,
   ) => (
     <th key={key} title={title}>
-      <div>{label}</div>
-      <div style={{ display: 'flex', gap: 2, marginTop: 2 }}>
-        <input
-          type="number"
-          min={0}
-          max={max}
-          step={integer ? 1 : 0.1}
-          placeholder="all"
-          value={columnDrafts[key] ?? ''}
-          disabled={busy !== null || loading}
-          title={`set ${label} on all ${ids.length} motors`}
-          onChange={(e) =>
-            setColumnDrafts((d) => ({ ...d, [key]: e.target.value }))
-          }
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') setAllColumn(key, label, max, integer)
-          }}
-          style={{ width: 46, fontSize: 9 }}
-        />
-        <button
-          className="btn btn-secondary"
-          style={{ padding: '0 4px', fontSize: 9 }}
-          disabled={
-            busy !== null || loading || (columnDrafts[key] ?? '').trim() === ''
-          }
-          title={`write this to all ${ids.length} motors`}
-          onClick={() => setAllColumn(key, label, max, integer)}
-        >
-          set
-        </button>
+      {/* Stacked and left-aligned together: the header's own text alignment
+          would otherwise leave the label sitting off the corner of the box. */}
+      <div style={{ display: 'flex', flexDirection: 'column',
+                    alignItems: 'flex-start', gap: 2 }}>
+        <span>{label}</span>
+        <div style={{ display: 'flex', gap: 2 }}>
+          <input
+            type="number"
+            min={0}
+            max={max}
+            step={integer ? 1 : 0.1}
+            placeholder="all"
+            value={columnDrafts[key] ?? ''}
+            disabled={busy !== null || loading}
+            title={`set ${label} on all ${ids.length} motors`}
+            onChange={(e) =>
+              setColumnDrafts((d) => ({ ...d, [key]: e.target.value }))
+            }
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') setAllColumn(key, label, max, integer)
+            }}
+            style={{ width: 46, fontSize: 9 }}
+          />
+          <button
+            className="btn btn-secondary"
+            style={{ padding: '0 4px', fontSize: 9 }}
+            disabled={
+              busy !== null || loading || (columnDrafts[key] ?? '').trim() === ''
+            }
+            title={`write this to all ${ids.length} motors`}
+            onClick={() => setAllColumn(key, label, max, integer)}
+          >
+            set
+          </button>
+        </div>
       </div>
     </th>
   )

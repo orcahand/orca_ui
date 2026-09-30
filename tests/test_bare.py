@@ -1081,3 +1081,24 @@ class TestFeetechIdentification:
         for model in motor_models.catalogue():
             if model.ceiling_ma and model.stall_current_ma:
                 assert model.ceiling_ma <= model.stall_current_ma, model.key
+
+
+class TestManualCeilingRespectsDeclarations:
+    """The declaration exists so a motor is never handed more than its model
+    tolerates. Applying that only at connect would leave the obvious way to
+    set a ceiling as the one way around it."""
+
+    def test_a_typed_ceiling_is_clamped_to_the_declared_model(self):
+        service, session, written = TestMotorDeclarations()._service()
+        service.declare_motor(1, "hls2915m", "index")
+
+        service._apply_declared_ceiling(session, 900.0)
+
+        assert written == [([1], [500.0])]
+
+    def test_an_undeclared_motor_is_still_left_alone(self):
+        service, session, written = TestMotorDeclarations()._service()
+
+        service._apply_declared_ceiling(session, 900.0)
+
+        assert written == []

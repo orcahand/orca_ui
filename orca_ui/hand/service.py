@@ -1220,7 +1220,13 @@ class HandService:
         except Exception as e:
             raise ServiceError(f"hand config rejected {ma} mA: {e}")
         with _bus_fence(session.hand):
-            session.hand.set_max_current(ma)
+            if self.settings.bare:
+                # The declaration is the whole point: a model rated 500 mA
+                # must not be handed 900 just because someone typed it here.
+                # Connect already respects it; so must this.
+                self._apply_declared_ceiling(session, float(ma))
+            else:
+                session.hand.set_max_current(ma)
         session.hand.config = config
         with self._state_lock:
             self._max_current = ma
