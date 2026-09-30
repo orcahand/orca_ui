@@ -25,6 +25,21 @@ type ProfileField = keyof ServoProfile
 // Fallback only, for a backend too old to report the width. Families differ:
 // X-series gain registers are two bytes, HLS gains one.
 const GAIN_MAX_FALLBACK = 16383
+// The release that first reported Feetech gains. Below it the console asks
+// and gets nothing back, which is indistinguishable from a family that has
+// no such registers — so say which it is rather than showing an empty table.
+const CORE_WITH_FEETECH_GAINS = '0.5.1'
+
+function isOlderRelease(version: string, wanted: string): boolean {
+  const parse = (v: string) =>
+    v.split('.').map((c) => Number.parseInt(c, 10) || 0)
+  const a = parse(version)
+  const b = parse(wanted)
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) < (b[i] ?? 0)
+  }
+  return false
+}
 
 const GAIN_FIELDS: { key: GainField; label: string; title: string }[] = [
   { key: 'kp', label: 'Kp', title: 'Position P gain — stiffness against position error.' },
@@ -83,6 +98,7 @@ function fmt(value: number | null | undefined): string {
 export function ServoTuningPanel() {
   const motors = useAppStore((s) => s.status?.capabilities?.motors ?? false)
   const joints = useAppStore((s) => s.handInfo?.joints)
+  const core = useAppStore((s) => s.handInfo?.core)
   const setError = useAppStore((s) => s.setError)
 
   const [gains, setGains] = useState<ServoGainsMap | null>(null)
@@ -221,6 +237,15 @@ export function ServoTuningPanel() {
     </th>
   )
 
+  const nothingSettable = gainFields.length === 0 && profileFields.length === 0
+  // A development checkout carries whatever version it was cut from, so its
+  // number says nothing about what it contains: never blame it.
+  const coreTooOld =
+    nothingSettable &&
+    core != null &&
+    !core.development &&
+    isOlderRelease(core.version, CORE_WITH_FEETECH_GAINS)
+
   const apply = (id: string) => {
     const draft = drafts[id] ?? {}
     const gainPayload: Partial<ServoGains> = {}
@@ -324,11 +349,22 @@ export function ServoTuningPanel() {
         limit; non-zero also rate-limits streamed targets, so it shapes teleop
         and replay, not just point-to-point moves.
       </div>
-      {ids.length === 0 ? (
+      {ids.length === 0 || nothingSettable ? (
         <div style={{ fontSize: 10, color: 'var(--dimmer)' }}>
-          {loading
-            ? 'reading…'
-            : 'nothing reported — this motor family may not expose these registers'}
+          {loading ? (
+            'reading…'
+          ) : coreTooOld ? (
+            <>
+              <span style={{ color: 'var(--warn)' }}>
+                orca_core {core?.version} does not report this motor family’s
+                gains.
+              </span>{' '}
+              {CORE_WITH_FEETECH_GAINS} does. Update with{' '}
+              <code>git pull &amp;&amp; uv sync</code> and reconnect.
+            </>
+          ) : (
+            'nothing reported — this motor family may not expose these registers'
+          )}
         </div>
       ) : (
         <table className="motor-table">
