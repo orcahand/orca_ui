@@ -90,6 +90,7 @@ export function ServoTuningPanel() {
   const [profile, setProfile] = useState<ServoProfileMap | null>(null)
   const [drafts, setDrafts] = useState<Record<string, Record<string, string>>>({})
   const [busy, setBusy] = useState<string | null>(null)
+  const [columnDrafts, setColumnDrafts] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
 
   const jointOfMotor = new Map<string, string>()
@@ -124,6 +125,13 @@ export function ServoTuningPanel() {
   // have. Showing an empty column for it invites tuning against a term that
   // does not exist, so the column is dropped rather than greyed out.
   const entries = Object.values(gains ?? {})
+  const profileEntries = Object.values(profile ?? {})
+  const profileFields = PROFILE_FIELDS.filter(
+    (f) =>
+      profileEntries.length === 0 ||
+      profileEntries.some((p) => p !== null && p[f.key] !== null &&
+                                 p[f.key] !== undefined),
+  )
   const gainFields = GAIN_FIELDS.filter(
     (f) =>
       entries.length === 0 ||
@@ -131,30 +139,82 @@ export function ServoTuningPanel() {
                           g[f.key] !== undefined),
   )
 
-  // Set one column on every motor at once. A chain is usually tuned as a
-  // set, and typing the same number seventeen times invites one typo that is
-  // then very hard to spot in a table of near-identical numbers.
-  const setAllGain = (key: GainField, label: string) => {
-    const typed = window.prompt(
-      `Set ${label} on all ${ids.length} motors (0-${maxGain})`,
-    )
-    if (typed === null) return
-    const value = Number.parseInt(typed.trim(), 10)
-    if (!Number.isFinite(value) || value < 0 || value > maxGain) {
-      setError(`${label} must be 0–${maxGain}`)
+  // Set one column on every motor at once. A chain is tuned as a set, and
+  // typing the same number seventeen times invites one typo that is then very
+  // hard to spot in a table of near-identical numbers.
+  const setAllColumn = (
+    key: string,
+    label: string,
+    max: number,
+    integer: boolean,
+  ) => {
+    const raw = (columnDrafts[key] ?? '').trim()
+    if (raw === '') return
+    const value = integer ? Number.parseInt(raw, 10) : Number.parseFloat(raw)
+    if (!Number.isFinite(value) || value < 0 || value > max) {
+      setError(`${label} must be 0–${max}`)
       return
     }
     setBusy('all')
-    Promise.all(
-      ids.map((id) => api.setServoGains(Number(id), { [key]: value })),
-    )
-      .then(() => setError(null))
+    const send = (id: string) =>
+      integer
+        ? api.setServoGains(Number(id), { [key]: value })
+        : api.setServoProfile(Number(id), { [key]: value })
+    Promise.all(ids.map(send))
+      .then(() => {
+        setColumnDrafts((d) => ({ ...d, [key]: '' }))
+        setError(null)
+      })
       .catch((e) => setError(String((e as Error).message ?? e)))
       .finally(() => {
         setBusy(null)
         refresh()
       })
   }
+
+  // One header cell: the label, a value for the whole column, and the button
+  // that writes it everywhere.
+  const columnHeader = (
+    key: string,
+    label: string,
+    title: string,
+    max: number,
+    integer: boolean,
+  ) => (
+    <th key={key} title={title}>
+      <div>{label}</div>
+      <div style={{ display: 'flex', gap: 2, marginTop: 2 }}>
+        <input
+          type="number"
+          min={0}
+          max={max}
+          step={integer ? 1 : 0.1}
+          placeholder="all"
+          value={columnDrafts[key] ?? ''}
+          disabled={busy !== null || loading}
+          title={`set ${label} on all ${ids.length} motors`}
+          onChange={(e) =>
+            setColumnDrafts((d) => ({ ...d, [key]: e.target.value }))
+          }
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') setAllColumn(key, label, max, integer)
+          }}
+          style={{ width: 46, fontSize: 9 }}
+        />
+        <button
+          className="btn btn-secondary"
+          style={{ padding: '0 4px', fontSize: 9 }}
+          disabled={
+            busy !== null || loading || (columnDrafts[key] ?? '').trim() === ''
+          }
+          title={`write this to all ${ids.length} motors`}
+          onClick={() => setAllColumn(key, label, max, integer)}
+        >
+          set
+        </button>
+      </div>
+    </th>
+  )
 
   const apply = (id: string) => {
     const draft = drafts[id] ?? {}
@@ -171,7 +231,7 @@ export function ServoTuningPanel() {
       }
       gainPayload[key] = value
     }
-    for (const { key, max } of PROFILE_FIELDS) {
+    for (const { key, max } of profileFields) {
       const raw = draft[key]
       if (raw === undefined || raw === '') continue
       const value = Number.parseFloat(raw)
@@ -271,23 +331,10 @@ export function ServoTuningPanel() {
             <tr>
               <th>MOTOR</th>
               <th>JOINT</th>
-              {gainFields.map((f) => (
-                <th key={f.key} title={f.title}>
-                  {f.label}
-                  <button
-                    className="btn btn-secondary"
-                    style={{ marginLeft: 4, padding: '0 4px', fontSize: 9 }}
-                    disabled={busy !== null || loading}
-                    title={`set ${f.label} on every motor`}
-                    onClick={() => setAllGain(f.key, f.label)}
-                  >
-                    all
-                  </button>
-                </th>
-              ))}
-              {PROFILE_FIELDS.map((f) => (
-                <th key={f.key} title={f.title}>{f.label}</th>
-              ))}
+              {gainFields.map((f) =>
+                columnHeader(f.key, f.label, f.title, maxGain, true))}
+              {profileFields.map((f) =>
+                columnHeader(f.key, f.label, f.title, f.max, false))}
               <th aria-label="apply" />
             </tr>
           </thead>
@@ -303,7 +350,7 @@ export function ServoTuningPanel() {
                   <td className="motor-joint">{jointOfMotor.get(id) ?? '--'}</td>
                   {gainFields.map((f) =>
                     cell(id, f.key, g === null ? undefined : g[f.key], maxGain, 1))}
-                  {PROFILE_FIELDS.map((f) =>
+                  {profileFields.map((f) =>
                     cell(id, f.key, p === null ? undefined : p[f.key], f.max, 0.1))}
                   <td>
                     <button
