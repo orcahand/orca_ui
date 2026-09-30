@@ -721,6 +721,12 @@ class HandService:
         stops the mock sweeper. Reports what was actioned.
         """
         report: dict = {}
+        # Before anything else: a bench sequence is a live motion source that
+        # keeps writing on its own timer.
+        try:
+            report["playback_stopped"] = self.stop_all_playback()
+        except Exception:
+            logger.exception("estop: bench playback stop failed")
         teleop = self.teleop_manager
         if teleop is not None:
             # First: teleop is the one source still streaming new motion.
@@ -801,6 +807,9 @@ class HandService:
 
     def disable_torque(self) -> None:
         session = self._require_motors()
+        # A running sequence would keep writing goal positions into a limp
+        # motor and then snap it to the next point when torque returned.
+        self.stop_all_playback()
         session.hand.disable_torque()
         self.supervisor.set_torque_flag(False)
         self.worker.reset()
@@ -1565,6 +1574,19 @@ class HandService:
         with self._state_lock:
             self._bench_playing.pop(int(motor_id), None)
 
+    def stop_all_playback(self) -> int:
+        """Stop every running bench sequence. Returns how many were running.
+
+        Playback writes goal positions on a timer, so anything that means
+        "stop moving" has to reach it. Torque off and e-stop both did not,
+        which left a sequence still writing while the operator believed they
+        had stopped it, and the motor resuming the moment torque came back.
+        """
+        with self._state_lock:
+            running = len(self._bench_playing)
+            self._bench_playing.clear()
+        return running
+
     def _ensure_bench_thread(self) -> None:
         if self._bench_thread is not None and self._bench_thread.is_alive():
             return
@@ -1592,6 +1614,10 @@ class HandService:
             return False
         session = self.session
         if session is None or not session.caps.motors:
+            return False
+        if not self.supervisor.status().torque_enabled:
+            # Belt and braces: whatever turned torque off, stop writing.
+            self.stop_all_playback()
             return False
         for motor_id, index in playing.items():
             points = self._bench_points.get(motor_id)

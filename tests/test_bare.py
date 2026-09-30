@@ -697,8 +697,11 @@ class TestRecordedPoints:
         service._require_manual_control = lambda: None
         # `session` is a property reading through the supervisor; give it one
         # rather than patching the class, which would leak into every other
-        # test in the run.
-        service.supervisor = SimpleNamespace(session=session)
+        # test in the run. Playback also asks it whether torque is on.
+        service.supervisor = SimpleNamespace(
+            session=session,
+            status=lambda: SimpleNamespace(torque_enabled=True),
+        )
         return service, writes, torque
 
     def test_points_are_recorded_and_returned(self):
@@ -1119,3 +1122,71 @@ class TestBenchTemperature:
 
         _topic, payload = published[0]
         assert payload["positions"] and payload["currents"]
+
+
+class TestPlaybackStops:
+    """Playback writes goal positions on its own timer, so anything meaning
+    "stop moving" has to reach it. Torque off and e-stop both did not, which
+    left a sequence writing into a limp motor and snapping it to the next
+    point the moment torque came back."""
+
+    def _service(self, torque=True):
+        from orca_ui.hand.service import HandService
+        from orca_ui.settings import UiSettings
+
+        writes: list = []
+
+        class _Hand:
+            motor_client = SimpleNamespace(position_range_rad=None)
+            config = SimpleNamespace(motor_ids=[1])
+
+            def get_motor_pos(self, as_dict=False):
+                return {1: -3.0}
+
+            def write_motor_pos(self, ids, values):
+                writes.append(float(values[0]))
+
+            def disable_torque(self, ids=None):
+                pass
+
+        service = HandService.__new__(HandService)
+        service.settings = UiSettings(config_path="/nowhere/config.yaml", bare=True)
+        service._state_lock = threading.Lock()
+        service._bench_points = {1: [-3.0, -2.0]}
+        service._bench_playing = {1: 0}
+        service._bench_ranges = {}
+        session = SimpleNamespace(hand=_Hand(),
+                                  caps=SimpleNamespace(motors=True))
+        service.supervisor = SimpleNamespace(
+            session=session,
+            status=lambda: SimpleNamespace(torque_enabled=torque),
+            set_torque_flag=lambda v: None,
+        )
+        return service, writes
+
+    def test_a_step_with_torque_off_writes_nothing(self):
+        service, writes = self._service(torque=False)
+
+        assert service._bench_step() is False
+        assert writes == []
+
+    def test_torque_off_leaves_nothing_playing(self):
+        """Otherwise it resumes the instant torque comes back."""
+        service, _ = self._service(torque=False)
+
+        service._bench_step()
+
+        assert service._bench_playing == {}
+
+    def test_stop_all_reports_what_it_stopped(self):
+        service, _ = self._service()
+
+        assert service.stop_all_playback() == 1
+        assert service.stop_all_playback() == 0
+
+    def test_a_step_with_torque_on_still_writes(self):
+        """The guard must not stop ordinary playback."""
+        service, writes = self._service(torque=True)
+
+        assert service._bench_step() is True
+        assert writes == [-3.0]
