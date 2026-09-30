@@ -1056,13 +1056,21 @@ class TestFeetechIdentification:
 
         assert motor_models.for_model_number(6922) is not None
 
-    def test_no_entry_claims_a_number_it_cannot_justify(self):
-        """HLS2915M-C001's datasheet gives no reported number, so the entry
-        must not claim one and silently contradict a servo."""
+    def test_the_finger_number_identifies_the_confirmed_model(self):
+        """6922 is the HLS2915M, confirmed against the hand. The datasheet
+        does not print the number, so only that confirmation justifies it."""
         from orca_ui.hand import motor_models
 
-        assert motor_models.get("hls2915m").model_numbers == ()
-        assert motor_models.get("hls2915m").verifiable is False
+        assert motor_models.for_model_number(6922).key == "hls2915m"
+        assert motor_models.get("hls2915m").verifiable is True
+
+    def test_the_generic_entry_claims_no_number(self):
+        """It stands for a family, so identifying a servo as it would be a
+        claim nothing supports."""
+        from orca_ui.hand import motor_models
+
+        assert motor_models.get("feetech-hls").model_numbers == ()
+        assert motor_models.get("feetech-hls").verifiable is False
 
     def test_the_protection_register_is_never_used_as_a_ceiling(self):
         """Register 28 reads 450 raw (2925 mA) on a motor that stalls at
