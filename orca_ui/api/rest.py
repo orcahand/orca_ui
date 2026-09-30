@@ -260,7 +260,8 @@ def build_router(service: HandService) -> APIRouter:
 
     @router.get("/motors/gains")
     def motors_gains():
-        return {"ok": True, "gains": guard(service.read_servo_gains)}
+        return {"ok": True, "gains": guard(service.read_servo_gains),
+                "gain_max": service.servo_gain_max()}
 
     @router.post("/motors/{motor_id}/gains")
     def motors_set_gains(motor_id: int, body: schemas.ServoGainsRequest):

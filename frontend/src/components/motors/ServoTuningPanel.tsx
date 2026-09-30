@@ -22,8 +22,9 @@ import { Panel } from '../common/Panel'
 type GainField = keyof ServoGains
 type ProfileField = keyof ServoProfile
 
-// The X-series PID registers are unsigned 16-bit, capped at 16383.
-const GAIN_MAX = 16383
+// Fallback only, for a backend too old to report the width. Families differ:
+// X-series gain registers are two bytes, HLS gains one.
+const GAIN_MAX_FALLBACK = 16383
 
 const GAIN_FIELDS: { key: GainField; label: string; title: string }[] = [
   { key: 'kp', label: 'Kp', title: 'Position P gain — stiffness against position error.' },
@@ -85,6 +86,7 @@ export function ServoTuningPanel() {
   const setError = useAppStore((s) => s.setError)
 
   const [gains, setGains] = useState<ServoGainsMap | null>(null)
+  const [gainMax, setGainMax] = useState<number | null>(null)
   const [profile, setProfile] = useState<ServoProfileMap | null>(null)
   const [drafts, setDrafts] = useState<Record<string, Record<string, string>>>({})
   const [busy, setBusy] = useState<string | null>(null)
@@ -103,6 +105,7 @@ export function ServoTuningPanel() {
     Promise.all([api.servoGains(), api.servoProfile()])
       .then(([g, p]) => {
         setGains(g.gains)
+        setGainMax(g.gain_max ?? null)
         setProfile(p.profile)
         setDrafts({})
       })
@@ -116,17 +119,29 @@ export function ServoTuningPanel() {
 
   if (!motors) return null
 
+  const maxGain = gainMax ?? GAIN_MAX_FALLBACK
+  // A field every motor reports as null is a register this family does not
+  // have. Showing an empty column for it invites tuning against a term that
+  // does not exist, so the column is dropped rather than greyed out.
+  const entries = Object.values(gains ?? {})
+  const gainFields = GAIN_FIELDS.filter(
+    (f) =>
+      entries.length === 0 ||
+      entries.some((g) => g !== null && g[f.key] !== null &&
+                          g[f.key] !== undefined),
+  )
+
   const apply = (id: string) => {
     const draft = drafts[id] ?? {}
     const gainPayload: Partial<ServoGains> = {}
     const profilePayload: Partial<ServoProfile> = {}
 
-    for (const { key } of GAIN_FIELDS) {
+    for (const { key } of gainFields) {
       const raw = draft[key]
       if (raw === undefined || raw === '') continue
       const value = Number.parseInt(raw, 10)
-      if (!Number.isFinite(value) || value < 0 || value > GAIN_MAX) {
-        setError(`${key} must be 0–${GAIN_MAX}`)
+      if (!Number.isFinite(value) || value < 0 || value > maxGain) {
+        setError(`${key} must be 0–${maxGain}`)
         return
       }
       gainPayload[key] = value
@@ -231,7 +246,7 @@ export function ServoTuningPanel() {
             <tr>
               <th>MOTOR</th>
               <th>JOINT</th>
-              {GAIN_FIELDS.map((f) => (
+              {gainFields.map((f) => (
                 <th key={f.key} title={f.title}>{f.label}</th>
               ))}
               {PROFILE_FIELDS.map((f) => (
@@ -250,8 +265,8 @@ export function ServoTuningPanel() {
                 <tr key={id}>
                   <td>{id}</td>
                   <td className="motor-joint">{jointOfMotor.get(id) ?? '--'}</td>
-                  {GAIN_FIELDS.map((f) =>
-                    cell(id, f.key, g === null ? undefined : g[f.key], GAIN_MAX, 1))}
+                  {gainFields.map((f) =>
+                    cell(id, f.key, g === null ? undefined : g[f.key], maxGain, 1))}
                   {PROFILE_FIELDS.map((f) =>
                     cell(id, f.key, p === null ? undefined : p[f.key], f.max, 0.1))}
                   <td>

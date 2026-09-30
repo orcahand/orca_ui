@@ -1166,6 +1166,16 @@ class HandService:
             for motor_id, entry in gains.items()
         }
 
+    def servo_gain_max(self) -> "int | None":
+        """Largest value this family's gain registers hold.
+
+        A register width, not a tuning limit. The browser must not assume one
+        family's: the X-series holds gains in two bytes, an HLS servo in one.
+        """
+        session = self.session
+        client = getattr(getattr(session, "hand", None), "motor_client", None)
+        return getattr(type(client), "servo_gain_max", None)
+
     def set_servo_gains(self, motor_id: int, fields: dict) -> dict:
         """Write the named gain fields on one motor and read the result back."""
         from orca_core.hardware.motor_client import ServoGains

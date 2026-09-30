@@ -106,7 +106,11 @@ export const api = {
   // Read straight off the motors: gains are RAM and a power cycle clears
   // them, so what was last typed is not evidence of what they hold.
   servoGains: () =>
-    request<{ gains: ServoGainsMap }>('/api/motors/gains'),
+    // gain_max is the family's register width, reported rather than assumed:
+    // X-series gains are two bytes, HLS gains one.
+    request<{ gains: ServoGainsMap; gain_max: number | null }>(
+      '/api/motors/gains',
+    ),
   // Omitted fields are left alone on the motor.
   setServoGains: (id: number, gains: Partial<ServoGains>) =>
     post<{ gains: ServoGainsMap }>(`/api/motors/${id}/gains`, gains),
