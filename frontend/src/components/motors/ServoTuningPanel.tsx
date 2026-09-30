@@ -131,6 +131,31 @@ export function ServoTuningPanel() {
                           g[f.key] !== undefined),
   )
 
+  // Set one column on every motor at once. A chain is usually tuned as a
+  // set, and typing the same number seventeen times invites one typo that is
+  // then very hard to spot in a table of near-identical numbers.
+  const setAllGain = (key: GainField, label: string) => {
+    const typed = window.prompt(
+      `Set ${label} on all ${ids.length} motors (0-${maxGain})`,
+    )
+    if (typed === null) return
+    const value = Number.parseInt(typed.trim(), 10)
+    if (!Number.isFinite(value) || value < 0 || value > maxGain) {
+      setError(`${label} must be 0–${maxGain}`)
+      return
+    }
+    setBusy('all')
+    Promise.all(
+      ids.map((id) => api.setServoGains(Number(id), { [key]: value })),
+    )
+      .then(() => setError(null))
+      .catch((e) => setError(String((e as Error).message ?? e)))
+      .finally(() => {
+        setBusy(null)
+        refresh()
+      })
+  }
+
   const apply = (id: string) => {
     const draft = drafts[id] ?? {}
     const gainPayload: Partial<ServoGains> = {}
@@ -247,7 +272,18 @@ export function ServoTuningPanel() {
               <th>MOTOR</th>
               <th>JOINT</th>
               {gainFields.map((f) => (
-                <th key={f.key} title={f.title}>{f.label}</th>
+                <th key={f.key} title={f.title}>
+                  {f.label}
+                  <button
+                    className="btn btn-secondary"
+                    style={{ marginLeft: 4, padding: '0 4px', fontSize: 9 }}
+                    disabled={busy !== null || loading}
+                    title={`set ${f.label} on every motor`}
+                    onClick={() => setAllGain(f.key, f.label)}
+                  >
+                    all
+                  </button>
+                </th>
               ))}
               {PROFILE_FIELDS.map((f) => (
                 <th key={f.key} title={f.title}>{f.label}</th>

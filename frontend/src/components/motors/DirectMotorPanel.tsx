@@ -139,6 +139,43 @@ export function DirectMotorPanel({
             </>
           )}
         </div>
+        {bench && models.length > 0 && snapshot && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 6,
+                        alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ color: 'var(--dimmer)' }}>declare every motor as</span>
+            <select
+              defaultValue=""
+              disabled={busy}
+              title="a chain is usually one model; declare it once"
+              onChange={(e) => {
+                const key = e.target.value
+                e.target.value = ''
+                if (!key) return
+                setBusy(true)
+                Promise.all(
+                  snapshot.motors.map((m) =>
+                    api.motorsDirectDeclare(m.id, key, m.nickname ?? null),
+                  ),
+                )
+                  .then(() => refresh())
+                  .catch(fail)
+                  .finally(() => setBusy(false))
+              }}
+            >
+              <option value="">choose a model…</option>
+              {models
+                .filter((m) => m.key !== 'unknown')
+                .map((m) => (
+                  <option key={m.key} value={m.key}>
+                    {m.label}
+                  </option>
+                ))}
+            </select>
+            <span style={{ color: 'var(--dimmer)' }}>
+              ({snapshot.motors.length} motors)
+            </span>
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
           {!armed ? (
             <button
