@@ -938,3 +938,50 @@ class TestMotorDeclarations:
         assert motor_models.UNKNOWN.has_current_control is False
         assert motor_models.get(None) is motor_models.UNKNOWN
         assert motor_models.get("nonsense") is motor_models.UNKNOWN
+
+
+class TestDatasheetCeilings:
+    """A bench holds a motor against a load, which is exactly where stall
+    current cooks it. The continuous rating is the number to hand it."""
+
+    def test_the_ceiling_is_the_continuous_rating_not_the_stall(self):
+        from orca_ui.hand import motor_models
+
+        hls2915 = motor_models.get("hls2915m")
+        assert hls2915.rated_current_ma == 500.0
+        assert hls2915.max_current_ma == 1500.0
+        assert hls2915.ceiling_ma == 500.0
+
+    def test_a_model_with_no_rating_falls_back_to_its_maximum(self):
+        from orca_ui.hand import motor_models
+
+        xc330 = motor_models.get("xc330-t288")
+        assert xc330.rated_current_ma is None
+        assert xc330.ceiling_ma == xc330.max_current_ma
+
+    def test_the_generic_hls_entry_is_the_most_conservative(self):
+        """Without a model there is no datasheet, so it must not hand out more
+        than the weakest catalogued HLS motor tolerates."""
+        from orca_ui.hand import motor_models
+
+        generic = motor_models.get("feetech-hls")
+        named = [m for m in motor_models.catalogue()
+                 if m.family == motor_models.FEETECH and m.key != "feetech-hls"]
+        assert named
+        assert generic.ceiling_ma == min(m.ceiling_ma for m in named)
+
+    def test_no_entry_offers_the_bare_register_maximum(self):
+        """2047 units at 6.5 mA is 13.3 A, which belongs to no motor here."""
+        from orca_ui.hand import motor_models
+
+        for model in motor_models.catalogue():
+            if model.ceiling_ma is not None:
+                assert model.ceiling_ma < 3000
+
+    def test_the_declared_ceiling_clamps_to_the_rating(self):
+        service, session, written = TestMotorDeclarations()._service()
+        service.declare_motor(1, "hls2915m", "index")
+
+        service._apply_declared_ceiling(session, 900.0)
+
+        assert written == [([1], [500.0])]

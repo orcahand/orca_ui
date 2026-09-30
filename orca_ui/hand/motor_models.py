@@ -40,10 +40,24 @@ class MotorModel:
     max_current_ma: float | None
     # Where these numbers came from. Audited by a human, not inferred.
     source: str
+    # What the motor can draw continuously without cooking, from its
+    # datasheet. This is the sensible bench default; max_current_ma is the
+    # stall figure and only a hard clamp.
+    rated_current_ma: float | None = None
 
     @property
     def verifiable(self) -> bool:
         return bool(self.model_numbers)
+
+    @property
+    def ceiling_ma(self) -> "float | None":
+        """The highest current a bench should hand this motor.
+
+        The continuous rating where the datasheet gives one. Stall current is
+        what the motor survives for a moment, not what it survives held
+        against a load, and a bench holds things against loads.
+        """
+        return self.rated_current_ma or self.max_current_ma
 
 
 UNKNOWN_KEY = "unknown"
@@ -60,6 +74,15 @@ UNKNOWN = MotorModel(
     max_current_ma=None,
     source="no declaration — treated as having no current control",
 )
+
+# Every HLS servo shares one memory table (Feetech HLS memory-table manual):
+#   28  Protection Current  RW  0..2047, 6.5 mA/unit, copied into 44 at power-up
+#   33  Operating Mode      RW  0 position, 1 speed, 2 current, 3 PWM
+#   44  Goal Torque         RW  -2047..2047, 6.5 mA/unit, caps running current
+#   69  Present Current     R   6.5 mA/unit
+# So the family always has current control, and the per-motor ceiling is
+# readable from register 28 rather than assumed from the model.
+HLS_CURRENT_SCALE_MA = 6.5
 
 # Confirmed by reading the control table off a real chain on 2026-09-29:
 # model 1220 answers Current Limit with 910, model 1080 answers it with 0.
@@ -94,24 +117,50 @@ _MODELS: tuple[MotorModel, ...] = (
                 "the operator as the wrist motor"),
     ),
     MotorModel(
+        key="hls2915m",
+        label="Feetech HLS2915M-C001",
+        family=FEETECH,
+        # The datasheet does not give the number the servo reports, and the
+        # bus has not been read for it yet, so a declaration of this model
+        # cannot be cross-checked.
+        model_numbers=(),
+        has_current_control=True,
+        current_scale_ma=HLS_CURRENT_SCALE_MA,
+        # Stall, the hard clamp. Sustained draw here cooks the motor.
+        max_current_ma=1500.0,
+        rated_current_ma=500.0,
+        source=("HL-2915-C001 product specification A/0, 2026-01-18: rated "
+                "current 500 mA, stall current 1.5 A at 12 V, stall torque "
+                "14.2 kg.cm; scale from the HLS memory table (6.5 mA/unit)"),
+    ),
+    MotorModel(
+        key="hls3930m",
+        label="Feetech HLS3930M-C001",
+        family=FEETECH,
+        model_numbers=(),
+        has_current_control=True,
+        current_scale_ma=HLS_CURRENT_SCALE_MA,
+        max_current_ma=2800.0,
+        rated_current_ma=800.0,
+        source=("HLS3930M-C001 product specification A/0, 2024-04-25: rated "
+                "current 800 mA, stall current 2.8 A at 12 V, stall torque "
+                "35 kg.cm; scale from the HLS memory table (6.5 mA/unit)"),
+    ),
+    MotorModel(
         key="feetech-hls",
         label="Feetech HLS series (generic)",
         family=FEETECH,
-        # orca_core maps 4106 to HLS3930 and both 6922 and 5130 to HLS3915.
-        # Left empty deliberately: this entry covers the family rather than one
-        # model, so it must not claim to identify any particular number.
         model_numbers=(),
         has_current_control=True,
-        # 6.5 mA per register unit, from orca_core's HLS register table.
-        current_scale_ma=6.5,
-        # The family default, not the register maximum. The register accepts up
-        # to 2047 units, which is 13.3 A — a stall figure, not something to
-        # hand a bench as a ceiling. Per-model limits need measuring.
-        max_current_ma=900.0,
-        source=("current_scale_ma from orca_core HLS.CURRENT_SCALE_MA (6.5); "
-                "max_current_ma is FeetechClient.default_max_current_ma (900), "
-                "NOT the register maximum of 13305 mA. Per-model ceilings for "
-                "HLS3606M / HLS3930M / HLS2915M are not yet confirmed"),
+        current_scale_ma=HLS_CURRENT_SCALE_MA,
+        # No model, so no datasheet rating: fall back to the lowest ceiling
+        # any catalogued HLS motor tolerates rather than the register maximum
+        # of 2047 units, which is 13.3 A and belongs to no motor here.
+        max_current_ma=1500.0,
+        rated_current_ma=500.0,
+        source=("HLS memory table (6.5 mA/unit, register 44 capped by "
+                "register 28). Limits are the most conservative of the "
+                "catalogued HLS models, not this motor's own rating"),
     ),
 )
 
@@ -152,6 +201,8 @@ def as_dict(model: MotorModel) -> dict:
         "has_current_control": model.has_current_control,
         "current_scale_ma": model.current_scale_ma,
         "max_current_ma": model.max_current_ma,
+        "rated_current_ma": model.rated_current_ma,
+        "ceiling_ma": model.ceiling_ma,
         "source": model.source,
         "verifiable": model.verifiable,
     }

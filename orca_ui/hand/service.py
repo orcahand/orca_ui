@@ -1055,7 +1055,10 @@ class HandService:
             if not model.has_current_control:
                 skipped.append(int(motor_id))
                 continue
-            ceiling = model.max_current_ma
+            # The datasheet's continuous rating, not its stall figure: a
+            # bench holds a motor against a load, which is exactly where
+            # stall current cooks it.
+            ceiling = model.ceiling_ma
             targets.append((int(motor_id),
                             min(ma, ceiling) if ceiling else ma))
         if skipped:
