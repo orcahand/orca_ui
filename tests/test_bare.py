@@ -1211,3 +1211,37 @@ class TestPlaybackStops:
 
         assert service._bench_step() is True
         assert writes == [-3.0]
+
+
+class TestAppendingPoints:
+    """Building a sequence by driving to each spot, rather than posing the
+    motor by hand. The browser appends to what is already stored, so the
+    backend has to accept a growing set without losing order."""
+
+    def test_points_keep_the_order_they_were_added_in(self):
+        """A cycle runs them in order, so appending must not sort or dedupe."""
+        service, _, _ = TestRecordedPoints()._service()
+
+        service.set_motor_points(1, [-3.0])
+        service.set_motor_points(1, [-3.0, -1.0])
+        result = service.set_motor_points(1, [-3.0, -1.0, -2.0])
+
+        assert result["points"] == [-3.0, -1.0, -2.0]
+
+    def test_the_same_position_twice_is_kept(self):
+        """Returning to a spot mid-cycle is a legitimate thing to record."""
+        service, _, _ = TestRecordedPoints()._service()
+
+        result = service.set_motor_points(1, [-3.0, -1.0, -3.0])
+
+        assert result["points"] == [-3.0, -1.0, -3.0]
+
+    def test_appending_past_the_travel_is_still_refused(self):
+        from orca_ui.hand.service import ServiceError
+
+        service, _, _ = TestRecordedPoints()._service()
+        service._require_motors().hand.motor_client.position_range_rad = (
+            -6.2816513263917, 0.0)
+
+        with pytest.raises(ServiceError):
+            service.set_motor_points(1, [-3.0, 1.0])

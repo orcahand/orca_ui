@@ -541,6 +541,11 @@ function BenchMotorRow({
       await api.motorsDirectTorque(motor.id, true)
     })
 
+  const addHere = () =>
+    void call(() =>
+      api.motorsDirectPoints(motor.id, [...(points ?? []), position]),
+    )
+
   const flags = motor.hw_error_flags
   const finding = find.phase !== 'idle'
 
@@ -663,6 +668,17 @@ function BenchMotorRow({
                   : `${points.length} points recorded — cycles between them`}
               </span>
               <button
+                className="btn btn-secondary"
+                disabled={busy || playing}
+                title={playing
+                  ? 'stop the sequence before adding to it'
+                  : 'append wherever the motor is now — drive it there with ' +
+                    'the slider or Go first'}
+                onClick={addHere}
+              >
+                + here
+              </button>
+              <button
                 className={playing ? 'btn btn-danger' : 'btn btn-primary'}
                 disabled={busy || disabled}
                 title={playing ? 'stop the sequence' : 'run the recorded points'}
@@ -681,14 +697,27 @@ function BenchMotorRow({
               </button>
             </>
           ) : (
-            <button
-              className="btn btn-secondary"
-              disabled={busy || disabled}
-              title="go limp, then capture positions by hand"
-              onClick={startRecord}
-            >
-              Record points
-            </button>
+            <>
+              <button
+                className="btn btn-secondary"
+                disabled={busy || disabled}
+                title={
+                  'append wherever the motor is now — drive it there with ' +
+                  'the slider or Go first'
+                }
+                onClick={addHere}
+              >
+                + here
+              </button>
+              <button
+                className="btn btn-secondary"
+                disabled={busy || disabled}
+                title="go limp, then capture positions by hand"
+                onClick={startRecord}
+              >
+                Record by hand
+              </button>
+            </>
           )}
         </div>
       )}
