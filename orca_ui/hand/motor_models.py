@@ -35,15 +35,20 @@ class MotorModel:
     model_numbers: tuple[int, ...]
     # Whether a Goal Current register exists and means what we think.
     has_current_control: bool
-    # Milliamps per register unit, and the ceiling the register accepts.
+    # Milliamps per register unit, and the largest value the register accepts.
+    # The register limit is a protocol fact and says nothing about heat.
     current_scale_ma: float | None
     max_current_ma: float | None
     # Where these numbers came from. Audited by a human, not inferred.
     source: str
-    # What the motor can draw continuously without cooking, from its
-    # datasheet. This is the sensible bench default; max_current_ma is the
-    # stall figure and only a hard clamp.
+    # Datasheet figures. Rated is what the motor draws continuously without
+    # cooking; stall is what it draws for a moment at zero speed. Either may
+    # be absent because the manufacturer did not publish it.
     rated_current_ma: float | None = None
+    stall_current_ma: float | None = None
+    # Operating Mode values the model accepts. Empty means unrecorded, which
+    # is not the same as "all of them".
+    operating_modes: tuple[int, ...] = ()
 
     @property
     def verifiable(self) -> bool:
@@ -53,11 +58,25 @@ class MotorModel:
     def ceiling_ma(self) -> "float | None":
         """The highest current a bench should hand this motor.
 
-        The continuous rating where the datasheet gives one. Stall current is
-        what the motor survives for a moment, not what it survives held
-        against a load, and a bench holds things against loads.
+        The published continuous rating first. Failing that, stall current,
+        which the motor at least survives momentarily. The register limit
+        only as a last resort: it is a protocol fact about what the register
+        accepts and carries no thermal meaning at all.
+
+        None for a motor with no current register, where the stall figure is
+        still a real number but there is nothing to write it to.
         """
-        return self.rated_current_ma or self.max_current_ma
+        if not self.has_current_control:
+            return None
+        return self.rated_current_ma or self.stall_current_ma or self.max_current_ma
+
+    def supports_mode(self, mode: int) -> "bool | None":
+        """Whether this model accepts an Operating Mode value.
+
+        None when the modes were never recorded — the caller must not read
+        that as permission.
+        """
+        return (mode in self.operating_modes) if self.operating_modes else None
 
 
 UNKNOWN_KEY = "unknown"
@@ -94,10 +113,19 @@ _MODELS: tuple[MotorModel, ...] = (
         model_numbers=(1220,),
         has_current_control=True,
         current_scale_ma=1.0,
+        # Current Limit (38) accepts 0..910 at 1 mA/unit; Goal Current (102)
+        # is bounded by whatever that register holds.
         max_current_ma=910.0,
-        source=("orca_core DynamixelClient (current_scale_ma, max_current_ma); "
-                "Current Limit read back as 910 on hardware; confirmed by the "
-                "operator as the finger-joint motor"),
+        # ROBOTIS publishes no continuous rating for this model, so the stall
+        # figure is the only thermal number there is — and note it is lower
+        # than what the register will accept.
+        rated_current_ma=None,
+        stall_current_ma=800.0,
+        operating_modes=(0, 1, 3, 4, 5, 16),
+        source=("ROBOTIS XC330-T288-T control table and specification: model "
+                "number 1220, Current Limit (38) 0..910 at 1.0 mA/unit, Goal "
+                "Current (102) bounded by it, stall 0.92 N.m at 11.1 V / "
+                "0.80 A; Current Limit read back as 910 on hardware"),
     ),
     MotorModel(
         key="dxl-1080",
@@ -107,14 +135,21 @@ _MODELS: tuple[MotorModel, ...] = (
         label="Dynamixel XC430-W240 / T240BB-T",
         family=DYNAMIXEL,
         model_numbers=(1080,),
-        # No current sensor, so no Goal Current register: the wrist runs in
-        # multi-turn position instead of current-based position.
+        # Its control table has no Goal Current (102) and no Current Limit
+        # (38) at all: 100 is Goal PWM and 104 is Goal Velocity, leaving
+        # 102-103 unallocated. Writing there is undefined, which is why this
+        # motor is skipped rather than clamped.
         has_current_control=False,
         current_scale_ma=None,
         max_current_ma=None,
-        source=("orca_core MODELS_WITHOUT_CURRENT_CONTROL; Current Limit and "
-                "Goal Current both read back as 0 on hardware; confirmed by "
-                "the operator as the wrist motor"),
+        stall_current_ma=1400.0,
+        # No current-based position (5) and no current control (0). The wrist
+        # runs in extended position (4) instead.
+        operating_modes=(1, 3, 4, 16),
+        source=("ROBOTIS XC430-W240 control table and specification: model "
+                "number 1080, no Goal Current or Current Limit register, "
+                "Operating Mode accepts only 1/3/4/16, stall 1.9 N.m at "
+                "12 V / 1.4 A; both registers read back as 0 on hardware"),
     ),
     MotorModel(
         key="hls2915m",
@@ -127,11 +162,16 @@ _MODELS: tuple[MotorModel, ...] = (
         has_current_control=True,
         current_scale_ma=HLS_CURRENT_SCALE_MA,
         # Stall, the hard clamp. Sustained draw here cooks the motor.
-        max_current_ma=1500.0,
+        # Register 44 accepts 2047 units, which is 13.3 A — far past this
+        # motor. The datasheet numbers are what matter.
+        max_current_ma=13305.5,
         rated_current_ma=500.0,
+        stall_current_ma=1500.0,
+        operating_modes=(0, 1, 2, 3),
         source=("HL-2915-C001 product specification A/0, 2026-01-18: rated "
                 "current 500 mA, stall current 1.5 A at 12 V, stall torque "
-                "14.2 kg.cm; scale from the HLS memory table (6.5 mA/unit)"),
+                "14.2 kg.cm; registers from the HLS memory table (44 capped "
+                "by 28, 6.5 mA/unit, modes 0-3)"),
     ),
     MotorModel(
         key="hls3930m",
@@ -140,11 +180,14 @@ _MODELS: tuple[MotorModel, ...] = (
         model_numbers=(),
         has_current_control=True,
         current_scale_ma=HLS_CURRENT_SCALE_MA,
-        max_current_ma=2800.0,
+        max_current_ma=13305.5,
         rated_current_ma=800.0,
+        stall_current_ma=2800.0,
+        operating_modes=(0, 1, 2, 3),
         source=("HLS3930M-C001 product specification A/0, 2024-04-25: rated "
                 "current 800 mA, stall current 2.8 A at 12 V, stall torque "
-                "35 kg.cm; scale from the HLS memory table (6.5 mA/unit)"),
+                "35 kg.cm; registers from the HLS memory table (44 capped "
+                "by 28, 6.5 mA/unit, modes 0-3)"),
     ),
     MotorModel(
         key="feetech-hls",
@@ -156,11 +199,14 @@ _MODELS: tuple[MotorModel, ...] = (
         # No model, so no datasheet rating: fall back to the lowest ceiling
         # any catalogued HLS motor tolerates rather than the register maximum
         # of 2047 units, which is 13.3 A and belongs to no motor here.
-        max_current_ma=1500.0,
+        max_current_ma=13305.5,
         rated_current_ma=500.0,
+        stall_current_ma=1500.0,
+        operating_modes=(0, 1, 2, 3),
         source=("HLS memory table (6.5 mA/unit, register 44 capped by "
-                "register 28). Limits are the most conservative of the "
-                "catalogued HLS models, not this motor's own rating"),
+                "register 28, modes 0-3). Current limits are the most "
+                "conservative of the catalogued HLS models, not this "
+                "motor's own rating"),
     ),
 )
 
@@ -202,7 +248,9 @@ def as_dict(model: MotorModel) -> dict:
         "current_scale_ma": model.current_scale_ma,
         "max_current_ma": model.max_current_ma,
         "rated_current_ma": model.rated_current_ma,
+        "stall_current_ma": model.stall_current_ma,
         "ceiling_ma": model.ceiling_ma,
+        "operating_modes": list(model.operating_modes),
         "source": model.source,
         "verifiable": model.verifiable,
     }

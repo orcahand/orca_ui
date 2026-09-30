@@ -877,7 +877,8 @@ class TestMotorDeclarations:
 
         service._apply_declared_ceiling(session, 5000.0)
 
-        assert written == [([1], [910.0])]
+        # 800 mA, its stall figure — not the 910 its Current Limit accepts.
+        assert written == [([1], [800.0])]
 
     def test_a_declaration_the_servo_contradicts_is_flagged(self):
         """Only a human can say whether the label or the wiring is wrong, so
@@ -949,15 +950,19 @@ class TestDatasheetCeilings:
 
         hls2915 = motor_models.get("hls2915m")
         assert hls2915.rated_current_ma == 500.0
-        assert hls2915.max_current_ma == 1500.0
+        assert hls2915.stall_current_ma == 1500.0
         assert hls2915.ceiling_ma == 500.0
 
-    def test_a_model_with_no_rating_falls_back_to_its_maximum(self):
+    def test_a_model_with_no_published_rating_falls_back_to_stall(self):
+        """ROBOTIS publishes no continuous rating for the XC330, so stall is
+        the only thermal number available — and it is below what the Current
+        Limit register would accept."""
         from orca_ui.hand import motor_models
 
         xc330 = motor_models.get("xc330-t288")
         assert xc330.rated_current_ma is None
-        assert xc330.ceiling_ma == xc330.max_current_ma
+        assert xc330.ceiling_ma == xc330.stall_current_ma
+        assert xc330.ceiling_ma < xc330.max_current_ma
 
     def test_the_generic_hls_entry_is_the_most_conservative(self):
         """Without a model there is no datasheet, so it must not hand out more
@@ -985,3 +990,53 @@ class TestDatasheetCeilings:
         service._apply_declared_ceiling(session, 900.0)
 
         assert written == [([1], [500.0])]
+
+
+class TestControlTableFacts:
+    """Numbers taken from the manufacturers' control tables, kept honest about
+    which kind of number each one is."""
+
+    def test_the_register_limit_is_not_treated_as_a_thermal_limit(self):
+        """The XC330's Current Limit accepts 910 mA but the motor stalls at
+        800. An HLS register accepts 13.3 A and no motor here survives it."""
+        from orca_ui.hand import motor_models
+
+        xc330 = motor_models.get("xc330-t288")
+        assert xc330.max_current_ma == 910.0
+        assert xc330.stall_current_ma == 800.0
+        assert xc330.ceiling_ma == 800.0
+
+        hls = motor_models.get("hls2915m")
+        assert hls.max_current_ma > 13000
+        assert hls.ceiling_ma == 500.0
+
+    def test_a_motor_without_the_register_offers_no_ceiling(self):
+        """Its stall current is a real number, but there is nothing to write
+        it to."""
+        from orca_ui.hand import motor_models
+
+        wrist = motor_models.get("dxl-1080")
+        assert wrist.stall_current_ma == 1400.0
+        assert wrist.has_current_control is False
+        assert wrist.ceiling_ma is None
+
+    def test_the_wrist_does_not_accept_current_based_position(self):
+        """Its Operating Mode takes only 1, 3, 4 and 16. Writing 5 would put
+        an unsupported value into EEPROM."""
+        from orca_ui.hand import motor_models
+
+        assert motor_models.get("dxl-1080").supports_mode(5) is False
+        assert motor_models.get("dxl-1080").supports_mode(4) is True
+        assert motor_models.get("xc330-t288").supports_mode(5) is True
+
+    def test_unrecorded_modes_are_not_permission(self):
+        from orca_ui.hand import motor_models
+
+        assert motor_models.UNKNOWN.supports_mode(5) is None
+
+    def test_every_catalogued_model_records_its_modes(self):
+        from orca_ui.hand import motor_models
+
+        for model in motor_models.catalogue():
+            if model.key != motor_models.UNKNOWN_KEY:
+                assert model.operating_modes, model.key
