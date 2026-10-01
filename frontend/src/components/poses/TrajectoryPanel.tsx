@@ -14,15 +14,6 @@ import { useAppStore } from '../../state/appStore'
 import { useStartGate } from '../../state/operationStore'
 import { Panel } from '../common/Panel'
 
-// A period paces the gaps *within* a segment, so with a single command per
-// segment there are no gaps for it to pace. Empty counts as direct too: that
-// is what motor waypoints default to.
-function stepsAreDirect(raw: string | undefined): boolean {
-  if (raw === undefined || raw === '') return true
-  const parsed = parseInt(raw, 10)
-  return !Number.isFinite(parsed) || parsed <= 1
-}
-
 // The 3D waypoint editor pulls in three.js — load it only when opened.
 const WaypointEditor = lazy(() =>
   import('./WaypointEditor').then((m) => ({ default: m.WaypointEditor })),
@@ -264,14 +255,13 @@ export function TrajectoryPanel({
                         <label
                           className="traj-loop"
                           title={
-                            stepsAreDirect(steps[traj.name])
-                              ? 'nothing to pace at 1 command per segment: ' +
-                                'each waypoint is commanded once and the next ' +
-                                'is not sent until every motor has arrived'
-                              : 'ms between the commands spanning a segment. ' +
-                                'Only the gaps within a segment are paced — ' +
-                                'at each recorded waypoint playback waits for ' +
-                                'every motor to arrive. Speed divides it.'
+                            'ms between commands, which is also the rest at ' +
+                            'each waypoint once every motor has arrived. At ' +
+                            '1 command per segment that rest is all it is; ' +
+                            'above 1 it also spaces the steps spanning a ' +
+                            'segment. A dwell longer than the settle cap ' +
+                            'outlasts it, so the cap only bites once this is ' +
+                            'short enough to notice.'
                           }
                         >
                           <input
@@ -280,7 +270,6 @@ export function TrajectoryPanel({
                             max={5000}
                             step={10}
                             placeholder="100"
-                            disabled={stepsAreDirect(steps[traj.name])}
                             value={periods[traj.name] ?? ''}
                             onChange={(e) =>
                               setPeriods((prev) => ({

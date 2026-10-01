@@ -58,10 +58,14 @@ TACTILE_MODES = {
 # per command — sliders nudge, they don't teleport.
 MAX_DIRECT_MOTOR_STEP_RAD = 0.8
 
-# How long a bench sequence rests on each recorded point before moving to the
-# next. Long enough to watch the motor arrive (or fail to) rather than a speed
-# control: the servo's own profile decides how fast it travels.
+# Default rest on each recorded point before the next command. Longer than
+# the trajectory player's because a bench run is watched rather than
+# performed, but settable the same way and with the same bounds -- a dwell
+# the operator cannot shorten silently outlasts any settle cap they set,
+# which makes the cap look broken.
 BENCH_DWELL_S = 1.5
+BENCH_MIN_PERIOD_S = 0.02
+BENCH_MAX_PERIOD_S = 5.0
 # Bounds a motor that cannot reach its point; it does not pace one that can.
 BENCH_ARRIVAL_TIMEOUT_S = 5.0
 # Commands per segment on the bench, matching the trajectory player: 1 moves
@@ -173,6 +177,7 @@ class HandService:
     # rather than guess how long they need.
     _bench_interp_steps = BENCH_MIN_INTERP_STEPS
     _bench_max_settle_ms: "int | None" = None
+    _bench_period_s = BENCH_DWELL_S
 
     def __init__(
         self,
@@ -202,6 +207,7 @@ class HandService:
         self._bench_playing: dict[int, int] = {}   # motor id -> next frame
         self._bench_interp_steps = BENCH_MIN_INTERP_STEPS
         self._bench_max_settle_ms = None
+        self._bench_period_s = BENCH_DWELL_S
         self._bench_thread: threading.Thread | None = None
         self._bench_stop = threading.Event()
         self._tactile_mode = "combined"
@@ -1625,7 +1631,8 @@ class HandService:
         return {"id": motor_id, "points": values}
 
     def set_bench_pacing(self, interp_steps: int,
-                         max_settle_ms: "int | None") -> dict:
+                         max_settle_ms: "int | None",
+                         period_ms: "int | None" = None) -> dict:
         """How bench playback paces itself, for every motor at once.
 
         Bench-wide rather than per motor because one thread drives the shared
@@ -1643,10 +1650,18 @@ class HandService:
             raise ServiceError(
                 "max_settle_ms must be 1..60000 (omit it to wait for every "
                 "motor)")
+        period = (self._bench_period_s if period_ms in (None, "")
+                  else int(period_ms) / 1000.0)
+        if not BENCH_MIN_PERIOD_S <= period <= BENCH_MAX_PERIOD_S:
+            raise ServiceError(
+                f"period_ms must be {BENCH_MIN_PERIOD_S * 1000:.0f}.."
+                f"{BENCH_MAX_PERIOD_S * 1000:.0f}")
         with self._state_lock:
             self._bench_interp_steps = steps
             self._bench_max_settle_ms = cap
-        return {"interp_steps": steps, "max_settle_ms": cap}
+            self._bench_period_s = period
+        return {"interp_steps": steps, "max_settle_ms": cap,
+                "period_ms": round(period * 1000)}
 
     def set_motor_playback(self, motor_id: int, enabled: bool) -> dict:
         """Run or stop this motor's recorded points.
@@ -1702,7 +1717,7 @@ class HandService:
         while not self._bench_stop.is_set():
             if not self._bench_step():
                 return
-            self._bench_stop.wait(BENCH_DWELL_S)
+            self._bench_stop.wait(self._bench_period_s)
 
     @staticmethod
     def _bench_target(points: "list[float]", frame: int, steps: int):

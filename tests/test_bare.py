@@ -1306,3 +1306,61 @@ class TestBenchFrames:
             value, arrives = self._target([-3.0, -2.0], 0, steps)
             assert value == pytest.approx(-3.0)
             assert arrives, "the approach is a sync point like any other"
+
+
+class TestBenchDwellMatchesThePlayer:
+    """A dwell the operator cannot shorten outlasts any settle cap they set,
+    which makes the cap look broken when it is working exactly as asked."""
+
+    def _service(self):
+        from orca_ui.hand.service import HandService
+
+        return HandService.__new__(HandService)
+
+    def test_the_dwell_is_settable_rather_than_a_constant(self):
+        from orca_ui.hand import service as svc
+
+        s = self._service()
+        s._state_lock = threading.RLock()
+        result = s.set_bench_pacing(1, 50, 100)
+
+        assert result["period_ms"] == 100
+        assert s._bench_period_s == pytest.approx(0.1)
+        assert s._bench_period_s != svc.BENCH_DWELL_S
+
+    def test_a_cap_shorter_than_the_dwell_is_the_case_that_matters(self):
+        """The reported bug: a 50 ms cap under a 1.5 s dwell can never be
+        observed, because the motor finishes during the dwell either way."""
+        from orca_ui.hand import service as svc
+
+        s = self._service()
+        s._state_lock = threading.RLock()
+        s.set_bench_pacing(1, 50, 100)
+
+        assert s._bench_max_settle_ms / 1000.0 < s._bench_period_s < svc.BENCH_DWELL_S
+
+    def test_the_bounds_match_the_trajectory_player(self):
+        from orca_ui.hand import service as svc
+        from orca_ui.hand.operations import player as pl
+
+        assert svc.BENCH_MIN_PERIOD_S == pl.MIN_STEP_PERIOD_S
+        assert svc.BENCH_MAX_PERIOD_S == pl.MAX_STEP_PERIOD_S
+
+    def test_an_out_of_range_dwell_is_refused(self):
+        from orca_ui.hand.service import ServiceError
+
+        s = self._service()
+        s._state_lock = threading.RLock()
+        with pytest.raises(ServiceError):
+            s.set_bench_pacing(1, None, 10)
+        with pytest.raises(ServiceError):
+            s.set_bench_pacing(1, None, 6000)
+
+    def test_omitting_the_dwell_keeps_the_current_one(self):
+        s = self._service()
+        s._state_lock = threading.RLock()
+        s.set_bench_pacing(1, None, 250)
+        s.set_bench_pacing(4, None, None)
+
+        assert s._bench_period_s == pytest.approx(0.25)
+        assert s._bench_interp_steps == 4

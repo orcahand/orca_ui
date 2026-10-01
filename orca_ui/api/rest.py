@@ -320,7 +320,7 @@ def build_router(service: HandService) -> APIRouter:
     @router.post("/motors/direct/pacing")
     def motors_direct_pacing(body: schemas.BenchPacingRequest):
         return guard(service.set_bench_pacing,
-                     body.interp_steps, body.max_settle_ms)
+                     body.interp_steps, body.max_settle_ms, body.period_ms)
 
     @router.post("/motors/direct/play")
     def motors_direct_play(body: schemas.MotorPlaybackRequest):

@@ -32,6 +32,7 @@ const CURRENT_WINDOW = 20
 function BenchPacing() {
   const [steps, setSteps] = useState('1')
   const [settle, setSettle] = useState('')
+  const [period, setPeriod] = useState('1500')
   const [saved, setSaved] = useState(false)
   const setError = useAppStore((s) => s.setError)
 
@@ -39,8 +40,9 @@ function BenchPacing() {
     const n = Math.min(200, Math.max(1, parseInt(steps, 10) || 1))
     const raw = settle.trim()
     const ms = raw === '' ? null : Math.min(60000, Math.max(1, parseInt(raw, 10)))
+    const ms2 = Math.min(5000, Math.max(20, parseInt(period, 10) || 1500))
     void api
-      .motorsDirectPacing(n, Number.isNaN(ms as number) ? null : ms)
+      .motorsDirectPacing(n, Number.isNaN(ms as number) ? null : ms, ms2)
       .then(() => {
         setSaved(true)
         setError(null)
@@ -96,6 +98,25 @@ function BenchPacing() {
           placeholder="wait"
           value={settle}
           onChange={(e) => setSettle(e.target.value)}
+          style={{ width: 56, marginLeft: 4 }}
+        />
+        ms
+      </label>
+      <label
+        title={
+          'ms between commands, which is also the rest at each recorded ' +
+          'point. A dwell longer than the settle cap outlasts it, so the ' +
+          'cap only bites once this is short enough to notice.'
+        }
+      >
+        every
+        <input
+          type="number"
+          min={20}
+          max={5000}
+          step={10}
+          value={period}
+          onChange={(e) => setPeriod(e.target.value)}
           style={{ width: 56, marginLeft: 4 }}
         />
         ms

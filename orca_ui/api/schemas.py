@@ -198,3 +198,4 @@ class BenchPacingRequest(BaseModel):
 
     interp_steps: int = 1
     max_settle_ms: "int | None" = None
+    period_ms: "int | None" = None
