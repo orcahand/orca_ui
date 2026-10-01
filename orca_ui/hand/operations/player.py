@@ -47,6 +47,11 @@ MIN_INTERP_STEPS = 1
 # Seconds to let a chain reach a waypoint before giving up on it. Generous:
 # this bounds a motor that cannot arrive, it does not pace one that can.
 WAYPOINT_ARRIVAL_TIMEOUT_S = 5.0
+# Bounds for the operator's own cap on that wait, in milliseconds. Off by
+# default, and when set it replaces the backstop above rather than stacking
+# with it -- a cap longer than the backstop would otherwise do nothing.
+MIN_MAX_SETTLE_MS = 1
+MAX_MAX_SETTLE_MS = 60_000
 
 # Waypoint holds. The hand trails the command stream by its own tracking lag
 # (~100 ms on a motors-only hand, more on a loaded thumb), while a waypoint is
@@ -249,20 +254,30 @@ def _stepped_frames(waypoints: list, steps: int) -> list:
     return frames
 
 
-def _await_arrival(ctx: OpContext, hand, what: str) -> None:
-    """Block until every motor has settled, or say why it did not.
+def _await_arrival(ctx: OpContext, hand, what: str,
+                   max_settle_s: "float | None" = None) -> bool:
+    """Block until every motor has settled. True if they all did.
 
-    A motor held short of its goal never reports arrival, so this is logged
-    rather than raised: stopping playback outright would be a worse answer
-    than carrying on from where the hand actually is.
+    With ``max_settle_s`` the wait is capped and moving on is the point, not
+    a failure, so it passes quietly -- the caller counts how often it
+    happened and reports that once rather than per waypoint.
+
+    Without one, a motor held short of its goal would wait forever, so a
+    backstop applies and saying so is worth a line: carrying on from where
+    the hand actually is beats stopping playback outright.
     """
     from orca_core.hardware.motor_client import MotionTimeoutError
 
+    capped = max_settle_s is not None
     try:
-        hand.wait_for_motion(timeout=WAYPOINT_ARRIVAL_TIMEOUT_S)
+        hand.wait_for_motion(
+            timeout=max_settle_s if capped else WAYPOINT_ARRIVAL_TIMEOUT_S)
+        return True
     except MotionTimeoutError as exc:
-        ctx.log(f"{what}: not every motor arrived within "
-                f"{WAYPOINT_ARRIVAL_TIMEOUT_S:g}s ({exc})")
+        if not capped:
+            ctx.log(f"{what}: not every motor arrived within "
+                    f"{WAYPOINT_ARRIVAL_TIMEOUT_S:g}s ({exc})")
+        return False
 
 
 def play_frames(ctx: OpContext, *, name: str, joint_ids: list[str],
@@ -389,7 +404,18 @@ class ReplayOperation(Operation):
             if traj_type == WAYPOINTS and interp_steps is None:
                 raise ServiceError(
                     "step_period_s paces stepped playback — set interp_steps "
-                    "too (0 = straight to each waypoint)")
+                    "too (1 = straight to each waypoint)")
+        max_settle_ms = params.get("max_settle_ms")
+        if max_settle_ms is not None:
+            max_settle_ms = int(max_settle_ms)
+            if not MIN_MAX_SETTLE_MS <= max_settle_ms <= MAX_MAX_SETTLE_MS:
+                raise ServiceError(
+                    f"max_settle_ms must be {MIN_MAX_SETTLE_MS}.."
+                    f"{MAX_MAX_SETTLE_MS} (omit it to wait for every motor)")
+            if traj_type == CONTINUOUS:
+                raise ServiceError(
+                    "max_settle_ms caps the wait at a waypoint — a "
+                    "continuous recording has none to wait at")
         frames = data.get("angles") or data.get("waypoints") or []
         if not frames:
             raise ServiceError("trajectory contains no frames")
@@ -402,6 +428,8 @@ class ReplayOperation(Operation):
             # None = the INTERP_STEP_PERIOD_S default; only meaningful in
             # stepped/motor playback, where it is the seconds per command.
             "step_period_s": step_period,
+            # None = wait for every motor at each waypoint, backstop aside.
+            "max_settle_ms": max_settle_ms,
         }
 
     def run(self, ctx: OpContext) -> dict:
@@ -482,9 +510,14 @@ class ReplayOperation(Operation):
             ctx.set_phase("approach", detail=f"{name} · moving to start")
             ctx.check_stop()
             ctx.pause_point()
+            cap_ms = self.params.get("max_settle_ms")
+            max_settle_s = cap_ms / 1000.0 if cap_ms else None
+            unsettled = 0
+
             hand.write_motor_pos(
                 motor_ids, np.asarray(waypoints[0], dtype=float))
-            _await_arrival(ctx, hand, "start")
+            if not _await_arrival(ctx, hand, "start", max_settle_s):
+                unsettled += 1
 
             # The hardware motor client divides positions by its scale, so
             # rows must be arrays, not plain lists.
@@ -518,15 +551,23 @@ class ReplayOperation(Operation):
                         # A recorded waypoint, and so a sync point: no motor
                         # starts the next leg until every motor has finished
                         # this one.
-                        _await_arrival(ctx, hand, f"waypoint {index // steps}")
+                        if not _await_arrival(
+                                ctx, hand, f"waypoint {index // steps}",
+                                max_settle_s):
+                            unsettled += 1
                         ctx.sleep(dt)
                 cycles += 1
                 if loop and cycles >= MAX_LOOP_CYCLES:
                     ctx.log(f"loop backstop reached ({MAX_LOOP_CYCLES} "
                             "cycles) — stopping playback")
                 if not loop or cycles >= MAX_LOOP_CYCLES:
+                    if unsettled and max_settle_s is not None:
+                        ctx.log(f"moved on before every motor settled at "
+                                f"{unsettled} waypoint(s) — the "
+                                f"{cap_ms:g} ms cap, not a fault")
                     return {"frames": len(waypoints), "cycles": cycles,
-                            "duration_s": duration_s}
+                            "duration_s": duration_s,
+                            "unsettled_waypoints": unsettled}
                 ctx.set_detail(f"{name} · cycle {cycles + 1}")
         finally:
             service.set_direct_motor_mode(False, from_operation=True)

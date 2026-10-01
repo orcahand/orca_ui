@@ -60,6 +60,7 @@ export function TrajectoryPanel({
   // With 0 steps this is the waypoint-to-waypoint time — the motor's own
   // controller does the travelling, the period just sets the rhythm.
   const [periods, setPeriods] = useState<Record<string, string>>({})
+  const [settles, setSettles] = useState<Record<string, string>>({})
   const [editing, setEditing] = useState<string | null>(null)
   const [mode, setMode] = useState<
     'continuous' | 'waypoints' | 'motor_waypoints'
@@ -102,6 +103,14 @@ export function TrajectoryPanel({
       Number.isFinite(periodMs)
         ? Math.min(5000, Math.max(20, periodMs)) / 1000
         : null
+    const settleRaw = settles[traj.name] ?? ''
+    const settleMs = parseInt(settleRaw, 10)
+    const settle =
+      traj.type === 'motor_waypoints' &&
+      settleRaw !== '' &&
+      Number.isFinite(settleMs)
+        ? Math.min(60000, Math.max(1, settleMs))
+        : null
     void api
       .operationStart('replay', {
         name: traj.name,
@@ -109,6 +118,7 @@ export function TrajectoryPanel({
         loop: loops[traj.name] ?? false,
         ...(interp !== null ? { interp_steps: interp } : {}),
         ...(period !== null ? { step_period_s: period } : {}),
+        ...(settle !== null ? { max_settle_ms: settle } : {}),
         ...(uncalibrated ? { allow_uncalibrated: true } : {}),
       })
       .catch(fail)
@@ -266,6 +276,37 @@ export function TrajectoryPanel({
                             value={periods[traj.name] ?? ''}
                             onChange={(e) =>
                               setPeriods((prev) => ({
+                                ...prev,
+                                [traj.name]: e.target.value,
+                              }))
+                            }
+                            style={{ width: 56 }}
+                          />
+                          ms
+                        </label>
+                      )}
+                      {traj.type === 'motor_waypoints' && (
+                        <label
+                          className="traj-loop"
+                          title={
+                            'max settle — ms to wait at each waypoint before ' +
+                            'sending the next command even if a motor has ' +
+                            'not reported arriving. Empty waits for every ' +
+                            'motor, which is what makes a recorded motion ' +
+                            'synchronous; set it when one motor cannot reach ' +
+                            'its point and should not hold up the rest.'
+                          }
+                        >
+                          settle
+                          <input
+                            type="number"
+                            min={1}
+                            max={60000}
+                            step={50}
+                            placeholder="wait"
+                            value={settles[traj.name] ?? ''}
+                            onChange={(e) =>
+                              setSettles((prev) => ({
                                 ...prev,
                                 [traj.name]: e.target.value,
                               }))

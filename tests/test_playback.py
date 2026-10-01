@@ -542,3 +542,78 @@ def test_translating_a_joint_recording_to_motor_space(client):
     _synthetic_trajectory(client, name="cont2", frames=5)
     response = client.post("/api/trajectories/cont2/to_motor", json={})
     assert response.status_code == 409 and "waypoint" in response.text
+
+
+def test_max_settle_is_off_unless_asked_for(client):
+    """Waiting for every motor is what makes a recorded motion synchronous,
+    so the cap that gives that up has to be opted into -- an unasked-for
+    replay must carry None, not some default number of milliseconds."""
+    from orca_ui.hand.operations.player import ReplayOperation
+
+    _waypoint_trajectory(client, "uncapped", [
+        [0.0] * len(_joint_ids(client)),
+        [5.0] + [0.0] * (len(_joint_ids(client)) - 1),
+    ])
+    client.post("/api/torque/enable")
+    service = client.app.state.service
+
+    params = ReplayOperation.validate(
+        service, {"name": "uncapped", "interp_steps": 1})
+
+    assert params["max_settle_ms"] is None
+
+
+def test_max_settle_out_of_range_is_refused(client):
+    _waypoint_trajectory(client, "capped", [
+        [0.0] * len(_joint_ids(client)),
+        [5.0] + [0.0] * (len(_joint_ids(client)) - 1),
+    ])
+    client.post("/api/torque/enable")
+
+    response = client.post("/api/operation/replay/start", json={"params": {
+        "name": "capped", "interp_steps": 1, "max_settle_ms": 0}})
+    assert response.status_code >= 400
+    assert "max_settle_ms" in response.text
+
+
+def test_a_capped_wait_passes_quietly_where_an_uncapped_one_complains():
+    """Hitting a cap the operator set is the point of setting it, not a
+    fault, so it must not read like one in the log."""
+    from orca_core.hardware.motor_client import MotionTimeoutError
+    from orca_ui.hand.operations import player as pl
+
+    class _Hand:
+        def wait_for_motion(self, timeout):
+            raise MotionTimeoutError("motor 3 short of goal")
+
+    class _Ctx:
+        def __init__(self):
+            self.logs = []
+
+        def log(self, message):
+            self.logs.append(message)
+
+    capped = _Ctx()
+    assert pl._await_arrival(capped, _Hand(), "waypoint 1", 0.05) is False
+    assert capped.logs == []
+
+    uncapped = _Ctx()
+    assert pl._await_arrival(uncapped, _Hand(), "waypoint 1", None) is False
+    assert len(uncapped.logs) == 1
+    assert "motor 3" in uncapped.logs[0]
+
+
+def test_the_cap_is_the_timeout_rather_than_stacking_with_the_backstop():
+    """A cap longer than the backstop would otherwise never be reached."""
+    from orca_ui.hand.operations import player as pl
+
+    seen = []
+
+    class _Hand:
+        def wait_for_motion(self, timeout):
+            seen.append(timeout)
+
+    pl._await_arrival(_Ctx := type("C", (), {"log": lambda *_: None})(),
+                      _Hand(), "waypoint 1", 20.0)
+    assert seen == [20.0]
+    assert seen[0] > pl.WAYPOINT_ARRIVAL_TIMEOUT_S
