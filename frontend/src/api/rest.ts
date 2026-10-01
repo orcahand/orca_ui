@@ -123,6 +123,19 @@ export const api = {
   setServoProfile: (id: number, profile: Partial<ServoProfile>) =>
     post<{ profile: ServoProfileMap }>(`/api/motors/${id}/profile`, profile),
 
+  spotlight: (
+    enabled: boolean,
+    sample_hz: number,
+    publish_hz: number,
+    average_samples: number,
+  ) =>
+    post<{
+      enabled: boolean
+      sample_hz: number
+      publish_hz: number
+      average_samples: number
+    }>('/api/spotlight', { enabled, sample_hz, publish_hz, average_samples }),
+
   models: () => request<ModelsInfo>('/api/models'),
   // name null hands the choice back to hardware detection.
   selectModel: (name: string | null, version?: string | null) =>

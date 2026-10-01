@@ -1629,6 +1629,23 @@ class HandService:
         self._bench_points[motor_id] = values
         return {"id": motor_id, "points": values}
 
+    def set_spotlight(self, enabled: bool, sample_hz: float,
+                      publish_hz: float, average_samples: int) -> dict:
+        """Arm the spotlight sampler, which reads far faster than telemetry.
+
+        Only while the panel is open: the rate it needs is a real share of a
+        half-duplex bus, and paying for it with nobody watching would slow
+        whatever is driving the hand.
+        """
+        telemetry = self._telemetry
+        if telemetry is None:
+            raise ServiceError("telemetry is not running", status_code=503)
+        if enabled:
+            self._require_motors()
+        return telemetry.set_spotlight(
+            enabled=bool(enabled), sample_hz=sample_hz,
+            publish_hz=publish_hz, average_samples=average_samples)
+
     def set_bench_pacing(self, interp_steps: int,
                          max_settle_ms: "int | None",
                          period_ms: "int | None" = None) -> dict:

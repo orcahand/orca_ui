@@ -10,6 +10,7 @@ import { DashboardView } from './components/views/DashboardView'
 import { MotorsView } from './components/views/MotorsView'
 import { PosesView } from './components/views/PosesView'
 import { SetupView } from './components/views/SetupView'
+import { SpotlightView } from './components/views/SpotlightView'
 import { TeleopView } from './components/views/TeleopView'
 import { useAppStore } from './state/appStore'
 
@@ -59,7 +60,8 @@ export default function App() {
         )
       ) : (
         <>
-          {(view === 'dashboard' || view === '3d' || view === 'poses') && (
+          {(view === 'dashboard' || view === '3d' || view === 'poses' ||
+            view === 'spotlight') && (
             <MaintenanceBanner />
           )}
           {view === 'dashboard' && <DashboardView />}
@@ -68,6 +70,13 @@ export default function App() {
               fallback={<div className="detecting-card">loading 3D view…</div>}
             >
               <ThreeDView />
+            </Suspense>
+          )}
+          {view === 'spotlight' && (
+            <Suspense
+              fallback={<div className="detecting-card">loading 3D view…</div>}
+            >
+              <SpotlightView />
             </Suspense>
           )}
           {view === 'poses' && <PosesView />}

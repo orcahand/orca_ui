@@ -140,6 +140,37 @@ export class JointGlowLayer {
     for (const entry of this.entries.values()) entry.mesh.visible = visible
   }
 
+  /**
+   * Mark one joint and hide the rest, or clear with null.
+   *
+   * Deliberately not the tracking ramp: this answers "which joint is the
+   * panel talking about", so it must read the same whatever the joint is
+   * doing, and must work on a hand with no encoders where the ramp has
+   * nothing to colour from.
+   *
+   * Returns false when the named joint has no ring, which is the caller's
+   * cue that the 3D view cannot show what the panel is saying.
+   */
+  spotlight(name: string | null): boolean {
+    if (name === null) {
+      for (const entry of this.entries.values()) {
+        entry.material.opacity = this.glow?.idleOpacity ?? 0.3
+      }
+      return true
+    }
+    let found = false
+    for (const [joint, entry] of this.entries.entries()) {
+      const lit = joint === name
+      entry.mesh.visible = lit
+      if (lit) {
+        found = true
+        entry.material.color.setRGB(1, 0.1, 0.1)
+        entry.material.opacity = 1
+      }
+    }
+    return found
+  }
+
   dispose(): void {
     for (const entry of this.entries.values()) {
       entry.mesh.removeFromParent()

@@ -39,6 +39,19 @@ export interface LatestFrames {
   teleop: {
     preview: { jpeg: string; seq: number | null } | null
   }
+  // Spotlight: sampled far faster than ordinary telemetry while the panel is
+  // open, and published at draw rate. Currents are already averaged over the
+  // sample window by the backend, which is the point of reading fast.
+  spotlight: {
+    positions: Record<string, number>
+    currents: Record<string, number>
+    peaks: Record<string, number>
+    temps: Record<string, number>
+    // What the sampler actually managed, which a busy bus will hold below
+    // what was asked for.
+    achievedHz: number
+    t: number
+  }
   stats: Record<string, unknown> | null
   health: SensorsHealth | null
 }
@@ -58,6 +71,8 @@ export const latest: LatestFrames = {
   motors: { temps: {}, currents: {}, positions: {}, maxTempC: null,
             faults: null },
   teleop: { preview: null },
+  spotlight: { positions: {}, currents: {}, peaks: {}, temps: {},
+               achievedHz: 0, t: 0 },
   stats: null,
   health: null,
 }

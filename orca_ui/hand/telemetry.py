@@ -16,6 +16,7 @@ import logging
 import math
 import threading
 import time
+from collections import deque
 from typing import Callable
 
 from orca_core.hardware.sensing.constants import (
@@ -53,6 +54,18 @@ BENCH_TELEMETRY_HZ = 20.0
 # that a motor heating under load is visible while it happens.
 BENCH_TEMP_HZ = 1.0
 
+# Spotlight: one joint shown at a time while a loop runs, read far faster
+# than the ordinary telemetry so the bar moves and the current average means
+# something. Sampling and drawing are separate rates on purpose -- a browser
+# cannot show more than its refresh, so publishing every sample would only
+# flood the socket, where averaging over them genuinely sharpens the reading.
+SPOTLIGHT_SAMPLE_HZ = 200.0
+SPOTLIGHT_MAX_SAMPLE_HZ = 250.0
+SPOTLIGHT_PUBLISH_HZ = 60.0
+SPOTLIGHT_MAX_PUBLISH_HZ = 60.0
+SPOTLIGHT_TEMP_HZ = 2.0
+SPOTLIGHT_AVERAGE_SAMPLES = 50
+
 # Minimum gap between motor-bus telemetry reads on a hand with no joint loop.
 # There is no loop to contend with, but the bus is half-duplex: every read
 # blocks commands for its whole round trip, and temperature moves over minutes,
@@ -69,6 +82,16 @@ MAX_TELEMETRY_STALENESS_S = 30.0
 # Without the hysteresis a flapping sensor leaks a burst of noise into the
 # 3D model every time one window happens to pass clean.
 ENCODER_RESTORE_WINDOWS = 5
+
+
+def _finite(values: dict, digits: int) -> dict:
+    """Drop the entries a JSON envelope cannot carry.
+
+    Non-finite readings mean a motor did not answer, which is a gap rather
+    than a value, and the stream envelope refuses NaN outright.
+    """
+    return {k: round(float(v), digits) for k, v in values.items()
+            if isinstance(v, (int, float)) and math.isfinite(v)}
 
 
 def _clean_angles(angles: dict | None) -> dict | None:
@@ -224,6 +247,14 @@ class _Sampler(threading.Thread):
     def stop(self) -> None:
         self._stop_event.set()
 
+    def set_period(self, period_s: float) -> None:
+        """Change the rate without restarting the thread.
+
+        Takes effect after the tick in flight: the wait is computed fresh
+        each pass, so there is nothing to interrupt.
+        """
+        self._period = max(1e-4, float(period_s))
+
     def run(self) -> None:
         while not self._stop_event.is_set():
             started = time.monotonic()
@@ -246,6 +277,22 @@ class TelemetryService:
             _Sampler("telemetry-mid", 1.0 / settings.mid_hz, self._mid_tick),
             _Sampler("telemetry-slow", 1.0 / settings.slow_hz, self._slow_tick),
         ]
+        # Idle until armed: a sampler polling the bus for a panel nobody has
+        # open is pure contention with whatever is driving the hand.
+        self._spotlight = _Sampler(
+            "telemetry-spotlight", 1.0 / SPOTLIGHT_SAMPLE_HZ,
+            self._spotlight_tick)
+        self._samplers.append(self._spotlight)
+        self._spot_armed = False
+        self._spot_publish_period = 1.0 / SPOTLIGHT_PUBLISH_HZ
+        self._spot_window = SPOTLIGHT_AVERAGE_SAMPLES
+        self._spot_current_samples: "dict[int, deque]" = {}
+        self._spot_last_publish = 0.0
+        self._spot_last_temp = float("-inf")
+        self._spot_temps: "dict[int, float]" = {}
+        self._spot_ticks = 0
+        self._spot_rate_since = 0.0
+        self._spot_achieved_hz = 0.0
         self._bus_reads = ("state", "temps")
         self._bus_read_index = 0
         # Start the staleness window now, so a hand already moving at startup
@@ -327,6 +374,99 @@ class TelemetryService:
                 taxels = getattr(reading.taxels, "taxels", None)
                 if taxels:
                     self._hub.publish(T.TACTILE_TAXELS, {"taxels": taxels})
+
+    def set_spotlight(self, *, enabled: bool, sample_hz: float,
+                      publish_hz: float, average_samples: int) -> dict:
+        """Arm or disarm the spotlight sampler and set its rates.
+
+        Sampling and publishing are separate because they answer different
+        questions: how often the bus is asked, and how often the browser is
+        told. Raising the first sharpens the average and the bar; raising the
+        second past a display refresh only costs bandwidth.
+        """
+        sample_hz = max(1.0, min(float(sample_hz), SPOTLIGHT_MAX_SAMPLE_HZ))
+        publish_hz = max(1.0, min(float(publish_hz), SPOTLIGHT_MAX_PUBLISH_HZ))
+        window = max(1, min(int(average_samples), 1000))
+        self._spot_publish_period = 1.0 / publish_hz
+        self._spot_window = window
+        self._spot_current_samples = {}
+        self._spot_armed = bool(enabled)
+        self._spot_ticks = 0
+        self._spot_rate_since = time.monotonic()
+        self._spot_achieved_hz = 0.0
+        self._spotlight.set_period(1.0 / sample_hz)
+        return {
+            "enabled": self._spot_armed,
+            "sample_hz": sample_hz,
+            "publish_hz": publish_hz,
+            "average_samples": window,
+        }
+
+    def _spotlight_tick(self) -> None:
+        """Read position and current as fast as asked, publish at draw rate.
+
+        Every sample feeds the per-motor current average, which is what makes
+        the reading steady: present current is the instantaneous phase current
+        of a PWM coil, so one sample says very little.
+        """
+        if not self._spot_armed:
+            return
+        session = self._service.session
+        hand = getattr(session, "hand", None)
+        if session is None or not session.caps.motors or hand is None:
+            return
+        try:
+            positions = hand.get_motor_pos(as_dict=True)
+            currents = hand.get_motor_current(as_dict=True)
+        except Exception:
+            logger.debug("spotlight read failed", exc_info=True)
+            return
+
+        now = time.monotonic()
+        for motor_id, value in currents.items():
+            samples = self._spot_current_samples.get(int(motor_id))
+            if samples is None or samples.maxlen != self._spot_window:
+                samples = deque(maxlen=self._spot_window)
+                self._spot_current_samples[int(motor_id)] = samples
+            samples.append(float(value))
+
+        # Measured rather than assumed: a bus busy with commands will not hit
+        # the rate that was asked for, and the panel should say so.
+        self._spot_ticks += 1
+        if now - self._spot_rate_since >= 0.5:
+            self._spot_achieved_hz = self._spot_ticks / (now - self._spot_rate_since)
+            self._spot_ticks = 0
+            self._spot_rate_since = now
+
+        if now - self._spot_last_temp >= 1.0 / SPOTLIGHT_TEMP_HZ:
+            self._spot_last_temp = now
+            try:
+                self._spot_temps = {
+                    int(k): round(float(v), 1)
+                    for k, v in hand.get_motor_temp(as_dict=True).items()}
+            except Exception:
+                logger.debug("spotlight temperature read failed", exc_info=True)
+
+        if now - self._spot_last_publish < self._spot_publish_period:
+            return
+        self._spot_last_publish = now
+        # A motor that does not answer reads back NaN, and the envelope is
+        # built with allow_nan=False: one of them would make the whole message
+        # unserializable, and the broadcaster marks a failed topic as sent so
+        # it never retries. One silent motor would therefore take the panel
+        # down rather than show a gap.
+        self._hub.publish(T.SPOTLIGHT, {
+            "positions": _finite({int(k): float(v)
+                                  for k, v in positions.items()}, 4),
+            "currents": _finite({
+                int(k): sum(v) / len(v)
+                for k, v in self._spot_current_samples.items() if v}, 1),
+            "peaks": _finite({
+                int(k): max(abs(s) for s in v)
+                for k, v in self._spot_current_samples.items() if v}, 1),
+            "temps": _finite(self._spot_temps, 1),
+            "achieved_hz": round(self._spot_achieved_hz, 1),
+        })
 
     def _bench_tick(self, session) -> None:
         """Position and current for bare motors, fast enough to watch a stall.

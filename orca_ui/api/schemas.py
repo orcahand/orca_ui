@@ -199,3 +199,12 @@ class BenchPacingRequest(BaseModel):
     interp_steps: int = 1
     max_settle_ms: "int | None" = None
     period_ms: "int | None" = None
+
+
+class SpotlightRequest(BaseModel):
+    """Spotlight sampling. Reading and drawing are separate rates."""
+
+    enabled: bool = False
+    sample_hz: float = 200.0
+    publish_hz: float = 60.0
+    average_samples: int = 50

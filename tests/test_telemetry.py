@@ -294,3 +294,70 @@ def test_a_dead_stream_is_not_suppressed_joint_by_joint():
     telemetry, _ = _build()
     telemetry._update_encoder_suppression(_health("no frames"))
     assert telemetry._enc_suppressed == {}
+
+
+class TestSpotlightPayload:
+    """One silent motor must not take the whole panel down.
+
+    The stream envelope is built with allow_nan=False and the broadcaster
+    marks a topic that failed to serialise as sent, so it never retries: a
+    single NaN would stop the panel permanently rather than leave a gap.
+    """
+
+    def _service(self, currents):
+        import types
+        from orca_ui.hand import telemetry as tm
+
+        published = []
+
+        class _Hub:
+            def publish(self, topic, payload):
+                published.append((topic, payload))
+
+        class _Hand:
+            def get_motor_pos(self, as_dict=True):
+                return {1: 0.5, 2: float("nan")}
+
+            def get_motor_current(self, as_dict=True):
+                return currents
+
+            def get_motor_temp(self, as_dict=True):
+                return {1: 30.0, 2: float("nan")}
+
+        session = types.SimpleNamespace(
+            hand=_Hand(), caps=types.SimpleNamespace(motors=True))
+        service = tm.TelemetryService(
+            types.SimpleNamespace(session=session), _Hub(),
+            types.SimpleNamespace(fast_hz=60, mid_hz=10, slow_hz=1))
+        service.set_spotlight(enabled=True, sample_hz=200, publish_hz=1000,
+                              average_samples=4)
+        return service, published
+
+    def test_a_silent_motor_leaves_a_gap_rather_than_a_nan(self):
+        service, published = self._service({1: 10.0, 2: float("nan")})
+        service._spotlight_tick()
+
+        payload = next(p for topic, p in published if topic == "spotlight")
+        assert payload["positions"] == {1: 0.5}
+        assert payload["currents"] == {1: 10.0}
+        assert 2 not in payload["temps"]
+
+    def test_the_payload_survives_json_with_nan_refused(self):
+        """Exactly how the envelope encodes it."""
+        import json
+
+        service, published = self._service({1: 10.0, 2: float("nan")})
+        service._spotlight_tick()
+        payload = next(p for topic, p in published if topic == "spotlight")
+
+        json.dumps(payload, allow_nan=False)  # must not raise
+
+    def test_an_all_nan_read_still_publishes(self):
+        """Empty is a legitimate answer; refusing to publish would leave the
+        panel showing a stale reading with no sign it had gone."""
+        service, published = self._service({1: float("nan"), 2: float("nan")})
+        service._spotlight_tick()
+
+        payload = next(p for topic, p in published if topic == "spotlight")
+        assert payload["currents"] == {}
+        assert "achieved_hz" in payload

@@ -38,6 +38,7 @@ const TABS: { id: ViewName; label: string }[] = [
   { id: 'teleop', label: 'Teleop' },
   { id: 'setup', label: 'Setup' },
   { id: 'motors', label: 'Motors' },
+  { id: 'spotlight', label: 'Spotlight' },
 ]
 
 export function AppHeader() {

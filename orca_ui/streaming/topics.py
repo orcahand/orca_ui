@@ -24,6 +24,7 @@ JOINTS_TARGET = "joints.target"
 JOINTS_CORRECTION = "joints.correction"
 
 MOTORS_TELEMETRY = "motors.telemetry"
+SPOTLIGHT = "spotlight"
 # Per-motor fault table: bus-error counters (parsed from orca_core's motor
 # client logs) and command adherence (target vs sampled pose, stall
 # durations). 1 Hz from telemetry's slow tick; counters reset per session.
@@ -46,6 +47,7 @@ TELEOP_LOG = "teleop.log"
 TELEOP_PREVIEW = "teleop.preview"
 
 ALL_TOPICS = [
+    SPOTLIGHT,
     STATUS, CONTROL_STATE, ERROR,
     OPERATION_STATE, OPERATION_LOG,
     TACTILE_FORCES, TACTILE_TAXELS,

@@ -18,6 +18,7 @@ export type ViewName =
   | 'teleop'
   | 'setup'
   | 'motors'
+  | 'spotlight'
 
 export interface TactileSettings {
   displayMode: TaxelDisplayMode
@@ -43,6 +44,9 @@ interface AppState {
   handInfo: HandInfo | null
   control: ControlState | null
   view: ViewName
+  // Joint the Spotlight panel is currently showing, so the 3D scene can mark
+  // it. null whenever the panel is not driving one.
+  spotlightJoint: string | null
   tactile: TactileSettings
   scene: SceneSettings
   showSparklineTarget: boolean
@@ -92,6 +96,7 @@ export const useAppStore = create<AppState>((set) => ({
   handInfo: null,
   control: null,
   view: 'dashboard',
+  spotlightJoint: null,
   tactile: {
     displayMode: 'magnitude',
     colorScheme: 'heat',

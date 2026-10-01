@@ -240,6 +240,15 @@ function dispatch(message: ServerMessage): void {
         (data.max_temp_c as number | undefined) ?? latest.motors.maxTempC
       markDirty()
       break
+    case TOPICS.spotlight:
+      latest.spotlight.positions = data.positions as Record<string, number>
+      latest.spotlight.currents = data.currents as Record<string, number>
+      latest.spotlight.peaks = (data.peaks ?? {}) as Record<string, number>
+      latest.spotlight.temps = (data.temps ?? {}) as Record<string, number>
+      latest.spotlight.achievedHz = (data.achieved_hz as number) ?? 0
+      latest.spotlight.t = Date.now()
+      markDirty()
+      break
     case TOPICS.motorsFaults: {
       const faults = data as unknown as MotorsFaults
       logFaultChanges(faults)

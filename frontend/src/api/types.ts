@@ -511,6 +511,7 @@ export const TOPICS = {
   jointsTarget: 'joints.target',
   jointsCorrection: 'joints.correction',
   motorsTelemetry: 'motors.telemetry',
+  spotlight: 'spotlight',
   motorsFaults: 'motors.faults',
   stats: 'stats',
   sensorsHealth: 'sensors.health',

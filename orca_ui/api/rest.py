@@ -317,6 +317,11 @@ def build_router(service: HandService) -> APIRouter:
     def motors_direct_declare(body: schemas.MotorDeclareRequest):
         return guard(service.declare_motor, body.id, body.model, body.nickname)
 
+    @router.post("/spotlight")
+    def spotlight(body: schemas.SpotlightRequest):
+        return guard(service.set_spotlight, body.enabled, body.sample_hz,
+                     body.publish_hz, body.average_samples)
+
     @router.post("/motors/direct/pacing")
     def motors_direct_pacing(body: schemas.BenchPacingRequest):
         return guard(service.set_bench_pacing,
