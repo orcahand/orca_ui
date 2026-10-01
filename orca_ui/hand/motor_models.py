@@ -49,6 +49,9 @@ class MotorModel:
     # Operating Mode values the model accepts. Empty means unrecorded, which
     # is not the same as "all of them".
     operating_modes: tuple[int, ...] = ()
+    # Output torque per amp, N.m/A. What turns a reported current into a
+    # force estimate. None where the manufacturer publishes nothing usable.
+    torque_constant_nm_per_a: float | None = None
 
     @property
     def verifiable(self) -> bool:
@@ -125,6 +128,11 @@ _MODELS: tuple[MotorModel, ...] = (
         rated_current_ma=None,
         stall_current_ma=800.0,
         operating_modes=(0, 1, 3, 4, 5, 16),
+        # From the published performance curve: current rises 0.15 A to 0.75 A
+        # across 0.07 to 0.635 N.m, so 1.07 A/N.m with a no-load offset near
+        # 75 mA. The same curve extrapolates to 70 rpm unloaded, which agrees
+        # with the Velocity Limit these motors ship with.
+        torque_constant_nm_per_a=0.93,
         source=("ROBOTIS XC330-T288-T control table and specification: model "
                 "number 1220, Current Limit (38) 0..910 at 1.0 mA/unit, Goal "
                 "Current (102) bounded by it, stall 0.92 N.m at 11.1 V / "
@@ -171,6 +179,9 @@ _MODELS: tuple[MotorModel, ...] = (
         rated_current_ma=500.0,
         stall_current_ma=1500.0,
         operating_modes=(0, 1, 2, 3),
+        # Published as 9.3 kg.cm/A. Consistent with the datasheet's own stall
+        # figures, 14.2 kg.cm at 1.5 A, which work out to 9.47 kg.cm/A.
+        torque_constant_nm_per_a=0.912,
         source=("HL-2915-C001 product specification A/0, 2026-01-18: rated "
                 "current 500 mA, stall current 1.5 A at 12 V, stall torque "
                 "14.2 kg.cm; registers from the HLS memory table (44 capped "
@@ -257,6 +268,7 @@ def as_dict(model: MotorModel) -> dict:
         "stall_current_ma": model.stall_current_ma,
         "ceiling_ma": model.ceiling_ma,
         "operating_modes": list(model.operating_modes),
+        "torque_constant_nm_per_a": model.torque_constant_nm_per_a,
         "source": model.source,
         "verifiable": model.verifiable,
     }
