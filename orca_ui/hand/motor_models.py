@@ -49,9 +49,17 @@ class MotorModel:
     # Operating Mode values the model accepts. Empty means unrecorded, which
     # is not the same as "all of them".
     operating_modes: tuple[int, ...] = ()
-    # Output torque per amp, N.m/A. What turns a reported current into a
-    # force estimate. None where the manufacturer publishes nothing usable.
+    # Output torque per amp, N.m/A: the nominal, single-number constant.
+    # None where the manufacturer publishes nothing usable.
     torque_constant_nm_per_a: float | None = None
+    # Torque as a polynomial in current, highest power first, N.m from amps.
+    # A curve rather than a constant because these motors are not linear: a
+    # single constant reads 38% high at 200 mA, which is inside the range a
+    # hand actually runs at. None where only the constant is known.
+    torque_poly_nm: tuple[float, ...] | None = None
+    # Currents the polynomial was fitted over. Outside it the fit is
+    # extrapolation and says nothing, so callers are told rather than guessing.
+    torque_poly_current_range_a: tuple[float, float] | None = None
 
     @property
     def verifiable(self) -> bool:
@@ -72,6 +80,28 @@ class MotorModel:
         if not self.has_current_control:
             return None
         return self.rated_current_ma or self.stall_current_ma or self.max_current_ma
+
+    def torque_nm(self, current_a: float) -> "float | None":
+        """Output torque for a measured current, best available estimate.
+
+        The fitted curve where there is one, otherwise the nominal constant.
+        None when neither is known, which a caller must not read as zero.
+        """
+        if self.torque_poly_nm:
+            torque = 0.0
+            for coefficient in self.torque_poly_nm:
+                torque = torque * current_a + coefficient
+            return max(0.0, torque)
+        if self.torque_constant_nm_per_a is not None:
+            return self.torque_constant_nm_per_a * current_a
+        return None
+
+    def torque_is_extrapolated(self, current_a: float) -> bool:
+        """Whether ``current_a`` falls outside the fitted range."""
+        if not self.torque_poly_current_range_a:
+            return False
+        low, high = self.torque_poly_current_range_a
+        return not low <= current_a <= high
 
     def supports_mode(self, mode: int) -> "bool | None":
         """Whether this model accepts an Operating Mode value.
@@ -128,11 +158,16 @@ _MODELS: tuple[MotorModel, ...] = (
         rated_current_ma=None,
         stall_current_ma=800.0,
         operating_modes=(0, 1, 3, 4, 5, 16),
-        # From the published performance curve: current rises 0.15 A to 0.75 A
-        # across 0.07 to 0.635 N.m, so 1.07 A/N.m with a no-load offset near
-        # 75 mA. The same curve extrapolates to 70 rpm unloaded, which agrees
-        # with the Velocity Limit these motors ship with.
+        # The published performance curve is distinctly not linear, so the
+        # constant below is only a nominal: quadratic fits the same nine
+        # sampled points to R^2 0.99998 where a straight line manages 0.989,
+        # and the two disagree by 38% at 200 mA. A cubic fits no better than
+        # the points can be read, so it would only be fitting noise.
+        # The same curve extrapolates to 70 rpm unloaded and 95 mA at zero
+        # torque, both of which agree with what these motors report.
         torque_constant_nm_per_a=0.93,
+        torque_poly_nm=(-0.57108, 1.44778, -0.13176),
+        torque_poly_current_range_a=(0.148, 0.745),
         source=("ROBOTIS XC330-T288-T control table and specification: model "
                 "number 1220, Current Limit (38) 0..910 at 1.0 mA/unit, Goal "
                 "Current (102) bounded by it, stall 0.92 N.m at 11.1 V / "
@@ -269,6 +304,9 @@ def as_dict(model: MotorModel) -> dict:
         "ceiling_ma": model.ceiling_ma,
         "operating_modes": list(model.operating_modes),
         "torque_constant_nm_per_a": model.torque_constant_nm_per_a,
+        "torque_poly_nm": list(model.torque_poly_nm) if model.torque_poly_nm else None,
+        "torque_poly_current_range_a": (list(model.torque_poly_current_range_a)
+                                        if model.torque_poly_current_range_a else None),
         "source": model.source,
         "verifiable": model.verifiable,
     }
