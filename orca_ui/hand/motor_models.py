@@ -228,10 +228,16 @@ _MODELS: tuple[MotorModel, ...] = (
         rated_current_ma=500.0,
         stall_current_ma=1500.0,
         operating_modes=(0, 1, 2, 3),
-        # Published as 9.3 kg.cm/A. Consistent with the datasheet's own stall
-        # figures, 14.2 kg.cm at 1.5 A, which work out to 9.47 kg.cm/A.
+        # The published 9.3 kg.cm/A is the stall secant: it divides stall
+        # torque by stall current and so folds in the current the motor
+        # spends on itself. The performance curve separates them, and the
+        # offset is large -- 255 mA of a 500 mA rating goes to turning the
+        # motor at all, so below that there is no output torque. Treating
+        # the nominal as a slope reads 65% high at 500 mA.
         torque_constant_nm_per_a=0.912,
-        no_load_rpm=110.0,
+        torque_poly_nm=(1.1288, -0.28784),
+        torque_poly_current_range_a=(0.255, 1.490),
+        no_load_rpm=100.0,
         source=("HL-2915-C001 product specification A/0, 2026-01-18: rated "
                 "current 500 mA, stall current 1.5 A at 12 V, stall torque "
                 "14.2 kg.cm; registers from the HLS memory table (44 capped "
@@ -252,8 +258,12 @@ _MODELS: tuple[MotorModel, ...] = (
         stall_current_ma=2800.0,
         operating_modes=(0, 1, 2, 3),
         # Published as 12.5 kg.cm/A, which its own stall figures confirm:
-        # 35 kg.cm at 2.8 A is 12.5 kg.cm/A exactly.
+        # 35 kg.cm at 2.8 A is 12.5 kg.cm/A exactly. That is the stall
+        # secant, though -- the curve's actual slope is 12.96 kg.cm/A past a
+        # 110 mA no-load offset, and the two disagree by 26% at 500 mA.
         torque_constant_nm_per_a=1.226,
+        torque_poly_nm=(1.27121, -0.1502),
+        torque_poly_current_range_a=(0.110, 2.810),
         # Less than half the finger motor's, which is why a speed ceiling has
         # to be per model and cannot be a family constant.
         no_load_rpm=45.0,
