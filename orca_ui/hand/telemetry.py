@@ -416,8 +416,10 @@ class TelemetryService:
         if session is None or not session.caps.motors or hand is None:
             return
         try:
-            positions = hand.get_motor_pos(as_dict=True)
-            currents = hand.get_motor_current(as_dict=True)
+            state = hand.get_motor_state()
+            motor_ids = list(hand.config.motor_ids)
+            positions = dict(zip(motor_ids, state.position))
+            currents = dict(zip(motor_ids, state.current))
         except Exception:
             logger.debug("spotlight read failed", exc_info=True)
             return
@@ -450,6 +452,22 @@ class TelemetryService:
         if now - self._spot_last_publish < self._spot_publish_period:
             return
         self._spot_last_publish = now
+
+        # The scene is the other half of the panel, so it is driven from this
+        # read rather than left on the ordinary 10 Hz estimate -- the motor
+        # positions are already in hand, so the angles cost no extra traffic.
+        # An uncalibrated hand has no motor-to-joint mapping to convert
+        # through; the panel says so rather than showing a still model.
+        estimate = None
+        try:
+            # Gated, not just guarded: the conversion warns per joint on an
+            # uncalibrated hand, which at this rate would be a wall of log.
+            if session._estimate_allowed():
+                estimate = session._joint_estimate(state.position)
+        except Exception:
+            logger.debug("spotlight estimate failed", exc_info=True)
+        if estimate:
+            self._hub.publish(T.JOINTS_ESTIMATE, {"angles": _clean_angles(estimate)})
         # A motor that does not answer reads back NaN, and the envelope is
         # built with allow_nan=False: one of them would make the whole message
         # unserializable, and the broadcaster marks a failed topic as sent so
@@ -466,6 +484,7 @@ class TelemetryService:
                 for k, v in self._spot_current_samples.items() if v}, 1),
             "temps": _finite(self._spot_temps, 1),
             "achieved_hz": round(self._spot_achieved_hz, 1),
+            "estimate_available": bool(estimate),
         })
 
     def _bench_tick(self, session) -> None:

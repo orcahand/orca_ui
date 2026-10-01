@@ -36,6 +36,9 @@ interface GlowEntry {
   lastT: number
 }
 
+// How much larger a spotlit ring is drawn than a tracking one.
+const SPOTLIGHT_SCALE = 2.6
+
 export class JointGlowLayer {
   private entries = new Map<string, GlowEntry>()
   private geometry = new THREE.TorusGeometry(RING_RADIUS, RING_TUBE, 8, 24)
@@ -151,21 +154,26 @@ export class JointGlowLayer {
    * Returns false when the named joint has no ring, which is the caller's
    * cue that the 3D view cannot show what the panel is saying.
    */
-  spotlight(name: string | null): boolean {
-    if (name === null) {
+  spotlight(names: readonly string[]): boolean {
+    if (names.length === 0) {
       for (const entry of this.entries.values()) {
         entry.material.opacity = this.glow?.idleOpacity ?? 0.3
+        entry.mesh.scale.setScalar(1)
       }
       return true
     }
+    const wanted = new Set(names)
     let found = false
     for (const [joint, entry] of this.entries.entries()) {
-      const lit = joint === name
+      const lit = wanted.has(joint)
       entry.mesh.visible = lit
       if (lit) {
         found = true
         entry.material.color.setRGB(1, 0.1, 0.1)
         entry.material.opacity = 1
+        // Bigger than the tracking ring it borrows: this has to be obvious
+        // across a room, not read at arm's length.
+        entry.mesh.scale.setScalar(SPOTLIGHT_SCALE)
       }
     }
     return found

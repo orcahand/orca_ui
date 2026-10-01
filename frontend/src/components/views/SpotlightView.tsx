@@ -36,6 +36,9 @@ export function SpotlightView() {
   const [average, setAverage] = useState(String(DEFAULT_AVERAGE))
   const [index, setIndex] = useState(0)
   const [tick, setTick] = useState(0)
+  // '' cycles. 'finger:index' pins a finger and stacks its joints.
+  // 'joint:index_mcp' pins one joint.
+  const [pinned, setPinned] = useState('')
 
   // Only joints the config gives a range: the bar is a fraction of travel, so
   // a joint without one has nothing to be a fraction of.
@@ -60,24 +63,45 @@ export function SpotlightView() {
 
   // Advance the spotlight on its own clock, independent of frame arrival.
   useEffect(() => {
-    if (!looping || spotlit.length === 0) return
+    if (!looping || spotlit.length === 0 || pinned !== '') return
     const seconds = Math.max(0.5, Math.min(60, parseFloat(dwellS) || DEFAULT_DWELL_S))
     const id = window.setInterval(
       () => setIndex((i) => (i + 1) % spotlit.length),
       seconds * 1000,
     )
     return () => window.clearInterval(id)
-  }, [looping, dwellS, spotlit.length])
+  }, [looping, dwellS, spotlit.length, pinned])
 
   // Redraw on frames rather than polling: the store is mutated in place.
   useEffect(() => subscribeFrames(() => setTick((t) => t + 1)), [])
 
-  const joint = spotlit[index % Math.max(1, spotlit.length)]
-  useAppStore.setState((s) =>
-    s.spotlightJoint === (looping ? joint?.id ?? null : null)
-      ? s
-      : { spotlightJoint: looping ? joint?.id ?? null : null },
-  )
+  // Which joints the boxes show. Pinning a finger stacks every joint on it,
+  // which is what makes a single finger's motion legible: the joints move
+  // together, so watching them apart tells you less than watching them stack.
+  let shown: typeof spotlit
+  if (pinned.startsWith('finger:')) {
+    const finger = pinned.slice(7)
+    shown = spotlit.filter((j) => fingerOf(j.id) === finger)
+  } else if (pinned.startsWith('joint:')) {
+    const id = pinned.slice(6)
+    shown = spotlit.filter((j) => j.id === id)
+  } else {
+    const one = spotlit[index % Math.max(1, spotlit.length)]
+    shown = one ? [one] : []
+  }
+
+  // Owned by this panel for exactly as long as it is mounted: left set, the
+  // marks would follow the operator to the ordinary 3D tab.
+  const lit = looping ? shown.map((j) => j.id) : []
+  const litKey = lit.join(',')
+  useEffect(() => {
+    useAppStore.setState({ spotlightJoints: litKey ? litKey.split(',') : [] })
+    return () => useAppStore.setState({ spotlightJoints: [] })
+  }, [litKey])
+
+  const fingers = Array.from(
+    new Set(spotlit.map((j) => fingerOf(j.id)).filter(Boolean)),
+  ) as string[]
 
   return (
     <div
@@ -90,7 +114,34 @@ export function SpotlightView() {
     >
       <HandScenePanel height="calc(100vh - 240px)" />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <SpotlightBox joint={joint} looping={looping} tick={tick} />
+        <select
+          value={pinned}
+          onChange={(e) => setPinned(e.target.value)}
+          title={
+            'cycle every joint in turn, or pin one finger (stacking its ' +
+            'joints) or a single joint and stay on it'
+          }
+          style={{ fontSize: 11 }}
+        >
+          <option value="">cycle every joint</option>
+          {fingers.map((f) => (
+            <option key={f} value={`finger:${f}`}>
+              finger — {f}
+            </option>
+          ))}
+          {spotlit.map((j) => (
+            <option key={j.id} value={`joint:${j.id}`}>
+              joint — {j.id.replace(/_/g, ' ')}
+            </option>
+          ))}
+        </select>
+        {shown.length === 0 ? (
+          <SpotlightBox joint={undefined} looping={looping} tick={tick} />
+        ) : (
+          shown.map((j) => (
+            <SpotlightBox key={j.id} joint={j} looping={looping} tick={tick} />
+          ))
+        )}
         <Panel title="Spotlight settings">
           <div style={{ display: 'grid', gap: 6, fontSize: 11 }}>
             <Field
@@ -167,4 +218,11 @@ function Field({
       <span style={{ color: 'var(--dimmer)' }}>{suffix}</span>
     </label>
   )
+}
+
+
+/** Finger a joint belongs to, or '' for the wrist, which belongs to none. */
+function fingerOf(jointId: string): string {
+  const [finger] = jointId.split('_')
+  return finger === jointId ? '' : finger
 }

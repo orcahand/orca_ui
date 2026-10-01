@@ -44,9 +44,11 @@ interface AppState {
   handInfo: HandInfo | null
   control: ControlState | null
   view: ViewName
-  // Joint the Spotlight panel is currently showing, so the 3D scene can mark
-  // it. null whenever the panel is not driving one.
-  spotlightJoint: string | null
+  // Joints the Spotlight panel is currently showing, so the 3D scene can
+  // mark them. Empty whenever the panel is not driving any, which the panel
+  // guarantees on unmount -- otherwise the marks would follow the operator
+  // to the ordinary 3D tab, where nothing explains them.
+  spotlightJoints: string[]
   tactile: TactileSettings
   scene: SceneSettings
   showSparklineTarget: boolean
@@ -96,7 +98,7 @@ export const useAppStore = create<AppState>((set) => ({
   handInfo: null,
   control: null,
   view: 'dashboard',
-  spotlightJoint: null,
+  spotlightJoints: [],
   tactile: {
     displayMode: 'magnitude',
     colorScheme: 'heat',

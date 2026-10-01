@@ -315,17 +315,21 @@ class TestSpotlightPayload:
                 published.append((topic, payload))
 
         class _Hand:
-            def get_motor_pos(self, as_dict=True):
-                return {1: 0.5, 2: float("nan")}
+            config = types.SimpleNamespace(motor_ids=[1, 2])
 
-            def get_motor_current(self, as_dict=True):
-                return currents
+            def get_motor_state(self):
+                return types.SimpleNamespace(
+                    position=[0.5, float("nan")],
+                    current=[currents[1], currents[2]])
 
             def get_motor_temp(self, as_dict=True):
                 return {1: 30.0, 2: float("nan")}
 
         session = types.SimpleNamespace(
-            hand=_Hand(), caps=types.SimpleNamespace(motors=True))
+            hand=_Hand(), caps=types.SimpleNamespace(motors=True),
+            # An uncalibrated hand has no motor-to-joint mapping, which is
+            # the case this panel has to stay usable in.
+            _estimate_allowed=lambda: False)
         service = tm.TelemetryService(
             types.SimpleNamespace(session=session), _Hub(),
             types.SimpleNamespace(fast_hz=60, mid_hz=10, slow_hz=1))

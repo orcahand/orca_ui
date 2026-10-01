@@ -226,15 +226,18 @@ function HandRig({
       // The Spotlight panel owns the rings while it is driving one: it is
       // saying "this joint", which has to read the same on a hand with no
       // encoders, where the tracking ramp has nothing to colour from.
-      const spotlit = useAppStore.getState().spotlightJoint
-      if (spotlit) {
+      const app = useAppStore.getState()
+      // Only the panel that owns the marks may show them: carried into the
+      // ordinary 3D tab they would be a red ring with nothing explaining it.
+      const spotlit = app.view === 'spotlight' ? app.spotlightJoints : []
+      if (spotlit.length > 0) {
         rig.glow.setVisible(true)
         rig.glow.spotlight(spotlit)
       } else {
-        rig.glow.spotlight(null)
+        rig.glow.spotlight([])
         rig.glow.setVisible(scene.jointGlow && caps.encoders)
       }
-      if (!spotlit && scene.jointGlow && caps.encoders) {
+      if (spotlit.length === 0 && scene.jointGlow && caps.encoders) {
         rig.glow.update(
           frames.joints.measured,
           frames.joints.target,
