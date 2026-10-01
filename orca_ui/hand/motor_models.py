@@ -189,6 +189,14 @@ _MODELS: tuple[MotorModel, ...] = (
         current_scale_ma=None,
         max_current_ma=None,
         stall_current_ma=1400.0,
+        # This one's published curve really is a straight line: a quadratic
+        # fits no better than the points can be read off the plot, so the
+        # constant is the honest model. Unlike the finger motor, which curves.
+        # Of limited use until something can read this model's current --
+        # it has no Goal Current or Current Limit register.
+        torque_constant_nm_per_a=0.963,
+        torque_poly_nm=(0.96274, -0.06123),
+        torque_poly_current_range_a=(0.17, 1.21),
         # No current-based position (5) and no current control (0). The wrist
         # runs in extended position (4) instead.
         operating_modes=(1, 3, 4, 16),
