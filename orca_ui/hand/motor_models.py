@@ -49,6 +49,10 @@ class MotorModel:
     # Operating Mode values the model accepts. Empty means unrecorded, which
     # is not the same as "all of them".
     operating_modes: tuple[int, ...] = ()
+    # Datasheet speed with nothing on the output shaft. The real ceiling for a
+    # speed cap, and per model rather than per family: one chain mixes motors
+    # whose no-load speeds differ by more than a factor of two.
+    no_load_rpm: float | None = None
     # Output torque per amp, N.m/A: the nominal, single-number constant.
     # None where the manufacturer publishes nothing usable.
     torque_constant_nm_per_a: float | None = None
@@ -168,6 +172,7 @@ _MODELS: tuple[MotorModel, ...] = (
         torque_constant_nm_per_a=0.93,
         torque_poly_nm=(-0.57108, 1.44778, -0.13176),
         torque_poly_current_range_a=(0.148, 0.745),
+        no_load_rpm=70.0,
         source=("ROBOTIS XC330-T288-T control table and specification: model "
                 "number 1220, Current Limit (38) 0..910 at 1.0 mA/unit, Goal "
                 "Current (102) bounded by it, stall 0.92 N.m at 11.1 V / "
@@ -197,6 +202,7 @@ _MODELS: tuple[MotorModel, ...] = (
         torque_constant_nm_per_a=0.963,
         torque_poly_nm=(0.96274, -0.06123),
         torque_poly_current_range_a=(0.17, 1.21),
+        no_load_rpm=72.0,
         # No current-based position (5) and no current control (0). The wrist
         # runs in extended position (4) instead.
         operating_modes=(1, 3, 4, 16),
@@ -225,6 +231,7 @@ _MODELS: tuple[MotorModel, ...] = (
         # Published as 9.3 kg.cm/A. Consistent with the datasheet's own stall
         # figures, 14.2 kg.cm at 1.5 A, which work out to 9.47 kg.cm/A.
         torque_constant_nm_per_a=0.912,
+        no_load_rpm=110.0,
         source=("HL-2915-C001 product specification A/0, 2026-01-18: rated "
                 "current 500 mA, stall current 1.5 A at 12 V, stall torque "
                 "14.2 kg.cm; registers from the HLS memory table (44 capped "
@@ -244,6 +251,12 @@ _MODELS: tuple[MotorModel, ...] = (
         rated_current_ma=800.0,
         stall_current_ma=2800.0,
         operating_modes=(0, 1, 2, 3),
+        # Published as 12.5 kg.cm/A, which its own stall figures confirm:
+        # 35 kg.cm at 2.8 A is 12.5 kg.cm/A exactly.
+        torque_constant_nm_per_a=1.226,
+        # Less than half the finger motor's, which is why a speed ceiling has
+        # to be per model and cannot be a family constant.
+        no_load_rpm=45.0,
         source=("HLS3930M-C001 product specification A/0, 2024-04-25: rated "
                 "current 800 mA, stall current 2.8 A at 12 V, stall torque "
                 "35 kg.cm; registers from the HLS memory table (44 capped "
@@ -263,6 +276,9 @@ _MODELS: tuple[MotorModel, ...] = (
         rated_current_ma=500.0,
         stall_current_ma=1500.0,
         operating_modes=(0, 1, 2, 3),
+        # The slowest catalogued HLS model. Too low only makes a default
+        # sluggish; too high stops it capping anything at all.
+        no_load_rpm=45.0,
         source=("HLS memory table (6.5 mA/unit, register 44 capped by "
                 "register 28, modes 0-3). Current limits are the most "
                 "conservative of the catalogued HLS models, not this "
@@ -312,6 +328,7 @@ def as_dict(model: MotorModel) -> dict:
         "ceiling_ma": model.ceiling_ma,
         "operating_modes": list(model.operating_modes),
         "torque_constant_nm_per_a": model.torque_constant_nm_per_a,
+        "no_load_rpm": model.no_load_rpm,
         "torque_poly_nm": list(model.torque_poly_nm) if model.torque_poly_nm else None,
         "torque_poly_current_range_a": (list(model.torque_poly_current_range_a)
                                         if model.torque_poly_current_range_a else None),
