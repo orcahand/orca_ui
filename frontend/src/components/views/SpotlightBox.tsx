@@ -12,22 +12,22 @@ const RAD2DEG = 180 / Math.PI
 
 export function SpotlightBox({
   joint,
-  looping,
+  active,
   tick,
 }: {
   joint: JointInfo | undefined
-  looping: boolean
+  active: boolean
   // Only to force a redraw: the frame store is mutated in place, so nothing
   // in it can be depended on by React directly.
   tick: number
 }) {
   void tick
-  if (!looping) {
+  if (!active) {
     return (
       <Panel title="Spotlight">
         <div style={{ fontSize: 11, color: 'var(--dimmer)', padding: '8px 0' }}>
-          Waiting for a loop. Start one from Poses and this follows along,
-          a joint at a time.
+          No motor bus in this session, so there is nothing to read a
+          position or a current from.
         </div>
       </Panel>
     )

@@ -15,7 +15,6 @@ import { useEffect, useState } from 'react'
 import { api } from '../../api/rest'
 import { useAppStore } from '../../state/appStore'
 import { subscribeFrames } from '../../state/streamStore'
-import { useOperationStore } from '../../state/operationStore'
 import { HandScenePanel } from '../three/HandScenePanel'
 import { Panel } from '../common/Panel'
 import { SpotlightBox } from './SpotlightBox'
@@ -27,8 +26,8 @@ const DEFAULT_DWELL_S = 3
 
 export function SpotlightView() {
   const joints = useAppStore((s) => s.handInfo?.joints)
+  const caps = useAppStore((s) => s.status?.capabilities)
   const setError = useAppStore((s) => s.setError)
-  const operation = useOperationStore((s) => s.operation)
 
   const [dwellS, setDwellS] = useState(String(DEFAULT_DWELL_S))
   const [sampleHz, setSampleHz] = useState(String(DEFAULT_SAMPLE_HZ))
@@ -47,12 +46,16 @@ export function SpotlightView() {
     (j) => j.motor_id !== null && j.rom && j.rom[1] !== j.rom[0],
   )
 
-  // A loop is what this panel is for. Arming the sampler costs a real share
-  // of a half-duplex bus, so it is not paid for while nothing is moving.
-  const looping = Boolean(operation?.state === 'running' && operation?.kind)
+  // Being on the tab is the gate. Arming the sampler costs a real share of a
+  // half-duplex bus, so it is paid for exactly while someone is looking at
+  // it: this component only mounts on its own tab, and disarms on the way
+  // out. A loop is the usual reason to be here, but watching one motor move
+  // under a hand push is a reason too, and waiting for an operation before
+  // showing anything made the panel look broken.
+  const active = Boolean(caps?.motors)
 
   useEffect(() => {
-    if (!looping) return
+    if (!active) return
     const n = Math.max(1, Math.min(250, parseInt(sampleHz, 10) || DEFAULT_SAMPLE_HZ))
     const p = Math.max(1, Math.min(60, parseInt(publishHz, 10) || DEFAULT_PUBLISH_HZ))
     const w = Math.max(1, Math.min(1000, parseInt(average, 10) || DEFAULT_AVERAGE))
@@ -60,18 +63,18 @@ export function SpotlightView() {
     return () => {
       void api.spotlight(false, n, p, w).catch(() => undefined)
     }
-  }, [looping, sampleHz, publishHz, average, setError])
+  }, [active, sampleHz, publishHz, average, setError])
 
   // Advance the spotlight on its own clock, independent of frame arrival.
   useEffect(() => {
-    if (!looping || spotlit.length === 0 || pinned !== '') return
+    if (!active || spotlit.length === 0 || pinned !== '') return
     const seconds = Math.max(0.5, Math.min(60, parseFloat(dwellS) || DEFAULT_DWELL_S))
     const id = window.setInterval(
       () => setIndex((i) => (i + 1) % spotlit.length),
       seconds * 1000,
     )
     return () => window.clearInterval(id)
-  }, [looping, dwellS, spotlit.length, pinned])
+  }, [active, dwellS, spotlit.length, pinned])
 
   // Redraw on frames rather than polling: the store is mutated in place.
   useEffect(() => subscribeFrames(() => setTick((t) => t + 1)), [])
@@ -93,7 +96,7 @@ export function SpotlightView() {
 
   // Owned by this panel for exactly as long as it is mounted: left set, the
   // marks would follow the operator to the ordinary 3D tab.
-  const lit = looping && highlight ? shown.map((j) => j.id) : []
+  const lit = active && highlight ? shown.map((j) => j.id) : []
   const litKey = lit.join(',')
   useEffect(() => {
     useAppStore.setState({ spotlightJoints: litKey ? litKey.split(',') : [] })
@@ -137,10 +140,10 @@ export function SpotlightView() {
           ))}
         </select>
         {shown.length === 0 ? (
-          <SpotlightBox joint={undefined} looping={looping} tick={tick} />
+          <SpotlightBox joint={undefined} active={active} tick={tick} />
         ) : (
           shown.map((j) => (
-            <SpotlightBox key={j.id} joint={j} looping={looping} tick={tick} />
+            <SpotlightBox key={j.id} joint={j} active={active} tick={tick} />
           ))
         )}
         <Panel title="Spotlight settings">
