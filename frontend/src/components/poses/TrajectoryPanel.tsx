@@ -209,22 +209,30 @@ export function TrajectoryPanel({
                   </td>
                   <td>
                     <span className="traj-actions">
-                      <select
-                        value={speeds[traj.name] ?? 1}
-                        title="playback speed"
-                        onChange={(e) =>
-                          setSpeeds((prev) => ({
-                            ...prev,
-                            [traj.name]: Number(e.target.value),
-                          }))
-                        }
-                      >
-                        {SPEEDS.map((speed) => (
-                          <option key={speed} value={speed}>
-                            ×{speed}
-                          </option>
-                        ))}
-                      </select>
+                      {/* Motor waypoints pace themselves: each point is
+                          commanded once and the next waits for every motor
+                          to arrive, so scaling the dwell between them says
+                          nothing about how fast the hand moves. The other
+                          kinds still stream frames on a clock, where it
+                          does. */}
+                      {traj.type !== 'motor_waypoints' && (
+                        <select
+                          value={speeds[traj.name] ?? 1}
+                          title="playback speed"
+                          onChange={(e) =>
+                            setSpeeds((prev) => ({
+                              ...prev,
+                              [traj.name]: Number(e.target.value),
+                            }))
+                          }
+                        >
+                          {SPEEDS.map((speed) => (
+                            <option key={speed} value={speed}>
+                              ×{speed}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       {traj.type !== 'continuous' && (
                         <input
                           type="number"
