@@ -1318,15 +1318,20 @@ class TestBenchDwellMatchesThePlayer:
         return HandService.__new__(HandService)
 
     def test_the_dwell_is_settable_rather_than_a_constant(self):
-        from orca_ui.hand import service as svc
-
         s = self._service()
         s._state_lock = threading.RLock()
-        result = s.set_bench_pacing(1, 50, 100)
+        result = s.set_bench_pacing(1, 50, 250)
 
-        assert result["period_ms"] == 100
-        assert s._bench_period_s == pytest.approx(0.1)
-        assert s._bench_period_s != svc.BENCH_DWELL_S
+        assert result["period_ms"] == 250
+        assert s._bench_period_s == pytest.approx(0.25)
+
+    def test_the_default_dwell_matches_the_trajectory_player(self):
+        """Same control under a different panel, so an operator who has set
+        one should find the other already familiar."""
+        from orca_ui.hand import service as svc
+        from orca_ui.hand.operations import player as pl
+
+        assert svc.BENCH_DWELL_S == pytest.approx(pl.INTERP_STEP_PERIOD_S)
 
     def test_a_cap_shorter_than_the_dwell_is_the_case_that_matters(self):
         """The reported bug: a 50 ms cap under a 1.5 s dwell can never be
@@ -1337,7 +1342,8 @@ class TestBenchDwellMatchesThePlayer:
         s._state_lock = threading.RLock()
         s.set_bench_pacing(1, 50, 100)
 
-        assert s._bench_max_settle_ms / 1000.0 < s._bench_period_s < svc.BENCH_DWELL_S
+        assert s._bench_max_settle_ms / 1000.0 < s._bench_period_s
+        assert s._bench_period_s <= svc.BENCH_MAX_PERIOD_S
 
     def test_the_bounds_match_the_trajectory_player(self):
         from orca_ui.hand import service as svc

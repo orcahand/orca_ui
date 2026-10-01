@@ -58,12 +58,11 @@ TACTILE_MODES = {
 # per command — sliders nudge, they don't teleport.
 MAX_DIRECT_MOTOR_STEP_RAD = 0.8
 
-# Default rest on each recorded point before the next command. Longer than
-# the trajectory player's because a bench run is watched rather than
-# performed, but settable the same way and with the same bounds -- a dwell
-# the operator cannot shorten silently outlasts any settle cap they set,
-# which makes the cap look broken.
-BENCH_DWELL_S = 1.5
+# ms between commands, which is also the rest at each recorded point. The
+# trajectory player's default and bounds, because the bench is the same
+# control under a different panel -- and because a dwell the operator cannot
+# shorten outlasts any settle cap they set, making the cap look broken.
+BENCH_DWELL_S = 0.1
 BENCH_MIN_PERIOD_S = 0.02
 BENCH_MAX_PERIOD_S = 5.0
 # Bounds a motor that cannot reach its point; it does not pace one that can.
