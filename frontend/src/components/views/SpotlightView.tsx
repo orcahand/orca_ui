@@ -39,6 +39,7 @@ export function SpotlightView() {
   // '' cycles. 'finger:index' pins a finger and stacks its joints.
   // 'joint:index_mcp' pins one joint.
   const [pinned, setPinned] = useState('')
+  const [highlight, setHighlight] = useState(true)
 
   // Only joints the config gives a range: the bar is a fraction of travel, so
   // a joint without one has nothing to be a fraction of.
@@ -92,7 +93,7 @@ export function SpotlightView() {
 
   // Owned by this panel for exactly as long as it is mounted: left set, the
   // marks would follow the operator to the ordinary 3D tab.
-  const lit = looping ? shown.map((j) => j.id) : []
+  const lit = looping && highlight ? shown.map((j) => j.id) : []
   const litKey = lit.join(',')
   useEffect(() => {
     useAppStore.setState({ spotlightJoints: litKey ? litKey.split(',') : [] })
@@ -172,6 +173,24 @@ export function SpotlightView() {
                 'cannot show more, so anything above only costs bandwidth.'
               }
             />
+            <label
+              title={
+                'mark the shown joint in the 3D view. Off leaves the scene '
+                + 'alone, which is what you want when the hand itself is '
+                + 'being filmed or the rings sit over what you are showing.'
+              }
+              style={{ display: 'flex', gap: 6, alignItems: 'center' }}
+            >
+              <span style={{ width: 92, color: 'var(--dim)' }}>highlight</span>
+              <input
+                type="checkbox"
+                checked={highlight}
+                onChange={(e) => setHighlight(e.target.checked)}
+              />
+              <span style={{ color: 'var(--dimmer)' }}>
+                red mark in 3D
+              </span>
+            </label>
             <Field
               label="average over"
               suffix="samples"
