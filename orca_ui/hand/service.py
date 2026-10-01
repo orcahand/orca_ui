@@ -16,6 +16,7 @@ from typing import Callable, TYPE_CHECKING
 import numpy as np
 
 from orca_core import JointGains
+from orca_core.hardware.motor_client import MotionTimeoutError
 
 if TYPE_CHECKING:
     from orca_core.hardware.motor_client import ServoGains, ServoProfile
@@ -61,6 +62,8 @@ MAX_DIRECT_MOTOR_STEP_RAD = 0.8
 # next. Long enough to watch the motor arrive (or fail to) rather than a speed
 # control: the servo's own profile decides how fast it travels.
 BENCH_DWELL_S = 1.5
+# Bounds a motor that cannot reach its point; it does not pace one that can.
+BENCH_ARRIVAL_TIMEOUT_S = 5.0
 
 # Dynamixel firmware restart: the motor is off the bus until it finishes,
 # so a read-back any sooner just times out and looks like a failed reboot.
@@ -600,6 +603,8 @@ class HandService:
                     self._max_current = _current_or_none(hand_config.max_current)
             self._config_gains = config_gains
         self._publish_control_state()
+        if session.caps.motors:
+            self._apply_default_profile(session)
         if session.caps.tactile:
             try:
                 zeroing.apply_saved_offsets(session)
@@ -608,6 +613,38 @@ class HandService:
             except Exception as e:
                 logger.exception("tactile stream autostart failed")
                 self._publish_error(f"tactile stream start failed: {e}")
+
+    def _apply_default_profile(self, session) -> None:
+        """Give every motor a trajectory profile on connect.
+
+        Without one a goal position is a step: the servo chases it at whatever
+        its position loop asks for, which is as fast as the motor goes. The
+        default is half each motor's own ceiling, so it is deliberate on a
+        wrist and on a finger joint alike rather than a figure chosen for one
+        of them.
+
+        These are RAM registers, so this is what a fresh session starts from;
+        anything written afterwards stands until the next connect. Best
+        effort -- a hand that will not take a profile is still usable.
+        """
+        client = getattr(getattr(session, "hand", None), "motor_client", None)
+        if client is None or not hasattr(client, "default_profile"):
+            return
+        try:
+            defaults = client.default_profile(client.motor_ids)
+            if not defaults:
+                return
+            client.write_servo_profile(defaults)
+        except Exception as e:
+            logger.warning("default motion profile not applied: %s", e)
+            return
+        speeds = sorted({round(p.velocity_rad_s, 2) for p in defaults.values()})
+        acc = next(iter(defaults.values())).acceleration_rad_s2
+        logger.info(
+            "applied default motion profile to %d motors: %s rad/s, "
+            "%.1f rad/s^2 (velocity is half each motor's own ceiling)",
+            len(defaults),
+            "/".join(f"{v:g}" for v in speeds), acc)
 
     # ----- validation helpers --------------------------------------------------
 
@@ -1185,6 +1222,34 @@ class HandService:
         client = getattr(getattr(session, "hand", None), "motor_client", None)
         return getattr(type(client), "servo_gain_max", None)
 
+    def servo_limits(self) -> dict:
+        """What each tunable accepts, and the ceiling that actually binds.
+
+        The two are not the same number and the gap is enormous: a speed
+        register holds values a hundred times faster than the motor turns,
+        and accepts them without complaint, so a panel that captions a box
+        with the register width invites an operator to ask for a speed that
+        silently does nothing. The per-motor ceiling is the useful bound, and
+        it varies within one chain.
+        """
+        session = self.session
+        client = getattr(getattr(session, "hand", None), "motor_client", None)
+        cls = type(client) if client is not None else None
+        if cls is None or not hasattr(cls, "servo_limits"):
+            return {}
+        out = {"tunables": cls.servo_limits(), "per_motor": {}}
+        try:
+            reachable = client.read_profile_limits(client.motor_ids)
+        except Exception:
+            logger.debug("profile limits unavailable", exc_info=True)
+            return out
+        out["per_motor"] = {
+            str(mid): {"velocity_rad_s": round(p.velocity_rad_s, 3),
+                       "acceleration_rad_s2": round(p.acceleration_rad_s2, 1)}
+            for mid, p in reachable.items()
+        }
+        return out
+
     def set_servo_gains(self, motor_id: int, fields: dict) -> dict:
         """Write the named gain fields on one motor and read the result back."""
         from orca_core.hardware.motor_client import ServoGains
@@ -1637,7 +1702,25 @@ class HandService:
                     # A single point is a hold, not a cycle: it keeps being
                     # written so a motor pushed off target returns to it.
                     self._bench_playing[motor_id] = index + 1
+        self._await_bench_arrival(session)
         return True
+
+    def _await_bench_arrival(self, session) -> None:
+        """Let the motors reach this point before the next one is written.
+
+        Without it the dwell is a guess at how long the move takes, so a
+        sequence either paces itself to its slowest leg or writes the next
+        point mid-travel and never reaches the recorded one at all.
+        """
+        try:
+            session.hand.wait_for_motion(timeout=BENCH_ARRIVAL_TIMEOUT_S)
+        except MotionTimeoutError:
+            # A motor held off its point never reports arrival. Carrying on
+            # keeps the sequence running where stopping would strand it.
+            logger.debug("bench playback: not every motor arrived",
+                         exc_info=True)
+        except Exception:
+            logger.debug("bench playback: arrival wait failed", exc_info=True)
 
     def _check_within_travel(self, hand, position: float) -> None:
         """Refuse a target the motor physically cannot reach.

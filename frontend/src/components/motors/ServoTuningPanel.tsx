@@ -13,6 +13,7 @@ import { api } from '../../api/rest'
 import type {
   ServoGains,
   ServoGainsMap,
+  ServoLimits,
   ServoProfile,
   ServoProfileMap,
 } from '../../api/types'
@@ -95,6 +96,69 @@ function fmt(value: number | null | undefined): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2)
 }
 
+// Spans across the chain, because the motors on one bus do not share a
+// ceiling: a wrist and a finger joint answer with different limits.
+function spread(values: number[], unit: string, digits = 1): string {
+  if (values.length === 0) return '--'
+  const low = Math.min(...values)
+  const high = Math.max(...values)
+  return low === high
+    ? `${high.toFixed(digits)} ${unit}`
+    : `${low.toFixed(digits)}–${high.toFixed(digits)} ${unit}`
+}
+
+/** What the boxes below will accept, and what the ends of the range mean.
+ *
+ * The reachable ceiling rather than the register width. The registers hold
+ * values far beyond anything these motors do and accept them silently, so a
+ * legend quoting the register would invite an operator to ask for a speed
+ * that does nothing at all.
+ */
+function LimitsLegend({
+  limits,
+  maxGain,
+}: {
+  limits: ServoLimits
+  maxGain: number
+}) {
+  const perMotor = Object.values(limits.per_motor ?? {})
+  const tunables = limits.tunables ?? {}
+  const accelMax = tunables.acceleration_rad_s2?.max ?? null
+  return (
+    <div
+      style={{
+        fontSize: 10,
+        color: 'var(--dimmer)',
+        marginBottom: 6,
+        borderLeft: '2px solid var(--dimmer)',
+        paddingLeft: 6,
+      }}
+    >
+      <div>
+        <b>KP/KI/KD/FF</b> 0–{maxGain} · 0 ={' '}
+        {tunables.gain?.zero_means ?? 'no contribution from this term'}
+      </div>
+      {perMotor.length > 0 && (
+        <div>
+          <b>VEL</b> 0–
+          {spread(perMotor.map((m) => m.velocity_rad_s), 'rad/s', 2)} · 0 = no
+          speed cap · above this the motor simply turns as fast as it can
+        </div>
+      )}
+      {accelMax !== null && (
+        <div>
+          <b>ACC</b> 0–{accelMax.toFixed(0)} rad/s² · 0 = maximum acceleration
+        </div>
+      )}
+      {tunables.velocity_rad_s?.ceiling_source && (
+        <div style={{ opacity: 0.8 }}>
+          ceiling from {tunables.velocity_rad_s.ceiling_source}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ServoTuningPanel() {
   const motors = useAppStore((s) => s.status?.capabilities?.motors ?? false)
   const joints = useAppStore((s) => s.handInfo?.joints)
@@ -104,6 +168,7 @@ export function ServoTuningPanel() {
   const [gains, setGains] = useState<ServoGainsMap | null>(null)
   const [gainMax, setGainMax] = useState<number | null>(null)
   const [profile, setProfile] = useState<ServoProfileMap | null>(null)
+  const [limits, setLimits] = useState<ServoLimits | null>(null)
   const [drafts, setDrafts] = useState<Record<string, Record<string, string>>>({})
   const [busy, setBusy] = useState<string | null>(null)
   const [columnDrafts, setColumnDrafts] = useState<Record<string, string>>({})
@@ -124,6 +189,7 @@ export function ServoTuningPanel() {
         setGains(g.gains)
         setGainMax(g.gain_max ?? null)
         setProfile(p.profile)
+        setLimits(p.limits ?? null)
         setDrafts({})
       })
       .catch((e) => setError(String((e as Error).message ?? e)))
@@ -349,6 +415,7 @@ export function ServoTuningPanel() {
         limit; non-zero also rate-limits streamed targets, so it shapes teleop
         and replay, not just point-to-point moves.
       </div>
+      {limits && <LimitsLegend limits={limits} maxGain={maxGain} />}
       {ids.length === 0 || nothingSettable ? (
         <div style={{ fontSize: 10, color: 'var(--dimmer)' }}>
           {loading ? (

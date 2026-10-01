@@ -14,6 +14,15 @@ import { useAppStore } from '../../state/appStore'
 import { useStartGate } from '../../state/operationStore'
 import { Panel } from '../common/Panel'
 
+// A period paces the gaps *within* a segment, so with a single command per
+// segment there are no gaps for it to pace. Empty counts as direct too: that
+// is what motor waypoints default to.
+function stepsAreDirect(raw: string | undefined): boolean {
+  if (raw === undefined || raw === '') return true
+  const parsed = parseInt(raw, 10)
+  return !Number.isFinite(parsed) || parsed <= 1
+}
+
 // The 3D waypoint editor pulls in three.js — load it only when opened.
 const WaypointEditor = lazy(() =>
   import('./WaypointEditor').then((m) => ({ default: m.WaypointEditor })),
@@ -81,9 +90,9 @@ export function TrajectoryPanel({
     const parsed = parseInt(raw, 10)
     const interp =
       raw !== '' && Number.isFinite(parsed)
-        ? Math.min(200, Math.max(0, parsed))
+        ? Math.min(200, Math.max(1, parsed))
         : traj.type === 'motor_waypoints'
-          ? 0
+          ? 1
           : null
     const periodRaw = periods[traj.name] ?? ''
     const periodMs = parseInt(periodRaw, 10)
@@ -209,16 +218,18 @@ export function TrajectoryPanel({
                       {traj.type !== 'continuous' && (
                         <input
                           type="number"
-                          min={0}
+                          min={1}
                           max={200}
                           placeholder={
-                            traj.type === 'motor_waypoints' ? '0' : 'glide'
+                            traj.type === 'motor_waypoints' ? '1' : 'glide'
                           }
                           title={
-                            'interpolation steps per segment — 0 jumps ' +
-                            'straight to each point; empty keeps the ' +
+                            'commands per segment — 1 moves directly from ' +
+                            'each waypoint to the next, and the motor\u2019s ' +
+                            'own controller does the travelling; empty keeps ' +
+                            'the ' +
                             (traj.type === 'motor_waypoints'
-                              ? 'direct stepping default (0)'
+                              ? 'direct move default (1)'
                               : 'smooth cruise-speed glide with waypoint holds')
                           }
                           value={steps[traj.name] ?? ''}
@@ -235,11 +246,14 @@ export function TrajectoryPanel({
                         <label
                           className="traj-loop"
                           title={
-                            'ms between motor commands — with 0 steps this is ' +
-                            'the time from one waypoint to the next. The ' +
-                            'motors\u2019 own controller does the moving, so a ' +
-                            'short period snaps between positions; speed ' +
-                            'divides it further.'
+                            stepsAreDirect(steps[traj.name])
+                              ? 'nothing to pace at 1 command per segment: ' +
+                                'each waypoint is commanded once and the next ' +
+                                'is not sent until every motor has arrived'
+                              : 'ms between the commands spanning a segment. ' +
+                                'Only the gaps within a segment are paced — ' +
+                                'at each recorded waypoint playback waits for ' +
+                                'every motor to arrive. Speed divides it.'
                           }
                         >
                           <input
@@ -248,6 +262,7 @@ export function TrajectoryPanel({
                             max={5000}
                             step={10}
                             placeholder="100"
+                            disabled={stepsAreDirect(steps[traj.name])}
                             value={periods[traj.name] ?? ''}
                             onChange={(e) =>
                               setPeriods((prev) => ({

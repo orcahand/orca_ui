@@ -43,11 +43,10 @@ INTERP_STEP_PERIOD_S = 0.1
 MIN_STEP_PERIOD_S = 0.02      # 50 Hz — the bus keeps up, anything faster is churn
 MAX_STEP_PERIOD_S = 5.0
 MAX_INTERP_STEPS = 200
-# Motor-space playback safety: no single raw command may jump a motor more
-# than this, so "no interpolation" still auto-splits violent segments; the
-# approach to the first waypoint glides in finer steps.
-MAX_MOTOR_STEP_RAD = 0.3
-MOTOR_APPROACH_STEP_RAD = 0.05
+MIN_INTERP_STEPS = 1
+# Seconds to let a chain reach a waypoint before giving up on it. Generous:
+# this bounds a motor that cannot arrive, it does not pace one that can.
+WAYPOINT_ARRIVAL_TIMEOUT_S = 5.0
 
 # Waypoint holds. The hand trails the command stream by its own tracking lag
 # (~100 ms on a motors-only hand, more on a loaded thumb), while a waypoint is
@@ -232,25 +231,38 @@ def _lerp(a, b, fraction: float):
     return a + (b - a) * fraction
 
 
-def _stepped_frames(waypoints: list, steps: int,
-                    max_step: "float | None" = None) -> list:
-    """Point-to-point frames: each segment becomes ``steps`` intermediate
-    commands plus the endpoint (steps=0 = jump straight to the next point).
-    ``max_step`` (same units as the values) auto-splits any segment whose
-    largest per-channel jump would exceed it."""
+def _stepped_frames(waypoints: list, steps: int) -> list:
+    """Frames for each segment, ``steps`` of them, the last being the endpoint.
+
+    ``steps=1`` is a direct move: the only command issued for a segment is its
+    endpoint, and the servo's own trajectory generator does the travelling.
+    Nothing is split beyond what was asked for -- a segment the operator
+    recorded as one move stays one move.
+    """
+    steps = max(MIN_INTERP_STEPS, int(steps))
     frames = [list(waypoints[0])]
     for start, end in zip(waypoints, waypoints[1:]):
-        n = steps
-        if max_step is not None:
-            deltas = [abs(b - a) for a, b in zip(start, end)
-                      if a is not None and b is not None]
-            span = max(deltas, default=0.0)
-            n = max(n, int(math.ceil(span / max_step)) - 1)
-        for k in range(1, n + 2):
-            fraction = k / (n + 1)
+        for k in range(1, steps + 1):
+            fraction = k / steps
             frames.append([_lerp(a, b, fraction)
                            for a, b in zip(start, end)])
     return frames
+
+
+def _await_arrival(ctx: OpContext, hand, what: str) -> None:
+    """Block until every motor has settled, or say why it did not.
+
+    A motor held short of its goal never reports arrival, so this is logged
+    rather than raised: stopping playback outright would be a worse answer
+    than carrying on from where the hand actually is.
+    """
+    from orca_core.hardware.motor_client import MotionTimeoutError
+
+    try:
+        hand.wait_for_motion(timeout=WAYPOINT_ARRIVAL_TIMEOUT_S)
+    except MotionTimeoutError as exc:
+        ctx.log(f"{what}: not every motor arrived within "
+                f"{WAYPOINT_ARRIVAL_TIMEOUT_S:g}s ({exc})")
 
 
 def play_frames(ctx: OpContext, *, name: str, joint_ids: list[str],
@@ -354,9 +366,11 @@ class ReplayOperation(Operation):
         interp_steps = params.get("interp_steps")
         if interp_steps is not None:
             interp_steps = int(interp_steps)
-            if not 0 <= interp_steps <= MAX_INTERP_STEPS:
+            if not MIN_INTERP_STEPS <= interp_steps <= MAX_INTERP_STEPS:
                 raise ServiceError(
-                    f"interp_steps must be 0..{MAX_INTERP_STEPS}")
+                    f"interp_steps must be {MIN_INTERP_STEPS}.."
+                    f"{MAX_INTERP_STEPS} ({MIN_INTERP_STEPS} = move directly "
+                    f"from each waypoint to the next)")
             if traj_type == CONTINUOUS:
                 raise ServiceError(
                     "interp_steps applies to waypoint recordings — a "
@@ -448,7 +462,8 @@ class ReplayOperation(Operation):
         if not motor_ids or not waypoints:
             raise ServiceError("motor recording is empty")
         loop = self.params["loop"]
-        steps = self.params.get("interp_steps") or 0
+        steps = max(MIN_INTERP_STEPS,
+                    int(self.params.get("interp_steps") or MIN_INTERP_STEPS))
         if loop and len(waypoints) > 1:
             waypoints = waypoints + [list(waypoints[0])]
         period = self.params["step_period_s"] or INTERP_STEP_PERIOD_S
@@ -462,23 +477,19 @@ class ReplayOperation(Operation):
 
         service.set_direct_motor_mode(True, from_operation=True)
         try:
-            current = hand.get_motor_pos(as_dict=True)
-            start = [float(current[m]) for m in motor_ids]
+            # The approach is a move to a waypoint like any other: one
+            # command, then wait for the chain to get there.
+            ctx.set_phase("approach", detail=f"{name} · moving to start")
+            ctx.check_stop()
+            ctx.pause_point()
+            hand.write_motor_pos(
+                motor_ids, np.asarray(waypoints[0], dtype=float))
+            _await_arrival(ctx, hand, "start")
+
             # The hardware motor client divides positions by its scale, so
             # rows must be arrays, not plain lists.
-            approach = [np.asarray(row, dtype=float) for row in _stepped_frames(
-                [start, waypoints[0]], 0,
-                max_step=MOTOR_APPROACH_STEP_RAD)[1:]]
-            ctx.set_phase("approach", detail=f"{name} · moving to start")
-            for row in approach:
-                ctx.check_stop()
-                ctx.pause_point()
-                hand.write_motor_pos(motor_ids, row)
-                ctx.sleep(1.0 / WAYPOINT_RATE_HZ)
-
             frames = [np.asarray(row, dtype=float)
-                      for row in _stepped_frames(waypoints, steps,
-                                                 max_step=MAX_MOTOR_STEP_RAD)]
+                      for row in _stepped_frames(waypoints, steps)]
             total = len(frames)
             duration_s = total * dt
             cycles = 0
@@ -490,7 +501,8 @@ class ReplayOperation(Operation):
                     f"{' (loop)' if loop else ''}")
             last_progress = 0.0
             while True:
-                for index, row in enumerate(frames):
+                # frames[0] restates where the approach already put the hand.
+                for index, row in enumerate(frames[1:], start=1):
                     ctx.check_stop()
                     ctx.pause_point()
                     hand.write_motor_pos(motor_ids, row)
@@ -499,7 +511,15 @@ class ReplayOperation(Operation):
                             index == total - 1:
                         ctx.set_progress((index + 1) / total)
                         last_progress = now
-                    ctx.sleep(dt)
+                    if index % steps:
+                        # Mid-segment, so only a step on the way somewhere.
+                        ctx.sleep(dt)
+                    else:
+                        # A recorded waypoint, and so a sync point: no motor
+                        # starts the next leg until every motor has finished
+                        # this one.
+                        _await_arrival(ctx, hand, f"waypoint {index // steps}")
+                        ctx.sleep(dt)
                 cycles += 1
                 if loop and cycles >= MAX_LOOP_CYCLES:
                     ctx.log(f"loop backstop reached ({MAX_LOOP_CYCLES} "

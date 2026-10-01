@@ -270,7 +270,8 @@ def build_router(service: HandService) -> APIRouter:
 
     @router.get("/motors/profile")
     def motors_profile():
-        return {"ok": True, "profile": guard(service.read_servo_profile)}
+        return {"ok": True, "profile": guard(service.read_servo_profile),
+                "limits": service.servo_limits()}
 
     @router.post("/motors/{motor_id}/profile")
     def motors_set_profile(motor_id: int, body: schemas.ServoProfileRequest):

@@ -26,6 +26,7 @@ import type {
   PoseSource,
   ServoGainsMap,
   ServoProfile,
+  ServoLimits,
   ServoProfileMap,
   ControlState,
 } from './types'
@@ -116,7 +117,9 @@ export const api = {
     post<{ gains: ServoGainsMap }>(`/api/motors/${id}/gains`, gains),
 
   servoProfile: () =>
-    request<{ profile: ServoProfileMap }>('/api/motors/profile'),
+    request<{ profile: ServoProfileMap; limits?: ServoLimits }>(
+      '/api/motors/profile',
+    ),
   setServoProfile: (id: number, profile: Partial<ServoProfile>) =>
     post<{ profile: ServoProfileMap }>(`/api/motors/${id}/profile`, profile),
 
