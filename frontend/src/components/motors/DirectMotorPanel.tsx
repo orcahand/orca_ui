@@ -23,6 +23,116 @@ const SEND_THROTTLE_MS = 80
 // shows what the motor is actually drawing, and the peak beside it shows the
 // transient a cap does not catch.
 const CURRENT_WINDOW = 20
+/** How bench playback paces itself, for every motor at once.
+ *
+ * The same three controls as a motor-waypoint replay, in the same order and
+ * with the same defaults: this is the same mechanism under a different
+ * panel, so an operator who has set one should recognise the other.
+ *
+ * Bench-wide rather than per motor: one thread drives the shared bus and
+ * arrival is a whole-chain condition, so two motors pacing themselves
+ * differently would only mean one waiting on the other.
+ */
+function BenchPacing() {
+  const [steps, setSteps] = useState('')
+  const [period, setPeriod] = useState('')
+  const [settle, setSettle] = useState('')
+  const [saved, setSaved] = useState(false)
+  const setError = useAppStore((s) => s.setError)
+
+  const apply = () => {
+    const n = Math.min(200, Math.max(1, parseInt(steps, 10) || 1))
+    const ms = Math.min(5000, Math.max(20, parseInt(period, 10) || 100))
+    const raw = settle.trim()
+    const parsed = parseInt(raw, 10)
+    const cap =
+      raw === '' || !Number.isFinite(parsed)
+        ? null
+        : Math.min(60000, Math.max(1, parsed))
+    void api
+      .motorsDirectPacing(n, cap, ms)
+      .then(() => {
+        setSaved(true)
+        setError(null)
+        window.setTimeout(() => setSaved(false), 1500)
+      })
+      .catch((e) => setError(String((e as Error).message ?? e)))
+  }
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 8,
+        alignItems: 'center',
+        marginBottom: 6,
+        color: 'var(--dim)',
+      }}
+    >
+      <span>playback</span>
+      <input
+        type="number"
+        min={1}
+        max={200}
+        placeholder="1"
+        title={
+          'commands per segment \u2014 1 moves directly from each recorded ' +
+          'point to the next, and the motor\u2019s own controller does the ' +
+          'travelling'
+        }
+        value={steps}
+        onChange={(e) => setSteps(e.target.value)}
+        style={{ width: 48 }}
+      />
+      <label
+        title={
+          'ms between commands, which is also the rest at each point once ' +
+          'every motor has arrived. At 1 command per segment that rest is ' +
+          'all it is; above 1 it also spaces the steps spanning a segment. ' +
+          'A dwell longer than the settle cap outlasts it, so the cap only ' +
+          'bites once this is short enough to notice.'
+        }
+      >
+        <input
+          type="number"
+          min={20}
+          max={5000}
+          step={10}
+          placeholder="100"
+          value={period}
+          onChange={(e) => setPeriod(e.target.value)}
+          style={{ width: 56 }}
+        />
+        ms
+      </label>
+      <label
+        title={
+          'max settle \u2014 ms to wait at each point before sending the ' +
+          'next command even if a motor has not reported arriving. Empty ' +
+          'waits for every motor; set it when one motor cannot reach its ' +
+          'point and should not hold up the rest.'
+        }
+      >
+        settle
+        <input
+          type="number"
+          min={1}
+          max={60000}
+          step={50}
+          placeholder="wait"
+          value={settle}
+          onChange={(e) => setSettle(e.target.value)}
+          style={{ width: 56 }}
+        />
+        ms
+      </label>
+      <button className="btn btn-secondary" onClick={apply}>
+        {saved ? 'set' : 'apply'}
+      </button>
+    </div>
+  )
+}
+
 export function DirectMotorPanel({
   torqueOn,
   locked,
@@ -124,6 +234,7 @@ export function DirectMotorPanel({
           : 'Direct motor control (advanced)'}
       </summary>
       <div style={{ padding: '6px 0 0 0' }}>
+        {bench && <BenchPacing />}
         <div style={{ color: 'var(--warn)', marginBottom: 6 }}>
           {bench ? (
             <>

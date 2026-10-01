@@ -653,3 +653,22 @@ export interface TrajectoryData {
   waypoints?: number[][]
   angles?: number[][]
 }
+
+
+// What a servo tunable accepts, and the ceiling that actually binds. The two
+// differ by orders of magnitude: a speed register stores values far faster
+// than the motor turns and never objects, so only the per-motor ceiling tells
+// an operator what asking for a number will do.
+export interface ServoLimitEntry {
+  min: number
+  max: number | null
+  unit: string
+  zero_means: string
+  register_width_only?: boolean
+  ceiling_source?: string
+}
+
+export interface ServoLimits {
+  tunables?: Record<string, ServoLimitEntry>
+  per_motor?: Record<string, { velocity_rad_s: number; acceleration_rad_s2: number }>
+}

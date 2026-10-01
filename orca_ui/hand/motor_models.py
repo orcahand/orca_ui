@@ -49,6 +49,21 @@ class MotorModel:
     # Operating Mode values the model accepts. Empty means unrecorded, which
     # is not the same as "all of them".
     operating_modes: tuple[int, ...] = ()
+    # Datasheet speed with nothing on the output shaft. The real ceiling for a
+    # speed cap, and per model rather than per family: one chain mixes motors
+    # whose no-load speeds differ by more than a factor of two.
+    no_load_rpm: float | None = None
+    # Output torque per amp, N.m/A: the nominal, single-number constant.
+    # None where the manufacturer publishes nothing usable.
+    torque_constant_nm_per_a: float | None = None
+    # Torque as a polynomial in current, highest power first, N.m from amps.
+    # A curve rather than a constant because these motors are not linear: a
+    # single constant reads 38% high at 200 mA, which is inside the range a
+    # hand actually runs at. None where only the constant is known.
+    torque_poly_nm: tuple[float, ...] | None = None
+    # Currents the polynomial was fitted over. Outside it the fit is
+    # extrapolation and says nothing, so callers are told rather than guessing.
+    torque_poly_current_range_a: tuple[float, float] | None = None
 
     @property
     def verifiable(self) -> bool:
@@ -69,6 +84,28 @@ class MotorModel:
         if not self.has_current_control:
             return None
         return self.rated_current_ma or self.stall_current_ma or self.max_current_ma
+
+    def torque_nm(self, current_a: float) -> "float | None":
+        """Output torque for a measured current, best available estimate.
+
+        The fitted curve where there is one, otherwise the nominal constant.
+        None when neither is known, which a caller must not read as zero.
+        """
+        if self.torque_poly_nm:
+            torque = 0.0
+            for coefficient in self.torque_poly_nm:
+                torque = torque * current_a + coefficient
+            return max(0.0, torque)
+        if self.torque_constant_nm_per_a is not None:
+            return self.torque_constant_nm_per_a * current_a
+        return None
+
+    def torque_is_extrapolated(self, current_a: float) -> bool:
+        """Whether ``current_a`` falls outside the fitted range."""
+        if not self.torque_poly_current_range_a:
+            return False
+        low, high = self.torque_poly_current_range_a
+        return not low <= current_a <= high
 
     def supports_mode(self, mode: int) -> "bool | None":
         """Whether this model accepts an Operating Mode value.
@@ -125,6 +162,17 @@ _MODELS: tuple[MotorModel, ...] = (
         rated_current_ma=None,
         stall_current_ma=800.0,
         operating_modes=(0, 1, 3, 4, 5, 16),
+        # The published performance curve is distinctly not linear, so the
+        # constant below is only a nominal: quadratic fits the same nine
+        # sampled points to R^2 0.99998 where a straight line manages 0.989,
+        # and the two disagree by 38% at 200 mA. A cubic fits no better than
+        # the points can be read, so it would only be fitting noise.
+        # The same curve extrapolates to 70 rpm unloaded and 95 mA at zero
+        # torque, both of which agree with what these motors report.
+        torque_constant_nm_per_a=0.93,
+        torque_poly_nm=(-0.57108, 1.44778, -0.13176),
+        torque_poly_current_range_a=(0.148, 0.745),
+        no_load_rpm=70.0,
         source=("ROBOTIS XC330-T288-T control table and specification: model "
                 "number 1220, Current Limit (38) 0..910 at 1.0 mA/unit, Goal "
                 "Current (102) bounded by it, stall 0.92 N.m at 11.1 V / "
@@ -146,6 +194,15 @@ _MODELS: tuple[MotorModel, ...] = (
         current_scale_ma=None,
         max_current_ma=None,
         stall_current_ma=1400.0,
+        # This one's published curve really is a straight line: a quadratic
+        # fits no better than the points can be read off the plot, so the
+        # constant is the honest model. Unlike the finger motor, which curves.
+        # Of limited use until something can read this model's current --
+        # it has no Goal Current or Current Limit register.
+        torque_constant_nm_per_a=0.963,
+        torque_poly_nm=(0.96274, -0.06123),
+        torque_poly_current_range_a=(0.17, 1.21),
+        no_load_rpm=72.0,
         # No current-based position (5) and no current control (0). The wrist
         # runs in extended position (4) instead.
         operating_modes=(1, 3, 4, 16),
@@ -171,6 +228,16 @@ _MODELS: tuple[MotorModel, ...] = (
         rated_current_ma=500.0,
         stall_current_ma=1500.0,
         operating_modes=(0, 1, 2, 3),
+        # The published 9.3 kg.cm/A is the stall secant: it divides stall
+        # torque by stall current and so folds in the current the motor
+        # spends on itself. The performance curve separates them, and the
+        # offset is large -- 255 mA of a 500 mA rating goes to turning the
+        # motor at all, so below that there is no output torque. Treating
+        # the nominal as a slope reads 65% high at 500 mA.
+        torque_constant_nm_per_a=0.912,
+        torque_poly_nm=(1.1288, -0.28784),
+        torque_poly_current_range_a=(0.255, 1.490),
+        no_load_rpm=100.0,
         source=("HL-2915-C001 product specification A/0, 2026-01-18: rated "
                 "current 500 mA, stall current 1.5 A at 12 V, stall torque "
                 "14.2 kg.cm; registers from the HLS memory table (44 capped "
@@ -190,6 +257,16 @@ _MODELS: tuple[MotorModel, ...] = (
         rated_current_ma=800.0,
         stall_current_ma=2800.0,
         operating_modes=(0, 1, 2, 3),
+        # Published as 12.5 kg.cm/A, which its own stall figures confirm:
+        # 35 kg.cm at 2.8 A is 12.5 kg.cm/A exactly. That is the stall
+        # secant, though -- the curve's actual slope is 12.96 kg.cm/A past a
+        # 110 mA no-load offset, and the two disagree by 26% at 500 mA.
+        torque_constant_nm_per_a=1.226,
+        torque_poly_nm=(1.27121, -0.1502),
+        torque_poly_current_range_a=(0.110, 2.810),
+        # Less than half the finger motor's, which is why a speed ceiling has
+        # to be per model and cannot be a family constant.
+        no_load_rpm=45.0,
         source=("HLS3930M-C001 product specification A/0, 2024-04-25: rated "
                 "current 800 mA, stall current 2.8 A at 12 V, stall torque "
                 "35 kg.cm; registers from the HLS memory table (44 capped "
@@ -209,6 +286,9 @@ _MODELS: tuple[MotorModel, ...] = (
         rated_current_ma=500.0,
         stall_current_ma=1500.0,
         operating_modes=(0, 1, 2, 3),
+        # The slowest catalogued HLS model. Too low only makes a default
+        # sluggish; too high stops it capping anything at all.
+        no_load_rpm=45.0,
         source=("HLS memory table (6.5 mA/unit, register 44 capped by "
                 "register 28, modes 0-3). Current limits are the most "
                 "conservative of the catalogued HLS models, not this "
@@ -257,6 +337,11 @@ def as_dict(model: MotorModel) -> dict:
         "stall_current_ma": model.stall_current_ma,
         "ceiling_ma": model.ceiling_ma,
         "operating_modes": list(model.operating_modes),
+        "torque_constant_nm_per_a": model.torque_constant_nm_per_a,
+        "no_load_rpm": model.no_load_rpm,
+        "torque_poly_nm": list(model.torque_poly_nm) if model.torque_poly_nm else None,
+        "torque_poly_current_range_a": (list(model.torque_poly_current_range_a)
+                                        if model.torque_poly_current_range_a else None),
         "source": model.source,
         "verifiable": model.verifiable,
     }

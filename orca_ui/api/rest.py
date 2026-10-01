@@ -270,7 +270,8 @@ def build_router(service: HandService) -> APIRouter:
 
     @router.get("/motors/profile")
     def motors_profile():
-        return {"ok": True, "profile": guard(service.read_servo_profile)}
+        return {"ok": True, "profile": guard(service.read_servo_profile),
+                "limits": service.servo_limits()}
 
     @router.post("/motors/{motor_id}/profile")
     def motors_set_profile(motor_id: int, body: schemas.ServoProfileRequest):
@@ -315,6 +316,11 @@ def build_router(service: HandService) -> APIRouter:
     @router.post("/motors/direct/declare")
     def motors_direct_declare(body: schemas.MotorDeclareRequest):
         return guard(service.declare_motor, body.id, body.model, body.nickname)
+
+    @router.post("/motors/direct/pacing")
+    def motors_direct_pacing(body: schemas.BenchPacingRequest):
+        return guard(service.set_bench_pacing,
+                     body.interp_steps, body.max_settle_ms, body.period_ms)
 
     @router.post("/motors/direct/play")
     def motors_direct_play(body: schemas.MotorPlaybackRequest):

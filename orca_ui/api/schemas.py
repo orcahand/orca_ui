@@ -191,3 +191,11 @@ class TrajectoryUpdateRequest(BaseModel):
                                    pattern=r"^[A-Za-z0-9_\-]+$")
 
 
+
+
+class BenchPacingRequest(BaseModel):
+    """How bench playback paces itself. Mirrors the trajectory player."""
+
+    interp_steps: int = 1
+    max_settle_ms: "int | None" = None
+    period_ms: "int | None" = None

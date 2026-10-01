@@ -1245,3 +1245,128 @@ class TestAppendingPoints:
 
         with pytest.raises(ServiceError):
             service.set_motor_points(1, [-3.0, 1.0])
+
+
+class TestBenchFrames:
+    """The bench follows the trajectory player's rules: commands per segment
+    with a floor of one, and a sync point only where a frame is a recorded
+    point. Pure arithmetic, so it is checked without a bus."""
+
+    def _target(self, points, frame, steps):
+        from orca_ui.hand.service import HandService
+
+        return HandService._bench_target(points, frame, steps)
+
+    def test_one_step_walks_the_points_directly(self):
+        """What "no interpolation" has to mean: the only command issued for a
+        segment is its endpoint, and the servo does the travelling."""
+        points = [0.0, 1.0, 2.0]
+        got = [self._target(points, f, 1) for f in range(4)]
+
+        assert [round(v, 3) for v, _ in got] == [0.0, 1.0, 2.0, 0.0]
+        assert all(arrives for _, arrives in got)
+
+    def test_interpolation_lands_only_on_the_last_step(self):
+        """Waiting at an intermediate step would make a glide stutter, so
+        only the recorded point counts as arrival."""
+        points = [0.0, 1.0]
+        got = [self._target(points, f, 4) for f in range(5)]
+
+        assert [round(v, 3) for v, _ in got] == [0.0, 0.25, 0.5, 0.75, 1.0]
+        assert [a for _, a in got] == [True, False, False, False, True]
+
+    def test_a_single_point_is_a_hold(self):
+        """One point is somewhere to stay, so every frame restates it and a
+        motor pushed off target comes back."""
+        for steps in (1, 5):
+            for frame in (0, 3, 11):
+                value, _ = self._target([0.7], frame, steps)
+                assert value == pytest.approx(0.7)
+
+    def test_points_cycle_rather_than_running_once(self):
+        points = [0.0, 1.0]
+        values = [round(self._target(points, f, 1)[0], 3) for f in range(5)]
+
+        assert values == [0.0, 1.0, 0.0, 1.0, 0.0]
+
+    def test_interpolation_spans_the_wrap_back_to_the_first_point(self):
+        """The closing segment is a segment like any other; leaving it
+        uninterpolated would snap the motor home at full speed."""
+        points = [0.0, 2.0]
+        got = [self._target(points, f, 2) for f in range(5)]
+
+        assert [round(v, 3) for v, _ in got] == [0.0, 1.0, 2.0, 1.0, 0.0]
+        assert [a for _, a in got] == [True, False, True, False, True]
+
+
+    def test_the_first_frame_is_an_approach_to_the_first_point(self):
+        """A motor is wherever the operator left it when playback starts, so
+        the opening point is somewhere to reach, not somewhere to leave."""
+        for steps in (1, 4):
+            value, arrives = self._target([-3.0, -2.0], 0, steps)
+            assert value == pytest.approx(-3.0)
+            assert arrives, "the approach is a sync point like any other"
+
+
+class TestBenchDwellMatchesThePlayer:
+    """A dwell the operator cannot shorten outlasts any settle cap they set,
+    which makes the cap look broken when it is working exactly as asked."""
+
+    def _service(self):
+        from orca_ui.hand.service import HandService
+
+        return HandService.__new__(HandService)
+
+    def test_the_dwell_is_settable_rather_than_a_constant(self):
+        s = self._service()
+        s._state_lock = threading.RLock()
+        result = s.set_bench_pacing(1, 50, 250)
+
+        assert result["period_ms"] == 250
+        assert s._bench_period_s == pytest.approx(0.25)
+
+    def test_the_default_dwell_matches_the_trajectory_player(self):
+        """Same control under a different panel, so an operator who has set
+        one should find the other already familiar."""
+        from orca_ui.hand import service as svc
+        from orca_ui.hand.operations import player as pl
+
+        assert svc.BENCH_DWELL_S == pytest.approx(pl.INTERP_STEP_PERIOD_S)
+
+    def test_a_cap_shorter_than_the_dwell_is_the_case_that_matters(self):
+        """The reported bug: a 50 ms cap under a 1.5 s dwell can never be
+        observed, because the motor finishes during the dwell either way."""
+        from orca_ui.hand import service as svc
+
+        s = self._service()
+        s._state_lock = threading.RLock()
+        s.set_bench_pacing(1, 50, 100)
+
+        assert s._bench_max_settle_ms / 1000.0 < s._bench_period_s
+        assert s._bench_period_s <= svc.BENCH_MAX_PERIOD_S
+
+    def test_the_bounds_match_the_trajectory_player(self):
+        from orca_ui.hand import service as svc
+        from orca_ui.hand.operations import player as pl
+
+        assert svc.BENCH_MIN_PERIOD_S == pl.MIN_STEP_PERIOD_S
+        assert svc.BENCH_MAX_PERIOD_S == pl.MAX_STEP_PERIOD_S
+
+    def test_an_out_of_range_dwell_is_refused(self):
+        from orca_ui.hand.service import ServiceError
+
+        s = self._service()
+        s._state_lock = threading.RLock()
+        with pytest.raises(ServiceError):
+            s.set_bench_pacing(1, None, 10)
+        with pytest.raises(ServiceError):
+            s.set_bench_pacing(1, None, 6000)
+
+    def test_omitting_the_dwell_keeps_the_current_one(self):
+        s = self._service()
+        s._state_lock = threading.RLock()
+        s.set_bench_pacing(1, None, 250)
+        s.set_bench_pacing(4, None, None)
+
+        assert s._bench_period_s == pytest.approx(0.25)
+        assert s._bench_interp_steps == 4

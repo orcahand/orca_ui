@@ -16,6 +16,7 @@ from typing import Callable, TYPE_CHECKING
 import numpy as np
 
 from orca_core import JointGains
+from orca_core.hardware.motor_client import MotionTimeoutError
 
 if TYPE_CHECKING:
     from orca_core.hardware.motor_client import ServoGains, ServoProfile
@@ -57,10 +58,20 @@ TACTILE_MODES = {
 # per command — sliders nudge, they don't teleport.
 MAX_DIRECT_MOTOR_STEP_RAD = 0.8
 
-# How long a bench sequence rests on each recorded point before moving to the
-# next. Long enough to watch the motor arrive (or fail to) rather than a speed
-# control: the servo's own profile decides how fast it travels.
-BENCH_DWELL_S = 1.5
+# ms between commands, which is also the rest at each recorded point. The
+# trajectory player's default and bounds, because the bench is the same
+# control under a different panel -- and because a dwell the operator cannot
+# shorten outlasts any settle cap they set, making the cap look broken.
+BENCH_DWELL_S = 0.1
+BENCH_MIN_PERIOD_S = 0.02
+BENCH_MAX_PERIOD_S = 5.0
+# Bounds a motor that cannot reach its point; it does not pace one that can.
+BENCH_ARRIVAL_TIMEOUT_S = 5.0
+# Commands per segment on the bench, matching the trajectory player: 1 moves
+# directly from one recorded point to the next and lets the servo's own
+# trajectory generator do the travelling.
+BENCH_MIN_INTERP_STEPS = 1
+BENCH_MAX_INTERP_STEPS = 200
 
 # Dynamixel firmware restart: the motor is off the bus until it finishes,
 # so a read-back any sooner just times out and looks like a failed reboot.
@@ -159,6 +170,14 @@ POSE_SOURCES = (POSE_SOURCE_AUTO, POSE_SOURCE_ESTIMATE, POSE_SOURCE_TARGET)
 
 
 class HandService:
+    # Bench pacing defaults, declared here so they hold on any instance
+    # rather than only one built through __init__. Both match the trajectory
+    # player: move directly from point to point, and wait for the motors
+    # rather than guess how long they need.
+    _bench_interp_steps = BENCH_MIN_INTERP_STEPS
+    _bench_max_settle_ms: "int | None" = None
+    _bench_period_s = BENCH_DWELL_S
+
     def __init__(
         self,
         settings: UiSettings,
@@ -184,7 +203,10 @@ class HandService:
         # model key. Undeclared motors are driven as if they had no current
         # register, because a servo cannot be asked.
         self._bench_declared: dict[int, dict] = {}
-        self._bench_playing: dict[int, int] = {}   # motor id -> next index
+        self._bench_playing: dict[int, int] = {}   # motor id -> next frame
+        self._bench_interp_steps = BENCH_MIN_INTERP_STEPS
+        self._bench_max_settle_ms = None
+        self._bench_period_s = BENCH_DWELL_S
         self._bench_thread: threading.Thread | None = None
         self._bench_stop = threading.Event()
         self._tactile_mode = "combined"
@@ -600,6 +622,8 @@ class HandService:
                     self._max_current = _current_or_none(hand_config.max_current)
             self._config_gains = config_gains
         self._publish_control_state()
+        if session.caps.motors:
+            self._apply_default_profile(session)
         if session.caps.tactile:
             try:
                 zeroing.apply_saved_offsets(session)
@@ -608,6 +632,38 @@ class HandService:
             except Exception as e:
                 logger.exception("tactile stream autostart failed")
                 self._publish_error(f"tactile stream start failed: {e}")
+
+    def _apply_default_profile(self, session) -> None:
+        """Give every motor a trajectory profile on connect.
+
+        Without one a goal position is a step: the servo chases it at whatever
+        its position loop asks for, which is as fast as the motor goes. The
+        default is half each motor's own ceiling, so it is deliberate on a
+        wrist and on a finger joint alike rather than a figure chosen for one
+        of them.
+
+        These are RAM registers, so this is what a fresh session starts from;
+        anything written afterwards stands until the next connect. Best
+        effort -- a hand that will not take a profile is still usable.
+        """
+        client = getattr(getattr(session, "hand", None), "motor_client", None)
+        if client is None or not hasattr(client, "default_profile"):
+            return
+        try:
+            defaults = client.default_profile(client.motor_ids)
+            if not defaults:
+                return
+            client.write_servo_profile(defaults)
+        except Exception as e:
+            logger.warning("default motion profile not applied: %s", e)
+            return
+        speeds = sorted({round(p.velocity_rad_s, 2) for p in defaults.values()})
+        acc = next(iter(defaults.values())).acceleration_rad_s2
+        logger.info(
+            "applied default motion profile to %d motors: %s rad/s, "
+            "%.1f rad/s^2 (velocity is half each motor's own ceiling)",
+            len(defaults),
+            "/".join(f"{v:g}" for v in speeds), acc)
 
     # ----- validation helpers --------------------------------------------------
 
@@ -1185,6 +1241,34 @@ class HandService:
         client = getattr(getattr(session, "hand", None), "motor_client", None)
         return getattr(type(client), "servo_gain_max", None)
 
+    def servo_limits(self) -> dict:
+        """What each tunable accepts, and the ceiling that actually binds.
+
+        The two are not the same number and the gap is enormous: a speed
+        register holds values a hundred times faster than the motor turns,
+        and accepts them without complaint, so a panel that captions a box
+        with the register width invites an operator to ask for a speed that
+        silently does nothing. The per-motor ceiling is the useful bound, and
+        it varies within one chain.
+        """
+        session = self.session
+        client = getattr(getattr(session, "hand", None), "motor_client", None)
+        cls = type(client) if client is not None else None
+        if cls is None or not hasattr(cls, "servo_limits"):
+            return {}
+        out = {"tunables": cls.servo_limits(), "per_motor": {}}
+        try:
+            reachable = client.read_profile_limits(client.motor_ids)
+        except Exception:
+            logger.debug("profile limits unavailable", exc_info=True)
+            return out
+        out["per_motor"] = {
+            str(mid): {"velocity_rad_s": round(p.velocity_rad_s, 3),
+                       "acceleration_rad_s2": round(p.acceleration_rad_s2, 1)}
+            for mid, p in reachable.items()
+        }
+        return out
+
     def set_servo_gains(self, motor_id: int, fields: dict) -> dict:
         """Write the named gain fields on one motor and read the result back."""
         from orca_core.hardware.motor_client import ServoGains
@@ -1545,6 +1629,39 @@ class HandService:
         self._bench_points[motor_id] = values
         return {"id": motor_id, "points": values}
 
+    def set_bench_pacing(self, interp_steps: int,
+                         max_settle_ms: "int | None",
+                         period_ms: "int | None" = None) -> dict:
+        """How bench playback paces itself, for every motor at once.
+
+        Bench-wide rather than per motor because one thread drives the shared
+        bus and arrival is a whole-chain condition: two motors pacing
+        themselves differently would only mean one waiting on the other.
+        """
+        steps = int(interp_steps)
+        if not BENCH_MIN_INTERP_STEPS <= steps <= BENCH_MAX_INTERP_STEPS:
+            raise ServiceError(
+                f"interp_steps must be {BENCH_MIN_INTERP_STEPS}.."
+                f"{BENCH_MAX_INTERP_STEPS} ({BENCH_MIN_INTERP_STEPS} = move "
+                f"directly from each point to the next)")
+        cap = None if max_settle_ms in (None, "") else int(max_settle_ms)
+        if cap is not None and not 1 <= cap <= 60_000:
+            raise ServiceError(
+                "max_settle_ms must be 1..60000 (omit it to wait for every "
+                "motor)")
+        period = (self._bench_period_s if period_ms in (None, "")
+                  else int(period_ms) / 1000.0)
+        if not BENCH_MIN_PERIOD_S <= period <= BENCH_MAX_PERIOD_S:
+            raise ServiceError(
+                f"period_ms must be {BENCH_MIN_PERIOD_S * 1000:.0f}.."
+                f"{BENCH_MAX_PERIOD_S * 1000:.0f}")
+        with self._state_lock:
+            self._bench_interp_steps = steps
+            self._bench_max_settle_ms = cap
+            self._bench_period_s = period
+        return {"interp_steps": steps, "max_settle_ms": cap,
+                "period_ms": round(period * 1000)}
+
     def set_motor_playback(self, motor_id: int, enabled: bool) -> dict:
         """Run or stop this motor's recorded points.
 
@@ -1599,14 +1716,37 @@ class HandService:
         while not self._bench_stop.is_set():
             if not self._bench_step():
                 return
-            self._bench_stop.wait(BENCH_DWELL_S)
+            self._bench_stop.wait(self._bench_period_s)
+
+    @staticmethod
+    def _bench_target(points: "list[float]", frame: int, steps: int):
+        """Where a motor should be on this frame, and whether it lands.
+
+        Frame zero is the approach: the motor may be anywhere when playback
+        starts, so the first recorded point is somewhere to get to rather
+        than somewhere to travel from. After that, segments run point to
+        point and wrap, so a two-point recording is a cycle and not a
+        one-way trip. ``steps`` commands span each segment, the last being
+        the recorded point itself -- at ``steps=1`` that is the only command,
+        which is a direct move.
+        """
+        if frame <= 0:
+            return points[0], True
+        count = len(points)
+        segment, within = divmod(frame - 1, steps)
+        start = points[segment % count]
+        end = points[(segment + 1) % count]
+        fraction = (within + 1) / steps
+        arrives = within + 1 == steps
+        return start + (end - start) * fraction, arrives
 
     def _bench_step(self) -> bool:
-        """Write every playing motor its next point. False when there is
+        """Write every playing motor its next frame. False when there is
         nothing left to play and the thread should end.
 
         One thread for the whole bench rather than one per motor: the bus is
-        shared, so the writes have to take turns anyway.
+        shared, so the writes have to take turns anyway, and arrival is a
+        whole-chain condition in any case.
         """
         with self._state_lock:
             playing = dict(self._bench_playing)
@@ -1619,12 +1759,15 @@ class HandService:
             # Belt and braces: whatever turned torque off, stop writing.
             self.stop_all_playback()
             return False
+        landing = False
         for motor_id, index in playing.items():
             points = self._bench_points.get(motor_id)
             if not points:
                 self._stop_motor_playback(motor_id)
                 continue
-            target = points[index % len(points)]
+            target, arrives = self._bench_target(
+                points, index, self._bench_interp_steps)
+            landing = landing or arrives
             try:
                 session.hand.write_motor_pos([motor_id], np.asarray([target]))
             except Exception:
@@ -1637,7 +1780,30 @@ class HandService:
                     # A single point is a hold, not a cycle: it keeps being
                     # written so a motor pushed off target returns to it.
                     self._bench_playing[motor_id] = index + 1
+        if landing:
+            self._await_bench_arrival(session)
         return True
+
+    def _await_bench_arrival(self, session) -> None:
+        """Let the motors reach this point before the next one is written.
+
+        Without it the dwell is a guess at how long the move takes, so a
+        sequence either paces itself to its slowest leg or writes the next
+        point mid-travel and never reaches the recorded one at all. Only at
+        a recorded point: a step on the way to one is not a sync point.
+        """
+        cap_ms = self._bench_max_settle_ms
+        timeout = cap_ms / 1000.0 if cap_ms else BENCH_ARRIVAL_TIMEOUT_S
+        try:
+            session.hand.wait_for_motion(timeout=timeout)
+        except MotionTimeoutError:
+            # Expected where the operator set a cap -- moving on is the point
+            # of setting one. Without a cap it means a motor is held off its
+            # point, and carrying on still beats stranding the sequence.
+            logger.debug("bench playback: not every motor arrived",
+                         exc_info=True)
+        except Exception:
+            logger.debug("bench playback: arrival wait failed", exc_info=True)
 
     def _check_within_travel(self, hand, position: float) -> None:
         """Refuse a target the motor physically cannot reach.

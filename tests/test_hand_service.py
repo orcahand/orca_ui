@@ -346,13 +346,19 @@ def test_enabling_torque_reapplies_only_gains_the_operator_chose(service):
 def test_servo_profile_round_trip_and_reapply(service):
     """Profile limits are RAM like gains, so the same rules apply: read back
     from the motors, and re-apply only what the operator chose."""
+    # Connecting leaves a usable profile rather than none: without one a goal
+    # position is a step command the servo chases as fast as it can.
     before = service.read_servo_profile()
-    assert before["1"]["velocity_rad_s"] == 0.0     # factory: no profile
+    assert before["1"]["velocity_rad_s"] > 0.0
+    client = service.supervisor.session.hand.motor_client
+    ceiling = client.read_profile_limits([1])[1].velocity_rad_s
+    assert before["1"]["velocity_rad_s"] < ceiling
 
     after = service.set_servo_profile(
         1, {"velocity_rad_s": 2.5, "acceleration_rad_s2": None})
     assert after["1"]["velocity_rad_s"] == 2.5
-    assert after["1"]["acceleration_rad_s2"] == 0.0  # untouched
+    assert (after["1"]["acceleration_rad_s2"]
+            == before["1"]["acceleration_rad_s2"])  # untouched
 
     applied = []
     hand = service.supervisor.session.hand
