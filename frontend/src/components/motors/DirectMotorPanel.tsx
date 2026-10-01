@@ -23,6 +23,90 @@ const SEND_THROTTLE_MS = 80
 // shows what the motor is actually drawing, and the peak beside it shows the
 // transient a cap does not catch.
 const CURRENT_WINDOW = 20
+/** How bench playback paces itself, for every motor at once.
+ *
+ * Bench-wide rather than per motor: one thread drives the shared bus and
+ * arrival is a whole-chain condition, so two motors pacing themselves
+ * differently would only mean one waiting on the other.
+ */
+function BenchPacing() {
+  const [steps, setSteps] = useState('1')
+  const [settle, setSettle] = useState('')
+  const [saved, setSaved] = useState(false)
+  const setError = useAppStore((s) => s.setError)
+
+  const apply = () => {
+    const n = Math.min(200, Math.max(1, parseInt(steps, 10) || 1))
+    const raw = settle.trim()
+    const ms = raw === '' ? null : Math.min(60000, Math.max(1, parseInt(raw, 10)))
+    void api
+      .motorsDirectPacing(n, Number.isNaN(ms as number) ? null : ms)
+      .then(() => {
+        setSaved(true)
+        setError(null)
+        window.setTimeout(() => setSaved(false), 1500)
+      })
+      .catch((e) => setError(String((e as Error).message ?? e)))
+  }
+
+  const direct = (parseInt(steps, 10) || 1) <= 1
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 8,
+        alignItems: 'center',
+        marginBottom: 6,
+        color: 'var(--dim)',
+      }}
+    >
+      <span>playback</span>
+      <label
+        title={
+          'commands per segment — 1 moves directly from each recorded point ' +
+          'to the next and lets the motor\u2019s own controller do the ' +
+          'travelling'
+        }
+      >
+        steps
+        <input
+          type="number"
+          min={1}
+          max={200}
+          value={steps}
+          onChange={(e) => setSteps(e.target.value)}
+          style={{ width: 46, marginLeft: 4 }}
+        />
+      </label>
+      <label
+        title={
+          direct
+            ? 'ms to wait at each point before moving on even if a motor has ' +
+              'not reported arriving. Empty waits for every motor.'
+            : 'ms to wait at each recorded point. Steps within a segment are ' +
+              'not waited on.'
+        }
+      >
+        settle
+        <input
+          type="number"
+          min={1}
+          max={60000}
+          step={50}
+          placeholder="wait"
+          value={settle}
+          onChange={(e) => setSettle(e.target.value)}
+          style={{ width: 56, marginLeft: 4 }}
+        />
+        ms
+      </label>
+      <button className="btn btn-secondary" onClick={apply}>
+        {saved ? 'set' : 'apply'}
+      </button>
+    </div>
+  )
+}
+
 export function DirectMotorPanel({
   torqueOn,
   locked,
@@ -124,6 +208,7 @@ export function DirectMotorPanel({
           : 'Direct motor control (advanced)'}
       </summary>
       <div style={{ padding: '6px 0 0 0' }}>
+        {bench && <BenchPacing />}
         <div style={{ color: 'var(--warn)', marginBottom: 6 }}>
           {bench ? (
             <>

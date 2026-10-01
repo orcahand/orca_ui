@@ -204,6 +204,11 @@ export const api = {
       id,
       enabled,
     }),
+  motorsDirectPacing: (interp_steps: number, max_settle_ms: number | null) =>
+    post<{ interp_steps: number; max_settle_ms: number | null }>(
+      '/api/motors/direct/pacing',
+      { interp_steps, max_settle_ms },
+    ),
   motorsDirectPosition: (id: number, position: number) =>
     post<{ id: number; position: number; previous: number }>(
       '/api/motors/direct/position',

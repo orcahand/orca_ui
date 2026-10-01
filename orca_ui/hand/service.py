@@ -64,6 +64,11 @@ MAX_DIRECT_MOTOR_STEP_RAD = 0.8
 BENCH_DWELL_S = 1.5
 # Bounds a motor that cannot reach its point; it does not pace one that can.
 BENCH_ARRIVAL_TIMEOUT_S = 5.0
+# Commands per segment on the bench, matching the trajectory player: 1 moves
+# directly from one recorded point to the next and lets the servo's own
+# trajectory generator do the travelling.
+BENCH_MIN_INTERP_STEPS = 1
+BENCH_MAX_INTERP_STEPS = 200
 
 # Dynamixel firmware restart: the motor is off the bus until it finishes,
 # so a read-back any sooner just times out and looks like a failed reboot.
@@ -162,6 +167,13 @@ POSE_SOURCES = (POSE_SOURCE_AUTO, POSE_SOURCE_ESTIMATE, POSE_SOURCE_TARGET)
 
 
 class HandService:
+    # Bench pacing defaults, declared here so they hold on any instance
+    # rather than only one built through __init__. Both match the trajectory
+    # player: move directly from point to point, and wait for the motors
+    # rather than guess how long they need.
+    _bench_interp_steps = BENCH_MIN_INTERP_STEPS
+    _bench_max_settle_ms: "int | None" = None
+
     def __init__(
         self,
         settings: UiSettings,
@@ -187,7 +199,9 @@ class HandService:
         # model key. Undeclared motors are driven as if they had no current
         # register, because a servo cannot be asked.
         self._bench_declared: dict[int, dict] = {}
-        self._bench_playing: dict[int, int] = {}   # motor id -> next index
+        self._bench_playing: dict[int, int] = {}   # motor id -> next frame
+        self._bench_interp_steps = BENCH_MIN_INTERP_STEPS
+        self._bench_max_settle_ms = None
         self._bench_thread: threading.Thread | None = None
         self._bench_stop = threading.Event()
         self._tactile_mode = "combined"
@@ -1610,6 +1624,30 @@ class HandService:
         self._bench_points[motor_id] = values
         return {"id": motor_id, "points": values}
 
+    def set_bench_pacing(self, interp_steps: int,
+                         max_settle_ms: "int | None") -> dict:
+        """How bench playback paces itself, for every motor at once.
+
+        Bench-wide rather than per motor because one thread drives the shared
+        bus and arrival is a whole-chain condition: two motors pacing
+        themselves differently would only mean one waiting on the other.
+        """
+        steps = int(interp_steps)
+        if not BENCH_MIN_INTERP_STEPS <= steps <= BENCH_MAX_INTERP_STEPS:
+            raise ServiceError(
+                f"interp_steps must be {BENCH_MIN_INTERP_STEPS}.."
+                f"{BENCH_MAX_INTERP_STEPS} ({BENCH_MIN_INTERP_STEPS} = move "
+                f"directly from each point to the next)")
+        cap = None if max_settle_ms in (None, "") else int(max_settle_ms)
+        if cap is not None and not 1 <= cap <= 60_000:
+            raise ServiceError(
+                "max_settle_ms must be 1..60000 (omit it to wait for every "
+                "motor)")
+        with self._state_lock:
+            self._bench_interp_steps = steps
+            self._bench_max_settle_ms = cap
+        return {"interp_steps": steps, "max_settle_ms": cap}
+
     def set_motor_playback(self, motor_id: int, enabled: bool) -> dict:
         """Run or stop this motor's recorded points.
 
@@ -1666,12 +1704,35 @@ class HandService:
                 return
             self._bench_stop.wait(BENCH_DWELL_S)
 
+    @staticmethod
+    def _bench_target(points: "list[float]", frame: int, steps: int):
+        """Where a motor should be on this frame, and whether it lands.
+
+        Frame zero is the approach: the motor may be anywhere when playback
+        starts, so the first recorded point is somewhere to get to rather
+        than somewhere to travel from. After that, segments run point to
+        point and wrap, so a two-point recording is a cycle and not a
+        one-way trip. ``steps`` commands span each segment, the last being
+        the recorded point itself -- at ``steps=1`` that is the only command,
+        which is a direct move.
+        """
+        if frame <= 0:
+            return points[0], True
+        count = len(points)
+        segment, within = divmod(frame - 1, steps)
+        start = points[segment % count]
+        end = points[(segment + 1) % count]
+        fraction = (within + 1) / steps
+        arrives = within + 1 == steps
+        return start + (end - start) * fraction, arrives
+
     def _bench_step(self) -> bool:
-        """Write every playing motor its next point. False when there is
+        """Write every playing motor its next frame. False when there is
         nothing left to play and the thread should end.
 
         One thread for the whole bench rather than one per motor: the bus is
-        shared, so the writes have to take turns anyway.
+        shared, so the writes have to take turns anyway, and arrival is a
+        whole-chain condition in any case.
         """
         with self._state_lock:
             playing = dict(self._bench_playing)
@@ -1684,12 +1745,15 @@ class HandService:
             # Belt and braces: whatever turned torque off, stop writing.
             self.stop_all_playback()
             return False
+        landing = False
         for motor_id, index in playing.items():
             points = self._bench_points.get(motor_id)
             if not points:
                 self._stop_motor_playback(motor_id)
                 continue
-            target = points[index % len(points)]
+            target, arrives = self._bench_target(
+                points, index, self._bench_interp_steps)
+            landing = landing or arrives
             try:
                 session.hand.write_motor_pos([motor_id], np.asarray([target]))
             except Exception:
@@ -1702,7 +1766,8 @@ class HandService:
                     # A single point is a hold, not a cycle: it keeps being
                     # written so a motor pushed off target returns to it.
                     self._bench_playing[motor_id] = index + 1
-        self._await_bench_arrival(session)
+        if landing:
+            self._await_bench_arrival(session)
         return True
 
     def _await_bench_arrival(self, session) -> None:
@@ -1710,13 +1775,17 @@ class HandService:
 
         Without it the dwell is a guess at how long the move takes, so a
         sequence either paces itself to its slowest leg or writes the next
-        point mid-travel and never reaches the recorded one at all.
+        point mid-travel and never reaches the recorded one at all. Only at
+        a recorded point: a step on the way to one is not a sync point.
         """
+        cap_ms = self._bench_max_settle_ms
+        timeout = cap_ms / 1000.0 if cap_ms else BENCH_ARRIVAL_TIMEOUT_S
         try:
-            session.hand.wait_for_motion(timeout=BENCH_ARRIVAL_TIMEOUT_S)
+            session.hand.wait_for_motion(timeout=timeout)
         except MotionTimeoutError:
-            # A motor held off its point never reports arrival. Carrying on
-            # keeps the sequence running where stopping would strand it.
+            # Expected where the operator set a cap -- moving on is the point
+            # of setting one. Without a cap it means a motor is held off its
+            # point, and carrying on still beats stranding the sequence.
             logger.debug("bench playback: not every motor arrived",
                          exc_info=True)
         except Exception:
