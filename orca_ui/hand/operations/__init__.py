@@ -1,4 +1,5 @@
-"""Long-running hand operations (calibrate, tension, wizard, replay, record).
+"""Long-running hand operations (calibrate, tension, spooling, wizard, replay,
+record).
 
 One :class:`OperationManager` per app runs at most one exclusive operation at
 a time, publishes ``operation.state`` / ``operation.log``, and supports
@@ -33,20 +34,24 @@ def build_operation_manager(service, settings, publish_topic) -> OperationManage
             SimulatedCalibrateOperation,
             SimulatedTensionOperation,
         )
+        from orca_ui.hand.operations.spooling import SimulatedSpoolingOperation
         from orca_ui.hand.operations.wizard import SimulatedWizardOperation
         manager.register(SimulatedCalibrateOperation)
         manager.register(SimulatedTensionOperation)
         manager.register(SimulatedWizardOperation)
         manager.register(SimulatedConfigureChainOperation)
+        manager.register(SimulatedSpoolingOperation)
     else:
         from orca_ui.hand.operations.calibrate import CalibrateOperation
         from orca_ui.hand.operations.chain import ConfigureChainOperation
+        from orca_ui.hand.operations.spooling import SpoolingOperation
         from orca_ui.hand.operations.tension import TensionOperation
         from orca_ui.hand.operations.wizard import WizardOperation
         manager.register(CalibrateOperation)
         manager.register(TensionOperation)
         manager.register(WizardOperation)
         manager.register(ConfigureChainOperation)
+        manager.register(SpoolingOperation)
     # In-session ops run for real in mock mode too (the mock stack is the
     # production stack over in-memory links).
     from orca_ui.hand.operations.player import DemoOperation, ReplayOperation

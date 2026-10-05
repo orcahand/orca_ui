@@ -264,3 +264,109 @@ def reset_motors_once(plan, *, progress_callback, prompt_callback,
         prompt_callback=prompt_callback,
         should_stop=should_stop,
     )
+
+
+# ----- spooling (motor-level holds outside orca_core's routines) ----------------
+#
+# Spooling drives the motors itself from a tick loop, so these are the raw
+# primitives it needs: direction convention, torque, current limits, one
+# combined state read, and absolute target writes.
+
+
+def read_motor_temps(hand) -> dict[int, float]:
+    """One temperature per motor, in °C."""
+    return {int(m): float(t)
+            for m, t in hand.get_motor_temp(as_dict=True).items()}
+
+
+def max_motor_temp_c(hand) -> float | None:
+    """The family's rated operating ceiling, when the client declares one."""
+    value = getattr(hand.motor_client, "max_operating_temp_c", None)
+    return float(value) if value is not None else None
+
+
+def enter_current_based_position(hand) -> None:
+    from orca_core.constants import CURRENT_BASED_POSITION
+
+    hand.set_control_mode(CURRENT_BASED_POSITION)
+
+
+def restore_after_hold(hand) -> None:
+    """What every hold must end with: configured current limit and control
+    mode back, torque off."""
+    hand.set_max_current(hand.config.max_current)
+    hand.set_control_mode(hand.config.control_mode)
+    hand.disable_torque()
+
+
+def enable_torque(hand, motor_ids: list[int]) -> list[int]:
+    """Returns the IDs that did not acknowledge."""
+    return list(hand.enable_torque(motor_ids))
+
+
+def set_current_limits(hand, limits: dict[int, float]) -> None:
+    """Per-motor goal-current limits in mA; motors not named keep the
+    configured ceiling."""
+    default = float(hand.config.max_current)
+    hand.set_max_current([float(limits.get(m, default))
+                          for m in hand.config.motor_ids])
+
+
+def read_motor_state(hand):
+    """One bus transaction -> ({id: rad}, {id: mA}), or None when the read
+    was stale (a stale sample must never drive a relative command)."""
+    state = hand.get_motor_state()
+    if not hand.last_read_ok:
+        return None
+    ids = hand.config.motor_ids
+    positions = {m: float(p) for m, p in zip(ids, state.position)}
+    currents = {m: float(c) for m, c in zip(ids, state.current)}
+    return positions, currents
+
+
+def write_motor_targets(hand, targets: dict[int, float]) -> None:
+    import numpy as np
+
+    if not targets:
+        return
+    ids = list(targets)
+    hand.write_motor_pos(ids, np.array([targets[m] for m in ids], dtype=float))
+
+
+def resolve_family_currents(config):
+    """Config with ``default`` current limits replaced by the motor family's
+    own — connect() does this on a real hand; the mock never connects."""
+    if config.currents_resolved:
+        return config
+    from orca_core.hardware.motor_factory import motor_client_class
+
+    return config.with_family_currents(
+        motor_client_class(config.motor_type or "dynamixel"))
+
+
+def motor_current_ceiling_ma(hand) -> float | None:
+    """The hardware ceiling of the connected family's goal-current register."""
+    value = getattr(hand.motor_client, "max_current_ma", None)
+    return float(value) if value is not None else None
+
+
+def read_servo_profiles(hand) -> dict:
+    """Each motor's trajectory limits, to be handed back to
+    :func:`restore_servo_profiles` afterwards."""
+    return {m: p for m, p in hand.get_servo_profile().items() if p is not None}
+
+
+def set_velocity_profile(hand, motor_ids: list[int], velocity_rad_s: float,
+                         acceleration_rad_s2: float) -> None:
+    """Cap how fast the named motors chase a goal, so a goal kept well ahead
+    of the shaft becomes a smooth pull instead of a step."""
+    from orca_core.hardware.motor_client import ServoProfile
+
+    profile = ServoProfile(velocity_rad_s=velocity_rad_s,
+                           acceleration_rad_s2=acceleration_rad_s2)
+    hand.set_servo_profile({m: profile for m in motor_ids})
+
+
+def restore_servo_profiles(hand, profiles: dict) -> None:
+    if profiles:
+        hand.set_servo_profile(profiles)

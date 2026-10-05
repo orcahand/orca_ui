@@ -305,6 +305,59 @@ export interface MotorChainExtra {
   resets: number[]
 }
 
+// ----- spooling operation extra (orca_ui/hand/operations/spooling.py) --------
+
+export type SpoolingMode = 'all' | 'one_by_one'
+
+export type SpoolState =
+  | 'pending'
+  | 'winding'
+  | 'stalled'
+  | 'holding'
+  | 'reached'
+  | 'over'
+
+export interface SpoolSide {
+  id: string // 'A' | 'B'
+  label: string // e.g. "motors 2–9"
+  motor_ids: number[]
+}
+
+export interface SpoolMotor {
+  joint: string
+  id: number
+  side: string | null
+  state: SpoolState
+  current_ma: number
+  // Goal-current limit this motor is held at right now.
+  limit_ma: number
+  // Degrees the shaft has moved off its anchor (tightening pushes it back).
+  pushed_deg: number
+  temp_c: number | null
+  // one_by_one: this motor's three steps are finished; it keeps holding.
+  done: boolean
+  // Near its rated temperature: parked at the tightening limit until cool.
+  cooling: boolean
+  // Times this motor went limp under load and was re-armed (loose connector).
+  torque_drops: number
+}
+
+export interface SpoolingExtra {
+  mode: SpoolingMode
+  phase: string
+  tighten_current_ma: number
+  // The pull: winding and seating run at this current.
+  wind_current_ma: number
+  // Goal-current limit the current phase holds the driven motors at.
+  limit_ma: number
+  max_temp_c: number | null
+  // The spool to work on now (wiggled when it becomes active).
+  active: string | null
+  // The pack's two sides, lower and upper finger-motor IDs.
+  sides: SpoolSide[]
+  motors: SpoolMotor[]
+}
+
 export interface OperationLogLine {
   seq: number
   t: number

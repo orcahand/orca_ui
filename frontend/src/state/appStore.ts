@@ -17,6 +17,7 @@ export type ViewName =
   | 'poses'
   | 'teleop'
   | 'setup'
+  | 'spooling'
   | 'motors'
 
 export interface TactileSettings {

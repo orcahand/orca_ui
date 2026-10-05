@@ -2600,3 +2600,432 @@ header h1 {
   line-height: 1.5;
   max-width: 480px;
 }
+
+/* ----- Spooling: per-motor tiles under the hold, and the torque-wrench flash */
+
+.spool-controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.spool-input {
+  width: 56px;
+  padding: 2px 4px;
+  font-family: var(--font);
+  font-size: 10px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 0;
+}
+
+.spool-grid {
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+}
+
+.spool-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px 8px;
+  font-size: 10px;
+  color: var(--dim);
+  border: 1px solid var(--panel-border-strong);
+  background: var(--panel);
+}
+
+.spool-tile-head,
+.spool-tile-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.spool-joint {
+  color: var(--text-bright);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.spool-id {
+  color: var(--dimmer);
+}
+
+.spool-bar {
+  height: 4px;
+  background: rgb(var(--overlay-rgb) / 0.08);
+}
+
+.spool-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.15s linear;
+}
+
+.spool-tile.winding {
+  border-color: rgb(var(--accent-rgb) / 0.4);
+}
+
+.spool-tile.winding .spool-state {
+  color: var(--accent);
+}
+
+.spool-tile.stalled .spool-state,
+.spool-tile.holding .spool-state {
+  color: var(--muted);
+}
+
+.spool-tile.reached {
+  border-color: rgb(var(--ok-rgb) / 0.6);
+  background: rgb(var(--ok-rgb) / 0.1);
+  animation: spool-flash 1.2s ease-out;
+}
+
+.spool-tile.reached .spool-bar-fill {
+  background: var(--ok);
+}
+
+.spool-tile.reached .spool-state {
+  color: var(--ok);
+  font-weight: 700;
+}
+
+.spool-tile.over {
+  border-color: rgb(var(--warn-rgb) / 0.6);
+  background: rgb(var(--warn-rgb) / 0.1);
+}
+
+.spool-tile.over .spool-bar-fill {
+  background: var(--warn);
+}
+
+.spool-tile.over .spool-state {
+  color: var(--warn);
+  font-weight: 700;
+}
+
+.spool-drift {
+  color: var(--warn);
+}
+
+@keyframes spool-flash {
+  0% {
+    background: rgb(var(--ok-rgb) / 0.75);
+    box-shadow: 0 0 0 4px rgb(var(--ok-rgb) / 0.5);
+  }
+  100% {
+    background: rgb(var(--ok-rgb) / 0.1);
+    box-shadow: none;
+  }
+}
+
+/* Whole-card flash on every new "at torque"; remounted per beep. */
+.spool-flash-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  animation: spool-card-flash 0.9s ease-out forwards;
+}
+
+@keyframes spool-card-flash {
+  0% {
+    background: rgb(var(--ok-rgb) / 0.35);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+.setup-callout.ok {
+  border-color: rgb(var(--ok-rgb) / 0.4);
+  background: rgb(var(--ok-rgb) / 0.07);
+}
+
+.setup-callout.ok .setup-callout-title {
+  color: var(--ok);
+}
+
+.spool-mode-switch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.spool-mode-tag {
+  margin-left: auto;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.spool-tile {
+  cursor: pointer;
+}
+
+.spool-tile:hover {
+  border-color: rgb(var(--accent-rgb) / 0.4);
+}
+
+.spool-tile.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgb(var(--accent-rgb) / 0.5);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.spool-tile.active.reached,
+.spool-tile.active.over {
+  animation: none;
+}
+
+.spool-active-mark {
+  color: var(--accent);
+}
+
+.spool-tile.done {
+  opacity: 0.75;
+}
+
+.spool-tile.cooling {
+  border-color: rgb(var(--warn-rgb) / 0.6);
+}
+
+.spool-tile.cooling .spool-state {
+  color: var(--warn);
+}
+
+.spool-temp.warn {
+  color: var(--warn);
+}
+
+.spool-temp.err {
+  color: var(--err);
+  font-weight: 700;
+}
+
+/* The pack's two sides, each with its own wiggle. */
+.spool-sides {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.spool-side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.spool-side-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.spool-side-wiggle {
+  padding: 2px 8px;
+  font-size: 9px;
+}
+
+
+/* ----- Spooling: the motor pack blueprint beside the run ------------------- */
+
+.spool-run {
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: 270px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .spool-run {
+    grid-template-columns: 1fr;
+  }
+}
+
+.spool-run-main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pack-map {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--panel-border);
+  background: rgb(var(--accent-rgb) / 0.03);
+}
+
+.pack-svg {
+  width: 100%;
+  height: auto;
+  font-family: var(--font);
+}
+
+.pack-body {
+  fill: none;
+  stroke: rgb(var(--accent-rgb) / 0.35);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.pack-side-label {
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  fill: var(--dim);
+  text-anchor: middle;
+}
+
+.pack-motor {
+  cursor: pointer;
+}
+
+.pack-motor.off {
+  cursor: default;
+}
+
+.pack-ring {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 2;
+}
+
+.pack-spool {
+  fill: var(--panel);
+  stroke: var(--panel-border-strong);
+  stroke-width: 1.5;
+  transition: fill 0.2s, stroke 0.2s;
+}
+
+.pack-id {
+  font-size: 9px;
+  font-weight: 700;
+  fill: var(--text);
+  text-anchor: middle;
+}
+
+.pack-joint {
+  font-size: 7px;
+  fill: var(--dim);
+  text-anchor: middle;
+}
+
+.pack-motor.off .pack-spool {
+  stroke-dasharray: 2 2;
+  stroke: var(--panel-border);
+}
+
+.pack-motor.off .pack-id {
+  fill: var(--dimmer);
+}
+
+.pack-motor.top .pack-id,
+.pack-motor.over .pack-id {
+  fill: var(--text-bright);
+}
+
+.pack-motor.pending .pack-spool {
+  stroke: var(--dim);
+}
+
+.pack-motor.winding .pack-spool {
+  stroke: var(--accent);
+  fill: rgb(var(--accent-rgb) / 0.12);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.pack-motor.bottom .pack-spool {
+  stroke: var(--accent);
+  fill: rgb(var(--accent-rgb) / 0.3);
+}
+
+.pack-motor.top .pack-spool {
+  stroke: var(--ok);
+  fill: rgb(var(--ok-rgb) / 0.55);
+}
+
+.pack-motor.over .pack-spool {
+  stroke: var(--warn);
+  fill: rgb(var(--warn-rgb) / 0.55);
+}
+
+.pack-motor.cooling .pack-ring {
+  stroke: var(--warn);
+  stroke-dasharray: 3 2;
+}
+
+.pack-motor.active .pack-ring {
+  stroke: var(--accent);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.pack-motor.active .pack-joint {
+  fill: var(--text-bright);
+  font-weight: 700;
+}
+
+.pack-motor:hover .pack-ring {
+  stroke: rgb(var(--accent-rgb) / 0.6);
+}
+
+.pack-motor.off:hover .pack-ring {
+  stroke: transparent;
+}
+
+.pack-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  color: var(--dim);
+}
+
+.pack-key::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-radius: 50%;
+  border: 1px solid var(--dim);
+  vertical-align: -1px;
+}
+
+.pack-key.winding::before {
+  border-color: var(--accent);
+  background: rgb(var(--accent-rgb) / 0.12);
+}
+
+.pack-key.bottom::before {
+  border-color: var(--accent);
+  background: rgb(var(--accent-rgb) / 0.3);
+}
+
+.pack-key.top::before {
+  border-color: var(--ok);
+  background: rgb(var(--ok-rgb) / 0.55);
+}
+
+.pack-key.over::before {
+  border-color: var(--warn);
+  background: rgb(var(--warn-rgb) / 0.55);
+}

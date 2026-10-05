@@ -10,6 +10,7 @@ import { DashboardView } from './components/views/DashboardView'
 import { MotorsView } from './components/views/MotorsView'
 import { PosesView } from './components/views/PosesView'
 import { SetupView } from './components/views/SetupView'
+import { SpoolingView } from './components/views/SpoolingView'
 import { TeleopView } from './components/views/TeleopView'
 import { useAppStore } from './state/appStore'
 
@@ -73,6 +74,7 @@ export default function App() {
           {view === 'poses' && <PosesView />}
           {view === 'teleop' && <TeleopView />}
           {view === 'setup' && <SetupView />}
+          {view === 'spooling' && <SpoolingView />}
           {view === 'motors' && <MotorsView />}
         </>
       )}
