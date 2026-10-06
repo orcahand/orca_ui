@@ -17,7 +17,7 @@ import pytest
 # other source, so the table header appearing at all is the entry.
 SOURCE_TABLE = re.compile(r"^[ \t]*\[tool\.uv\.sources", re.MULTILINE)
 
-FIX = ("Drop the entry and run against a local core with `./dev <command>`\n"
+FIX = ("Drop the entry and run against a local core with `./dev local`\n"
        "instead. A branch that needs unpublished orca_core is paired in CI — "
        "see .github/workflows/test.yml.")
 

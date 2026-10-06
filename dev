@@ -5,11 +5,13 @@
 #   ./dev local [DIR]   a local checkout, live-editable (default ../orca_core)
 #   ./dev release       the published package
 #
-# `local` links the checkout into .venv, puts it ahead of the installed package
-# on sys.path, and installs any of its dependencies the venv does not satisfy.
-# Nothing tracked changes, so nothing can reach a commit; `uv run` and an IDE
-# on .venv both see the flip. Recreating .venv drops it, back to the release.
+# `local` links the checkout into .venv/orca-core-dev, along with any of its
+# dependencies the venv does not satisfy, and puts that ahead of the installed
+# packages on sys.path. Nothing tracked changes, so nothing can reach a commit;
+# `uv run` and an IDE on .venv both see the flip, and neither `uv run` nor
+# `uv sync` touches the shim. Recreating .venv drops it, back to the release.
 
+here=$PWD
 cd "$(dirname "$0")" || exit 1
 
 SHIM=.venv/orca-core-dev  # keep in sync with SHIM_DIR in orca_ui/core_source.py
@@ -23,14 +25,25 @@ status() {
 }
 
 use_local() {
-    core=$(cd "${1:-../orca_core}" 2>/dev/null && pwd)
+    dir=${1:-../orca_core}
+    # A DIR given on the command line is relative to where it was typed.
+    case "$dir" in /*) ;; *) [ -n "$1" ] && dir="$here/$dir" ;; esac
+    core=$(cd "$dir" 2>/dev/null && pwd)
     if ! grep -qE '^name *= *"orca[-_]core"' "$core/pyproject.toml" 2>/dev/null; then
-        echo "dev: no orca_core checkout at ${1:-../orca_core}" >&2
+        echo "dev: no orca_core checkout at $dir" >&2
         exit 1
     fi
-    # Installs only what the venv does not already satisfy.
-    uv pip install -q --python "$PY" -r "$core/pyproject.toml" || exit 1
+    # Only what the venv lacks, installed into the shim rather than the venv,
+    # where `uv run` would put the locked versions back.
+    plan=$(uv pip install --dry-run --python "$PY" -r "$core/pyproject.toml" 2>&1) \
+        || { echo "$plan" >&2; exit 1; }
+    missing=$(echo "$plan" | sed -n 's/^ + //p')
+    rm -rf "$SHIM"
     mkdir -p "$SHIM"
+    if [ -n "$missing" ]; then
+        # shellcheck disable=SC2086  # one requirement per word
+        uv pip install -q --python "$PY" --target "$SHIM" --no-deps $missing || exit 1
+    fi
     ln -sfn "$core/orca_core" "$SHIM/orca_core"
     "$PY" -c 'import os, sys; open(sys.argv[1], "w").write("import sys; sys.path.insert(0, %r)\n" % os.path.abspath(sys.argv[2]))' "$PTH" "$SHIM"
 }
@@ -45,6 +58,16 @@ confirm() {
     read -r answer
     case "$answer" in [yY]*) return 0 ;; *) return 1 ;; esac
 }
+
+if grep -qE '^[[:space:]]*\[tool\.uv\.sources' pyproject.toml; then
+    cat >&2 <<'EOF2'
+dev: pyproject.toml has a [tool.uv.sources] entry. ./dev does not use one, and
+committed it breaks every other clone. Unless you added it on purpose:
+
+    git restore pyproject.toml uv.lock
+
+EOF2
+fi
 
 case "${1:-}" in
     local)   use_local "$2" ;;
@@ -62,7 +85,7 @@ case "${1:-}" in
         fi
         ;;
     *)
-        sed -n '2,11s/^# \{0,1\}//p' "$0"
+        sed -n '2,12s/^# \{0,1\}//p' "$0"
         exit 2
         ;;
 esac

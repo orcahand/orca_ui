@@ -1,7 +1,27 @@
 #!/bin/sh
-# Keeps a stale frontend bundle out of shared history.
+# Keeps two things out of shared history: an orca_core source override, and a
+# stale frontend bundle.
 
 staged=$(git diff --cached --name-only)
+
+# --- orca_core source override -----------------------------------------------
+# A [tool.uv.sources] path entry is a fact about one machine. Committed, it
+# makes the project unresolvable everywhere else.
+if echo "$staged" | grep -qE '^(pyproject\.toml|uv\.lock)$' \
+   && git show :pyproject.toml 2>/dev/null | grep -qE '^[[:space:]]*\[tool\.uv\.sources|^[[:space:]]*"?orca[-_]core"?[[:space:]]*=[[:space:]]*\{'; then
+    cat >&2 <<'EOF'
+pre-commit: pyproject.toml has a local orca_core override staged.
+
+A relative path only resolves on your machine; a clone without a sibling
+orca_core cannot install at all. Unstage it and commit the rest:
+
+    git restore --staged pyproject.toml uv.lock
+
+To run against a local orca_core, use ./dev local instead. A branch that
+needs unpublished orca_core is paired in CI — see .github/workflows/test.yml.
+EOF
+    exit 1
+fi
 
 # --- frontend bundle ---------------------------------------------------------
 # The built frontend (orca_ui/webui/) is committed to git so npm-less machines

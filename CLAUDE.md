@@ -95,8 +95,10 @@ checks out a same-named `orca_core` branch beside this repo.
 git show :pyproject.toml | grep 'tool.uv.sources'   # must print nothing
 ```
 
-`tests/test_no_committed_dev_override.py` and the `uv sync --locked` install
-in `.github/workflows/test.yml` catch one that slips through.
+`.githooks/pre-commit` refuses to commit one (in clones that set
+`core.hooksPath`); `tests/test_no_committed_dev_override.py` and the
+`uv sync --locked` install in `.github/workflows/test.yml` catch one that slips
+through. None of them replaces reading the diff.
 
 ---
 

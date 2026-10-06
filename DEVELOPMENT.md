@@ -67,13 +67,16 @@ Recreating `.venv` drops it, back to the release.
 
 `./dev local` also installs whatever the checkout's own dependencies need that
 the venv does not already satisfy, so a core that adds or bumps one just works.
-`uv sync` removes those again, since the lock does not list them; re-run
-`./dev local` if an import fails afterwards.
+Those land in the same shim rather than the venv, where `uv run` would put the
+locked versions back. Re-run `./dev local` after the core's dependencies
+change, or after a `uv sync` that moves the lock.
 
 Do not add a `[tool.uv.sources]` entry for `orca_core` instead. A path is a
 fact about one machine: committed, it makes the project unresolvable
-everywhere else. `tests/test_no_committed_dev_override.py` fails on one in
-`HEAD`, and CI installs PRs into `main` with `uv sync --locked`.
+everywhere else. `.githooks/pre-commit` refuses to commit one,
+`tests/test_no_committed_dev_override.py` fails on one in `HEAD`, and CI
+installs PRs into `main` with `uv sync --locked`. `./dev` warns when it finds
+one in your working tree.
 
 A branch that needs an unreleased `orca_core` is paired in CI instead:
 `test.yml` checks `orca_core` out beside this repo, preferring a branch of the

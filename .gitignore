@@ -26,5 +26,8 @@ env/
 node_modules/
 .superpowers/
 
+# A machine-local orca_core path, from the orca-dev tool
+.orca-dev.json
+
 # Personal Claude Code instructions, never committed
 CLAUDE.local.md
