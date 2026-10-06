@@ -258,6 +258,11 @@ def connect_session(settings: UiSettings, config,
     if settings.mock:
         return _connect_mock(settings, config, declared)
 
+    if settings.motors_enabled and len(settings.bare_buses) > 1:
+        # A bench carrying both motor families. Each bus connects as its own
+        # hand with its own client, so nothing below has to know there are two.
+        return _connect_dual_bus(settings, config, declared)
+
     if presence is None:
         presence = probe_hardware(config)
     sensing_present = bool(presence.sensing.tactile or presence.sensing.encoder)
@@ -436,6 +441,44 @@ def _connect_with_motors(settings, config, declared, presence: HardwarePresence)
         logger.warning("connect tier %s failed: %s", tier, msg)
 
     raise SessionConnectError("all connect tiers failed", attempts=attempts)
+
+
+def _connect_dual_bus(settings: UiSettings, config, declared: dict) -> HandSession:
+    """Connect every bare bus and front them with one session.
+
+    All or nothing: a bench with half its motors live reads as a smaller bench,
+    and the ids that went missing are exactly the ones an operator would then
+    command by hand. Whatever did connect is released before raising.
+    """
+    from orca_ui.hand.dual_bus import DualBusHand
+
+    hands, attempts = [], []
+    for bus_config_path in settings.bare_buses:
+        hand = load_hand(config_path=bus_config_path, engage_feedback=False)
+        try:
+            ok, msg = hand.connect(interactive=False)
+        except Exception as e:
+            ok, msg = False, str(e)
+        if not ok:
+            attempts.append(f"{bus_config_path}: {msg}")
+            break
+        hands.append(hand)
+    if len(hands) != len(settings.bare_buses):
+        for hand in hands:
+            try:
+                hand.disconnect()
+            except Exception:
+                logger.exception("releasing a bus after a dual-bus connect failed")
+        raise SessionConnectError("a motor bus did not connect", attempts=attempts)
+
+    dual = DualBusHand(hands=hands, config=config)
+    ports = {"motor": ", ".join(h.config.port for h in hands),
+             "tactile": None, "encoder": None}
+    families = ", ".join(h.config.motor_type for h in hands)
+    return HandSession(
+        hand=dual, caps=_caps_from_hand(dual, declared), tier="dual-bus",
+        message=f"{len(hands)} motor buses connected ({families})",
+        ports=ports)
 
 
 def _tier_name(feedback: bool, tactile: bool) -> str:

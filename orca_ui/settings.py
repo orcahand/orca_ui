@@ -32,6 +32,11 @@ class UiSettings:
     # synthesised from a bus scan, so detection and the connect ladder are
     # skipped entirely and the session is motors-only by construction.
     bare: bool = False
+    # One synthesised single-bus config per motor bus the bare scan found,
+    # when it found more than one. ``config_path`` is then the merged bench
+    # view and these are what actually get connected, one hand each — a hand
+    # pins one port, family and rate, so two families means two hands.
+    bare_buses: tuple[str, ...] = ()
     engage_feedback: bool = True
     motors_enabled: bool = True
     host: str = "127.0.0.1"

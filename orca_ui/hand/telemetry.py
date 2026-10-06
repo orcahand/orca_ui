@@ -26,6 +26,7 @@ from orca_core.hardware.sensing.constants import (
 )
 from orca_core.hardware.sensing.health import EncoderStreamHealth
 
+from orca_ui.hand.dual_bus import bus_clients, client_owning
 from orca_ui.hand.faults import (
     BusErrorMonitor,
     TrackingMonitor,
@@ -536,11 +537,15 @@ class TelemetryService:
         """temps/currents plus the family's rated max operating temperature
         (same source as scripts/stress_test.py's monitor)."""
         payload = dict(self._motor_health)
-        max_temp = getattr(getattr(session, "hand", None), "motor_client",
-                           None)
-        max_temp = getattr(max_temp, "max_operating_temp_c", None)
-        if max_temp is not None:
-            payload["max_temp_c"] = float(max_temp)
+        # The lowest ceiling across the buses. A thermal warning threshold is
+        # the one number here it is safe to be conservative about: warning a
+        # cooler-rated motor early beats letting a hotter-rated one set the
+        # bar for it.
+        ceilings = [getattr(bus, "max_operating_temp_c", None)
+                    for bus in bus_clients(getattr(session, "hand", None))]
+        ceilings = [float(c) for c in ceilings if c is not None]
+        if ceilings:
+            payload["max_temp_c"] = min(ceilings)
         return payload
 
     def _publish_motor_state(self, session) -> None:
@@ -644,7 +649,8 @@ class TelemetryService:
         classified: dict[int, dict] = {}
         for mid in hand.config.motor_ids:
             try:
-                flags = client.decode_hardware_error(raw[int(mid)])
+                flags = client_owning(
+                    hand, mid).decode_hardware_error(raw[int(mid)])
             except Exception:
                 continue
             if not flags:

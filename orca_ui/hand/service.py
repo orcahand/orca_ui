@@ -26,6 +26,7 @@ from pathlib import Path
 from orca_ui.core_source import resolve_cached as resolve_core_source
 from orca_ui.hand import zeroing
 from orca_ui.hand.commands import CommandWorker
+from orca_ui.hand.dual_bus import bus_clients, client_owning
 from orca_ui.hand.presets import BUILTIN_POSES, BUILTIN_SEQUENCES
 from orca_ui.hand.faults import classify_hw_error
 from orca_ui.hand.models import ModelEntry, available_models, describe
@@ -107,6 +108,22 @@ def _decode_hw_error(client, value: int | None) -> list[str] | None:
     if decode is None or value is None:
         return None
     return list(decode(value))
+
+
+def _client_for(session, motor_id: int):
+    """The motor client that owns ``motor_id`` in this session."""
+    return client_owning(getattr(session, "hand", None), motor_id)
+
+
+def _span_rad(client) -> "list[float] | None":
+    """The travel this motor's family can reach, or None if it declares none.
+
+    A multi-turn family has no single-turn limit, which is not the same as a
+    missing answer: either way the caller has no bound to clamp against and
+    must not invent one.
+    """
+    span = getattr(type(client), "position_range_rad", None)
+    return list(span) if span else None
 
 
 def _bus_fence(hand):
@@ -1236,10 +1253,14 @@ class HandService:
 
         A register width, not a tuning limit. The browser must not assume one
         family's: the X-series holds gains in two bytes, an HLS servo in one.
+        Two families on one bench have no shared answer, so none is given —
+        the narrower width would silently cap the wider family's gains, and
+        the wider one would offer values the narrower cannot store.
         """
         session = self.session
-        client = getattr(getattr(session, "hand", None), "motor_client", None)
-        return getattr(type(client), "servo_gain_max", None)
+        widths = {getattr(type(client), "servo_gain_max", None)
+                  for client in bus_clients(getattr(session, "hand", None))}
+        return widths.pop() if len(widths) == 1 else None
 
     def servo_limits(self) -> dict:
         """What each tunable accepts, and the ceiling that actually binds.
@@ -1252,16 +1273,22 @@ class HandService:
         it varies within one chain.
         """
         session = self.session
-        client = getattr(getattr(session, "hand", None), "motor_client", None)
-        cls = type(client) if client is not None else None
-        if cls is None or not hasattr(cls, "servo_limits"):
+        buses = [bus for bus in bus_clients(getattr(session, "hand", None))
+                 if hasattr(type(bus), "servo_limits")]
+        if not buses:
             return {}
-        out = {"tunables": cls.servo_limits(), "per_motor": {}}
-        try:
-            reachable = client.read_profile_limits(client.motor_ids)
-        except Exception:
-            logger.debug("profile limits unavailable", exc_info=True)
-            return out
+        # Register widths are a family's, so they are only reportable when
+        # every bus agrees. The per-motor ceilings below are per motor anyway
+        # and stay useful either way.
+        tunables = [type(bus).servo_limits() for bus in buses]
+        out = {"tunables": tunables[0] if all(t == tunables[0] for t in tunables)
+               else {}, "per_motor": {}}
+        reachable: dict = {}
+        for bus in buses:
+            try:
+                reachable.update(bus.read_profile_limits(bus.motor_ids) or {})
+            except Exception:
+                logger.debug("profile limits unavailable", exc_info=True)
         out["per_motor"] = {
             str(mid): {"velocity_rad_s": round(p.velocity_rad_s, 3),
                        "acceleration_rad_s2": round(p.acceleration_rad_s2, 1)}
@@ -1365,7 +1392,14 @@ class HandService:
         motor_to_joint = hand.config.motor_to_joint_dict
         with self._state_lock:
             direct = self._direct_motor_mode
-        span = getattr(type(client), "position_range_rad", None)
+        spans = {int(mid): _span_rad(_client_for(session, mid))
+                 for mid in hand.config.motor_ids}
+        # One travel for the whole panel only when every motor agrees on it.
+        # Two families do not, and a dial drawn over one family's span would
+        # put the other family's motors somewhere they cannot go.
+        unanimous = set(map(tuple, (s for s in spans.values() if s)))
+        span = (spans[int(hand.config.motor_ids[0])]
+                if len(unanimous) == 1 and all(spans.values()) else None)
         return {
             "direct_mode": direct,
             # A bench moves a loose motor across its whole travel in one go;
@@ -1374,12 +1408,15 @@ class HandService:
                              else MAX_DIRECT_MOTOR_STEP_RAD),
             # The travel the family can actually reach, so a dial can be drawn
             # over real angles instead of a guessed range.
-            "span_rad": list(span) if span else None,
+            "span_rad": span,
             "motors": [
                 {
                     "id": int(mid),
                     "joint": str(motor_to_joint.get(mid, "")),
                     "position": float(positions[mid]),
+                    # This motor's own travel, which is the only answer on a
+                    # bench whose buses carry different families.
+                    "span_rad": spans[int(mid)],
                     "range_rad": (list(self._bench_ranges[int(mid)])
                                   if int(mid) in self._bench_ranges else None),
                     **(self._declaration(session, int(mid))
@@ -1389,7 +1426,8 @@ class HandService:
                     "current_ma": currents.get(mid),
                     "temp_c": temps.get(mid),
                     "hw_error": errors[mid],
-                    "hw_error_flags": _decode_hw_error(client, errors[mid]),
+                    "hw_error_flags": _decode_hw_error(
+                        _client_for(session, mid), errors[mid]),
                 }
                 for mid in hand.config.motor_ids
             ],
@@ -1440,7 +1478,7 @@ class HandService:
                 except Exception:
                     error = None
 
-        flags = _decode_hw_error(client, error)
+        flags = _decode_hw_error(_client_for(session, motor_id), error)
         joint = hand.config.motor_to_joint_dict.get(motor_id)
         info = classify_hw_error(flags, motor=motor_id, joint=joint)
         # Drop the cached latch so the dashboard updates on this reply rather
@@ -1544,8 +1582,7 @@ class HandService:
             raise ServiceError(
                 "the two limits are the same position — move the motor "
                 "between setting them")
-        span = getattr(type(getattr(session.hand, "motor_client", None)),
-                       "position_range_rad", None)
+        span = _span_rad(_client_for(session, motor_id))
         if span is not None and (low < span[0] - 1e-6 or high > span[1] + 1e-6):
             raise ServiceError(
                 f"range {low:.3f}..{high:.3f} rad is outside the motor's "
@@ -1625,7 +1662,7 @@ class HandService:
         if not all(math.isfinite(p) for p in values):
             raise ServiceError("recorded points must be finite")
         for value in values:
-            self._check_within_travel(session.hand, value)
+            self._check_within_travel(session, motor_id, value)
         self._bench_points[motor_id] = values
         return {"id": motor_id, "points": values}
 
@@ -1805,21 +1842,24 @@ class HandService:
         except Exception:
             logger.debug("bench playback: arrival wait failed", exc_info=True)
 
-    def _check_within_travel(self, hand, position: float) -> None:
-        """Refuse a target the motor physically cannot reach.
+    def _check_within_travel(self, session, motor_id: int,
+                             position: float) -> None:
+        """Refuse a target this motor physically cannot reach.
 
         Out of range does not fail at the servo, it clamps to whichever end is
         nearer, so an unreachable target reads as a hard drive into a stop
-        rather than as a rejected command.
+        rather than as a rejected command. Per motor, not per hand: on a bench
+        whose buses carry different families the travel differs between the
+        motor being commanded and the one next to it.
         """
-        span = getattr(type(getattr(hand, "motor_client", None)),
-                       "position_range_rad", None)
+        span = _span_rad(_client_for(session, motor_id))
         if span is not None and not (span[0] <= position <= span[1]):
             raise ServiceError(
                 f"{position:.3f} rad is outside this motor's travel "
                 f"({span[0]:.3f} to {span[1]:.3f} rad)")
 
-    def _check_reachable(self, hand, motor_id: int, position: float) -> None:
+    def _check_reachable(self, session, motor_id: int,
+                         position: float) -> None:
         """As above, and also inside the range the operator found by hand.
 
         Only for a target somebody typed or dragged. A recorded point is a
@@ -1833,7 +1873,7 @@ class HandService:
                 f"{position:.3f} rad is outside the range found for this "
                 f"motor ({found[0]:.3f} to {found[1]:.3f} rad) — clear the "
                 "range to command past it")
-        self._check_within_travel(hand, position)
+        self._check_within_travel(session, motor_id, position)
 
     def set_motor_position(self, motor_id: int, position: float) -> dict:
         """Raw motor-space position write (radians) for one motor."""
@@ -1857,7 +1897,7 @@ class HandService:
                 f"refusing a {abs(position - current):.2f} rad move — direct "
                 f"moves are capped at {MAX_DIRECT_MOTOR_STEP_RAD} rad from "
                 "the current position")
-        self._check_reachable(hand, motor_id, position)
+        self._check_reachable(session, motor_id, position)
         # A hand on the slider outranks a running sequence, which would
         # otherwise fight it for the motor a second and a half later.
         self._stop_motor_playback(motor_id)

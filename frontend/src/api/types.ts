@@ -198,6 +198,9 @@ export interface DirectMotorInfo {
   mismatch?: boolean
   // The travel an operator found by hand, in radians, once recorded.
   range_rad?: [number, number] | null
+  // This motor's own travel. The only answer on a bench whose buses carry
+  // different families, which disagree on it.
+  span_rad?: [number, number] | null
   // Points recorded by hand. One is a place to hold, two or more is a cycle.
   points?: number[] | null
   playing?: boolean
@@ -212,8 +215,9 @@ export interface DirectMotorSnapshot {
   // null in bare motor mode: the cap exists so a slider cannot yank a tendon,
   // and a loose motor on a bench has none.
   max_step_rad: number | null
-  // The travel this motor family can reach, in radians. null for a family with
-  // no single-turn limit.
+  // The travel every motor here can reach, in radians. null for a family with
+  // no single-turn limit, and also when the buses disagree — then each
+  // motor's own span_rad is the answer.
   span_rad?: [number, number] | null
   motors: DirectMotorInfo[]
 }

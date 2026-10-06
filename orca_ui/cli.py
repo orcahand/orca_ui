@@ -118,7 +118,11 @@ def resolve_config_path(args: argparse.Namespace) -> tuple[str, bool]:
         return os.path.abspath(config_path), True
 
     if args.bare:
-        return _resolve_bare_config(args), True
+        # The scan also decides how many buses there are, and the per-bus
+        # configs are needed to connect them; carry them on args rather than
+        # scanning the hardware a second time to ask again.
+        config_path, args.bare_buses = _resolve_bare_config(args)
+        return config_path, True
 
     if args.mock and not (args.model or args.side):
         # Bundled mock model, copied to a tempdir so runtime writes
@@ -150,15 +154,17 @@ def resolve_config_path(args: argparse.Namespace) -> tuple[str, bool]:
                          f"(model={model_name!r}, version={args.model_version!r}): {e}")
 
 
-def _resolve_bare_config(args) -> str:
-    """Survey every motor bus and synthesise a config for the one that answered.
+def _resolve_bare_config(args) -> "tuple[str, tuple[str, ...]]":
+    """Survey every motor bus and synthesise the configs that describe them.
+
+    Returns ``(config_path, bus_config_paths)``. One populated bus is the
+    normal case and gets one config with nothing else to say about it. Several
+    get one config each, plus a merged bench view that ``config_path`` points
+    at — an ``OrcaHand`` pins a single port, family and rate, so two families
+    are two hands behind one session rather than one hand over two buses.
 
     Fails loudly with what was tried: a bare-mode start that silently fell
-    back to a packaged 17-motor model would drive a hand that is not there,
-    and one that silently took the first of two adapters would leave the other
-    one's motors off the screen. A session drives a single bus — one port, one
-    family, one rate — so two populated buses are the operator's choice to
-    make, offered rather than guessed at.
+    back to a packaged 17-motor model would drive a hand that is not there.
     """
     from orca_core.utils.utils import serial_port_exists
     from orca_ui.hand import bare as bare_mode
@@ -193,23 +199,40 @@ def _resolve_bare_config(args) -> str:
             "--scan-all to sweep every ID and baud rate."
             if not args.scan_all else
             "--bare found no motors after a full sweep. Check power and wiring.")
-    if len(populated) > 1:
-        offer = "\n".join(
-            f"  --board {bus.port}   ({len(bus.motors)} motor(s), "
-            f"{bus.motor_type} @ {bus.baud_rate} baud)" for bus in populated)
+    for bus in populated:
+        if bus.mixed_baud:
+            raise SystemExit(
+                f"Motors on {bus.port} answered at more than one baud rate, "
+                "which cannot be physically true on a shared line. Scan "
+                "again, or power-cycle the bus.")
+    clashing = _ids_on_more_than_one_bus(populated)
+    if clashing:
         raise SystemExit(
-            f"Motors answered on {len(populated)} buses:\n{offer}\n"
-            "A console drives one bus: the motor family fixes the protocol, "
-            "the register map, the current scale and the position range, and "
-            "a motor ID only identifies a motor within its own bus. Pick a "
-            "bus with --board, or start a console per bus on separate --port "
-            "numbers.")
-    scan = populated[0]
-    if scan.mixed_baud:
-        raise SystemExit(
-            "Motors answered at more than one baud rate on the same bus, which "
-            "cannot be physically true. Scan again, or power-cycle the bus.")
-    return bare_mode.synthesize_config(scan)
+            f"Motor ID(s) {', '.join(str(i) for i in clashing)} answered on "
+            "more than one bus. Every command names a motor by ID alone, so "
+            "there is no way to say which of them is meant. Give them "
+            "distinct IDs, or bring up one bus at a time with --board.")
+    bus_paths = tuple(bare_mode.synthesize_config(bus) for bus in populated)
+    if len(populated) == 1:
+        return bus_paths[0], ()
+    print(f"Bringing up {len(populated)} buses as one bench "
+          f"({', '.join(bus.motor_type for bus in populated)}).",
+          file=sys.stderr)
+    return bare_mode.synthesize_merged_config(populated), bus_paths
+
+
+def _ids_on_more_than_one_bus(buses) -> list[int]:
+    """Motor IDs that answered on two buses at once.
+
+    Bare mode routes every command by ID alone, so a duplicate is not a
+    degraded case to work around — it is two motors the console cannot tell
+    apart, and one of them would silently take the other's commands.
+    """
+    seen: dict[int, int] = {}
+    for bus in buses:
+        for motor_id in bus.motor_ids:
+            seen[motor_id] = seen.get(motor_id, 0) + 1
+    return sorted(mid for mid, count in seen.items() if count > 1)
 
 
 def build_settings(argv=None) -> UiSettings:
@@ -222,6 +245,7 @@ def build_settings(argv=None) -> UiSettings:
         board=None if args.mock else args.board,
         mock=args.mock,
         bare=args.bare,
+        bare_buses=tuple(getattr(args, "bare_buses", ())),
         engage_feedback=not args.no_feedback,
         motors_enabled=not args.no_motors,
         host=args.host,

@@ -272,26 +272,15 @@ def survey_buses(
     return survey
 
 
-def synthesize_config(scan: BareScan, *, side: str = "right") -> str:
-    """Write a config describing exactly the motors that answered.
+def _motor_fields(scan: BareScan) -> dict:
+    """The per-motor half of a bare config: pseudo-joints and their spans.
 
     One pseudo-joint per motor keeps the config valid — orca_core requires the
-    motor, joint and joint-map counts to agree — without inventing a hand. The
-    port, family and rate are pinned to what the scan resolved, so connecting
-    re-probes nothing and cannot wander onto another adapter.
+    motor, joint and joint-map counts to agree — without inventing a hand.
     """
-    if not scan.motors:
-        raise ValueError("no motors found: nothing to synthesise a config from")
     joints = [pseudo_joint(m.motor_id) for m in scan.motors]
     rom = travel_span_deg(scan.motor_type)
-    config = {
-        "port": scan.port,
-        "motor_type": scan.motor_type,
-        "baudrate": scan.baud_rate,
-        "type": side,
-        "control_mode": "current_based_position",
-        "max_current": BARE_MAX_CURRENT_MA,
-        "calibration_current": BARE_MAX_CURRENT_MA,
+    return {
         "motor_ids": scan.motor_ids,
         "joint_ids": joints,
         "joint_to_motor_map": {
@@ -302,14 +291,71 @@ def synthesize_config(scan: BareScan, *, side: str = "right") -> str:
         "joint_roms": {joint: list(rom) for joint in joints},
         # Mid-travel, which is reachable from anywhere and is never a stop.
         "neutral_position": {joint: round(sum(rom) / 2, 3) for joint in joints},
+    }
+
+
+def _bench_fields(side: str) -> dict:
+    """Config fields that describe the bench rather than any one bus."""
+    return {
+        "type": side,
+        "control_mode": "current_based_position",
+        "max_current": BARE_MAX_CURRENT_MA,
+        "calibration_current": BARE_MAX_CURRENT_MA,
         # Nothing to calibrate: there is no hardstop to find on a loose motor.
         "calibration_sequence": [],
     }
+
+
+def _write_config(config: dict) -> str:
     run_dir = os.path.join(tempfile.mkdtemp(prefix="orca_ui_bare_"), "bare-motors")
     os.makedirs(run_dir)
     path = os.path.join(run_dir, "config.yaml")
     write_yaml_atomic(path, config)
     return path
+
+
+def synthesize_config(scan: BareScan, *, side: str = "right") -> str:
+    """Write a config describing exactly the motors that answered on one bus.
+
+    The port, family and rate are pinned to what the scan resolved, so
+    connecting re-probes nothing and cannot wander onto another adapter.
+    """
+    if not scan.motors:
+        raise ValueError("no motors found: nothing to synthesise a config from")
+    return _write_config({
+        "port": scan.port,
+        "motor_type": scan.motor_type,
+        "baudrate": scan.baud_rate,
+        **_bench_fields(side),
+        **_motor_fields(scan),
+    })
+
+
+def synthesize_merged_config(scans: list[BareScan], *, side: str = "right") -> str:
+    """Write the config that describes every bus's motors as one bench.
+
+    This is the read-only view the console shows — the joint list, the motor
+    list, the per-motor spans — and it is deliberately the one config with no
+    port, family or rate: those differ per bus, and a hand built from this
+    would open one port for motors that are on two. The buses are connected
+    from their own single-bus configs and fronted by a dual-bus session.
+
+    Pseudo-joint names and motor ids are taken to be unique across the buses,
+    which is bare mode's standing assumption: two motors sharing an id on two
+    adapters cannot be told apart by any command the console sends.
+    """
+    if not scans:
+        raise ValueError("no buses: nothing to synthesise a config from")
+    merged: dict = {**_bench_fields(side), "motor_ids": [], "joint_ids": [],
+                    "joint_to_motor_map": {}, "joint_roms": {},
+                    "neutral_position": {}}
+    for scan in scans:
+        fields = _motor_fields(scan)
+        merged["motor_ids"] += fields["motor_ids"]
+        merged["joint_ids"] += fields["joint_ids"]
+        for key in ("joint_to_motor_map", "joint_roms", "neutral_position"):
+            merged[key].update(fields[key])
+    return _write_config(merged)
 
 
 def describe(scan: BareScan) -> str:

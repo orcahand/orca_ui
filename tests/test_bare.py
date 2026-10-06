@@ -1,13 +1,16 @@
 """Bare motor mode: a bus scan, and a config describing only what answered.
 
 The point of bare mode is bringing up motors that are not in a hand, so the
-tests here care about two things: that the scan asks the cheap question first,
-and that the config it synthesises is one orca_core will actually accept.
+tests here care about three things: that the scan asks the cheap question
+first, that the config it synthesises is one orca_core will actually accept,
+and that a bench carrying both motor families routes every command to the bus
+that owns the motor.
 """
 
 import threading
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from orca_ui.hand import bare
@@ -223,13 +226,15 @@ class TestBareSettings:
 
         config = tmp_path / "config.yaml"
         config.write_text("port: /dev/null\n")
-        monkeypatch.setattr(cli, "_resolve_bare_config", lambda args: str(config))
+        monkeypatch.setattr(cli, "_resolve_bare_config",
+                            lambda args: (str(config), ()))
 
         settings = cli.build_settings(["--bare", "--no-browser"])
 
         assert settings is not None, "build_settings returned nothing"
         assert settings.bare is True
         assert settings.config_path == str(config)
+        assert settings.bare_buses == ()
 
     def test_a_normal_start_is_not_bare(self, monkeypatch, tmp_path):
         from orca_ui import cli
@@ -343,37 +348,6 @@ class TestEveryBusIsSurveyed:
         assert survey.skipped == [("/dev/cu.usbserial-0001",
                                    "held open by another process")]
         assert "/dev/cu.usbserial-0001" in bare.describe_survey(survey)
-
-    def test_two_populated_buses_are_offered_not_guessed_between(self, monkeypatch):
-        """One console drives one bus — the family fixes the protocol, the
-        register map and the current scale, and a motor ID only means
-        something within its own bus. Picking one silently would leave the
-        other adapter's motors off the screen with no hint they exist."""
-        from orca_ui import cli
-
-        found = {
-            "/dev/cu.usbserial-0000": bare.FoundMotor(1, 1_000_000, "XM430", "dynamixel"),
-            "/dev/cu.usbserial-0001": bare.FoundMotor(1, 1_000_000, "STS3215", "feetech"),
-        }
-
-        def fake_scan(port, **kw):
-            scan = bare.BareScan(port=port)
-            scan.motors = [found[port]]
-            return scan
-
-        monkeypatch.setattr(bare, "scan_bus", fake_scan)
-        monkeypatch.setattr(bare, "candidate_ports", lambda: sorted(found))
-        monkeypatch.setattr(
-            "orca_core.hardware.sensing.serial_discovery.port_in_use",
-            lambda p: False)
-
-        with pytest.raises(SystemExit) as caught:
-            cli._resolve_bare_config(cli.parse_args(["--bare"]))
-
-        message = str(caught.value)
-        for port in found:
-            assert port in message, f"{port} was not offered"
-        assert "--board" in message
 
     def test_a_pinned_board_scans_only_that_bus(self, monkeypatch):
         """The way out of the ambiguity above has to actually narrow the scan."""
@@ -1499,3 +1473,301 @@ class TestBenchDwellMatchesThePlayer:
 
         assert s._bench_period_s == pytest.approx(0.25)
         assert s._bench_interp_steps == 4
+
+
+class TestDualBus:
+    """A bench carrying both motor families: two buses, two clients, one
+    console. The families disagree on travel, register widths and current
+    scales, so every answer has to come from the bus that owns the motor —
+    an answer borrowed from the other bus drives a motor into a stop.
+    """
+
+    def _scans(self):
+        dyn = bare.BareScan(port="/dev/cu.usbserial-0000")
+        dyn.motors = [bare.FoundMotor(1, 1_000_000, "XM430", "dynamixel")]
+        fee = bare.BareScan(port="/dev/cu.usbserial-0001")
+        fee.motors = [bare.FoundMotor(11, 1_000_000, "STS3215", "feetech")]
+        return [dyn, fee]
+
+    def _cli_buses(self, monkeypatch, scans):
+        from orca_ui import cli
+
+        by_port = {scan.port: scan for scan in scans}
+        monkeypatch.setattr(bare, "scan_bus", lambda port, **kw: by_port[port])
+        monkeypatch.setattr(bare, "candidate_ports", lambda: list(by_port))
+        monkeypatch.setattr(
+            "orca_core.hardware.sensing.serial_discovery.port_in_use",
+            lambda p: False)
+        return cli._resolve_bare_config(cli.parse_args(["--bare"]))
+
+    def test_both_families_are_brought_up(self, monkeypatch):
+        """The whole point: a Feetech chain on one adapter and a Dynamixel
+        chain on another come up together instead of one being dropped."""
+        from orca_core.hand_factory import load_hand
+
+        merged_path, bus_paths = self._cli_buses(monkeypatch, self._scans())
+
+        assert len(bus_paths) == 2
+        families = {load_hand(config_path=p).config.motor_type
+                    for p in bus_paths}
+        assert families == {"dynamixel", "feetech"}
+        merged = load_hand(config_path=merged_path)
+        assert sorted(merged.config.motor_ids) == [1, 11]
+
+    def test_the_merged_config_pins_no_bus_of_its_own(self, monkeypatch):
+        """It describes two buses, so a hand built from it would open one port
+        for motors that are on two — and silently miss half of them."""
+        from orca_core.hand_factory import load_hand
+
+        merged_path, _ = self._cli_buses(monkeypatch, self._scans())
+        config = load_hand(config_path=merged_path).config
+
+        assert config.motor_type is None
+        assert config.baudrate is None
+        assert config.port == "auto"
+
+    def test_each_motor_keeps_its_own_familys_travel(self, monkeypatch):
+        """Dynamixel is multi-turn and declares no span; Feetech's whole turn
+        is negative radians. One merged span would be wrong for both."""
+        from orca_core.hand_factory import load_hand
+
+        merged_path, _ = self._cli_buses(monkeypatch, self._scans())
+        roms = load_hand(config_path=merged_path).config.joint_roms_dict
+
+        assert roms["motor_01"] != roms["motor_11"]
+        assert roms["motor_11"][1] <= 0, "feetech travel is negative"
+
+    def test_an_id_on_two_buses_is_refused(self, monkeypatch):
+        """Every command names a motor by ID alone. Two motors answering to
+        one ID means one of them silently takes the other's commands."""
+        scans = self._scans()
+        scans[1].motors = [bare.FoundMotor(1, 1_000_000, "STS3215", "feetech")]
+
+        with pytest.raises(SystemExit) as caught:
+            self._cli_buses(monkeypatch, scans)
+
+        assert "more than one bus" in str(caught.value)
+
+    def test_one_bus_is_still_a_plain_single_bus_start(self, monkeypatch):
+        """The normal case must not grow a merged config or a façade."""
+        scans = self._scans()[:1]
+
+        path, bus_paths = self._cli_buses(monkeypatch, scans)
+
+        assert bus_paths == ()
+        from orca_core.hand_factory import load_hand
+        assert load_hand(config_path=path).config.motor_type == "dynamixel"
+
+
+def _dual_hand(positions=None, travels=None, record=None):
+    """A DualBusHand over two fake single-bus hands with differing families."""
+    from orca_ui.hand.dual_bus import DualBusHand
+
+    positions = positions or {1: -0.5, 2: -0.5, 11: -3.0}
+    travels = travels or {"a": None, "b": (-6.28, 0.0)}
+    record = record if record is not None else []
+
+    def make(name, ids):
+        class _Client:
+            position_range_rad = travels[name]
+            servo_gain_max = {"a": 16383, "b": 255}[name]
+            motor_ids = list(ids)
+
+            def read_hardware_error(self, motor_id):
+                record.append((name, "read_hardware_error", motor_id))
+                return 0
+
+            def decode_hardware_error(self, value):
+                return [f"{name}-bit"]
+
+        class _Hand:
+            motor_client = _Client()
+            config = SimpleNamespace(motor_ids=list(ids), motor_type=name,
+                                     port=f"/dev/{name}")
+            _task_stop_event = threading.Event()
+
+            def get_motor_pos(self, as_dict=False):
+                sub = {i: positions[i] for i in ids}
+                return sub if as_dict else np.asarray(list(sub.values()))
+
+            def write_motor_pos(self, mids, values):
+                record.append((name, "write", list(mids),
+                               [float(v) for v in values]))
+
+            def disable_torque(self, mids=None):
+                record.append((name, "disable_torque", mids))
+                if name == "a":
+                    raise RuntimeError("bus a is wedged")
+                return []
+
+            def is_connected(self):
+                return True
+
+        return _Hand()
+
+    hands = [make("a", [1, 2]), make("b", [11])]
+    config = SimpleNamespace(motor_ids=[1, 2, 11])
+    return DualBusHand(hands=hands, config=config), record
+
+
+class TestRoutingByMotorId:
+    """The façade dispatches on motor id, which bare mode takes to be unique
+    across the buses. A command reaching the wrong bus either errors or, worse,
+    moves a motor nobody asked about."""
+
+    def test_a_read_merges_in_merged_config_order(self):
+        """Callers zip these arrays against config.motor_ids, so bus order and
+        config order must be the same order."""
+        dual, _ = _dual_hand()
+
+        assert list(dual.get_motor_pos()) == [-0.5, -0.5, -3.0]
+        assert dual.get_motor_pos(as_dict=True) == {1: -0.5, 2: -0.5, 11: -3.0}
+
+    def test_a_write_reaches_only_the_owning_bus(self):
+        dual, record = _dual_hand()
+
+        dual.write_motor_pos([11, 1], [-2.0, -0.2])
+
+        assert ("b", "write", [11], [-2.0]) in record
+        assert ("a", "write", [1], [-0.2]) in record
+        assert len([r for r in record if r[1] == "write"]) == 2
+
+    def test_a_per_motor_client_call_goes_to_its_own_family(self):
+        dual, record = _dual_hand()
+
+        dual.motor_client.read_hardware_error(11)
+
+        assert record == [("b", "read_hardware_error", 11)]
+
+    def test_torque_off_reaches_every_bus_even_when_one_fails(self):
+        """Half a bench left powered because the other half errored is the
+        dangerous outcome, so every bus is asked regardless."""
+        dual, record = _dual_hand()
+
+        failed = dual.disable_torque()
+
+        asked = [r[0] for r in record if r[1] == "disable_torque"]
+        assert asked == ["a", "b"]
+        assert set(failed) == {1, 2}, "the wedged bus's motors are reported"
+
+    def test_the_router_declines_a_family_wide_question(self):
+        """``position_range_rad`` off the router would have to be one family's.
+        Absent, the caller is forced to ask about a motor instead."""
+        dual, _ = _dual_hand()
+
+        assert getattr(type(dual.motor_client), "position_range_rad", None) is None
+        assert dual.client_for(11).position_range_rad == (-6.28, 0.0)
+        assert dual.client_for(1).position_range_rad is None
+
+    def test_a_bus_that_drops_takes_the_session_down(self):
+        """A bench with half its motors gone is not a smaller bench: the ids
+        that vanished are the ones an operator would command next."""
+        dual, _ = _dual_hand()
+        dual.hands[0].is_connected = lambda: False
+
+        assert dual.is_connected() is False
+
+
+class TestDualBusTravelChecks:
+    """The service's refusals have to use the commanded motor's own travel.
+    Checked against the other bus's family, a reachable target is refused and
+    an unreachable one is written straight into a hard stop."""
+
+    def _service(self):
+        from orca_ui.hand.service import HandService
+        from orca_ui.settings import UiSettings
+
+        dual, record = _dual_hand()
+        service = HandService.__new__(HandService)
+        service.settings = UiSettings(config_path="/nowhere/config.yaml",
+                                      bare=True,
+                                      bare_buses=("/a.yaml", "/b.yaml"))
+        service._state_lock = threading.Lock()
+        service._direct_motor_mode = True
+        service._bench_ranges = {}
+        service._bench_points = {}
+        service._bench_playing = {}
+        session = SimpleNamespace(hand=dual)
+        service._require_torque = lambda: session
+        service._require_manual_control = lambda: None
+        return service, record
+
+    def test_a_target_is_checked_against_its_own_bus(self):
+        from orca_ui.hand.service import ServiceError
+
+        service, record = self._service()
+
+        # -3.0 rad is inside Feetech's single turn and outside nothing on the
+        # multi-turn bus, so both motors must accept it.
+        service.set_motor_position(11, -3.0)
+        service.set_motor_position(1, -3.0)
+        assert [r[0] for r in record if r[1] == "write"] == ["b", "a"]
+
+        # +1.0 rad is past the end of Feetech's travel but is simply another
+        # turn on the multi-turn bus.
+        with pytest.raises(ServiceError) as caught:
+            service.set_motor_position(11, 1.0)
+        assert "outside this motor's travel" in str(caught.value)
+        service.set_motor_position(1, 1.0)
+
+
+class TestDualBusSnapshotContract:
+    """The bench panel draws one slider per motor over the travel the snapshot
+    reports. A bench-wide travel borrowed from one family would draw the other
+    family's sliders over angles its motors cannot reach."""
+
+    def _service(self, hand):
+        from orca_ui.hand.service import HandService
+        from orca_ui.settings import UiSettings
+
+        service = HandService.__new__(HandService)
+        service.settings = UiSettings(config_path="/nowhere/config.yaml",
+                                      bare=True)
+        service._state_lock = threading.Lock()
+        service._direct_motor_mode = False
+        service._bench_ranges = {}
+        service._bench_points = {}
+        service._bench_playing = {}
+        service._bench_declared = {}
+        session = SimpleNamespace(hand=hand)
+        service._require_motors = lambda: session
+        return service
+
+    def test_each_motor_reports_its_own_travel(self):
+        dual, _ = _dual_hand()
+        dual.config = SimpleNamespace(motor_ids=[1, 2, 11],
+                                      motor_to_joint_dict={})
+
+        snapshot = self._service(dual).motor_snapshot()
+
+        by_id = {m["id"]: m for m in snapshot["motors"]}
+        assert by_id[11]["span_rad"] == [-6.28, 0.0]
+        assert by_id[1]["span_rad"] is None, "the multi-turn bus declares none"
+        assert snapshot["span_rad"] is None, "no travel is true of both buses"
+
+    def test_one_bus_still_reports_a_bench_wide_travel(self):
+        """The single-bus panel must keep working off the top-level field."""
+        from orca_ui.hand.dual_bus import DualBusHand
+
+        dual, _ = _dual_hand(travels={"a": (-6.28, 0.0), "b": (-6.28, 0.0)})
+        single = DualBusHand(hands=dual.hands[:1],
+                             config=SimpleNamespace(
+                                 motor_ids=[1, 2], motor_to_joint_dict={}))
+
+        snapshot = self._service(single).motor_snapshot()
+
+        assert snapshot["span_rad"] == [-6.28, 0.0]
+        assert all(m["span_rad"] == [-6.28, 0.0] for m in snapshot["motors"])
+
+    def test_a_latched_error_is_named_in_its_own_familys_words(self):
+        """A power fault must never be reported as 'let it cool'. The bit
+        names come from the family that latched them."""
+        dual, _ = _dual_hand()
+        dual.config = SimpleNamespace(motor_ids=[1, 11],
+                                      motor_to_joint_dict={})
+
+        snapshot = self._service(dual).motor_snapshot()
+
+        by_id = {m["id"]: m for m in snapshot["motors"]}
+        assert by_id[1]["hw_error_flags"] == ["a-bit"]
+        assert by_id[11]["hw_error_flags"] == ["b-bit"]

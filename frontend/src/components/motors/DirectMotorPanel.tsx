@@ -483,9 +483,9 @@ function BenchMotorRow({
   models,
 }: {
   motor: DirectMotorInfo
-  // The family's declared travel, when it has one. A multi-turn family does
-  // not, which changes nothing here: the range comes from the operator either
-  // way, and there is no wrap to undo.
+  // The bench-wide declared travel, when every bus agrees on one. This motor's
+  // own span wins over it: two families disagree, and a slider drawn over the
+  // other bus's travel would drive this motor into a stop.
   span: [number, number] | null
   disabled: boolean
   onError: (error: unknown) => void
@@ -494,7 +494,8 @@ function BenchMotorRow({
   onChanged: () => Promise<void> | void
   models: MotorModelInfo[]
 }) {
-  const turn = span ? Math.abs(span[1] - span[0]) : null
+  const travel = motor.span_rad ?? span
+  const turn = travel ? Math.abs(travel[1] - travel[0]) : null
   const range = motor.range_rad ?? null
 
   // Live position and current at the bench rate, so a stall is visible while
