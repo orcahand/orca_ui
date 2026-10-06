@@ -13,6 +13,12 @@ while sweeping every ID at every rate takes over two minutes. Hence the sweep
 is opt-in. Only Dynamixel could do better — its protocol can broadcast a ping
 and collect every responder at once, where the Feetech protocol must ask each
 ID in turn.
+
+Every candidate adapter is surveyed, not just one: a bench with two adapters
+has two buses, and they may carry different families at different rates. A
+session still drives exactly one of them — a hand is one port, one family and
+one rate all the way down to the motor client's class attributes — so the
+survey's job is to show the operator every bus that answered and let them pick.
 """
 
 from __future__ import annotations
@@ -201,6 +207,71 @@ def scan_bus(
     return scan
 
 
+@dataclass
+class BusSurvey:
+    """One :class:`BareScan` per candidate adapter, plus what was left alone."""
+
+    buses: list[BareScan] = field(default_factory=list)
+    # (port, reason) for adapters that were not scanned at all.
+    skipped: list[tuple[str, str]] = field(default_factory=list)
+
+    @property
+    def populated(self) -> list[BareScan]:
+        return [bus for bus in self.buses if bus.motors]
+
+
+def candidate_ports() -> list[str]:
+    """Every port that could be a motor bus, in the order worth trying.
+
+    A controller board's motor CDC comes first, then classic USB adapters
+    matched by vendor ID. A board CDC that does not identify as the motor bus
+    is left out deliberately: its twin carries the sensor stream, and writing
+    motor protocol at a megabaud into that is not a probe worth making.
+    """
+    from orca_core.hand_factory import _classic_motor_ports
+    from orca_core.hardware.sensing.serial_discovery import (
+        oh_board_ports,
+        probe_orca_info,
+    )
+
+    ports: list[str] = []
+    for port in oh_board_ports():
+        info = probe_orca_info(port)
+        if info is not None and info.role == "motor":
+            ports.append(port)
+    for port in _classic_motor_ports():
+        if port not in ports:
+            ports.append(port)
+    return ports
+
+
+def survey_buses(
+    ports: list[str],
+    *,
+    id_range: tuple[int, int] = DEFAULT_ID_RANGE,
+    all_rates: bool = False,
+    progress: Callable[[str, str, str, int], None] | None = None,
+) -> BusSurvey:
+    """Scan each port in ``ports`` as its own bus.
+
+    A port another process holds open is reported rather than scanned: it
+    would answer nothing and read as an empty bus, which is how a second
+    console's hand would come to look like bare metal.
+    """
+    from orca_core.hardware.sensing.serial_discovery import port_in_use
+
+    survey = BusSurvey()
+    for port in ports:
+        if port_in_use(port):
+            survey.skipped.append((port, "held open by another process"))
+            continue
+        per_port = (None if progress is None
+                    else lambda t, phase, rate, _p=port: progress(_p, t, phase, rate))
+        survey.buses.append(scan_bus(port, id_range=id_range,
+                                     all_rates=all_rates, progress=per_port))
+    return survey
+
+
 def synthesize_config(scan: BareScan, *, side: str = "right") -> str:
     """Write a config describing exactly the motors that answered.
 
@@ -257,3 +328,10 @@ def describe(scan: BareScan) -> str:
         f"{len(scan.motors)} motor(s) on {scan.port}: IDs {ids} "
         f"({scan.motor_type} @ {scan.baud_rate} baud, {', '.join(models)})"
     )
+
+
+def describe_survey(survey: BusSurvey) -> str:
+    """One line per bus for the terminal banner, skipped adapters included."""
+    lines = [describe(bus) for bus in survey.buses]
+    lines += [f"skipped {port}: {reason}" for port, reason in survey.skipped]
+    return "\n".join(lines) if lines else "no motor adapter found"

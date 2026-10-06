@@ -39,15 +39,16 @@ def parse_args(argv=None) -> argparse.Namespace:
                              "first board that answers. Pin it when running "
                              "one console per hand on the same machine, so "
                              "each keeps to its own board; also changeable "
-                             "from the header picker while running.")
+                             "from the header picker while running. With "
+                             "--bare, this is the one bus that gets scanned.")
     parser.add_argument("--mock", action="store_true",
                         help="Simulate the hand in-memory (motors, joint encoders, "
                              "tactile sine signals). No hardware needed. Without "
                              "--config/--model this uses the bundled full-featured "
                              "mock model.")
     parser.add_argument("--bare", action="store_true",
-                        help="Bare motor mode: scan the bus for whatever motors "
-                             "answer and bring them up for direct per-motor "
+                        help="Bare motor mode: scan every motor bus for whatever "
+                             "motors answer and bring one bus up for per-motor "
                              "control, ID/baud programming and testing. For "
                              "loose motors on a bench — no hand, no joints, no "
                              "calibration, no sensing.")
@@ -150,37 +151,60 @@ def resolve_config_path(args: argparse.Namespace) -> tuple[str, bool]:
 
 
 def _resolve_bare_config(args) -> str:
-    """Scan the bus and synthesise a config for whatever answered.
+    """Survey every motor bus and synthesise a config for the one that answered.
 
     Fails loudly with what was tried: a bare-mode start that silently fell
-    back to a packaged 17-motor model would drive a hand that is not there.
+    back to a packaged 17-motor model would drive a hand that is not there,
+    and one that silently took the first of two adapters would leave the other
+    one's motors off the screen. A session drives a single bus — one port, one
+    family, one rate — so two populated buses are the operator's choice to
+    make, offered rather than guessed at.
     """
-    from orca_core.maintenance.motor_chain import resolve_port
+    from orca_core.utils.utils import serial_port_exists
     from orca_ui.hand import bare as bare_mode
 
-    port = resolve_port(args.config or None)
-    if port is None:
+    if args.board:
+        if not serial_port_exists(args.board):
+            raise SystemExit(
+                f"--board {args.board} is not a serial port on this machine.")
+        ports = [args.board]
+    else:
+        ports = bare_mode.candidate_ports()
+    if not ports:
         raise SystemExit(
             "--bare found no serial adapter. Plug the motor bus in, or name "
-            "its device path with --config /dev/cu.usbmodemXXXX.")
+            "its device path with --board /dev/cu.usbmodemXXXX.")
     id_range = bare_mode.FULL_ID_RANGE if args.scan_all else bare_mode.DEFAULT_ID_RANGE
-    print(f"Scanning {port} for motors "
+    print(f"Scanning {len(ports)} bus(es) for motors "
           f"(IDs {id_range[0]}-{id_range[1]}"
-          f"{', every baud rate' if args.scan_all else ', 1M baud'})...",
-          file=sys.stderr)
+          f"{', every baud rate' if args.scan_all else ', 1M baud'}): "
+          f"{', '.join(ports)}...", file=sys.stderr)
 
-    def progress(motor_type: str, _phase: str, baud: int) -> None:
-        print(f"  {motor_type} @ {baud} baud...", file=sys.stderr)
+    def progress(port: str, motor_type: str, _phase: str, baud: int) -> None:
+        print(f"  {port}: {motor_type} @ {baud} baud...", file=sys.stderr)
 
-    scan = bare_mode.scan_bus(port, id_range=id_range,
-                              all_rates=args.scan_all, progress=progress)
-    print(bare_mode.describe(scan), file=sys.stderr)
-    if not scan.motors:
+    survey = bare_mode.survey_buses(ports, id_range=id_range,
+                                   all_rates=args.scan_all, progress=progress)
+    print(bare_mode.describe_survey(survey), file=sys.stderr)
+    populated = survey.populated
+    if not populated:
         raise SystemExit(
             "--bare found no motors. Check power and wiring, then retry with "
             "--scan-all to sweep every ID and baud rate."
             if not args.scan_all else
             "--bare found no motors after a full sweep. Check power and wiring.")
+    if len(populated) > 1:
+        offer = "\n".join(
+            f"  --board {bus.port}   ({len(bus.motors)} motor(s), "
+            f"{bus.motor_type} @ {bus.baud_rate} baud)" for bus in populated)
+        raise SystemExit(
+            f"Motors answered on {len(populated)} buses:\n{offer}\n"
+            "A console drives one bus: the motor family fixes the protocol, "
+            "the register map, the current scale and the position range, and "
+            "a motor ID only identifies a motor within its own bus. Pick a "
+            "bus with --board, or start a console per bus on separate --port "
+            "numbers.")
+    scan = populated[0]
     if scan.mixed_baud:
         raise SystemExit(
             "Motors answered at more than one baud rate on the same bus, which "

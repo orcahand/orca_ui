@@ -258,8 +258,7 @@ class TestBareSettings:
             return scan
 
         monkeypatch.setattr(bare, "scan_bus", fake_scan)
-        monkeypatch.setattr("orca_core.maintenance.motor_chain.resolve_port",
-                            lambda port: "/dev/cu.usbmodemXXXX")
+        _one_bus(monkeypatch)
 
         cli._resolve_bare_config(cli.parse_args(["--bare"]))
         assert seen == {"id_range": bare.DEFAULT_ID_RANGE, "all_rates": False}
@@ -277,8 +276,7 @@ class TestBareSettings:
         monkeypatch.setattr(
             bare, "scan_bus",
             lambda port, **kw: bare.BareScan(port=port))
-        monkeypatch.setattr("orca_core.maintenance.motor_chain.resolve_port",
-                            lambda port: "/dev/cu.usbmodemXXXX")
+        _one_bus(monkeypatch)
 
         with _pytest.raises(SystemExit) as caught:
             cli._resolve_bare_config(cli.parse_args(["--bare"]))
@@ -289,12 +287,143 @@ class TestBareSettings:
 
         from orca_ui import cli
 
-        monkeypatch.setattr("orca_core.maintenance.motor_chain.resolve_port",
-                            lambda port: None)
+        monkeypatch.setattr(bare, "candidate_ports", lambda: [])
 
         with _pytest.raises(SystemExit) as caught:
             cli._resolve_bare_config(cli.parse_args(["--bare"]))
         assert "no serial adapter" in str(caught.value)
+
+
+def _one_bus(monkeypatch, port: str = "/dev/cu.usbmodemXXXX"):
+    """Pretend one free adapter is plugged in, and nothing holds it open."""
+    monkeypatch.setattr(bare, "candidate_ports", lambda: [port])
+    monkeypatch.setattr(
+        "orca_core.hardware.sensing.serial_discovery.port_in_use",
+        lambda p: False)
+
+
+class TestEveryBusIsSurveyed:
+    """Two adapters are two buses, and they may carry different families at
+    different rates. Stopping at the first one hides whatever is on the second,
+    and resolving a single port up front refuses to start at all: orca_core's
+    port autodetection only answers when exactly one adapter matches."""
+
+    def test_both_adapters_are_scanned(self, monkeypatch):
+        scanned = []
+
+        def fake_scan(port, **kw):
+            scanned.append(port)
+            return bare.BareScan(port=port)
+
+        monkeypatch.setattr(bare, "scan_bus", fake_scan)
+        monkeypatch.setattr(
+            "orca_core.hardware.sensing.serial_discovery.port_in_use",
+            lambda p: False)
+
+        survey = bare.survey_buses(["/dev/cu.usbserial-0000",
+                                    "/dev/cu.usbserial-0001"])
+
+        assert scanned == ["/dev/cu.usbserial-0000", "/dev/cu.usbserial-0001"]
+        assert len(survey.buses) == 2
+        assert survey.populated == []
+
+    def test_a_busy_adapter_is_reported_not_read_as_empty(self, monkeypatch):
+        """Another console's hand holds its port open. Scanned, it answers
+        nothing and reads as bare metal; the operator must see why instead."""
+        monkeypatch.setattr(bare, "scan_bus",
+                            lambda port, **kw: bare.BareScan(port=port))
+        monkeypatch.setattr(
+            "orca_core.hardware.sensing.serial_discovery.port_in_use",
+            lambda p: p == "/dev/cu.usbserial-0001")
+
+        survey = bare.survey_buses(["/dev/cu.usbserial-0000",
+                                    "/dev/cu.usbserial-0001"])
+
+        assert [bus.port for bus in survey.buses] == ["/dev/cu.usbserial-0000"]
+        assert survey.skipped == [("/dev/cu.usbserial-0001",
+                                   "held open by another process")]
+        assert "/dev/cu.usbserial-0001" in bare.describe_survey(survey)
+
+    def test_two_populated_buses_are_offered_not_guessed_between(self, monkeypatch):
+        """One console drives one bus — the family fixes the protocol, the
+        register map and the current scale, and a motor ID only means
+        something within its own bus. Picking one silently would leave the
+        other adapter's motors off the screen with no hint they exist."""
+        from orca_ui import cli
+
+        found = {
+            "/dev/cu.usbserial-0000": bare.FoundMotor(1, 1_000_000, "XM430", "dynamixel"),
+            "/dev/cu.usbserial-0001": bare.FoundMotor(1, 1_000_000, "STS3215", "feetech"),
+        }
+
+        def fake_scan(port, **kw):
+            scan = bare.BareScan(port=port)
+            scan.motors = [found[port]]
+            return scan
+
+        monkeypatch.setattr(bare, "scan_bus", fake_scan)
+        monkeypatch.setattr(bare, "candidate_ports", lambda: sorted(found))
+        monkeypatch.setattr(
+            "orca_core.hardware.sensing.serial_discovery.port_in_use",
+            lambda p: False)
+
+        with pytest.raises(SystemExit) as caught:
+            cli._resolve_bare_config(cli.parse_args(["--bare"]))
+
+        message = str(caught.value)
+        for port in found:
+            assert port in message, f"{port} was not offered"
+        assert "--board" in message
+
+    def test_a_pinned_board_scans_only_that_bus(self, monkeypatch):
+        """The way out of the ambiguity above has to actually narrow the scan."""
+        from orca_ui import cli
+
+        scanned = []
+
+        def fake_scan(port, **kw):
+            scanned.append(port)
+            scan = bare.BareScan(port=port)
+            scan.motors = [bare.FoundMotor(1, 1_000_000, "STS3215", "feetech")]
+            return scan
+
+        monkeypatch.setattr(bare, "scan_bus", fake_scan)
+        monkeypatch.setattr(bare, "candidate_ports",
+                            lambda: ["/dev/cu.usbserial-0000",
+                                     "/dev/cu.usbserial-0001"])
+        monkeypatch.setattr("orca_core.utils.utils.serial_port_exists",
+                            lambda p: True)
+        monkeypatch.setattr(
+            "orca_core.hardware.sensing.serial_discovery.port_in_use",
+            lambda p: False)
+
+        cli._resolve_bare_config(
+            cli.parse_args(["--bare", "--board", "/dev/cu.usbserial-0001"]))
+
+        assert scanned == ["/dev/cu.usbserial-0001"]
+
+    def test_a_boards_sensor_cdc_is_never_a_motor_bus(self, monkeypatch):
+        """Both of a controller board's CDCs share one vendor ID. Scanning the
+        sensor one writes motor protocol at a megabaud into the encoder
+        stream, so only the CDC that identifies as the motor bus is a
+        candidate — and one that identifies as nothing is left alone."""
+        from types import SimpleNamespace
+
+        roles = {"/dev/cu.usbmodem0001": "motor",
+                 "/dev/cu.usbmodem0002": "sensor",
+                 "/dev/cu.usbmodem0003": None}
+        monkeypatch.setattr(
+            "orca_core.hardware.sensing.serial_discovery.oh_board_ports",
+            lambda: sorted(roles))
+        monkeypatch.setattr(
+            "orca_core.hardware.sensing.serial_discovery.probe_orca_info",
+            lambda port: (None if roles[port] is None
+                          else SimpleNamespace(role=roles[port])))
+        monkeypatch.setattr("orca_core.hand_factory._classic_motor_ports",
+                            lambda: ["/dev/cu.usbserial-0000"])
+
+        assert bare.candidate_ports() == ["/dev/cu.usbmodem0001",
+                                          "/dev/cu.usbserial-0000"]
 
 
 class TestReachableSpan:
