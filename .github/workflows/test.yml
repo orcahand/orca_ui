@@ -87,16 +87,13 @@ jobs:
       # --locked is the guard here: this job creates the very sibling layout a
       # committed override names, so without it uv would re-lock and pass.
       # Python is pinned on the sync rather than through setup-uv, whose
-      # python-version input activates a venv of its own at the workspace
-      # root; the editable install would land there instead of in .venv.
+      # python-version input activates a venv of its own at the workspace root.
       - name: Install dependencies
         working-directory: orca_ui
-        run: |
-          uv sync --locked --group dev --python 3.10
-          uv pip install -e ../orca_core
+        run: uv sync --locked --group dev --python 3.10
 
-      # --no-sync keeps uv from reverting orca_core to the locked release.
-      # Any step here using plain `uv run` silently un-pairs the run.
+      # The same layering ./dev does locally: orca_core from the checkout,
+      # everything else from the lock.
       - name: Run tests
         working-directory: orca_ui
-        run: uv run --no-sync pytest --timeout=120
+        run: uv run --no-sync --with-editable ../orca_core pytest --timeout=120

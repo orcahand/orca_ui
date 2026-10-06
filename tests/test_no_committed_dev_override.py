@@ -1,13 +1,11 @@
-"""Dev mode must never reach a commit.
+"""No orca_core source override may reach a commit.
 
-Pointing this checkout at an orca_core next to it needs a ``[tool.uv.sources]``
-entry, because uv has no local-only override file. That entry is a fact about
-one machine: committed, it makes the project unresolvable everywhere else —
-``uv lock`` fails outright on a clone with no sibling orca_core.
+A ``[tool.uv.sources]`` path entry is a fact about one machine: committed, it
+makes the project unresolvable everywhere else — ``uv lock`` fails outright on
+a clone with no sibling orca_core. ``./dev`` never writes one, but a hand-made
+entry is just as fatal.
 
-These tests read the *committed* files, not the working tree, so they pass
-while you are pointed at a local checkout and fail only once that reaches a
-commit.
+These tests read the *committed* files, not the working tree.
 """
 
 import re
@@ -19,9 +17,8 @@ import pytest
 # other source, so the table header appearing at all is the entry.
 SOURCE_TABLE = re.compile(r"^[ \t]*\[tool\.uv\.sources", re.MULTILINE)
 
-FIX = ("Keep the override in your working tree, out of the commit:\n"
-       "    git restore --staged pyproject.toml uv.lock\n"
-       "A branch that needs unpublished orca_core is paired in CI instead — "
+FIX = ("Drop the entry and run against a local core with `./dev local`\n"
+       "instead. A branch that needs unpublished orca_core is paired in CI — "
        "see .github/workflows/test.yml.")
 
 

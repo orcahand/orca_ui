@@ -75,50 +75,30 @@ uv run pytest tests/ -n0        # serial, for debugging one test
 
 The suite runs against whichever `orca_core` is installed. A failure that
 appears only on your machine is usually the console disagreeing with an
-unreleased `orca_core` — check `./dev status` first.
+unreleased `orca_core` — check `./dev` first.
 
 ---
 
-## Dev mode must never reach a commit
+## Running against an unreleased orca_core
 
-`./dev local` points this checkout at an `orca_core` next to it, and
-`./dev release` puts it back. uv has no local-only override file, so the entry
-lands in tracked files:
+`./dev local` flips this checkout onto the sibling `../orca_core` until
+`./dev release` flips it back; `./dev` says which is live. The flip lives in
+`.venv` — nothing tracked changes. See DEVELOPMENT.md.
 
-```toml
-[tool.uv.sources]
-orca-core = { path = "../orca_core", editable = true }
-```
-
-A relative path is a fact about one machine. Committed, it makes the project
-unresolvable everywhere else — `uv lock` fails outright on a clone with no
-sibling `orca_core`.
-
-**Never stage `pyproject.toml` or `uv.lock` without checking.** If a diff you
-are about to commit adds a `[tool.uv.sources]` entry for `orca_core`, drop it —
-even when the user asks for the file to be committed as-is, and even when it is
-the only way the branch currently runs. Say so instead; the pairing belongs in
-CI, not in the file.
+**Never add a `[tool.uv.sources]` entry for `orca_core`**, even when asked to
+commit one or when it is the only way a branch currently runs. A relative path
+is a fact about one machine; committed, it makes the project unresolvable
+everywhere else. Say so instead — the pairing belongs in CI, which already
+checks out a same-named `orca_core` branch beside this repo.
 
 ```bash
 git show :pyproject.toml | grep 'tool.uv.sources'   # must print nothing
 ```
 
-Three things enforce this, and none of them replaces reading the diff:
-
-- `.githooks/pre-commit` refuses the commit and names what to unstage. It only
-  runs in clones that set `core.hooksPath`, because git will not ship active
-  hooks — so it can never be the only guard.
-- `tests/test_no_committed_dev_override.py` reads the committed files, so it
-  passes while your working tree is in dev mode and fails only once the
-  override is committed.
-- `.github/workflows/test.yml` runs that test on every pull request. A PR into
-  `main` also installs with `uv sync --locked` against the published
-  `orca_core`, which a path source cannot satisfy. This is the guard that
-  catches a commit made on a machine without the hook.
-
-A branch that needs an unreleased `orca_core` is paired in CI by checking the
-core out beside this repo, so it never needs a source entry of its own.
+`.githooks/pre-commit` refuses to commit one (in clones that set
+`core.hooksPath`); `tests/test_no_committed_dev_override.py` and the
+`uv sync --locked` install in `.github/workflows/test.yml` catch one that slips
+through. None of them replaces reading the diff.
 
 ---
 
