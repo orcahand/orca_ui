@@ -138,6 +138,7 @@ export function MotorRegisterPanel({ onClose }: { onClose: () => void }) {
                 current={values[entry.key] ?? null}
                 draft={drafts[entry.key] ?? ''}
                 taken={entry.key === 'id' ? taken : []}
+                idRange={schema.id_range}
                 selected={selected}
                 busy={busy === entry.key}
                 onDraft={(v) => setDrafts((d) => ({ ...d, [entry.key]: v }))}
@@ -159,6 +160,7 @@ function Row({
   current,
   draft,
   taken,
+  idRange,
   selected,
   busy,
   onDraft,
@@ -168,6 +170,7 @@ function Row({
   current: number | null
   draft: string
   taken: number[]
+  idRange: [number, number]
   selected: number
   busy: boolean
   onDraft: (v: string) => void
@@ -222,7 +225,7 @@ function Row({
             title="ids already answering on this bus are not offered"
           >
             <option value="">--</option>
-            {idOptions(entry, taken, selected).map((id) => (
+            {idOptions(idRange, taken, selected).map((id) => (
               <option key={id} value={id}>
                 {id}
               </option>
@@ -252,15 +255,20 @@ function Row({
   )
 }
 
-/** Ids a motor may move to: in range, and not already answering on this bus.
- *  Two motors on one id means one silently takes the other's commands. */
+/** Ids a motor may move to.
+ *
+ *  Bounded by what a bench re-scan reaches, not by what the register accepts:
+ *  an id outside that writes fine and then the motor appears to vanish, when
+ *  in fact it is answering and nothing is looking for it there.
+ *
+ *  Ids already on the bus are excluded too -- two motors on one id means one
+ *  silently takes the other's commands. */
 function idOptions(
-  entry: MotorConfigRegister,
+  idRange: [number, number],
   taken: number[],
   selected: number,
 ): number[] {
-  const low = entry.min ?? 0
-  const high = entry.max ?? 253
+  const [low, high] = idRange
   const out: number[] = []
   for (let id = low; id <= high; id += 1) {
     if (id === selected || !taken.includes(id)) out.push(id)

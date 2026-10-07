@@ -1430,3 +1430,34 @@ class TestConfigRegisters:
         fee = {r.key for r in motor_client_class("feetech").config_registers}
         assert "return_delay_time" in dxl
         assert "return_delay_time" not in fee
+
+    def test_the_rescan_reaches_every_id_a_change_can_use(self):
+        """The startup scan stops at 25 to keep launch quick. A re-scan after
+        an id change cannot: a motor sent to 30 writes fine, answers fine, and
+        would be reported missing by a scan that never looks there."""
+        from orca_ui.hand import bare as bare_mode
+
+        assert bare_mode.FULL_ID_RANGE[1] > bare_mode.DEFAULT_ID_RANGE[1]
+        assert bare_mode.FULL_ID_RANGE[1] >= 253
+
+    def test_the_offered_ids_are_the_ids_a_rescan_can_find(self, monkeypatch):
+        """Otherwise the dropdown offers a value that loses the motor."""
+        from types import SimpleNamespace
+
+        from orca_core.hardware.motor_factory import mock_motor_client_class
+        from orca_ui.hand import bare as bare_mode
+        from orca_ui.hand.service import HandService
+
+        client = mock_motor_client_class("feetech")([1])
+        client.connect()
+        session = SimpleNamespace(
+            hand=SimpleNamespace(motor_client=client),
+            caps=SimpleNamespace(motors=True))
+        service = HandService.__new__(HandService)
+        service.settings = SimpleNamespace(bare=True)
+        monkeypatch.setattr(HandService, "session",
+                            property(lambda self: session))
+
+        assert service.reachable_id_range() == bare_mode.FULL_ID_RANGE
+        assert service.motor_config_schema()["id_range"] == list(
+            bare_mode.FULL_ID_RANGE)

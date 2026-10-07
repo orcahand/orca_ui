@@ -698,6 +698,9 @@ export interface MotorConfigRegister {
 
 export interface MotorConfigSchema {
   motor_type: string | null
+  // Ids a bench re-scan will actually find. Narrower than the id register
+  // allows: offering one outside this writes fine and then loses the motor.
+  id_range: [number, number]
   registers: MotorConfigRegister[]
 }
 

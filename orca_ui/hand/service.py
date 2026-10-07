@@ -1578,8 +1578,10 @@ class HandService:
         one needs no browser change.
         """
         _, client = self._config_client()
+        low, high = self.reachable_id_range()
         return {
             "motor_type": getattr(type(client), "motor_type", None),
+            "id_range": [low, high],
             "registers": [
                 {
                     "key": r.key,
@@ -1612,6 +1614,17 @@ class HandService:
                              motor_id, entry.key, exc_info=True)
                 values[entry.key] = None
         return {"id": motor_id, "values": values}
+
+    def reachable_id_range(self) -> "tuple[int, int]":
+        """Ids a bench re-scan will find after a change.
+
+        The id register allows more than this, but offering an id the scan
+        cannot reach means a write that succeeds and a motor that appears to
+        vanish -- it is answering, nothing is looking for it there.
+        """
+        from orca_ui.hand import bare as bare_mode
+
+        return bare_mode.FULL_ID_RANGE
 
     def taken_motor_ids(self) -> "list[int]":
         """Ids already answering on this bus, which a re-id may not collide with.
@@ -1711,7 +1724,10 @@ class HandService:
 
         port = self.supervisor.config.port
         try:
-            scan = bare_mode.scan_bus(port)
+            # The full range, not the startup one: an id change can put a
+            # motor anywhere its register allows, and a scan that stopped
+            # short would report it missing when it is answering fine.
+            scan = bare_mode.scan_bus(port, id_range=bare_mode.FULL_ID_RANGE)
             if not scan.motors:
                 logger.warning("re-scan of %s found no motors", port)
                 return False
