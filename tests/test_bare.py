@@ -1514,3 +1514,85 @@ class TestConfigRegisters:
         assert out["port"] == "/dev/cu.usbmodemXXXX"
         assert out["motor_type"] == "feetech"
         assert out["baudrate"] == 1_000_000
+
+
+class TestTheBusIsReleasedBeforeTheReconnect:
+    """An id or baud change is the one teardown that starts with the bus live:
+    the transaction that caused it has only just finished."""
+
+    @staticmethod
+    def _supervisor(client):
+        from types import SimpleNamespace
+
+        from orca_ui.hand.supervisor import HandSupervisor
+
+        supervisor = HandSupervisor.__new__(HandSupervisor)
+        supervisor._session = SimpleNamespace(
+            hand=SimpleNamespace(motor_client=client))
+        supervisor.order = []
+        supervisor._install_config = lambda config: supervisor.order.append(
+            "install")
+        supervisor.request_reconnect = lambda: supervisor.order.append(
+            "reconnect")
+        return supervisor
+
+    def test_the_port_is_closed_before_the_config_is_swapped(self):
+        """Closing it afterwards would be too late: the connect ladder starts
+        on the reconnect, and it cannot replace a handler whose port is open."""
+        from types import SimpleNamespace
+
+        calls = []
+        supervisor = self._supervisor(SimpleNamespace(
+            disconnect_fixed_lock_order=lambda: calls.append("closed")))
+
+        supervisor.install_bare_config_object(object())
+
+        assert supervisor.order == ["install", "reconnect"]
+        assert calls == ["closed"]
+
+    def test_it_uses_the_teardown_that_waits_for_the_bus(self):
+        """Not plain disconnect, which reads the SDK in-use flag before taking
+        the bus lock and gives up when a sampler happens to hold it -- leaving
+        the port open with nothing scheduled to try again."""
+        from types import SimpleNamespace
+
+        calls = []
+        supervisor = self._supervisor(SimpleNamespace(
+            disconnect=lambda: calls.append("disconnect"),
+            disconnect_fixed_lock_order=lambda: calls.append("fixed")))
+
+        supervisor.install_bare_config_object(object())
+
+        assert calls == ["fixed"]
+
+    def test_a_core_without_it_keeps_its_own_behaviour(self):
+        from types import SimpleNamespace
+
+        supervisor = self._supervisor(SimpleNamespace())
+
+        supervisor.install_bare_config_object(object())
+
+        assert supervisor.order == ["install", "reconnect"]
+
+    def test_a_close_that_raises_does_not_strand_the_reconnect(self):
+        """The session close that follows is still the guarantee; this is an
+        attempt to make it land cleanly, not a prerequisite for it."""
+        from types import SimpleNamespace
+
+        def boom():
+            raise OSError("port already gone")
+
+        supervisor = self._supervisor(
+            SimpleNamespace(disconnect_fixed_lock_order=boom))
+
+        supervisor.install_bare_config_object(object())
+
+        assert supervisor.order == ["install", "reconnect"]
+
+    def test_no_session_is_not_an_error(self):
+        supervisor = self._supervisor(None)
+        supervisor._session = None
+
+        supervisor.install_bare_config_object(object())
+
+        assert supervisor.order == ["install", "reconnect"]
