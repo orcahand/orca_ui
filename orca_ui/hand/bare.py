@@ -38,9 +38,16 @@ logger = logging.getLogger(__name__)
 # The rate every packaged hand runs at, and the first one worth trying.
 PREFERRED_BAUD = 1_000_000
 # Motors are numbered from 1 up in every hand, and a factory-fresh servo
-# answers at 1. Scanning past the twenties only pays off on a motor someone
-# has deliberately programmed high, which is what --scan-all is for.
-DEFAULT_ID_RANGE = (0, 25)
+# answers at 1. 40 covers two 17-motor chains, so a second hand shifted clear
+# of the first is still found, and it is what bounds the ids the control table
+# will offer -- an id that can be set has to be an id that is found again
+# after a restart.
+#
+# Measured on a 17-motor chain: 0-25 takes 1.9 s, 0-40 takes 3.1 s, and the
+# full 0-253 takes 21.1 s. The sweep costs a bus timeout per silent id and
+# runs once per family, so a Feetech bus pays for the Dynamixel pass too.
+# --scan-all is there for the rare motor deliberately programmed high.
+DEFAULT_ID_RANGE = (0, 40)
 FULL_ID_RANGE = (0, 253)
 
 # Fallback span for a family that declares no single-turn limit (Dynamixel is
@@ -273,6 +280,20 @@ def config_with_motor_id_changed(config_path: str, old_id: int,
             values[new_joint] = carried
         config[key] = {j: values[j] for j in order if j in values}
 
+    run_dir = os.path.join(tempfile.mkdtemp(prefix="orca_ui_bare_"), "bare-motors")
+    os.makedirs(run_dir)
+    path = os.path.join(run_dir, "config.yaml")
+    write_yaml_atomic(path, config)
+    return path
+
+
+def config_with_baud_changed(config_path: str, baud_rate: int) -> str:
+    """A copy of ``config_path`` opening the bus at ``baud_rate``.
+
+    The motors have already been told; this is how the host follows them.
+    """
+    config = read_yaml(config_path) or {}
+    config["baudrate"] = int(baud_rate)
     run_dir = os.path.join(tempfile.mkdtemp(prefix="orca_ui_bare_"), "bare-motors")
     os.makedirs(run_dir)
     path = os.path.join(run_dir, "config.yaml")

@@ -1431,17 +1431,18 @@ class TestConfigRegisters:
         assert "return_delay_time" in dxl
         assert "return_delay_time" not in fee
 
-    def test_the_rescan_reaches_every_id_a_change_can_use(self):
-        """The startup scan stops at 25 to keep launch quick. A re-scan after
-        an id change cannot: a motor sent to 30 writes fine, answers fine, and
-        would be reported missing by a scan that never looks there."""
+    def test_the_startup_range_reaches_a_second_chain(self):
+        """Two hands cannot both use 1-17, so the second is shifted clear.
+        Measured on a 17-motor chain: 0-40 costs 3.1 s against 1.9 s for
+        0-25, where the full 0-253 costs 21.1 s."""
         from orca_ui.hand import bare as bare_mode
 
-        assert bare_mode.FULL_ID_RANGE[1] > bare_mode.DEFAULT_ID_RANGE[1]
-        assert bare_mode.FULL_ID_RANGE[1] >= 253
+        assert bare_mode.DEFAULT_ID_RANGE[1] >= 34
+        assert bare_mode.DEFAULT_ID_RANGE[1] < bare_mode.FULL_ID_RANGE[1]
 
-    def test_the_offered_ids_are_the_ids_a_rescan_can_find(self, monkeypatch):
-        """Otherwise the dropdown offers a value that loses the motor."""
+    def test_the_offered_ids_are_the_ids_startup_will_find(self, monkeypatch):
+        """Otherwise a write succeeds and the motor is gone after a restart --
+        answering on the bus, with nothing looking for it there."""
         from types import SimpleNamespace
 
         from orca_core.hardware.motor_factory import mock_motor_client_class
@@ -1458,9 +1459,9 @@ class TestConfigRegisters:
         monkeypatch.setattr(HandService, "session",
                             property(lambda self: session))
 
-        assert service.reachable_id_range() == bare_mode.FULL_ID_RANGE
+        assert service.reachable_id_range() == bare_mode.DEFAULT_ID_RANGE
         assert service.motor_config_schema()["id_range"] == list(
-            bare_mode.FULL_ID_RANGE)
+            bare_mode.DEFAULT_ID_RANGE)
 
     def test_an_id_change_is_followed_without_a_bus_scan(self, tmp_path):
         """The write is already confirmed by a read-back at the new id, so

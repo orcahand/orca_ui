@@ -1619,13 +1619,17 @@ class HandService:
     def reachable_id_range(self) -> "tuple[int, int]":
         """Ids a bench re-scan will find after a change.
 
-        The id register allows more than this, but offering an id the scan
-        cannot reach means a write that succeeds and a motor that appears to
-        vanish -- it is answering, nothing is looking for it there.
+        The id register allows far more than this, but offering an id the
+        startup scan cannot reach means a write that succeeds and a motor that
+        comes back missing after the next restart -- it is answering, nothing
+        is looking for it there. Observed exactly that: a motor moved to 30
+        survived the change and was gone on relaunch.
+
+        So the settable ids are the scanned ids. Widening one widens the other.
         """
         from orca_ui.hand import bare as bare_mode
 
-        return bare_mode.FULL_ID_RANGE
+        return bare_mode.DEFAULT_ID_RANGE
 
     def taken_motor_ids(self) -> "list[int]":
         """Ids already answering on this bus, which a re-id may not collide with.
@@ -1687,7 +1691,8 @@ class HandService:
         """
         session, client = self._config_client()
         baud_rate = int(baud_rate)
-        if baud_rate not in type(client).baud_rate_map:
+        index = type(client).baud_rate_map.get(baud_rate)
+        if index is None:
             raise ServiceError(
                 f"{baud_rate} is not a rate this family supports "
                 f"({sorted(type(client).baud_rate_map)})")
@@ -1696,20 +1701,34 @@ class HandService:
                 "baud lives in EEPROM and needs torque off", status_code=409)
 
         motor_ids = sorted(int(m) for m in session.hand.config.motor_ids)
+        # Every motor is told at the rate the bus is still running at, and
+        # none of them is followed in between. A per-motor helper that
+        # reopened the port would move the host after the first write and
+        # leave the other sixteen unreachable at the old rate -- the exact
+        # orphaning this control exists to avoid.
         changed, failed = [], []
         for motor_id in motor_ids:
             try:
-                if client.change_motor_baudrate(motor_id, baud_rate):
-                    changed.append(motor_id)
-                else:
-                    failed.append(motor_id)
+                client.write_config_register(motor_id, "baud_rate", index)
+                changed.append(motor_id)
             except Exception:
-                logger.debug("baud change failed: motor %s", motor_id,
+                logger.debug("baud write failed: motor %s", motor_id,
                              exc_info=True)
                 failed.append(motor_id)
-        # Re-scan whatever the outcome: a partial change is exactly when the
-        # operator most needs to see which motors are where.
-        rescanned = self._rebuild_bare_session()
+
+        # Now the host follows. A motor that refused the write is still at the
+        # old rate and will not answer; the reconnect is what reveals which.
+        rescanned = False
+        try:
+            from orca_ui.hand import bare as bare_mode
+
+            config = load_config(bare_mode.config_with_baud_changed(
+                self.supervisor.config.config_path, baud_rate))
+            self.supervisor.install_bare_config_object(config)
+            rescanned = True
+        except Exception:
+            logger.exception("could not follow the bus to %d baud", baud_rate)
+
         return {"requested": baud_rate, "changed": changed, "failed": failed,
                 "rescanned": rescanned}
 
