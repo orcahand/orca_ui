@@ -1665,7 +1665,7 @@ class HandService:
                   "rescanned": False}
         if key == "id" and actual == value:
             result["id"] = value
-            result["rescanned"] = self._rebuild_bare_session()
+            result["rescanned"] = self._follow_motor_id(motor_id, value)
         return result
 
     def bus_baud_rates(self) -> dict:
@@ -1713,44 +1713,26 @@ class HandService:
         return {"requested": baud_rate, "changed": changed, "failed": failed,
                 "rescanned": rescanned}
 
-    def _rebuild_bare_session(self) -> bool:
-        """Re-scan the bench and rebuild the session around what answered.
+    def _follow_motor_id(self, old_id: int, new_id: int) -> bool:
+        """Point the session at the motor's new id and reconnect.
 
-        The port has to be released first. The live session holds it with an
-        advisory lock, so a scan attempted alongside opens nothing and reports
-        an empty bus -- which reads as "every motor vanished" when they are
-        all answering fine. Maintenance is how the supervisor is asked to let
-        go, and it reconnects on the way out.
+        No bus scan. The write was already confirmed by reading the register
+        back at the new id, so where the motor is, is known -- rediscovering
+        it would mean sweeping every id the register allows, a bus timeout
+        each, and taking the bench down for ten seconds to learn nothing new.
 
-        The scan sweeps the full id range: a change can put a motor anywhere
-        its register allows, and looking only where motors usually live is
-        what made one disappear.
+        Only the session is rebuilt, which the client needs because its motor
+        ids are fixed when it is constructed.
         """
         from orca_ui.hand import bare as bare_mode
 
-        port = self.supervisor.config.port
         try:
-            self.supervisor.enter_maintenance("bare-rescan")
-        except Exception:
-            logger.exception("could not free the bus to re-scan")
-            return False
-        try:
-            scan = bare_mode.scan_bus(port, id_range=bare_mode.FULL_ID_RANGE)
-            if not scan.motors:
-                logger.warning("re-scan of %s found no motors", port)
-                return False
-            config_path = bare_mode.synthesize_config(scan)
+            config_path = bare_mode.config_with_motor_id_changed(
+                self.supervisor.config.config_path, int(old_id), int(new_id))
             config = load_config(config_path)
         except Exception:
-            logger.exception("bare re-scan failed")
+            logger.exception("could not repoint the bench at motor %s", new_id)
             return False
-        finally:
-            # Always hand the hardware back, even on a failed scan: leaving
-            # the supervisor in maintenance would strand the bench.
-            try:
-                self.supervisor.exit_maintenance()
-            except Exception:
-                logger.exception("could not leave maintenance after re-scan")
         self.supervisor.install_bare_config_object(config)
         return True
 

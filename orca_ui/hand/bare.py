@@ -31,7 +31,7 @@ from orca_core.constants import (
 )
 from orca_core.hardware.motor_factory import motor_client_class
 from orca_core.maintenance.motor_chain import scan_motors
-from orca_core.utils.utils import write_yaml_atomic
+from orca_core.utils.utils import read_yaml, write_yaml_atomic
 
 logger = logging.getLogger(__name__)
 
@@ -234,6 +234,45 @@ def synthesize_config(scan: BareScan, *, side: str = "right") -> str:
         # Nothing to calibrate: there is no hardstop to find on a loose motor.
         "calibration_sequence": [],
     }
+    run_dir = os.path.join(tempfile.mkdtemp(prefix="orca_ui_bare_"), "bare-motors")
+    os.makedirs(run_dir)
+    path = os.path.join(run_dir, "config.yaml")
+    write_yaml_atomic(path, config)
+    return path
+
+
+def config_with_motor_id_changed(config_path: str, old_id: int,
+                                 new_id: int) -> str:
+    """A copy of ``config_path`` with one motor's id substituted.
+
+    Used after an id write, which has already been confirmed by reading the
+    register back at the new id -- so where the motor is, is known. Re-scanning
+    the bus to rediscover it would mean sweeping every id the register allows
+    (254 of them, a bus timeout each) to learn something already established,
+    and taking the bench down for it.
+
+    Only the keys that name a motor change. Everything the scan resolved --
+    port, family, baud, travel -- is carried across untouched.
+    """
+    config = read_yaml(config_path) or {}
+    old_joint, new_joint = pseudo_joint(old_id), pseudo_joint(new_id)
+
+    config["motor_ids"] = sorted(
+        new_id if m == old_id else m for m in config.get("motor_ids", []))
+    config["joint_to_motor_map"] = {
+        (new_joint if j == old_joint else j): (new_id if m == old_id else m)
+        for j, m in (config.get("joint_to_motor_map") or {}).items()
+    }
+    order = [pseudo_joint(m) for m in config["motor_ids"]]
+    config["joint_ids"] = order
+    for key in ("joint_roms", "neutral_position"):
+        values = config.get(key) or {}
+        carried = values.get(old_joint)
+        values = {j: v for j, v in values.items() if j != old_joint}
+        if carried is not None:
+            values[new_joint] = carried
+        config[key] = {j: values[j] for j in order if j in values}
+
     run_dir = os.path.join(tempfile.mkdtemp(prefix="orca_ui_bare_"), "bare-motors")
     os.makedirs(run_dir)
     path = os.path.join(run_dir, "config.yaml")

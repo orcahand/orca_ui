@@ -1461,3 +1461,55 @@ class TestConfigRegisters:
         assert service.reachable_id_range() == bare_mode.FULL_ID_RANGE
         assert service.motor_config_schema()["id_range"] == list(
             bare_mode.FULL_ID_RANGE)
+
+    def test_an_id_change_is_followed_without_a_bus_scan(self, tmp_path):
+        """The write is already confirmed by a read-back at the new id, so
+        rediscovering the motor would mean sweeping 254 ids at a bus timeout
+        each -- ten seconds of maintenance to learn what is already known."""
+        import yaml
+
+        from orca_ui.hand import bare as bare_mode
+
+        path = tmp_path / "config.yaml"
+        path.write_text(yaml.safe_dump({
+            "port": "/dev/cu.usbmodemXXXX", "motor_type": "feetech",
+            "baudrate": 1_000_000, "motor_ids": [1, 2, 16],
+            "joint_ids": ["motor_01", "motor_02", "motor_16"],
+            "joint_to_motor_map": {"motor_01": 1, "motor_02": 2, "motor_16": 16},
+            "joint_roms": {"motor_01": [0, 1], "motor_02": [0, 1],
+                           "motor_16": [0, 1]},
+            "neutral_position": {"motor_01": 0.5, "motor_02": 0.5,
+                                 "motor_16": 0.5},
+        }))
+
+        out = yaml.safe_load(
+            open(bare_mode.config_with_motor_id_changed(str(path), 16, 30)))
+
+        assert out["motor_ids"] == [1, 2, 30]
+        assert out["joint_ids"] == ["motor_01", "motor_02", "motor_30"]
+        assert out["joint_to_motor_map"] == {"motor_01": 1, "motor_02": 2,
+                                             "motor_30": 30}
+        assert "motor_16" not in out["joint_roms"]
+        assert out["joint_roms"]["motor_30"] == [0, 1]
+
+    def test_what_the_scan_resolved_is_carried_across(self, tmp_path):
+        """Port, family and baud were settled at startup; an id change says
+        nothing about them and must not disturb them."""
+        import yaml
+
+        from orca_ui.hand import bare as bare_mode
+
+        path = tmp_path / "config.yaml"
+        path.write_text(yaml.safe_dump({
+            "port": "/dev/cu.usbmodemXXXX", "motor_type": "feetech",
+            "baudrate": 1_000_000, "motor_ids": [5],
+            "joint_ids": ["motor_05"],
+            "joint_to_motor_map": {"motor_05": 5},
+        }))
+
+        out = yaml.safe_load(
+            open(bare_mode.config_with_motor_id_changed(str(path), 5, 9)))
+
+        assert out["port"] == "/dev/cu.usbmodemXXXX"
+        assert out["motor_type"] == "feetech"
+        assert out["baudrate"] == 1_000_000
