@@ -1596,3 +1596,97 @@ class TestTheBusIsReleasedBeforeTheReconnect:
         supervisor.install_bare_config_object(object())
 
         assert supervisor.order == ["install", "reconnect"]
+
+
+class TestOnlyRatesTheTransportCanCarry:
+    """A motor switches rate the instant the write lands. If the host cannot
+    follow it there, nothing on that port can reach it again -- so a rate the
+    transport will not carry must never be offered."""
+
+    @staticmethod
+    def _service(monkeypatch, transport_rates):
+        from types import SimpleNamespace
+
+        from orca_core.hardware.motor_factory import mock_motor_client_class
+        from orca_ui.hand.service import HandService
+
+        client = mock_motor_client_class("dynamixel")([1, 2])
+        client.connect()
+        client.baudrate = 1_000_000
+        client.transport_baud_rates = lambda: transport_rates
+        session = SimpleNamespace(
+            hand=SimpleNamespace(motor_client=client),
+            caps=SimpleNamespace(motors=True),
+            config=SimpleNamespace(motor_ids=[1, 2]))
+        service = HandService.__new__(HandService)
+        service.settings = SimpleNamespace(bare=True)
+        monkeypatch.setattr(HandService, "session",
+                            property(lambda self: session))
+        return service, client
+
+    def test_a_board_narrows_the_family_map(self, monkeypatch):
+        """The board only re-tunes its wire for some rates and ignores the rest,
+        so the family's nine become six."""
+        from orca_core.hardware.sensing.serial_discovery import (
+            OH_BOARD_MOTOR_BAUD_RATES)
+
+        service, client = self._service(monkeypatch, OH_BOARD_MOTOR_BAUD_RATES)
+
+        offered = service.bus_baud_rates()["rates"]
+        assert offered == [57600, 1_000_000, 2_000_000, 3_000_000,
+                           4_000_000, 4_500_000]
+        assert set(type(client).baud_rate_map) - set(offered) == {
+            9600, 115200, 10_500_000}
+
+    def test_a_plain_adapter_is_not_narrowed(self, monkeypatch):
+        """None means the transport sets no limit of its own, so the family's
+        own map is the only bound -- a direct adapter keeps all nine."""
+        service, client = self._service(monkeypatch, None)
+
+        assert service.bus_baud_rates()["rates"] == sorted(
+            type(client).baud_rate_map)
+
+    def test_a_rate_the_transport_cannot_carry_is_refused(self, monkeypatch):
+        """Refused server-side, not merely absent from the dropdown: this is the
+        request that strands a bus, and anything that can POST can send it."""
+        from orca_core.hardware.sensing.serial_discovery import (
+            OH_BOARD_MOTOR_BAUD_RATES)
+        from orca_ui.hand.service import ServiceError
+
+        service, _ = self._service(monkeypatch, OH_BOARD_MOTOR_BAUD_RATES)
+        service.supervisor = type("S", (), {
+            "status": staticmethod(lambda: type("T", (), {
+                "torque_enabled": False})())})()
+
+        with pytest.raises(ServiceError) as caught:
+            service.set_bus_baud(115200)
+        assert caught.value.status_code == 409
+        assert "cannot carry" in str(caught.value)
+
+    def test_a_rate_no_motor_supports_is_still_refused(self, monkeypatch):
+        """The family check comes first, so an unsupported rate reports that
+        rather than blaming the transport."""
+        from orca_ui.hand.service import ServiceError
+
+        service, _ = self._service(monkeypatch, None)
+
+        with pytest.raises(ServiceError) as caught:
+            service.set_bus_baud(12345)
+        assert "not a rate this family supports" in str(caught.value)
+
+    def test_a_core_without_the_capability_leaves_the_map_alone(self):
+        """A core too old to answer must leave the family's map as the bound,
+        not narrow it to nothing."""
+        from orca_ui.hand.service import HandService
+
+        assert HandService._transport_rates(object()) is None
+
+    def test_a_probe_that_raises_leaves_the_map_alone(self):
+        """Same reasoning: failing to establish a limit is not evidence of one."""
+        from orca_ui.hand.service import HandService
+
+        class Hostile:
+            def transport_baud_rates(self):
+                raise OSError("port went away")
+
+        assert HandService._transport_rates(Hostile()) is None

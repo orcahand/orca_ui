@@ -1673,12 +1673,38 @@ class HandService:
         return result
 
     def bus_baud_rates(self) -> dict:
-        """Rates this bus can be moved to, and the one it is on."""
+        """Rates this bus can be moved to, and the one it is on.
+
+        The family's map intersected with what the transport can carry. A
+        connector board only retunes its wire for certain rates and ignores the
+        rest, so offering the family's map raw offers rates that strand every
+        motor on the bus: they move, the host cannot follow, and nothing on this
+        port can reach them again.
+        """
         session, client = self._config_client()
+        family = sorted(type(client).baud_rate_map)
+        allowed = self._transport_rates(client)
+        rates = family if allowed is None else [r for r in family if r in allowed]
         return {
             "current": int(getattr(client, "baudrate", 0)) or None,
-            "rates": sorted(type(client).baud_rate_map),
+            "rates": rates,
         }
+
+    @staticmethod
+    def _transport_rates(client) -> "tuple | None":
+        """What the transport can carry, or None when it sets no limit.
+
+        None is also what a core too old to answer gives, which keeps the
+        family's map as the bound rather than an empty list.
+        """
+        probe = getattr(client, "transport_baud_rates", None)
+        if probe is None:
+            return None
+        try:
+            return probe()
+        except Exception:
+            logger.exception("could not establish what the transport carries")
+            return None
 
     def set_bus_baud(self, baud_rate: int) -> dict:
         """Move every motor on the bus to a new rate, then re-scan at it.
@@ -1696,6 +1722,14 @@ class HandService:
             raise ServiceError(
                 f"{baud_rate} is not a rate this family supports "
                 f"({sorted(type(client).baud_rate_map)})")
+        # Checked here and not only in the browser: this is the request that
+        # strands a bus, and it is reachable from anything that can POST.
+        allowed = self._transport_rates(client)
+        if allowed is not None and baud_rate not in allowed:
+            raise ServiceError(
+                f"the transport on this port cannot carry {baud_rate} baud, so "
+                f"every motor moved there would be unreachable. It carries "
+                f"{sorted(allowed)}", status_code=409)
         if self.supervisor.status().torque_enabled:
             raise ServiceError(
                 "baud lives in EEPROM and needs torque off", status_code=409)

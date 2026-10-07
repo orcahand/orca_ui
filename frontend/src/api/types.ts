@@ -720,6 +720,8 @@ export interface MotorConfigWriteResult {
 
 export interface BusBaudInfo {
   current: number | null
+  /** Rates that are safe to select: the motor family's own map narrowed to
+   *  what the transport between host and motors can actually carry. */
   rates: number[]
 }
 

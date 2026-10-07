@@ -44,9 +44,10 @@ export function BusBaudPanel({ onClose }: { onClose: () => void }) {
     if (
       !window.confirm(
         `Change ALL ${motorCount} motors on this bus to ${rate.toLocaleString()} baud?\n\n` +
-          'Every motor is rewritten and the bench is re-scanned at the new ' +
-          'rate. A motor that does not take the change is left behind at the ' +
-          'old rate and will not answer until it is set back.',
+          'Every motor is rewritten at the current rate first, then the host ' +
+          'follows the bus to the new one. A motor that does not take the ' +
+          'change is left behind at the old rate and will not answer until it ' +
+          'is set back — which needs a host that can still reach it.',
       )
     )
       return
