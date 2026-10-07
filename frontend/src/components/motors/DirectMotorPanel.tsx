@@ -14,6 +14,8 @@ import type {
 } from '../../api/types'
 import { useStreamFrame } from '../../hooks/useStreamFrame'
 import { useAppStore } from '../../state/appStore'
+import { MotorRegisterPanel } from './MotorRegisterPanel'
+import { BusBaudPanel } from './BusBaudPanel'
 
 const SLIDER_HALF_RANGE_RAD = 0.5 // slider span around the anchor position
 const SEND_THROTTLE_MS = 80
@@ -235,6 +237,12 @@ export function DirectMotorPanel({
       </summary>
       <div style={{ padding: '6px 0 0 0' }}>
         {bench && <BenchPacing />}
+        {bench && (snapshot?.motors.length ?? 0) > 0 && (
+          <>
+            <MotorRegisterPanel motors={snapshot!.motors} />
+            <BusBaudPanel motorCount={snapshot!.motors.length} />
+          </>
+        )}
         <div style={{ color: 'var(--warn)', marginBottom: 6 }}>
           {bench ? (
             <>

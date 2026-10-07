@@ -672,3 +672,57 @@ export interface ServoLimits {
   tunables?: Record<string, ServoLimitEntry>
   per_motor?: Record<string, { velocity_rad_s: number; acceleration_rad_s2: number }>
 }
+
+
+// ----- configuration registers (bare bench) --------------------------------
+// Rendered from what the connected family declares, never from a list here:
+// a family without a setting sends no row for it, and one that gains a
+// setting needs no change in the browser.
+
+export interface MotorConfigRegister {
+  key: string
+  label: string
+  address: number
+  size: number
+  eeprom: boolean
+  unit: string
+  min: number | null
+  max: number | null
+  // Raw value -> meaning. A baud index is 9600 on one family and 1 000 000
+  // on the other, so the raw number must never be shown on its own.
+  choices: Record<string, string> | null
+  // Changing this moves the motor on the bus.
+  reidentifies: boolean
+  note: string
+}
+
+export interface MotorConfigSchema {
+  motor_type: string | null
+  registers: MotorConfigRegister[]
+}
+
+export interface MotorConfigValues {
+  id: number
+  values: Record<string, number | null>
+}
+
+export interface MotorConfigWriteResult {
+  id: number
+  key: string
+  requested: number
+  actual: number | null
+  applied: boolean
+  rescanned: boolean
+}
+
+export interface BusBaudInfo {
+  current: number | null
+  rates: number[]
+}
+
+export interface BusBaudResult {
+  requested: number
+  changed: number[]
+  failed: number[]
+  rescanned: boolean
+}

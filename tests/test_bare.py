@@ -1370,3 +1370,63 @@ class TestBenchDwellMatchesThePlayer:
 
         assert s._bench_period_s == pytest.approx(0.25)
         assert s._bench_interp_steps == 4
+
+
+class TestConfigRegisters:
+    """The control table is a bare-bench control, and a write has to say what
+    actually stuck rather than what was asked for."""
+
+    def test_it_is_refused_on_an_assembled_hand(self, monkeypatch):
+        """An id change there orphans a joint from joint_to_motor_map, and the
+        hand loses it until the config is edited to match.
+
+        monkeypatch, not a direct class assignment: HandService.session is a
+        real property, so overwriting and deleting it strips the attribute
+        from every test that runs afterwards.
+        """
+        from types import SimpleNamespace
+
+        from orca_core.hardware.motor_factory import mock_motor_client_class
+        from orca_ui.hand.service import HandService, ServiceError
+
+        client = mock_motor_client_class("dynamixel")([1])
+        client.connect()
+        session = SimpleNamespace(
+            hand=SimpleNamespace(motor_client=client),
+            caps=SimpleNamespace(motors=True))
+        service = HandService.__new__(HandService)
+        service.settings = SimpleNamespace(bare=False)
+        monkeypatch.setattr(HandService, "session",
+                            property(lambda self: session))
+
+        with pytest.raises(ServiceError, match="bare-bench"):
+            service._config_client()
+
+    def test_a_bare_bench_is_allowed(self, monkeypatch):
+        from types import SimpleNamespace
+
+        from orca_core.hardware.motor_factory import mock_motor_client_class
+        from orca_ui.hand.service import HandService
+
+        client = mock_motor_client_class("dynamixel")([1])
+        client.connect()
+        session = SimpleNamespace(
+            hand=SimpleNamespace(motor_client=client),
+            caps=SimpleNamespace(motors=True))
+        service = HandService.__new__(HandService)
+        service.settings = SimpleNamespace(bare=True)
+        monkeypatch.setattr(HandService, "session",
+                            property(lambda self: session))
+
+        _, resolved = service._config_client()
+        assert resolved is client
+
+    def test_the_schema_is_what_the_family_declares(self):
+        """Not a list the browser holds: a family without a setting sends no
+        row for it."""
+        from orca_core.hardware.motor_factory import motor_client_class
+
+        dxl = {r.key for r in motor_client_class("dynamixel").config_registers}
+        fee = {r.key for r in motor_client_class("feetech").config_registers}
+        assert "return_delay_time" in dxl
+        assert "return_delay_time" not in fee

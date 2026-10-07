@@ -889,6 +889,17 @@ class HandSupervisor(threading.Thread):
         self._install_config(config)
         return True
 
+    def install_bare_config(self, config_path: str) -> None:
+        """Swap in a freshly synthesised bare config and reconnect.
+
+        Bare mode resolves its config once at startup from a bus scan, so a
+        motor that changed id leaves it describing a bus that is no longer
+        there. This is how that gets corrected without restarting.
+        """
+        config = load_config(config_path)
+        self._install_config(config)
+        self.request_reconnect()
+
     def _install_config(self, config) -> None:
         """Put ``config`` in force and repoint everything keyed by the model."""
         with self._lock:

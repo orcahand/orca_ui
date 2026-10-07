@@ -1,6 +1,11 @@
 // Thin fetch wrappers over the REST API. Errors carry the backend's detail.
 
 import type {
+  MotorConfigSchema,
+  MotorConfigValues,
+  MotorConfigWriteResult,
+  BusBaudInfo,
+  BusBaudResult,
   BoardsInfo,
   DemoEntry,
   DirectMotorSnapshot,
@@ -122,6 +127,18 @@ export const api = {
     ),
   setServoProfile: (id: number, profile: Partial<ServoProfile>) =>
     post<{ profile: ServoProfileMap }>(`/api/motors/${id}/profile`, profile),
+
+  motorConfigSchema: () =>
+    request<MotorConfigSchema>('/api/motors/config/schema'),
+  motorConfigTakenIds: () =>
+    request<{ ids: number[] }>('/api/motors/config/taken-ids'),
+  motorConfigRead: (id: number) =>
+    request<MotorConfigValues>(`/api/motors/${id}/config`),
+  motorConfigWrite: (id: number, key: string, value: number) =>
+    post<MotorConfigWriteResult>(`/api/motors/${id}/config`, { key, value }),
+  busBaud: () => request<BusBaudInfo>('/api/motors/bus/baud'),
+  setBusBaud: (baud_rate: number) =>
+    post<BusBaudResult>('/api/motors/bus/baud', { baud_rate }),
 
   models: () => request<ModelsInfo>('/api/models'),
   // name null hands the choice back to hardware detection.

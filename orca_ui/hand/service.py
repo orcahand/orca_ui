@@ -1553,6 +1553,175 @@ class HandService:
         self._bench_ranges[motor_id] = (low, high)
         return {"id": motor_id, "range_rad": [low, high]}
 
+    # ----- configuration registers (bare bench only) --------------------------
+
+    def _config_client(self):
+        """The motor client, with the editable-register surface it declares."""
+        session = self._require_motors()
+        if not self.settings.bare:
+            raise ServiceError(
+                "editing configuration registers is a bare-bench control: on "
+                "an assembled hand an id change orphans a joint from its "
+                "config", status_code=409)
+        client = getattr(session.hand, "motor_client", None)
+        if client is None or not getattr(client, "config_registers", ()):
+            raise ServiceError(
+                "this motor family declares no editable registers",
+                status_code=409)
+        return session, client
+
+    def motor_config_schema(self) -> dict:
+        """What this family lets an operator change, for the browser to render.
+
+        Rendered from the declaration rather than a list in the front-end, so
+        a family that lacks a setting shows no row for it and one that gains
+        one needs no browser change.
+        """
+        _, client = self._config_client()
+        return {
+            "motor_type": getattr(type(client), "motor_type", None),
+            "registers": [
+                {
+                    "key": r.key,
+                    "label": r.label,
+                    "address": r.address,
+                    "size": r.size,
+                    "eeprom": r.eeprom,
+                    "unit": r.unit,
+                    "min": r.minimum,
+                    "max": r.maximum,
+                    "choices": ({str(k): v for k, v in r.choices.items()}
+                                if r.choices else None),
+                    "reidentifies": r.reidentifies,
+                    "note": r.note,
+                }
+                for r in client.config_registers
+            ],
+        }
+
+    def read_motor_config(self, motor_id: int) -> dict:
+        """Every declared register for one motor. None where it did not answer."""
+        _, client = self._config_client()
+        motor_id = int(motor_id)
+        values: dict[str, "int | None"] = {}
+        for entry in client.config_registers:
+            try:
+                values[entry.key] = client.read_config_register(motor_id, entry.key)
+            except Exception:
+                logger.debug("config read failed: motor %s %s",
+                             motor_id, entry.key, exc_info=True)
+                values[entry.key] = None
+        return {"id": motor_id, "values": values}
+
+    def taken_motor_ids(self) -> "list[int]":
+        """Ids already answering on this bus, which a re-id may not collide with.
+
+        Two motors on one id is not a degraded bus, it is a broken one: one of
+        them silently takes the other's commands.
+        """
+        session = self._require_motors()
+        return sorted(int(m) for m in session.hand.config.motor_ids)
+
+    def write_motor_config(self, motor_id: int, key: str, value: int) -> dict:
+        """Write one register, read it back, and say what actually stuck.
+
+        An id change moves the motor, so the bench is re-scanned and the
+        session rebuilt around what is there now -- the browser keeps its
+        connection and the motor reappears under its new id.
+        """
+        session, client = self._config_client()
+        motor_id, value = int(motor_id), int(value)
+        if key == "id" and value != motor_id and value in self.taken_motor_ids():
+            raise ServiceError(
+                f"id {value} is already on this bus; two motors on one id "
+                "means one silently takes the other's commands")
+        if self.supervisor.status().torque_enabled:
+            raise ServiceError(
+                "these are EEPROM registers and need torque off",
+                status_code=409)
+        try:
+            actual = client.write_config_register(motor_id, key, value)
+        except ValueError as e:
+            raise ServiceError(str(e))
+        except Exception as e:
+            raise ServiceError(f"motor {motor_id}: {key} write failed: {e}")
+
+        result = {"id": motor_id, "key": key, "requested": value,
+                  "actual": actual, "applied": actual == value,
+                  "rescanned": False}
+        if key == "id" and actual == value:
+            result["id"] = value
+            result["rescanned"] = self._rebuild_bare_session()
+        return result
+
+    def bus_baud_rates(self) -> dict:
+        """Rates this bus can be moved to, and the one it is on."""
+        session, client = self._config_client()
+        return {
+            "current": int(getattr(client, "baudrate", 0)) or None,
+            "rates": sorted(type(client).baud_rate_map),
+        }
+
+    def set_bus_baud(self, baud_rate: int) -> dict:
+        """Move every motor on the bus to a new rate, then re-scan at it.
+
+        Bus-wide by necessity, not by choice. A motor switches rate the
+        instant the write lands, and the port can only be open at one rate --
+        so changing one motor orphans it from the rest. Changing all of them
+        and following the bus is the only version of this that leaves a
+        working bench.
+        """
+        session, client = self._config_client()
+        baud_rate = int(baud_rate)
+        if baud_rate not in type(client).baud_rate_map:
+            raise ServiceError(
+                f"{baud_rate} is not a rate this family supports "
+                f"({sorted(type(client).baud_rate_map)})")
+        if self.supervisor.status().torque_enabled:
+            raise ServiceError(
+                "baud lives in EEPROM and needs torque off", status_code=409)
+
+        motor_ids = sorted(int(m) for m in session.hand.config.motor_ids)
+        changed, failed = [], []
+        for motor_id in motor_ids:
+            try:
+                if client.change_motor_baudrate(motor_id, baud_rate):
+                    changed.append(motor_id)
+                else:
+                    failed.append(motor_id)
+            except Exception:
+                logger.debug("baud change failed: motor %s", motor_id,
+                             exc_info=True)
+                failed.append(motor_id)
+        # Re-scan whatever the outcome: a partial change is exactly when the
+        # operator most needs to see which motors are where.
+        rescanned = self._rebuild_bare_session()
+        return {"requested": baud_rate, "changed": changed, "failed": failed,
+                "rescanned": rescanned}
+
+    def _rebuild_bare_session(self) -> bool:
+        """Re-scan the bench and rebuild the session around what answered.
+
+        The bare config is synthesised once at startup, so a motor that has
+        moved leaves it describing a bus that no longer exists. Rescanning
+        costs a couple of seconds and no restart: the browser holds its
+        socket and watches the session come back.
+        """
+        from orca_ui.hand import bare as bare_mode
+
+        port = self.supervisor.config.port
+        try:
+            scan = bare_mode.scan_bus(port)
+            if not scan.motors:
+                logger.warning("re-scan of %s found no motors", port)
+                return False
+            config_path = bare_mode.synthesize_config(scan)
+            self.supervisor.install_bare_config(config_path)
+        except Exception:
+            logger.exception("bare re-scan failed")
+            return False
+        return True
+
     def declare_motor(self, motor_id: int, model_key: "str | None",
                       nickname: "str | None") -> dict:
         """Record what the operator says is at this ID.
