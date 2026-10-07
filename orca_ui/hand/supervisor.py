@@ -889,6 +889,46 @@ class HandSupervisor(threading.Thread):
         self._install_config(config)
         return True
 
+    def install_bare_config_object(self, config) -> None:
+        """Swap in a freshly scanned bare config and reconnect.
+
+        Bare mode resolves its config once at startup from a bus scan, so a
+        motor that changed id leaves it describing a bus that is no longer
+        there. This is how that gets corrected without restarting.
+
+        Takes a loaded config rather than a path because the caller has to
+        read it while the bus is free, and the bus is free only inside the
+        maintenance window it opened to scan.
+        """
+        self._release_bus_for_reidentify()
+        self._install_config(config)
+        self.request_reconnect()
+
+    def _release_bus_for_reidentify(self) -> None:
+        """Close the port before the reconnect that follows an id or baud change.
+
+        This teardown is provoked by a bus transaction, so unlike every other
+        one it starts with the bus live. The clients' own ``disconnect`` reads
+        the SDK in-use flag before taking the bus lock and abandons the close
+        when it is set, which here is likely to be a true answer about the
+        telemetry sampler -- and abandoning it leaves the port open, so the
+        reconnect cannot replace the handler and the bench stays down.
+        ``disconnect_fixed_lock_order`` waits for the bus instead.
+
+        Best-effort: the session close that follows is still the thing that
+        guarantees teardown, and a core without this method keeps its own
+        behaviour.
+        """
+        session = self._session
+        client = getattr(getattr(session, "hand", None), "motor_client", None)
+        close = getattr(client, "disconnect_fixed_lock_order", None)
+        if close is None:
+            return
+        try:
+            close()
+        except Exception:
+            logger.exception("could not release the bus before reconnecting")
+
     def _install_config(self, config) -> None:
         """Put ``config`` in force and repoint everything keyed by the model."""
         with self._lock:

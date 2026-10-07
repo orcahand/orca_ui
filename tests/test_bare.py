@@ -1370,3 +1370,350 @@ class TestBenchDwellMatchesThePlayer:
 
         assert s._bench_period_s == pytest.approx(0.25)
         assert s._bench_interp_steps == 4
+
+
+class TestConfigRegisters:
+    """The control table is a bare-bench control, and a write has to say what
+    actually stuck rather than what was asked for."""
+
+    def test_it_is_refused_on_an_assembled_hand(self, monkeypatch):
+        """An id change there orphans a joint from joint_to_motor_map, and the
+        hand loses it until the config is edited to match.
+
+        monkeypatch, not a direct class assignment: HandService.session is a
+        real property, so overwriting and deleting it strips the attribute
+        from every test that runs afterwards.
+        """
+        from types import SimpleNamespace
+
+        from orca_core.hardware.motor_factory import mock_motor_client_class
+        from orca_ui.hand.service import HandService, ServiceError
+
+        client = mock_motor_client_class("dynamixel")([1])
+        client.connect()
+        session = SimpleNamespace(
+            hand=SimpleNamespace(motor_client=client),
+            caps=SimpleNamespace(motors=True))
+        service = HandService.__new__(HandService)
+        service.settings = SimpleNamespace(bare=False)
+        monkeypatch.setattr(HandService, "session",
+                            property(lambda self: session))
+
+        with pytest.raises(ServiceError, match="bare-bench"):
+            service._config_client()
+
+    def test_a_bare_bench_is_allowed(self, monkeypatch):
+        from types import SimpleNamespace
+
+        from orca_core.hardware.motor_factory import mock_motor_client_class
+        from orca_ui.hand.service import HandService
+
+        client = mock_motor_client_class("dynamixel")([1])
+        client.connect()
+        session = SimpleNamespace(
+            hand=SimpleNamespace(motor_client=client),
+            caps=SimpleNamespace(motors=True))
+        service = HandService.__new__(HandService)
+        service.settings = SimpleNamespace(bare=True)
+        monkeypatch.setattr(HandService, "session",
+                            property(lambda self: session))
+
+        _, resolved = service._config_client()
+        assert resolved is client
+
+    def test_the_schema_is_what_the_family_declares(self):
+        """Not a list the browser holds: a family without a setting sends no
+        row for it."""
+        from orca_core.hardware.motor_factory import motor_client_class
+
+        dxl = {r.key for r in motor_client_class("dynamixel").config_registers}
+        fee = {r.key for r in motor_client_class("feetech").config_registers}
+        assert "return_delay_time" in dxl
+        assert "return_delay_time" not in fee
+
+    def test_the_startup_range_reaches_a_second_chain(self):
+        """Two hands cannot both use 1-17, so the second is shifted clear.
+        Measured on a 17-motor chain: 0-40 costs 3.1 s against 1.9 s for
+        0-25, where the full 0-253 costs 21.1 s."""
+        from orca_ui.hand import bare as bare_mode
+
+        assert bare_mode.DEFAULT_ID_RANGE[1] >= 34
+        assert bare_mode.DEFAULT_ID_RANGE[1] < bare_mode.FULL_ID_RANGE[1]
+
+    def test_the_offered_ids_are_the_ids_startup_will_find(self, monkeypatch):
+        """Otherwise a write succeeds and the motor is gone after a restart --
+        answering on the bus, with nothing looking for it there."""
+        from types import SimpleNamespace
+
+        from orca_core.hardware.motor_factory import mock_motor_client_class
+        from orca_ui.hand import bare as bare_mode
+        from orca_ui.hand.service import HandService
+
+        client = mock_motor_client_class("feetech")([1])
+        client.connect()
+        session = SimpleNamespace(
+            hand=SimpleNamespace(motor_client=client),
+            caps=SimpleNamespace(motors=True))
+        service = HandService.__new__(HandService)
+        service.settings = SimpleNamespace(bare=True)
+        monkeypatch.setattr(HandService, "session",
+                            property(lambda self: session))
+
+        assert service.reachable_id_range() == bare_mode.DEFAULT_ID_RANGE
+        assert service.motor_config_schema()["id_range"] == list(
+            bare_mode.DEFAULT_ID_RANGE)
+
+    def test_an_id_change_is_followed_without_a_bus_scan(self, tmp_path):
+        """The write is already confirmed by a read-back at the new id, so
+        rediscovering the motor would mean sweeping 254 ids at a bus timeout
+        each -- ten seconds of maintenance to learn what is already known."""
+        import yaml
+
+        from orca_ui.hand import bare as bare_mode
+
+        path = tmp_path / "config.yaml"
+        path.write_text(yaml.safe_dump({
+            "port": "/dev/cu.usbmodemXXXX", "motor_type": "feetech",
+            "baudrate": 1_000_000, "motor_ids": [1, 2, 16],
+            "joint_ids": ["motor_01", "motor_02", "motor_16"],
+            "joint_to_motor_map": {"motor_01": 1, "motor_02": 2, "motor_16": 16},
+            "joint_roms": {"motor_01": [0, 1], "motor_02": [0, 1],
+                           "motor_16": [0, 1]},
+            "neutral_position": {"motor_01": 0.5, "motor_02": 0.5,
+                                 "motor_16": 0.5},
+        }))
+
+        out = yaml.safe_load(
+            open(bare_mode.config_with_motor_id_changed(str(path), 16, 30)))
+
+        assert out["motor_ids"] == [1, 2, 30]
+        assert out["joint_ids"] == ["motor_01", "motor_02", "motor_30"]
+        assert out["joint_to_motor_map"] == {"motor_01": 1, "motor_02": 2,
+                                             "motor_30": 30}
+        assert "motor_16" not in out["joint_roms"]
+        assert out["joint_roms"]["motor_30"] == [0, 1]
+
+    def test_what_the_scan_resolved_is_carried_across(self, tmp_path):
+        """Port, family and baud were settled at startup; an id change says
+        nothing about them and must not disturb them."""
+        import yaml
+
+        from orca_ui.hand import bare as bare_mode
+
+        path = tmp_path / "config.yaml"
+        path.write_text(yaml.safe_dump({
+            "port": "/dev/cu.usbmodemXXXX", "motor_type": "feetech",
+            "baudrate": 1_000_000, "motor_ids": [5],
+            "joint_ids": ["motor_05"],
+            "joint_to_motor_map": {"motor_05": 5},
+        }))
+
+        out = yaml.safe_load(
+            open(bare_mode.config_with_motor_id_changed(str(path), 5, 9)))
+
+        assert out["port"] == "/dev/cu.usbmodemXXXX"
+        assert out["motor_type"] == "feetech"
+        assert out["baudrate"] == 1_000_000
+
+
+class TestTheBusIsReleasedBeforeTheReconnect:
+    """An id or baud change is the one teardown that starts with the bus live:
+    the transaction that caused it has only just finished."""
+
+    @staticmethod
+    def _supervisor(client):
+        from types import SimpleNamespace
+
+        from orca_ui.hand.supervisor import HandSupervisor
+
+        supervisor = HandSupervisor.__new__(HandSupervisor)
+        supervisor._session = SimpleNamespace(
+            hand=SimpleNamespace(motor_client=client))
+        supervisor.order = []
+        supervisor._install_config = lambda config: supervisor.order.append(
+            "install")
+        supervisor.request_reconnect = lambda: supervisor.order.append(
+            "reconnect")
+        return supervisor
+
+    def test_the_port_is_closed_before_the_config_is_swapped(self):
+        """Closing it afterwards would be too late: the connect ladder starts
+        on the reconnect, and it cannot replace a handler whose port is open."""
+        from types import SimpleNamespace
+
+        calls = []
+        supervisor = self._supervisor(SimpleNamespace(
+            disconnect_fixed_lock_order=lambda: calls.append("closed")))
+
+        supervisor.install_bare_config_object(object())
+
+        assert supervisor.order == ["install", "reconnect"]
+        assert calls == ["closed"]
+
+    def test_it_uses_the_teardown_that_waits_for_the_bus(self):
+        """Not plain disconnect, which reads the SDK in-use flag before taking
+        the bus lock and gives up when a sampler happens to hold it -- leaving
+        the port open with nothing scheduled to try again."""
+        from types import SimpleNamespace
+
+        calls = []
+        supervisor = self._supervisor(SimpleNamespace(
+            disconnect=lambda: calls.append("disconnect"),
+            disconnect_fixed_lock_order=lambda: calls.append("fixed")))
+
+        supervisor.install_bare_config_object(object())
+
+        assert calls == ["fixed"]
+
+    def test_a_core_without_it_keeps_its_own_behaviour(self):
+        from types import SimpleNamespace
+
+        supervisor = self._supervisor(SimpleNamespace())
+
+        supervisor.install_bare_config_object(object())
+
+        assert supervisor.order == ["install", "reconnect"]
+
+    def test_a_close_that_raises_does_not_strand_the_reconnect(self):
+        """The session close that follows is still the guarantee; this is an
+        attempt to make it land cleanly, not a prerequisite for it."""
+        from types import SimpleNamespace
+
+        def boom():
+            raise OSError("port already gone")
+
+        supervisor = self._supervisor(
+            SimpleNamespace(disconnect_fixed_lock_order=boom))
+
+        supervisor.install_bare_config_object(object())
+
+        assert supervisor.order == ["install", "reconnect"]
+
+    def test_no_session_is_not_an_error(self):
+        supervisor = self._supervisor(None)
+        supervisor._session = None
+
+        supervisor.install_bare_config_object(object())
+
+        assert supervisor.order == ["install", "reconnect"]
+
+
+class TestOnlyRatesTheTransportCanCarry:
+    """A motor switches rate the instant the write lands. If the host cannot
+    follow it there, nothing on that port can reach it again -- so a rate the
+    transport will not carry must never be offered."""
+
+    @staticmethod
+    def _service(monkeypatch, transport_rates):
+        from types import SimpleNamespace
+
+        from orca_core.hardware.motor_factory import mock_motor_client_class
+        from orca_ui.hand.service import HandService
+
+        client = mock_motor_client_class("dynamixel")([1, 2])
+        client.connect()
+        client.baudrate = 1_000_000
+        client.transport_baud_rates = lambda: transport_rates
+        session = SimpleNamespace(
+            hand=SimpleNamespace(motor_client=client),
+            caps=SimpleNamespace(motors=True),
+            config=SimpleNamespace(motor_ids=[1, 2]))
+        service = HandService.__new__(HandService)
+        service.settings = SimpleNamespace(bare=True)
+        monkeypatch.setattr(HandService, "session",
+                            property(lambda self: session))
+        return service, client
+
+    def test_a_board_narrows_the_family_map(self, monkeypatch):
+        """The board only re-tunes its wire for some rates and ignores the rest,
+        so the family's nine become six."""
+        from orca_core.hardware.sensing.serial_discovery import (
+            OH_BOARD_MOTOR_BAUD_RATES)
+
+        service, client = self._service(monkeypatch, OH_BOARD_MOTOR_BAUD_RATES)
+
+        offered = service.bus_baud_rates()["rates"]
+        assert offered == [57600, 1_000_000, 2_000_000, 3_000_000,
+                           4_000_000, 4_500_000]
+        assert set(type(client).baud_rate_map) - set(offered) == {
+            9600, 115200, 10_500_000}
+
+    def test_a_plain_adapter_is_not_narrowed(self, monkeypatch):
+        """None means the transport sets no limit of its own, so the family's
+        own map is the only bound -- a direct adapter keeps all nine."""
+        service, client = self._service(monkeypatch, None)
+
+        assert service.bus_baud_rates()["rates"] == sorted(
+            type(client).baud_rate_map)
+
+    def test_a_rate_the_transport_cannot_carry_is_refused(self, monkeypatch):
+        """Refused server-side, not merely absent from the dropdown: this is the
+        request that strands a bus, and anything that can POST can send it."""
+        from orca_core.hardware.sensing.serial_discovery import (
+            OH_BOARD_MOTOR_BAUD_RATES)
+        from orca_ui.hand.service import ServiceError
+
+        service, _ = self._service(monkeypatch, OH_BOARD_MOTOR_BAUD_RATES)
+        service.supervisor = type("S", (), {
+            "status": staticmethod(lambda: type("T", (), {
+                "torque_enabled": False})())})()
+
+        with pytest.raises(ServiceError) as caught:
+            service.set_bus_baud(115200)
+        assert caught.value.status_code == 409
+        assert "cannot carry" in str(caught.value)
+
+    def test_a_rate_no_motor_supports_is_still_refused(self, monkeypatch):
+        """The family check comes first, so an unsupported rate reports that
+        rather than blaming the transport."""
+        from orca_ui.hand.service import ServiceError
+
+        service, _ = self._service(monkeypatch, None)
+
+        with pytest.raises(ServiceError) as caught:
+            service.set_bus_baud(12345)
+        assert "not a rate this family supports" in str(caught.value)
+
+    def test_a_core_that_cannot_be_asked_is_not_read_as_no_limit(self):
+        """The distinction that matters. A core too old to answer tells us
+        nothing about the transport, and a rate the transport will not follow
+        strands every motor on the bus -- so 'unknown' must not collapse into
+        'unconstrained'."""
+        from orca_ui.hand.service import HandService
+
+        assert HandService._transport_rates(object()) is \
+            HandService.UNKNOWN_TRANSPORT
+
+    def test_a_probe_that_raises_is_also_unknown(self):
+        """Failing to establish a limit is not evidence that there is none."""
+        from orca_ui.hand.service import HandService
+
+        class Hostile:
+            def transport_baud_rates(self):
+                raise OSError("port went away")
+
+        assert HandService._transport_rates(Hostile()) is \
+            HandService.UNKNOWN_TRANSPORT
+
+    def test_an_unaskable_core_offers_no_rates_rather_than_every_rate(self,
+                                                                     monkeypatch):
+        """Which is what makes the browser say why, instead of quietly handing
+        back the nine rates three of which strand the bus."""
+        service, client = self._service(monkeypatch, None)
+        client.transport_baud_rates = None  # as an older core presents
+
+        assert service.bus_baud_rates()["rates"] == []
+
+    def test_an_unaskable_core_refuses_the_write(self, monkeypatch):
+        from orca_ui.hand.service import ServiceError
+
+        service, client = self._service(monkeypatch, None)
+        client.transport_baud_rates = None
+        service.supervisor = type("S", (), {
+            "status": staticmethod(lambda: type("T", (), {
+                "torque_enabled": False})())})()
+
+        with pytest.raises(ServiceError) as caught:
+            service.set_bus_baud(1_000_000)
+        assert caught.value.status_code == 409
+        assert "0.5.3" in str(caught.value)

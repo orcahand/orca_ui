@@ -199,3 +199,16 @@ class BenchPacingRequest(BaseModel):
     interp_steps: int = 1
     max_settle_ms: "int | None" = None
     period_ms: "int | None" = None
+
+
+class MotorConfigWriteRequest(BaseModel):
+    """One configuration register on one motor."""
+
+    key: str
+    value: int
+
+
+class BusBaudRequest(BaseModel):
+    """A new rate for every motor on the bus."""
+
+    baud_rate: int

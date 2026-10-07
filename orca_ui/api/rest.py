@@ -317,6 +317,30 @@ def build_router(service: HandService) -> APIRouter:
     def motors_direct_declare(body: schemas.MotorDeclareRequest):
         return guard(service.declare_motor, body.id, body.model, body.nickname)
 
+    @router.get("/motors/config/schema")
+    def motors_config_schema():
+        return guard(service.motor_config_schema)
+
+    @router.get("/motors/config/taken-ids")
+    def motors_config_taken_ids():
+        return {"ids": guard(service.taken_motor_ids)}
+
+    @router.get("/motors/{motor_id}/config")
+    def motors_config_read(motor_id: int):
+        return guard(service.read_motor_config, motor_id)
+
+    @router.post("/motors/{motor_id}/config")
+    def motors_config_write(motor_id: int, body: schemas.MotorConfigWriteRequest):
+        return guard(service.write_motor_config, motor_id, body.key, body.value)
+
+    @router.get("/motors/bus/baud")
+    def motors_bus_baud():
+        return guard(service.bus_baud_rates)
+
+    @router.post("/motors/bus/baud")
+    def motors_bus_baud_set(body: schemas.BusBaudRequest):
+        return guard(service.set_bus_baud, body.baud_rate)
+
     @router.post("/motors/direct/pacing")
     def motors_direct_pacing(body: schemas.BenchPacingRequest):
         return guard(service.set_bench_pacing,

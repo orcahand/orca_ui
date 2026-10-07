@@ -36,6 +36,7 @@ from orca_ui.hand.supervisor import (
     HandBusyError,
     HandSupervisor,
     ModelSelectError,
+    load_config,
     model_name_of,
 )
 from orca_ui.library import Library, LibraryError
@@ -1552,6 +1553,261 @@ class HandService:
                 f"travel ({span[0]:.3f} to {span[1]:.3f} rad)")
         self._bench_ranges[motor_id] = (low, high)
         return {"id": motor_id, "range_rad": [low, high]}
+
+    # ----- configuration registers (bare bench only) --------------------------
+
+    def _config_client(self):
+        """The motor client, with the editable-register surface it declares."""
+        session = self._require_motors()
+        if not self.settings.bare:
+            raise ServiceError(
+                "editing configuration registers is a bare-bench control: on "
+                "an assembled hand an id change orphans a joint from its "
+                "config", status_code=409)
+        client = getattr(session.hand, "motor_client", None)
+        if client is None or not getattr(client, "config_registers", ()):
+            raise ServiceError(
+                "this motor family declares no editable registers",
+                status_code=409)
+        return session, client
+
+    def motor_config_schema(self) -> dict:
+        """What this family lets an operator change, for the browser to render.
+
+        Rendered from the declaration rather than a list in the front-end, so
+        a family that lacks a setting shows no row for it and one that gains
+        one needs no browser change.
+        """
+        _, client = self._config_client()
+        low, high = self.reachable_id_range()
+        return {
+            "motor_type": getattr(type(client), "motor_type", None),
+            "id_range": [low, high],
+            "registers": [
+                {
+                    "key": r.key,
+                    "label": r.label,
+                    "address": r.address,
+                    "size": r.size,
+                    "eeprom": r.eeprom,
+                    "unit": r.unit,
+                    "min": r.minimum,
+                    "max": r.maximum,
+                    "choices": ({str(k): v for k, v in r.choices.items()}
+                                if r.choices else None),
+                    "reidentifies": r.reidentifies,
+                    "note": r.note,
+                }
+                for r in client.config_registers
+            ],
+        }
+
+    def read_motor_config(self, motor_id: int) -> dict:
+        """Every declared register for one motor. None where it did not answer."""
+        _, client = self._config_client()
+        motor_id = int(motor_id)
+        values: dict[str, "int | None"] = {}
+        for entry in client.config_registers:
+            try:
+                values[entry.key] = client.read_config_register(motor_id, entry.key)
+            except Exception:
+                logger.debug("config read failed: motor %s %s",
+                             motor_id, entry.key, exc_info=True)
+                values[entry.key] = None
+        return {"id": motor_id, "values": values}
+
+    def reachable_id_range(self) -> "tuple[int, int]":
+        """Ids a bench re-scan will find after a change.
+
+        The id register allows far more than this, but offering an id the
+        startup scan cannot reach means a write that succeeds and a motor that
+        comes back missing after the next restart -- it is answering, nothing
+        is looking for it there. Observed exactly that: a motor moved to 30
+        survived the change and was gone on relaunch.
+
+        So the settable ids are the scanned ids. Widening one widens the other.
+        """
+        from orca_ui.hand import bare as bare_mode
+
+        return bare_mode.DEFAULT_ID_RANGE
+
+    def taken_motor_ids(self) -> "list[int]":
+        """Ids already answering on this bus, which a re-id may not collide with.
+
+        Two motors on one id is not a degraded bus, it is a broken one: one of
+        them silently takes the other's commands.
+        """
+        session = self._require_motors()
+        return sorted(int(m) for m in session.hand.config.motor_ids)
+
+    def write_motor_config(self, motor_id: int, key: str, value: int) -> dict:
+        """Write one register, read it back, and say what actually stuck.
+
+        An id change moves the motor, so the bench is re-scanned and the
+        session rebuilt around what is there now -- the browser keeps its
+        connection and the motor reappears under its new id.
+        """
+        session, client = self._config_client()
+        motor_id, value = int(motor_id), int(value)
+        if key == "id" and value != motor_id and value in self.taken_motor_ids():
+            raise ServiceError(
+                f"id {value} is already on this bus; two motors on one id "
+                "means one silently takes the other's commands")
+        if self.supervisor.status().torque_enabled:
+            raise ServiceError(
+                "these are EEPROM registers and need torque off",
+                status_code=409)
+        try:
+            actual = client.write_config_register(motor_id, key, value)
+        except ValueError as e:
+            raise ServiceError(str(e))
+        except Exception as e:
+            raise ServiceError(f"motor {motor_id}: {key} write failed: {e}")
+
+        result = {"id": motor_id, "key": key, "requested": value,
+                  "actual": actual, "applied": actual == value,
+                  "rescanned": False}
+        if key == "id" and actual == value:
+            result["id"] = value
+            result["rescanned"] = self._follow_motor_id(motor_id, value)
+        return result
+
+    def bus_baud_rates(self) -> dict:
+        """Rates this bus can be moved to, and the one it is on.
+
+        The family's map intersected with what the transport can carry. A
+        connector board only retunes its wire for certain rates and ignores the
+        rest, so offering the family's map raw offers rates that strand every
+        motor on the bus: they move, the host cannot follow, and nothing on this
+        port can reach them again.
+        """
+        session, client = self._config_client()
+        family = sorted(type(client).baud_rate_map)
+        allowed = self._transport_rates(client)
+        if allowed is self.UNKNOWN_TRANSPORT:
+            # Nothing offered rather than everything. A core that cannot say
+            # what the port carries cannot rule out the rates that strand a
+            # bus, and the browser names the version that can.
+            rates = []
+        elif allowed is None:
+            rates = family
+        else:
+            rates = [r for r in family if r in allowed]
+        return {
+            "current": int(getattr(client, "baudrate", 0)) or None,
+            "rates": rates,
+        }
+
+    UNKNOWN_TRANSPORT = object()
+    """The core could not be asked what the transport carries.
+
+    Distinct from ``None``, which is a core answering "no limit of my own". The
+    difference decides whether offering the family's whole map is safe: a rate
+    the transport will not follow strands every motor on the bus beyond the
+    host's reach, so not knowing is not the same as knowing there is no limit.
+    """
+
+    @classmethod
+    def _transport_rates(cls, client):
+        """What the transport can carry, ``None`` for no limit, or
+        :attr:`UNKNOWN_TRANSPORT` when the question could not be put."""
+        probe = getattr(client, "transport_baud_rates", None)
+        if probe is None:
+            return cls.UNKNOWN_TRANSPORT
+        try:
+            return probe()
+        except Exception:
+            logger.exception("could not establish what the transport carries")
+            return cls.UNKNOWN_TRANSPORT
+
+    def set_bus_baud(self, baud_rate: int) -> dict:
+        """Move every motor on the bus to a new rate, then re-scan at it.
+
+        Bus-wide by necessity, not by choice. A motor switches rate the
+        instant the write lands, and the port can only be open at one rate --
+        so changing one motor orphans it from the rest. Changing all of them
+        and following the bus is the only version of this that leaves a
+        working bench.
+        """
+        session, client = self._config_client()
+        baud_rate = int(baud_rate)
+        index = type(client).baud_rate_map.get(baud_rate)
+        if index is None:
+            raise ServiceError(
+                f"{baud_rate} is not a rate this family supports "
+                f"({sorted(type(client).baud_rate_map)})")
+        # Checked here and not only in the browser: this is the request that
+        # strands a bus, and it is reachable from anything that can POST.
+        allowed = self._transport_rates(client)
+        if allowed is self.UNKNOWN_TRANSPORT:
+            raise ServiceError(
+                "this orca_core cannot report which rates the port's transport "
+                "carries, and a rate it will not follow strands every motor on "
+                "the bus. Update orca_core to 0.5.3 or newer and reconnect",
+                status_code=409)
+        if allowed is not None and baud_rate not in allowed:
+            raise ServiceError(
+                f"the transport on this port cannot carry {baud_rate} baud, so "
+                f"every motor moved there would be unreachable. It carries "
+                f"{sorted(allowed)}", status_code=409)
+        if self.supervisor.status().torque_enabled:
+            raise ServiceError(
+                "baud lives in EEPROM and needs torque off", status_code=409)
+
+        motor_ids = sorted(int(m) for m in session.hand.config.motor_ids)
+        # Every motor is told at the rate the bus is still running at, and
+        # none of them is followed in between. A per-motor helper that
+        # reopened the port would move the host after the first write and
+        # leave the other sixteen unreachable at the old rate -- the exact
+        # orphaning this control exists to avoid.
+        changed, failed = [], []
+        for motor_id in motor_ids:
+            try:
+                client.write_config_register(motor_id, "baud_rate", index)
+                changed.append(motor_id)
+            except Exception:
+                logger.debug("baud write failed: motor %s", motor_id,
+                             exc_info=True)
+                failed.append(motor_id)
+
+        # Now the host follows. A motor that refused the write is still at the
+        # old rate and will not answer; the reconnect is what reveals which.
+        rescanned = False
+        try:
+            from orca_ui.hand import bare as bare_mode
+
+            config = load_config(bare_mode.config_with_baud_changed(
+                self.supervisor.config.config_path, baud_rate))
+            self.supervisor.install_bare_config_object(config)
+            rescanned = True
+        except Exception:
+            logger.exception("could not follow the bus to %d baud", baud_rate)
+
+        return {"requested": baud_rate, "changed": changed, "failed": failed,
+                "rescanned": rescanned}
+
+    def _follow_motor_id(self, old_id: int, new_id: int) -> bool:
+        """Point the session at the motor's new id and reconnect.
+
+        No bus scan. The write was already confirmed by reading the register
+        back at the new id, so where the motor is, is known -- rediscovering
+        it would mean sweeping every id the register allows, a bus timeout
+        each, and taking the bench down for ten seconds to learn nothing new.
+
+        Only the session is rebuilt, which the client needs because its motor
+        ids are fixed when it is constructed.
+        """
+        from orca_ui.hand import bare as bare_mode
+
+        try:
+            config_path = bare_mode.config_with_motor_id_changed(
+                self.supervisor.config.config_path, int(old_id), int(new_id))
+            config = load_config(config_path)
+        except Exception:
+            logger.exception("could not repoint the bench at motor %s", new_id)
+            return False
+        self.supervisor.install_bare_config_object(config)
+        return True
 
     def declare_motor(self, motor_id: int, model_key: "str | None",
                       nickname: "str | None") -> dict:

@@ -31,16 +31,23 @@ from orca_core.constants import (
 )
 from orca_core.hardware.motor_factory import motor_client_class
 from orca_core.maintenance.motor_chain import scan_motors
-from orca_core.utils.utils import write_yaml_atomic
+from orca_core.utils.utils import read_yaml, write_yaml_atomic
 
 logger = logging.getLogger(__name__)
 
 # The rate every packaged hand runs at, and the first one worth trying.
 PREFERRED_BAUD = 1_000_000
 # Motors are numbered from 1 up in every hand, and a factory-fresh servo
-# answers at 1. Scanning past the twenties only pays off on a motor someone
-# has deliberately programmed high, which is what --scan-all is for.
-DEFAULT_ID_RANGE = (0, 25)
+# answers at 1. 40 covers two 17-motor chains, so a second hand shifted clear
+# of the first is still found, and it is what bounds the ids the control table
+# will offer -- an id that can be set has to be an id that is found again
+# after a restart.
+#
+# Measured on a 17-motor chain: 0-25 takes 1.9 s, 0-40 takes 3.1 s, and the
+# full 0-253 takes 21.1 s. The sweep costs a bus timeout per silent id and
+# runs once per family, so a Feetech bus pays for the Dynamixel pass too.
+# --scan-all is there for the rare motor deliberately programmed high.
+DEFAULT_ID_RANGE = (0, 40)
 FULL_ID_RANGE = (0, 253)
 
 # Fallback span for a family that declares no single-turn limit (Dynamixel is
@@ -234,6 +241,59 @@ def synthesize_config(scan: BareScan, *, side: str = "right") -> str:
         # Nothing to calibrate: there is no hardstop to find on a loose motor.
         "calibration_sequence": [],
     }
+    run_dir = os.path.join(tempfile.mkdtemp(prefix="orca_ui_bare_"), "bare-motors")
+    os.makedirs(run_dir)
+    path = os.path.join(run_dir, "config.yaml")
+    write_yaml_atomic(path, config)
+    return path
+
+
+def config_with_motor_id_changed(config_path: str, old_id: int,
+                                 new_id: int) -> str:
+    """A copy of ``config_path`` with one motor's id substituted.
+
+    Used after an id write, which has already been confirmed by reading the
+    register back at the new id -- so where the motor is, is known. Re-scanning
+    the bus to rediscover it would mean sweeping every id the register allows
+    (254 of them, a bus timeout each) to learn something already established,
+    and taking the bench down for it.
+
+    Only the keys that name a motor change. Everything the scan resolved --
+    port, family, baud, travel -- is carried across untouched.
+    """
+    config = read_yaml(config_path) or {}
+    old_joint, new_joint = pseudo_joint(old_id), pseudo_joint(new_id)
+
+    config["motor_ids"] = sorted(
+        new_id if m == old_id else m for m in config.get("motor_ids", []))
+    config["joint_to_motor_map"] = {
+        (new_joint if j == old_joint else j): (new_id if m == old_id else m)
+        for j, m in (config.get("joint_to_motor_map") or {}).items()
+    }
+    order = [pseudo_joint(m) for m in config["motor_ids"]]
+    config["joint_ids"] = order
+    for key in ("joint_roms", "neutral_position"):
+        values = config.get(key) or {}
+        carried = values.get(old_joint)
+        values = {j: v for j, v in values.items() if j != old_joint}
+        if carried is not None:
+            values[new_joint] = carried
+        config[key] = {j: values[j] for j in order if j in values}
+
+    run_dir = os.path.join(tempfile.mkdtemp(prefix="orca_ui_bare_"), "bare-motors")
+    os.makedirs(run_dir)
+    path = os.path.join(run_dir, "config.yaml")
+    write_yaml_atomic(path, config)
+    return path
+
+
+def config_with_baud_changed(config_path: str, baud_rate: int) -> str:
+    """A copy of ``config_path`` opening the bus at ``baud_rate``.
+
+    The motors have already been told; this is how the host follows them.
+    """
+    config = read_yaml(config_path) or {}
+    config["baudrate"] = int(baud_rate)
     run_dir = os.path.join(tempfile.mkdtemp(prefix="orca_ui_bare_"), "bare-motors")
     os.makedirs(run_dir)
     path = os.path.join(run_dir, "config.yaml")
