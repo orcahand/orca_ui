@@ -55,7 +55,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--scan-all", action="store_true",
                         help="With --bare, sweep every motor ID (0-253) and "
                              "every baud rate up to 1M instead of the default "
-                             "IDs 0-25 at 1M. Minutes rather than seconds on "
+                             "IDs 0-40 at 1M. Minutes rather than seconds on "
                              "Feetech, whose protocol cannot broadcast a ping.")
     parser.add_argument("--no-feedback", action="store_true",
                         help="Do not engage the closed-loop joint-feedback "

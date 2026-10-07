@@ -1771,3 +1771,13 @@ class TestDualBusSnapshotContract:
         by_id = {m["id"]: m for m in snapshot["motors"]}
         assert by_id[1]["hw_error_flags"] == ["a-bit"]
         assert by_id[11]["hw_error_flags"] == ["b-bit"]
+
+
+def test_the_default_id_range_reaches_a_second_hand():
+    """Two hands cannot both use 1-17, so the second is shifted clear of the
+    first. A default that stopped at 25 found the shifted chain's opening
+    motors and silently missed the rest."""
+    low, high = bare.DEFAULT_ID_RANGE
+    assert low == 0
+    assert high >= 34, "two 17-motor chains need ids up to 34"
+    assert high < bare.FULL_ID_RANGE[1], "still narrower than --scan-all"

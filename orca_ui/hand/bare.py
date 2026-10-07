@@ -44,9 +44,12 @@ logger = logging.getLogger(__name__)
 # The rate every packaged hand runs at, and the first one worth trying.
 PREFERRED_BAUD = 1_000_000
 # Motors are numbered from 1 up in every hand, and a factory-fresh servo
-# answers at 1. Scanning past the twenties only pays off on a motor someone
-# has deliberately programmed high, which is what --scan-all is for.
-DEFAULT_ID_RANGE = (0, 25)
+# answers at 1. Two hands on one bench cannot both use 1-17, so the second is
+# shifted clear of the first and the default range has to reach it -- 40
+# covers two 17-motor chains with room to spare. Past that only pays off on a
+# motor someone has deliberately programmed high, which is what --scan-all is
+# for; an id nobody answers costs a bus timeout, around 45 ms.
+DEFAULT_ID_RANGE = (0, 40)
 FULL_ID_RANGE = (0, 253)
 
 # Fallback span for a family that declares no single-turn limit (Dynamixel is
