@@ -1684,27 +1684,41 @@ class HandService:
         session, client = self._config_client()
         family = sorted(type(client).baud_rate_map)
         allowed = self._transport_rates(client)
-        rates = family if allowed is None else [r for r in family if r in allowed]
+        if allowed is self.UNKNOWN_TRANSPORT:
+            # Nothing offered rather than everything. A core that cannot say
+            # what the port carries cannot rule out the rates that strand a
+            # bus, and the browser names the version that can.
+            rates = []
+        elif allowed is None:
+            rates = family
+        else:
+            rates = [r for r in family if r in allowed]
         return {
             "current": int(getattr(client, "baudrate", 0)) or None,
             "rates": rates,
         }
 
-    @staticmethod
-    def _transport_rates(client) -> "tuple | None":
-        """What the transport can carry, or None when it sets no limit.
+    UNKNOWN_TRANSPORT = object()
+    """The core could not be asked what the transport carries.
 
-        None is also what a core too old to answer gives, which keeps the
-        family's map as the bound rather than an empty list.
-        """
+    Distinct from ``None``, which is a core answering "no limit of my own". The
+    difference decides whether offering the family's whole map is safe: a rate
+    the transport will not follow strands every motor on the bus beyond the
+    host's reach, so not knowing is not the same as knowing there is no limit.
+    """
+
+    @classmethod
+    def _transport_rates(cls, client):
+        """What the transport can carry, ``None`` for no limit, or
+        :attr:`UNKNOWN_TRANSPORT` when the question could not be put."""
         probe = getattr(client, "transport_baud_rates", None)
         if probe is None:
-            return None
+            return cls.UNKNOWN_TRANSPORT
         try:
             return probe()
         except Exception:
             logger.exception("could not establish what the transport carries")
-            return None
+            return cls.UNKNOWN_TRANSPORT
 
     def set_bus_baud(self, baud_rate: int) -> dict:
         """Move every motor on the bus to a new rate, then re-scan at it.
@@ -1725,6 +1739,12 @@ class HandService:
         # Checked here and not only in the browser: this is the request that
         # strands a bus, and it is reachable from anything that can POST.
         allowed = self._transport_rates(client)
+        if allowed is self.UNKNOWN_TRANSPORT:
+            raise ServiceError(
+                "this orca_core cannot report which rates the port's transport "
+                "carries, and a rate it will not follow strands every motor on "
+                "the bus. Update orca_core to 0.5.3 or newer and reconnect",
+                status_code=409)
         if allowed is not None and baud_rate not in allowed:
             raise ServiceError(
                 f"the transport on this port cannot carry {baud_rate} baud, so "

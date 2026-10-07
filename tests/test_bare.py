@@ -1674,19 +1674,46 @@ class TestOnlyRatesTheTransportCanCarry:
             service.set_bus_baud(12345)
         assert "not a rate this family supports" in str(caught.value)
 
-    def test_a_core_without_the_capability_leaves_the_map_alone(self):
-        """A core too old to answer must leave the family's map as the bound,
-        not narrow it to nothing."""
+    def test_a_core_that_cannot_be_asked_is_not_read_as_no_limit(self):
+        """The distinction that matters. A core too old to answer tells us
+        nothing about the transport, and a rate the transport will not follow
+        strands every motor on the bus -- so 'unknown' must not collapse into
+        'unconstrained'."""
         from orca_ui.hand.service import HandService
 
-        assert HandService._transport_rates(object()) is None
+        assert HandService._transport_rates(object()) is \
+            HandService.UNKNOWN_TRANSPORT
 
-    def test_a_probe_that_raises_leaves_the_map_alone(self):
-        """Same reasoning: failing to establish a limit is not evidence of one."""
+    def test_a_probe_that_raises_is_also_unknown(self):
+        """Failing to establish a limit is not evidence that there is none."""
         from orca_ui.hand.service import HandService
 
         class Hostile:
             def transport_baud_rates(self):
                 raise OSError("port went away")
 
-        assert HandService._transport_rates(Hostile()) is None
+        assert HandService._transport_rates(Hostile()) is \
+            HandService.UNKNOWN_TRANSPORT
+
+    def test_an_unaskable_core_offers_no_rates_rather_than_every_rate(self,
+                                                                     monkeypatch):
+        """Which is what makes the browser say why, instead of quietly handing
+        back the nine rates three of which strand the bus."""
+        service, client = self._service(monkeypatch, None)
+        client.transport_baud_rates = None  # as an older core presents
+
+        assert service.bus_baud_rates()["rates"] == []
+
+    def test_an_unaskable_core_refuses_the_write(self, monkeypatch):
+        from orca_ui.hand.service import ServiceError
+
+        service, client = self._service(monkeypatch, None)
+        client.transport_baud_rates = None
+        service.supervisor = type("S", (), {
+            "status": staticmethod(lambda: type("T", (), {
+                "torque_enabled": False})())})()
+
+        with pytest.raises(ServiceError) as caught:
+            service.set_bus_baud(1_000_000)
+        assert caught.value.status_code == 409
+        assert "0.5.3" in str(caught.value)

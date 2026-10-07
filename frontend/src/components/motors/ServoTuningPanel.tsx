@@ -17,6 +17,7 @@ import type {
   ServoProfile,
   ServoProfileMap,
 } from '../../api/types'
+import { corePredates } from '../../api/coreVersion'
 import { useAppStore } from '../../state/appStore'
 import { Panel } from '../common/Panel'
 
@@ -30,17 +31,6 @@ const GAIN_MAX_FALLBACK = 16383
 // and gets nothing back, which is indistinguishable from a family that has
 // no such registers — so say which it is rather than showing an empty table.
 const CORE_WITH_FEETECH_GAINS = '0.5.1'
-
-function isOlderRelease(version: string, wanted: string): boolean {
-  const parse = (v: string) =>
-    v.split('.').map((c) => Number.parseInt(c, 10) || 0)
-  const a = parse(version)
-  const b = parse(wanted)
-  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
-    if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) < (b[i] ?? 0)
-  }
-  return false
-}
 
 const GAIN_FIELDS: { key: GainField; label: string; title: string }[] = [
   { key: 'kp', label: 'Kp', title: 'Position P gain — stiffness against position error.' },
@@ -307,10 +297,7 @@ export function ServoTuningPanel() {
   // A development checkout carries whatever version it was cut from, so its
   // number says nothing about what it contains: never blame it.
   const coreTooOld =
-    nothingSettable &&
-    core != null &&
-    !core.development &&
-    isOlderRelease(core.version, CORE_WITH_FEETECH_GAINS)
+    nothingSettable && corePredates(core, CORE_WITH_FEETECH_GAINS)
 
   const apply = (id: string) => {
     const draft = drafts[id] ?? {}

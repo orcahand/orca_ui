@@ -7,17 +7,24 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../../api/rest'
+import {
+  CORE_WITH_TRANSPORT_BAUDS,
+  corePredates,
+  updateHint,
+} from '../../api/coreVersion'
 import { useAppStore } from '../../state/appStore'
 import { RegisterPopover } from './RegisterPopover'
 
 export function BusBaudPanel({ onClose }: { onClose: () => void }) {
   const setError = useAppStore((s) => s.setError)
+  const core = useAppStore((s) => s.handInfo?.core)
   const [motorCount, setMotorCount] = useState(0)
   const [rates, setRates] = useState<number[]>([])
   const [current, setCurrent] = useState<number | null>(null)
   const [choice, setChoice] = useState('')
   const [busy, setBusy] = useState(false)
   const [outcome, setOutcome] = useState<string | null>(null)
+  const [loaded, setLoaded] = useState(false)
 
   const fail = useCallback(
     (e: unknown) => setError(String((e as Error).message ?? e)),
@@ -30,6 +37,7 @@ export function BusBaudPanel({ onClose }: { onClose: () => void }) {
       .then((r) => {
         setRates(r.rates)
         setCurrent(r.current)
+        setLoaded(true)
       })
       .catch(fail)
     void api
@@ -37,6 +45,12 @@ export function BusBaudPanel({ onClose }: { onClose: () => void }) {
       .then((r) => setMotorCount((r.motors ?? []).length))
       .catch(fail)
   }, [fail])
+
+  // No rates with a loaded panel means the core could not be asked what the
+  // transport carries. A development checkout carries whatever version it was
+  // cut from, so its number says nothing about what it contains.
+  const coreTooOld =
+    loaded && rates.length === 0 && corePredates(core, CORE_WITH_TRANSPORT_BAUDS)
 
   const apply = () => {
     const rate = parseInt(choice, 10)
@@ -103,6 +117,18 @@ export function BusBaudPanel({ onClose }: { onClose: () => void }) {
           {busy ? 'changing…' : `change all ${motorCount}`}
         </button>
       </div>
+      {coreTooOld && (
+        <div style={{ marginTop: 6, fontSize: 10, color: 'var(--dimmer)' }}>
+          <span style={{ color: 'var(--warn)' }}>
+            orca_core {core?.version} cannot report which rates the board
+            between these motors and this computer will carry.
+          </span>{' '}
+          {CORE_WITH_TRANSPORT_BAUDS} can. Until then no rate is offered,
+          because a rate the board will not follow moves every motor somewhere
+          nothing on this port can reach. Update with <code>{updateHint()}</code>{' '}
+          and reconnect.
+        </div>
+      )}
       {outcome && (
         <div style={{ marginTop: 6, color: 'var(--dim)' }}>{outcome}</div>
       )}

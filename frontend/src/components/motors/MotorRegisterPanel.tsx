@@ -15,11 +15,17 @@ import type {
   MotorConfigRegister,
   MotorConfigSchema,
 } from '../../api/types'
+import {
+  CORE_WITH_CONFIG_REGISTERS,
+  corePredates,
+  updateHint,
+} from '../../api/coreVersion'
 import { useAppStore } from '../../state/appStore'
 import { RegisterPopover } from './RegisterPopover'
 
 export function MotorRegisterPanel({ onClose }: { onClose: () => void }) {
   const setError = useAppStore((s) => s.setError)
+  const core = useAppStore((s) => s.handInfo?.core)
   const [motors, setMotors] = useState<DirectMotorInfo[]>([])
   const [schema, setSchema] = useState<MotorConfigSchema | null>(null)
   const [selected, setSelected] = useState<number | null>(null)
@@ -28,19 +34,31 @@ export function MotorRegisterPanel({ onClose }: { onClose: () => void }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState<string | null>(null)
   const [outcome, setOutcome] = useState<string | null>(null)
+  const [noSchema, setNoSchema] = useState(false)
 
   const fail = useCallback(
     (e: unknown) => setError(String((e as Error).message ?? e)),
     [setError],
   )
 
+  const coreTooOld = corePredates(core, CORE_WITH_CONFIG_REGISTERS)
+
   useEffect(() => {
-    void api.motorConfigSchema().then(setSchema).catch(fail)
+    void api
+      .motorConfigSchema()
+      .then(setSchema)
+      .catch((e) => {
+        setNoSchema(true)
+        // On an older core the refusal says the family declares no editable
+        // registers, which is true of every family it has ever seen. Reporting
+        // that as an error would send someone looking at their hardware.
+        if (!coreTooOld) fail(e)
+      })
     void api
       .motorsDirect()
       .then((r) => setMotors(r.motors ?? []))
       .catch(fail)
-  }, [fail])
+  }, [fail, coreTooOld])
 
   const load = useCallback(
     (id: number) => {
@@ -119,6 +137,17 @@ export function MotorRegisterPanel({ onClose }: { onClose: () => void }) {
           </option>
         ))}
       </select>
+
+      {noSchema && coreTooOld && (
+        <div style={{ marginTop: 8, fontSize: 10, color: 'var(--dimmer)' }}>
+          <span style={{ color: 'var(--warn)' }}>
+            orca_core {core?.version} does not declare which registers an
+            operator may edit.
+          </span>{' '}
+          {CORE_WITH_CONFIG_REGISTERS} does. Update with{' '}
+          <code>{updateHint()}</code> and reconnect.
+        </div>
+      )}
 
       {selected !== null && schema && (
         <table className="motor-table" style={{ marginTop: 8 }}>
