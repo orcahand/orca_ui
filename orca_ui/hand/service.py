@@ -36,6 +36,7 @@ from orca_ui.hand.supervisor import (
     HandBusyError,
     HandSupervisor,
     ModelSelectError,
+    load_config,
     model_name_of,
 )
 from orca_ui.library import Library, LibraryError
@@ -1715,27 +1716,42 @@ class HandService:
     def _rebuild_bare_session(self) -> bool:
         """Re-scan the bench and rebuild the session around what answered.
 
-        The bare config is synthesised once at startup, so a motor that has
-        moved leaves it describing a bus that no longer exists. Rescanning
-        costs a couple of seconds and no restart: the browser holds its
-        socket and watches the session come back.
+        The port has to be released first. The live session holds it with an
+        advisory lock, so a scan attempted alongside opens nothing and reports
+        an empty bus -- which reads as "every motor vanished" when they are
+        all answering fine. Maintenance is how the supervisor is asked to let
+        go, and it reconnects on the way out.
+
+        The scan sweeps the full id range: a change can put a motor anywhere
+        its register allows, and looking only where motors usually live is
+        what made one disappear.
         """
         from orca_ui.hand import bare as bare_mode
 
         port = self.supervisor.config.port
         try:
-            # The full range, not the startup one: an id change can put a
-            # motor anywhere its register allows, and a scan that stopped
-            # short would report it missing when it is answering fine.
+            self.supervisor.enter_maintenance("bare-rescan")
+        except Exception:
+            logger.exception("could not free the bus to re-scan")
+            return False
+        try:
             scan = bare_mode.scan_bus(port, id_range=bare_mode.FULL_ID_RANGE)
             if not scan.motors:
                 logger.warning("re-scan of %s found no motors", port)
                 return False
             config_path = bare_mode.synthesize_config(scan)
-            self.supervisor.install_bare_config(config_path)
+            config = load_config(config_path)
         except Exception:
             logger.exception("bare re-scan failed")
             return False
+        finally:
+            # Always hand the hardware back, even on a failed scan: leaving
+            # the supervisor in maintenance would strand the bench.
+            try:
+                self.supervisor.exit_maintenance()
+            except Exception:
+                logger.exception("could not leave maintenance after re-scan")
+        self.supervisor.install_bare_config_object(config)
         return True
 
     def declare_motor(self, motor_id: int, model_key: "str | None",
