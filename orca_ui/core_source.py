@@ -31,9 +31,14 @@ from typing import List, Optional
 
 CORE_PACKAGE = "orca_core"
 CORE_REPO = "https://github.com/orcahand/orca_core.git"
-# `orca-dev release` rewrites pyproject.toml's orca-core entry from this, so it
-# has to match the pin there — otherwise leaving dev mode silently moves it.
-CORE_RELEASE_SPEC = "orca_core>=0.4.2,<0.5"
+CORE_RELEASE_SPEC_FALLBACK = "orca_core<1"
+"""Used only when the committed requirement cannot be read; deliberately wide.
+
+Leaving dev mode must not narrow the dependency to a guess. A previous constant
+here named the exact pin and had to be kept in step with pyproject.toml by hand;
+it was not, so ``release`` walked the requirement two minors back and installed a
+core the console no longer supported.
+"""
 SIBLING_PATH = "../orca_core"
 
 SETTINGS_FILE = ".orca-dev.json"
@@ -441,9 +446,28 @@ def use_branch(name: str) -> None:
     _remember_mode("branch", name)
 
 
+def released_core_spec() -> str:
+    """The orca-core requirement the project itself declares.
+
+    Read from the committed ``pyproject.toml`` rather than restated here, so
+    there is one pin and it cannot drift. The committed file is the right source
+    even in dev mode: dev mode only adds a ``[tool.uv.sources]`` entry on top of
+    the requirement, never changes the requirement.
+    """
+    try:
+        committed = subprocess.run(
+            ["git", "show", "HEAD:pyproject.toml"],
+            cwd=_project_root(), capture_output=True, text=True, check=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return CORE_RELEASE_SPEC_FALLBACK
+    found = _CORE_REQUIREMENT.search(committed)
+    return found.group(1) if found else CORE_RELEASE_SPEC_FALLBACK
+
+
 def use_release() -> None:
     _run_uv("remove", CORE_PACKAGE, required=False)
-    _run_uv("add", CORE_RELEASE_SPEC)
+    _run_uv("add", released_core_spec())
     _remember_mode("release")
 
 
@@ -453,6 +477,9 @@ def use_release() -> None:
 
 # The trailing newline is optional: the entry is the last line of the file
 # whenever uv appended the table, and may arrive without one.
+_CORE_REQUIREMENT = re.compile(r"""["'](orca[-_]core[^"']*)["']""")
+"""The orca-core line inside ``[project] dependencies``, version spec included."""
+
 _SOURCE_ENTRY = re.compile(r"^orca[-_]core\s*=\s*\{[^\n]*\}[ \t]*(?:\n|\Z)",
                            re.MULTILINE)
 _EMPTY_SOURCES_TABLE = re.compile(r"\n?^\[tool\.uv\.sources\][ \t]*\n(?=\s*(\[|\Z))",
