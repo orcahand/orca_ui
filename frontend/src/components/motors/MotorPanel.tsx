@@ -10,6 +10,8 @@ import { api } from '../../api/rest'
 import type { JointInfo } from '../../api/types'
 import { useStreamFrame } from '../../hooks/useStreamFrame'
 import { useAppStore } from '../../state/appStore'
+import { MotorRegisterPanel } from './MotorRegisterPanel'
+import { BusBaudPanel } from './BusBaudPanel'
 import { sendTarget } from '../../state/commandBus'
 import { useControlGate } from '../../state/operationStore'
 import { Panel } from '../common/Panel'
@@ -40,6 +42,8 @@ export function MotorPanel() {
 
   const [values, setValues] = useState<Record<string, number>>({})
   const [busy, setBusy] = useState(false)
+  const [tableOpen, setTableOpen] = useState(false)
+  const [baudOpen, setBaudOpen] = useState(false)
   const seeded = useRef(false)
   const wasLocked = useRef(false)
 
@@ -116,6 +120,38 @@ export function MotorPanel() {
 
   const toolbar = (
     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+      {bare && (
+        <>
+          <div style={{ position: 'relative' }}>
+            <button
+              className="btn btn-secondary"
+              title="read and change this motor's configuration registers"
+              onClick={() => {
+                setBaudOpen(false)
+                setTableOpen((v) => !v)
+              }}
+            >
+              Control table
+            </button>
+            {tableOpen && (
+              <MotorRegisterPanel onClose={() => setTableOpen(false)} />
+            )}
+          </div>
+          <div style={{ position: 'relative' }}>
+            <button
+              className="btn btn-secondary"
+              title="change the baud rate of every motor on the bus"
+              onClick={() => {
+                setTableOpen(false)
+                setBaudOpen((v) => !v)
+              }}
+            >
+              Bus baud
+            </button>
+            {baudOpen && <BusBaudPanel onClose={() => setBaudOpen(false)} />}
+          </div>
+        </>
+      )}
       {!torqueOn ? (
         <button
           className="btn btn-primary"

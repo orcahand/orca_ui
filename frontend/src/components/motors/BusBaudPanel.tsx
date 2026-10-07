@@ -8,10 +8,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../../api/rest'
 import { useAppStore } from '../../state/appStore'
+import { RegisterPopover } from './RegisterPopover'
 
-export function BusBaudPanel({ motorCount }: { motorCount: number }) {
+export function BusBaudPanel({ onClose }: { onClose: () => void }) {
   const setError = useAppStore((s) => s.setError)
-  const [open, setOpen] = useState(false)
+  const [motorCount, setMotorCount] = useState(0)
   const [rates, setRates] = useState<number[]>([])
   const [current, setCurrent] = useState<number | null>(null)
   const [choice, setChoice] = useState('')
@@ -24,7 +25,6 @@ export function BusBaudPanel({ motorCount }: { motorCount: number }) {
   )
 
   useEffect(() => {
-    if (!open || rates.length) return
     void api
       .busBaud()
       .then((r) => {
@@ -32,7 +32,11 @@ export function BusBaudPanel({ motorCount }: { motorCount: number }) {
         setCurrent(r.current)
       })
       .catch(fail)
-  }, [open, rates.length, fail])
+    void api
+      .motorsDirect()
+      .then((r) => setMotorCount((r.motors ?? []).length))
+      .catch(fail)
+  }, [fail])
 
   const apply = () => {
     const rate = parseInt(choice, 10)
@@ -64,48 +68,43 @@ export function BusBaudPanel({ motorCount }: { motorCount: number }) {
   }
 
   return (
-    <details
-      open={open}
-      onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}
-      style={{ marginTop: 10, fontSize: 10 }}
+    <RegisterPopover
+      title="Bus baud rate"
+      warning={
+        'Applies to every motor on the bus. One motor cannot be changed on ' +
+        'its own: the port carries a single rate, so a lone change would ' +
+        'orphan that motor from the rest.'
+      }
+      width={380}
+      onClose={onClose}
     >
-      <summary style={{ cursor: 'pointer', color: 'var(--dimmer)' }}>
-        Bus baud rate
-      </summary>
-      <div style={{ padding: '6px 0 0 0' }}>
-        <div style={{ color: 'var(--warn)', marginBottom: 6 }}>
-          Applies to every motor on the bus. One motor cannot be changed on its
-          own: the port carries a single rate, so a lone change would orphan
-          that motor from the rest.
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span style={{ color: 'var(--dim)' }}>
-            now {current === null ? '--' : current.toLocaleString()}
-          </span>
-          <select
-            value={choice}
-            onChange={(e) => setChoice(e.target.value)}
-            style={{ fontSize: 11 }}
-          >
-            <option value="">change to…</option>
-            {rates.map((rate) => (
-              <option key={rate} value={rate}>
-                {rate.toLocaleString()}
-              </option>
-            ))}
-          </select>
-          <button
-            className="btn btn-danger"
-            disabled={choice === '' || busy}
-            onClick={apply}
-          >
-            {busy ? 'changing…' : `change all ${motorCount}`}
-          </button>
-        </div>
-        {outcome && (
-          <div style={{ marginTop: 6, color: 'var(--dim)' }}>{outcome}</div>
-        )}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <span style={{ color: 'var(--dim)' }}>
+          now {current === null ? '--' : current.toLocaleString()}
+        </span>
+        <select
+          value={choice}
+          onChange={(e) => setChoice(e.target.value)}
+          style={{ fontSize: 11 }}
+        >
+          <option value="">change to…</option>
+          {rates.map((rate) => (
+            <option key={rate} value={rate}>
+              {rate.toLocaleString()}
+            </option>
+          ))}
+        </select>
+        <button
+          className="btn btn-danger"
+          disabled={choice === '' || busy || motorCount === 0}
+          onClick={apply}
+        >
+          {busy ? 'changing…' : `change all ${motorCount}`}
+        </button>
       </div>
-    </details>
+      {outcome && (
+        <div style={{ marginTop: 6, color: 'var(--dim)' }}>{outcome}</div>
+      )}
+    </RegisterPopover>
   )
 }

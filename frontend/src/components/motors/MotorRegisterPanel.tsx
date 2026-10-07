@@ -16,10 +16,11 @@ import type {
   MotorConfigSchema,
 } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
+import { RegisterPopover } from './RegisterPopover'
 
-export function MotorRegisterPanel({ motors }: { motors: DirectMotorInfo[] }) {
+export function MotorRegisterPanel({ onClose }: { onClose: () => void }) {
   const setError = useAppStore((s) => s.setError)
-  const [open, setOpen] = useState(false)
+  const [motors, setMotors] = useState<DirectMotorInfo[]>([])
   const [schema, setSchema] = useState<MotorConfigSchema | null>(null)
   const [selected, setSelected] = useState<number | null>(null)
   const [values, setValues] = useState<Record<string, number | null>>({})
@@ -34,9 +35,12 @@ export function MotorRegisterPanel({ motors }: { motors: DirectMotorInfo[] }) {
   )
 
   useEffect(() => {
-    if (!open || schema) return
     void api.motorConfigSchema().then(setSchema).catch(fail)
-  }, [open, schema, fail])
+    void api
+      .motorsDirect()
+      .then((r) => setMotors(r.motors ?? []))
+      .catch(fail)
+  }, [fail])
 
   const load = useCallback(
     (id: number) => {
@@ -92,66 +96,61 @@ export function MotorRegisterPanel({ motors }: { motors: DirectMotorInfo[] }) {
     [`ID ${m.id}`, m.model?.label, m.nickname].filter(Boolean).join(' — ')
 
   return (
-    <details
-      open={open}
-      onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}
-      style={{ marginTop: 10, fontSize: 10 }}
+    <RegisterPopover
+      title="Control table"
+      warning={
+        'EEPROM settings: they need torque off and survive a power cycle. ' +
+        'Changing an ID moves the motor on the bus.'
+      }
+      width={430}
+      onClose={onClose}
     >
-      <summary style={{ cursor: 'pointer', color: 'var(--dimmer)' }}>
-        Control table
-      </summary>
-      <div style={{ padding: '6px 0 0 0' }}>
-        <div style={{ color: 'var(--warn)', marginBottom: 6 }}>
-          EEPROM settings: they need torque off and survive a power cycle.
-          Changing an ID or baud rate moves the motor on the bus.
-        </div>
-        <select
-          value={selected ?? ''}
-          onChange={(e) =>
-            e.target.value === '' ? setSelected(null) : load(Number(e.target.value))
-          }
-          style={{ fontSize: 11, minWidth: 220 }}
-        >
-          <option value="">select a motor…</option>
-          {motors.map((m) => (
-            <option key={m.id} value={m.id}>
-              {label(m)}
-            </option>
-          ))}
-        </select>
+      <select
+        value={selected ?? ''}
+        onChange={(e) =>
+          e.target.value === '' ? setSelected(null) : load(Number(e.target.value))
+        }
+        style={{ fontSize: 11, minWidth: 240 }}
+      >
+        <option value="">select a motor…</option>
+        {motors.map((m) => (
+          <option key={m.id} value={m.id}>
+            {label(m)}
+          </option>
+        ))}
+      </select>
 
-        {selected !== null && schema && (
-          <table className="motor-table" style={{ marginTop: 8 }}>
-            <thead>
-              <tr>
-                <th>setting</th>
-                <th>now</th>
-                <th>set to</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {schema.registers.map((entry) => (
-                <Row
-                  key={entry.key}
-                  entry={entry}
-                  current={values[entry.key] ?? null}
-                  draft={drafts[entry.key] ?? ''}
-                  taken={entry.key === 'id' ? taken : []}
-                  selected={selected}
-                  busy={busy === entry.key}
-                  onDraft={(v) => setDrafts((d) => ({ ...d, [entry.key]: v }))}
-                  onApply={() => apply(entry)}
-                />
-              ))}
-            </tbody>
-          </table>
-        )}
-        {outcome && (
-          <div style={{ marginTop: 6, color: 'var(--dim)' }}>{outcome}</div>
-        )}
-      </div>
-    </details>
+      {selected !== null && schema && (
+        <table className="motor-table" style={{ marginTop: 8 }}>
+          <thead>
+            <tr>
+              <th>setting</th>
+              <th>now</th>
+              <th>set to</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {schema.registers.map((entry) => (
+              <Row
+                key={entry.key}
+                entry={entry}
+                current={values[entry.key] ?? null}
+                draft={drafts[entry.key] ?? ''}
+                taken={entry.key === 'id' ? taken : []}
+                selected={selected}
+                busy={busy === entry.key}
+                onDraft={(v) => setDrafts((d) => ({ ...d, [entry.key]: v }))}
+                onApply={() => apply(entry)}
+              />
+            ))}
+          </tbody>
+        </table>
+      )}
+      {outcome && (
+        <div style={{ marginTop: 6, color: 'var(--dim)' }}>{outcome}</div>
+      )}
+    </RegisterPopover>
   )
 }
 
@@ -180,6 +179,22 @@ function Row({
       : entry.choices
         ? (entry.choices[String(current)] ?? `${current} (unknown)`)
         : `${current}${entry.unit ? ' ' + entry.unit : ''}`
+
+  // Baud is a property of the bus, not of a motor: a port carries one rate,
+  // so setting a single motor's would orphan it from the chain. Shown here
+  // because a motor stranded at the wrong rate is worth seeing; changed only
+  // from the bus control.
+  if (entry.key === 'baud_rate') {
+    return (
+      <tr>
+        <td title={`${entry.note} (address ${entry.address})`}>{entry.label}</td>
+        <td style={{ fontVariantNumeric: 'tabular-nums' }}>{shown}</td>
+        <td colSpan={2} style={{ color: 'var(--dimmer)' }}>
+          set from Bus baud rate — one motor cannot change alone
+        </td>
+      </tr>
+    )
+  }
 
   return (
     <tr>
