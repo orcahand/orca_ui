@@ -30,15 +30,28 @@ from orca_ui.hand.operations.events import OperationStopped
 
 RESET_PASS_PERIOD_S = 1.0
 
-# The Feetech assembly flow needs the operator prompt for its USB power-cycle
-# dance (wired below via ctx.wait_input), but orca_core's
-# FeetechClient.connect() still retries torque-enable forever on an absent
-# motor — that would wedge the operation thread with the maintenance lease
-# held. Until that retry is bounded, Feetech chains stay on the CLI script.
-_FEETECH_UNSUPPORTED = (
-    "feetech chain configuration isn't supported from the UI yet — use "
-    "orca_core/scripts/configure_motor_chain.py (it walks the required USB "
-    "power-cycle procedure)")
+# A family that cannot be hot-plugged onto a live bus is power-cycled around
+# the operator prompt (MotorClient.requires_unpowered_hotplug, which the plan
+# carries). That is wired below through ctx.wait_input, and the maintenance
+# lease suspends health checks and reconnects for the duration, so the port
+# disappearing mid-run is expected rather than a fault to recover from.
+
+
+def _family_of_connected_bus(service) -> "str | None":
+    """The family of the bus this console is already talking to, if any.
+
+    Factory-default probing cannot identify the family of a *resumed* chain:
+    every motor already programmed has moved off the default ID, so nothing
+    answers the probe and detection fails -- on a hand whose config leaves the
+    family on auto, which the packaged ones do. The session knows, because it
+    connected to these motors.
+
+    Returns ``None`` at assembly time, when there is no session; detection is
+    the right answer there, and a fresh chain does answer it.
+    """
+    session = service.session
+    client = getattr(getattr(session, "hand", None), "motor_client", None)
+    return getattr(type(client), "motor_type", None) if client else None
 
 
 def validate_chain_params(service, params: dict) -> dict:
@@ -59,11 +72,10 @@ def validate_chain_params(service, params: dict) -> dict:
                            status_code=409)
     # None = unpinned: the real op probes the family at factory defaults on
     # the bus (orca_core's detect_motor_type).
-    motor_type = params.get("motor_type") or config.motor_type
+    motor_type = (params.get("motor_type") or config.motor_type
+                  or _family_of_connected_bus(service))
     if motor_type is not None and motor_type not in hand_ops.known_motor_types():
         raise ServiceError(f"unknown motor_type {motor_type!r}")
-    if motor_type == "feetech":
-        raise ServiceError(_FEETECH_UNSUPPORTED, status_code=409)
     # No session requirement: chain configuration happens at assembly time,
     # when the supervisor typically sits in DETECTING with no connectable hand.
     return {"mode": mode, "motor_type": motor_type}
@@ -107,7 +119,10 @@ def _progress_mapper(ctx: OpContext, grid: _ChainGrid, mode: str):
 
     def on_event(event: dict) -> None:
         kind = event.get("event")
-        if kind == "prescan_done":
+        if kind == "chain_started":
+            ctx.log(f"configuring {event['total_motors']} {event['motor_type']} "
+                    f"motors on {event['port']} @ {event['target_baud']:,} bps")
+        elif kind == "prescan_done":
             for motor_id in event.get("already_configured", []):
                 grid.mark(motor_id, "configured")
             if event.get("already_configured"):
@@ -134,11 +149,45 @@ def _progress_mapper(ctx: OpContext, grid: _ChainGrid, mode: str):
         elif kind == "chain_verified":
             ctx.log(f"chain verified: {sorted(event['configured_ids'])}")
         elif kind == "chain_done":
-            ctx.set_progress(
-                1.0, detail="all motors configured — ready for operation")
+            # Sets the phase, not just progress: a chain that was already
+            # complete returns before the first step_started, so without this
+            # the run finishes still reporting "acquiring".
+            ctx.set_phase("configuring", progress=1.0,
+                          detail="all motors configured — ready for operation")
+            ctx.log(f"chain complete: "
+                    f"{sorted(event['configured_ids'], reverse=True)}")
         elif kind == "waiting_for_port":
-            ctx.set_detail("unplug the USB cable" if event.get("present") is False
-                           else "plug the USB cable back in")
+            ctx.set_detail("turn the board off" if event.get("present") is False
+                           else "turn the board back on")
+        elif kind == "port_ready":
+            if event.get("present"):
+                ctx.log("board back on")
+        elif kind == "awaiting_motor":
+            # The poll that follows is silent and unbounded by design, so this
+            # is the only thing distinguishing "looking for your motor" from a
+            # wedged operation.
+            ctx.set_detail(f"scanning for a factory-default "
+                           f"{event['expected_model']} → ID {event['target_id']}")
+        elif kind == "motor_found":
+            motor = event.get("motor") or {}
+            ctx.log(f"found a factory-default {motor.get('model_name', 'motor')} "
+                    f"→ programming as ID {event['target_id']}")
+        elif kind == "wrong_motor_detected":
+            # Recoverable: orca_core keeps polling so the motor can be swapped
+            # without losing the run. Say so, or it reads as a dead end.
+            ctx.set_detail(f"wrong model for ID {event['target_id']} — swap it, "
+                           f"still scanning")
+            ctx.log(f"wrong motor: {event['error']}")
+        elif kind == "duplicate_default_motor":
+            ctx.log(f"a second factory-default motor is answering at "
+                    f"{event['baudrate']:,} bps — only one may be connected "
+                    f"while ID {event['target_id']} is programmed")
+        elif kind == "unrecognised_motor_model":
+            ctx.log(f"model number {event.get('model_number')} is not in the "
+                    f"lookup table (reported {event.get('model_name')!r}); "
+                    f"accepting it as {event['expected_model']}")
+        elif kind == "probe_failed":
+            ctx.log(f"probe of {event['motor_type']} failed: {event['error']}")
         elif kind == "motor_updated":
             motor = event["motor"]
             grid.mark(motor["id"], "reset")
@@ -187,8 +236,6 @@ class ConfigureChainOperation(Operation):
                         "factory defaults on the bus) — set motor_type in "
                         "the hand config.yaml or pass it explicitly")
                 ctx.log(f"detected {motor_type} motors")
-                if motor_type == "feetech":
-                    raise RuntimeError(_FEETECH_UNSUPPORTED)
 
             plan = hand_ops.build_chain_plan(supervisor.config, port,
                                              motor_type)
@@ -305,7 +352,20 @@ class SimulatedConfigureChainOperation(Operation):
                        f"{model} to {location} — it becomes ID {target_id}",
                 progress=len(configured) / total)
             ctx.set_extra(grid.extra("configure"))
-            ctx.sleep(step_s)
+            # A family that cannot be hot-plugged is power-cycled around the
+            # prompt in the real flow. Simulating it is the point: that is the
+            # part of assembly a mock run is actually useful for rehearsing,
+            # and it is the only step that differs between the families.
+            if plan.requires_unpowered_hotplug:
+                ctx.set_detail("turn the board off")
+                ctx.sleep(step_s)
+                ctx.wait_input(
+                    f"connect a factory-fresh {model} to {location}, then turn "
+                    "the board back on", ["Connected"])
+                ctx.set_detail("turn the board back on")
+                ctx.sleep(step_s)
+            else:
+                ctx.sleep(step_s)
             configured.append(target_id)
             grid.mark(target_id, "configured")
             ctx.set_extra(grid.extra("configure"))
