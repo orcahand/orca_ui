@@ -108,6 +108,8 @@ export interface BoardsInfo {
 }
 
 export interface JointInfo {
+  /** Direction the running joint_to_motor_map assigns to this joint. */
+  inverted?: boolean
   id: string
   // Motor driving this joint, or null when the config maps none.
   motor_id: number | null
@@ -232,6 +234,9 @@ export interface CoreSourceInfo {
 export interface HandInfo {
   model_name: string
   side: 'left' | 'right'
+  /** Board-reported hardware revision, major*10+minor (2 = v2.0, 21 = v2.1);
+   *  null until a session has resolved it. */
+  hardware_version?: number | null
   mock: boolean
   joints: JointInfo[]
   calibration: CalibrationInfo
