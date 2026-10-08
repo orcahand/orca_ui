@@ -281,6 +281,10 @@ class HandService:
         config = self.supervisor.config
         encoder_backed = set(_encoder_sensed_joints(config))
         session = self.session
+        # The hand in a session runs a config resolved against the board it
+        # connected to (hardware revision, detected ports); the supervisor's is
+        # the file as loaded. Report what is actually running when there is one.
+        live = getattr(getattr(session, "hand", None), "config", None) or config
         # Which sensed joints can actually be decoded: raw counts become joint
         # angles only with a per-joint anchor from the calibration sweep.
         encoder_calibrated = None
@@ -311,6 +315,9 @@ class HandService:
                 "motor_id": config.joint_to_motor_map.get(joint),
                 "rom": [float(v) for v in config.joint_roms_dict[joint]],
                 "neutral": float(config.neutral_position.get(joint, 0.0)),
+                # Direction the running map assigns: True when flexing the
+                # joint turns the motor the negative way.
+                "inverted": bool(live.joint_inversion_dict.get(joint, False)),
                 "encoder_backed": joint in encoder_backed,
                 "encoder_calibrated": (
                     None if encoder_calibrated is None or joint not in encoder_backed
@@ -327,6 +334,9 @@ class HandService:
         info = {
             "model_name": model_name_of(config),
             "side": config.type,
+            # The board's hardware revision (2 = v2.0, 21 = v2.1); None until
+            # a session resolved it. Decides which joint_to_motor_map is in force.
+            "hardware_version": getattr(live, "hardware_version", None),
             "mock": self.settings.mock,
             "joints": joints,
             "calibration": self._calibration_state(
