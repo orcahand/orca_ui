@@ -37,6 +37,23 @@ RESET_PASS_PERIOD_S = 1.0
 # disappearing mid-run is expected rather than a fault to recover from.
 
 
+def _family_of_connected_bus(service) -> "str | None":
+    """The family of the bus this console is already talking to, if any.
+
+    Factory-default probing cannot identify the family of a *resumed* chain:
+    every motor already programmed has moved off the default ID, so nothing
+    answers the probe and detection fails -- on a hand whose config leaves the
+    family on auto, which the packaged ones do. The session knows, because it
+    connected to these motors.
+
+    Returns ``None`` at assembly time, when there is no session; detection is
+    the right answer there, and a fresh chain does answer it.
+    """
+    session = service.session
+    client = getattr(getattr(session, "hand", None), "motor_client", None)
+    return getattr(type(client), "motor_type", None) if client else None
+
+
 def validate_chain_params(service, params: dict) -> dict:
     from orca_ui.hand.service import ServiceError
 
@@ -55,7 +72,8 @@ def validate_chain_params(service, params: dict) -> dict:
                            status_code=409)
     # None = unpinned: the real op probes the family at factory defaults on
     # the bus (orca_core's detect_motor_type).
-    motor_type = params.get("motor_type") or config.motor_type
+    motor_type = (params.get("motor_type") or config.motor_type
+                  or _family_of_connected_bus(service))
     if motor_type is not None and motor_type not in hand_ops.known_motor_types():
         raise ServiceError(f"unknown motor_type {motor_type!r}")
     # No session requirement: chain configuration happens at assembly time,
@@ -101,7 +119,10 @@ def _progress_mapper(ctx: OpContext, grid: _ChainGrid, mode: str):
 
     def on_event(event: dict) -> None:
         kind = event.get("event")
-        if kind == "prescan_done":
+        if kind == "chain_started":
+            ctx.log(f"configuring {event['total_motors']} {event['motor_type']} "
+                    f"motors on {event['port']} @ {event['target_baud']:,} bps")
+        elif kind == "prescan_done":
             for motor_id in event.get("already_configured", []):
                 grid.mark(motor_id, "configured")
             if event.get("already_configured"):
@@ -133,6 +154,35 @@ def _progress_mapper(ctx: OpContext, grid: _ChainGrid, mode: str):
         elif kind == "waiting_for_port":
             ctx.set_detail("turn the board off" if event.get("present") is False
                            else "turn the board back on")
+        elif kind == "port_ready":
+            if event.get("present"):
+                ctx.log("board back on")
+        elif kind == "awaiting_motor":
+            # The poll that follows is silent and unbounded by design, so this
+            # is the only thing distinguishing "looking for your motor" from a
+            # wedged operation.
+            ctx.set_detail(f"scanning for a factory-default "
+                           f"{event['expected_model']} → ID {event['target_id']}")
+        elif kind == "motor_found":
+            motor = event.get("motor") or {}
+            ctx.log(f"found a factory-default {motor.get('model_name', 'motor')} "
+                    f"→ programming as ID {event['target_id']}")
+        elif kind == "wrong_motor_detected":
+            # Recoverable: orca_core keeps polling so the motor can be swapped
+            # without losing the run. Say so, or it reads as a dead end.
+            ctx.set_detail(f"wrong model for ID {event['target_id']} — swap it, "
+                           f"still scanning")
+            ctx.log(f"wrong motor: {event['error']}")
+        elif kind == "duplicate_default_motor":
+            ctx.log(f"a second factory-default motor is answering at "
+                    f"{event['baudrate']:,} bps — only one may be connected "
+                    f"while ID {event['target_id']} is programmed")
+        elif kind == "unrecognised_motor_model":
+            ctx.log(f"model number {event.get('model_number')} is not in the "
+                    f"lookup table (reported {event.get('model_name')!r}); "
+                    f"accepting it as {event['expected_model']}")
+        elif kind == "probe_failed":
+            ctx.log(f"probe of {event['motor_type']} failed: {event['error']}")
         elif kind == "motor_updated":
             motor = event["motor"]
             grid.mark(motor["id"], "reset")

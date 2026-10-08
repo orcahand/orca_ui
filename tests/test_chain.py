@@ -176,3 +176,58 @@ def test_configure_chain_blocked_while_operation_runs(client):
     assert response.status_code == 409
     client.post("/api/operation/stop")
     _wait_state(client, "done")
+
+
+def test_every_event_orca_core_emits_is_surfaced():
+    """The failure this guards against: orca_core grew chain events and the
+    console quietly dropped eight of them, including the one that says it is
+    scanning for your motor. The poll it runs is silent and unbounded by
+    design, so a dropped event turns a correct wait into something
+    indistinguishable from a hang.
+
+    Read off orca_core rather than listed here, so an event added there fails
+    this test instead of going unnoticed.
+    """
+    import inspect
+    import re
+
+    from orca_core.maintenance import motor_chain
+
+    from orca_ui.hand.operations import chain
+
+    emitted = set(re.findall(r'_emit\(progress_callback,\s*"([a-z_]+)"',
+                             inspect.getsource(motor_chain)))
+    assert emitted, "found no progress events in orca_core — check the pattern"
+
+    mapper = inspect.getsource(chain._progress_mapper)
+    unhandled = sorted(name for name in emitted if f'"{name}"' not in mapper)
+    assert unhandled == [], (
+        f"orca_core emits these but the console says nothing: {unhandled}")
+
+
+def test_a_resumed_chain_takes_the_family_from_the_connected_bus(client):
+    """Factory-default probing cannot identify a resumed chain: every motor
+    already programmed has moved off the default ID, so nothing answers. The
+    packaged configs leave the family on auto, so without this the browser's
+    plain {"mode": "configure"} fails on exactly the hand you are part-way
+    through building."""
+    from orca_ui.hand.operations.chain import validate_chain_params
+
+    service = client.app_state.service
+    assert service.supervisor.config.motor_type in (None, "", "auto")
+
+    clean = validate_chain_params(service, {"mode": "configure"})
+
+    assert clean["motor_type"] is not None, (
+        "resolved nothing, so the run would fall through to factory-default "
+        "probing and fail on a part-built chain")
+
+
+def test_assembly_time_still_defers_to_probing(client):
+    """With no session there is nothing to ask, and that is correct: a chain
+    being built from scratch does answer the factory-default probe."""
+    import types
+
+    from orca_ui.hand.operations.chain import _family_of_connected_bus
+
+    assert _family_of_connected_bus(types.SimpleNamespace(session=None)) is None
