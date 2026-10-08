@@ -149,8 +149,13 @@ def _progress_mapper(ctx: OpContext, grid: _ChainGrid, mode: str):
         elif kind == "chain_verified":
             ctx.log(f"chain verified: {sorted(event['configured_ids'])}")
         elif kind == "chain_done":
-            ctx.set_progress(
-                1.0, detail="all motors configured — ready for operation")
+            # Sets the phase, not just progress: a chain that was already
+            # complete returns before the first step_started, so without this
+            # the run finishes still reporting "acquiring".
+            ctx.set_phase("configuring", progress=1.0,
+                          detail="all motors configured — ready for operation")
+            ctx.log(f"chain complete: "
+                    f"{sorted(event['configured_ids'], reverse=True)}")
         elif kind == "waiting_for_port":
             ctx.set_detail("turn the board off" if event.get("present") is False
                            else "turn the board back on")

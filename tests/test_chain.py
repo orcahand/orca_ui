@@ -231,3 +231,18 @@ def test_assembly_time_still_defers_to_probing(client):
     from orca_ui.hand.operations.chain import _family_of_connected_bus
 
     assert _family_of_connected_bus(types.SimpleNamespace(session=None)) is None
+
+
+def test_an_already_complete_chain_finishes_in_a_sane_phase(client):
+    """A chain with nothing left to do returns before the first step, so the
+    phase never advances on its own. Finishing while still reporting
+    "acquiring" reads as a run that stalled taking the bus."""
+    response = client.post(
+        "/api/operation/configure_chain/start",
+        json={"params": {"mode": "configure", "motor_type": "dynamixel",
+                         **FAST}})
+    assert response.status_code == 200, response.text
+
+    snapshot = _wait_state(client, "done")
+    assert snapshot["phase"] != "acquiring"
+    assert snapshot["progress"] == 1.0
