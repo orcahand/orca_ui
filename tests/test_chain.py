@@ -69,15 +69,54 @@ def test_unknown_mode_rejected(client):
     assert response.status_code == 400
 
 
-def test_feetech_rejected_with_pointer_to_the_script(client):
-    # The UI flow can't do the Feetech USB power-cycle dance (and orca_core's
-    # FeetechClient.connect() retries forever on an absent motor) — reject
-    # loudly instead of wedging a maintenance lease.
+def test_either_family_can_be_configured(client):
+    """Chain configuration is family-agnostic: orca_core's routine carries no
+    per-family branch, and the one real difference -- whether the bus can be
+    hot-plugged -- is a client attribute the plan exposes."""
+    for motor_type in ("dynamixel", "feetech"):
+        response = client.post(
+            "/api/operation/configure_chain/start",
+            json={"params": {"mode": "configure", "motor_type": motor_type,
+                             **FAST}})
+        assert response.status_code == 200, f"{motor_type}: {response.text}"
+        client.post("/api/operation/stop")
+        _wait_for(lambda: _operation(client) is None
+                  or _operation(client)["state"] in ("done", "error",
+                                                     "stopped"))
+
+
+def test_a_family_that_cannot_be_hot_plugged_asks_for_the_power_cycle(client):
+    """The one real difference between the families. Feetech cannot be plugged
+    onto a live bus, so each step waits for the board to go off and come back;
+    the operator has to be there, which is why the run blocks on input."""
     response = client.post(
         "/api/operation/configure_chain/start",
-        json={"params": {"mode": "configure", "motor_type": "feetech"}})
-    assert response.status_code == 409
-    assert "configure_motor_chain.py" in response.json()["detail"]
+        json={"params": {"mode": "configure", "motor_type": "feetech", **FAST}})
+    assert response.status_code == 200, response.text
+
+    snapshot = _wait_state(client, "awaiting_input")
+    assert "turn the board back on" in snapshot["awaiting"]["prompt"]
+    assert snapshot["awaiting"]["options"] == ["Connected"]
+
+    client.post("/api/operation/stop")
+    _wait_for(lambda: (_operation(client) or {}).get("state")
+              in ("done", "error", "stopped"))
+
+
+def test_a_hot_pluggable_family_never_waits_on_the_operator(client):
+    """Dynamixel is hot-pluggable, so orca_core polls the bus instead of
+    prompting and assembly stays headless. A prompt here would mean the family
+    attribute had stopped being consulted."""
+    response = client.post(
+        "/api/operation/configure_chain/start",
+        json={"params": {"mode": "configure", "motor_type": "dynamixel",
+                         **FAST}})
+    assert response.status_code == 200, response.text
+
+    snapshot = _wait_state(client, "done")
+    assert snapshot["result"]["configured"]
+    states = {m["state"] for m in snapshot["extra"]["chain"]}
+    assert states == {"configured"}
 
 
 def test_configure_walks_the_chain_with_extra_grid(client):
