@@ -41,13 +41,31 @@ export function SetupStep({
   )
 }
 
-export function TensionSteps({ started }: { started?: boolean }) {
+export function TensionSteps({
+  started,
+  wind = true,
+}: {
+  started?: boolean
+  // False when the winding pass is skipped: nothing moves, so the warning to
+  // keep clear would be telling the user to stand back from a hand that is
+  // about to sit still.
+  wind?: boolean
+}) {
   return (
     <ol className="setup-steps">
       {!started && (
         <SetupStep n={1} title="Start tensioning">
-          The motors wind the tendons in and then hold them there. Keep clear
-          until they stop moving.
+          {wind ? (
+            <>
+              The motors wind the tendons in and then hold them there. Keep
+              clear until they stop moving.
+            </>
+          ) : (
+            <>
+              The motors hold at the position they are already in. Nothing
+              winds and nothing moves.
+            </>
+          )}
         </SetupStep>
       )}
       <SetupStep n={started ? 1 : 2} title="Tighten every spool">

@@ -167,3 +167,61 @@ def test_concurrent_maintenance_rejected(client):
     client.post("/api/operation/stop")
     _wait_op_state(client, "done")
     _wait_reconnected(client)
+
+
+# --- the optional winding pass -------------------------------------------
+# Tensioning normally drives every tendon to its stall in both directions
+# before holding. On a hand whose spools are already close that is motion for
+# nothing, so the pass is skippable and the motors just hold where they are.
+
+
+def _log_text(client) -> str:
+    return " ".join(
+        entry["line"] for entry in client.get("/api/operation/log").json()["lines"]
+    )
+
+
+def test_tension_winds_by_default(client):
+    client.post("/api/operation/tension/start", json={"params": FAST})
+    snapshot = _wait_op_state(client, "awaiting_input")
+
+    assert snapshot["params"]["move_motors"] is True
+    assert "winding" in _log_text(client)
+
+    client.post("/api/operation/input", json={"value": "Release"})
+    _wait_op_state(client, "done")
+    _wait_reconnected(client)
+
+
+def test_tension_can_hold_without_winding(client):
+    """The motors reach the hold without a winding or ramp phase: nothing is
+    driven anywhere, which is the whole point of asking for it."""
+    client.post("/api/operation/tension/start",
+                json={"params": {**FAST, "move_motors": False}})
+    snapshot = _wait_op_state(client, "awaiting_input")
+
+    assert snapshot["phase"] == "holding"
+    assert snapshot["params"]["move_motors"] is False
+    assert "winding" not in _log_text(client)
+    assert "ramping" not in _log_text(client)
+
+    # Still a real hold that has to be released, and still ends torque-off.
+    assert snapshot["awaiting"]["options"] == ["Release"]
+    client.post("/api/operation/input", json={"value": "Release"})
+    done = _wait_op_state(client, "done")
+    assert done["phase"] == "released"
+    _wait_reconnected(client)
+
+
+def test_the_hold_is_reported_so_a_reload_knows_which_run_it_is(client):
+    """The card reads the run's own params rather than its local tickbox, so a
+    browser that reloads mid-hold still describes what actually happened."""
+    client.post("/api/operation/tension/start",
+                json={"params": {**FAST, "move_motors": False}})
+    _wait_op_state(client, "awaiting_input")
+
+    assert _operation(client)["params"]["move_motors"] is False
+
+    client.post("/api/operation/input", json={"value": "Release"})
+    _wait_op_state(client, "done")
+    _wait_reconnected(client)
