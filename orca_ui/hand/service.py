@@ -1119,7 +1119,13 @@ class HandService:
 
         0 while the calibration current is still the motor family's
         ``default`` — no floor is known until a session names the family.
+
+        Also 0 on a bare bench. The floor exists so calibration cannot stall
+        against its own limit, and a bench never calibrates: the point of the
+        bench is to drive a motor at whatever ceiling the test wants.
         """
+        if self.settings.bare:
+            return 0
         return _current_or_none(
             getattr(self.supervisor.config, "calibration_current", 0)) or 0
 
@@ -1352,13 +1358,26 @@ class HandService:
 
         session = self._require_motors()
         ma = int(ma)
-        # Validate before the hardware write: orca_core refuses a ceiling
-        # below the calibration current, and a rejected value must not leave
-        # the motors on it with the config and our snapshot on the old one.
-        try:
-            config = dataclasses.replace(session.hand.config, max_current=ma)
-        except Exception as e:
-            raise ServiceError(f"hand config rejected {ma} mA: {e}")
+        if ma < 0:
+            raise ServiceError(f"max_current must be non-negative, got {ma}")
+        if self.settings.bare:
+            # The config's own validation refuses a ceiling below the
+            # calibration current so calibration cannot stall against it. A
+            # bench never calibrates, so that rule has nothing to protect
+            # here; the ceiling goes to the motors as typed and the config
+            # records it without being re-validated against the rule.
+            import copy
+            config = copy.copy(session.hand.config)
+            object.__setattr__(config, "max_current", ma)
+        else:
+            # Validate before the hardware write: orca_core refuses a ceiling
+            # below the calibration current, and a rejected value must not
+            # leave the motors on it with the config and our snapshot on the
+            # old one.
+            try:
+                config = dataclasses.replace(session.hand.config, max_current=ma)
+            except Exception as e:
+                raise ServiceError(f"hand config rejected {ma} mA: {e}")
         with _bus_fence(session.hand):
             # Deliberately not clamped to the declared model's rating. The
             # declaration decides what a motor is given on connect; a value

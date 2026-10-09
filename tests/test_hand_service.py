@@ -140,6 +140,28 @@ def test_wrist_is_measured_and_follows_commands(service):
 
     assert _wait_for(wrist_tracks), service.session.measured_joints()
 
+def test_a_bare_bench_has_no_current_floor():
+    """The floor exists so calibration cannot stall against its own limit. A
+    bench never calibrates, so it may drive a motor at any ceiling the test
+    wants -- including well below the family's calibration current."""
+    from orca_ui.hand.service import HandService
+
+    settings = UiSettings(config_path=materialize_mock_model(), mock=True,
+                          bare=True, open_browser=False)
+    svc = HandService(settings, publish_status=lambda s: None,
+                      publish_error=lambda e: None)
+    svc.start()
+    try:
+        assert _wait_for(lambda: svc.session is not None)
+        assert svc.max_current_floor() == 0
+        calibration = svc.supervisor.config.calibration_current
+        svc.set_max_current(calibration - 1)
+        assert svc.control_state()["max_current"] == calibration - 1
+        assert svc.session.hand.config.max_current == calibration - 1
+    finally:
+        svc.stop()
+
+
 def test_max_current_floor_is_the_calibration_current(service):
     """orca_core refuses a ceiling below the calibration current. The floor is
     published so the UI can stop there, and a write below it is rejected
