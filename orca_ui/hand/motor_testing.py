@@ -30,6 +30,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+import numpy as np
+
 from orca_core.constants import CURRENT, MODE_MAP
 
 from orca_ui.hand import motor_models
@@ -347,7 +349,7 @@ class ChirpRunner:
                 u = chirp_value(spec, t)
                 if spec.mode == "position":
                     cmd = centre + u
-                    hand.write_motor_pos([spec.motor_id], [cmd])
+                    hand.write_motor_pos([spec.motor_id], np.asarray([cmd]))
                 else:
                     cmd = current_bias + (u / spec.amplitude) * amplitude_ma
                     with hand._motor_lock:
