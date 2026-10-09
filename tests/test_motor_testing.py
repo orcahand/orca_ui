@@ -272,7 +272,7 @@ class TestCurrentRun:
 
         assert state["status"] == "done", state
         assert client.mode_writes == [((1,), 0), ((1,), 3)]
-        assert client.signed[-1] == 0.0, "the run ends with the motor unloaded"
+        assert client.signed[-1] == 50.0, "the run ends back at the bias"
         peak = max(abs(v - 50.0) for v in client.signed)
         assert 150.0 < peak <= 200.0 + 1e-9
         assert state["spec"]["amplitude_ma"] == 200.0
@@ -367,3 +367,24 @@ class TestService:
     def test_stopping_with_nothing_running_is_harmless(self):
         service, _ = self._service()
         assert service.stop_motor_test() is False
+
+
+class TestComment:
+    def test_the_comment_heads_the_csv_and_the_sidecar(self, tmp_path):
+        runner, service, client = _runner(tmp_path)
+        spec = _spec(duration_s=0.2, taper_s=0.05, rate_hz=100.0,
+                     comment="1.7 kg on the spool,\nprofile off")
+        runner.start(spec)
+        state = _finish(runner)
+        folder = tmp_path / "motortestingdata" / "bare"
+        lines = (folder / f"{state['run_id']}.csv").read_text().splitlines()
+        assert lines[0].startswith("t_s,")
+        assert lines[1] == "# 1.7 kg on the spool, profile off"
+        assert json.loads((folder / f"{state['run_id']}.json").read_text())["comment"] == spec.comment
+        # Readers skip '#' lines, so the data loads as before.
+        data = np.genfromtxt(folder / f"{state['run_id']}.csv", delimiter=",", names=True)
+        assert data.dtype.names[0] == "t_s" and len(data) == state["samples"]
+
+    def test_an_overlong_comment_is_refused(self):
+        with pytest.raises(MotorTestError):
+            _spec(comment="x" * 501).validate()

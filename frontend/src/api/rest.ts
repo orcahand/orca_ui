@@ -238,6 +238,17 @@ export const api = {
       max_settle_ms: number | null
       period_ms: number
     }>('/api/motors/direct/pacing', { interp_steps, max_settle_ms, period_ms }),
+  // Bare bench: a signed current instead of a position, held until rewritten.
+  motorsDirectControl: (id: number, mode: 'position' | 'current') =>
+    post<{ id: number; control: 'position' | 'current'; commanded_ma: number | null }>(
+      '/api/motors/direct/control',
+      { id, mode },
+    ),
+  motorsDirectCurrent: (id: number, ma: number) =>
+    post<{ id: number; ma: number; ceiling_ma: number | null }>(
+      '/api/motors/direct/current',
+      { id, ma },
+    ),
   motorsDirectPosition: (id: number, position: number) =>
     post<{ id: number; position: number; previous: number }>(
       '/api/motors/direct/position',

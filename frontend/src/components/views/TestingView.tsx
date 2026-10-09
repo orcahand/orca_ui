@@ -33,6 +33,7 @@ const DEFAULTS: Omit<TestingRequest, 'motor_id' | 'mode' | 'amplitude'> = {
   rate_hz: 200,
   torque_unit: 'ma',
   position_envelope_rad: 1,
+  comment: '',
 }
 
 const fmt = (v: number | null | undefined, digits = 2) =>
@@ -54,6 +55,7 @@ export function TestingView() {
   const [form, setForm] = useState({ ...DEFAULTS })
   const [offset, setOffset] = useState('0')
   const [taperS, setTaperS] = useState('0.5')
+  const [comment, setComment] = useState('')
 
   const motor = motors.find((m) => m.id === motorId) ?? null
   const running = state?.status === 'running'
@@ -112,8 +114,10 @@ export function TestingView() {
         amplitude: Number(amplitude),
         offset: Number(offset) || 0,
         taper_s: form.taper === 'none' ? 0 : Number(taperS) || 0,
+        comment: comment.trim(),
       }
       const next = await api.testingStart(body)
+      setComment('')
       latest.testing.trace = []
       setState(next)
       setError(null)
@@ -341,6 +345,21 @@ export function TestingView() {
                 </label>
               </>
             )}
+            <label
+              title="written as a '#' line under the CSV header and into the JSON sidecar"
+              style={{ flexBasis: '100%' }}
+            >
+              comment{' '}
+              <input
+                type="text"
+                maxLength={500}
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="what this run is (load, setup, purpose)"
+                disabled={running}
+                style={{ width: 'min(520px, 80%)' }}
+              />
+            </label>
             {motor && (
               <span style={{ color: 'var(--dimmer)', fontSize: 11 }}>
                 {motor.range_rad
@@ -384,6 +403,7 @@ export function TestingView() {
                 <th>samples</th>
                 <th>rate</th>
                 <th>status</th>
+                <th>comment</th>
                 <th />
               </tr>
             </thead>
@@ -407,6 +427,10 @@ export function TestingView() {
                   <td>{run.samples}</td>
                   <td>{fmt(run.achieved_rate_hz, 0)} Hz</td>
                   <td title={run.detail}>{run.status}</td>
+                  <td style={{ maxWidth: 260, whiteSpace: 'nowrap', overflow: 'hidden',
+                               textOverflow: 'ellipsis' }} title={run.comment ?? ''}>
+                    {run.comment ?? ''}
+                  </td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     <a
                       className="btn btn-secondary"

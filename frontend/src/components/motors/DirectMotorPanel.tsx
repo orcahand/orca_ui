@@ -507,6 +507,7 @@ function BenchMotorRow({
   const [find, setFind] = useState<RangeFind>({ phase: 'idle' })
   const [rec, setRec] = useState<Recording>({ active: false, points: [] })
   const [target, setTarget] = useState<string>('')
+  const [maTarget, setMaTarget] = useState<string>('')
   const [busy, setBusy] = useState(false)
   const findRef = useRef(find)
   findRef.current = find
@@ -660,6 +661,21 @@ function BenchMotorRow({
   const flags = motor.hw_error_flags
   const finding = find.phase !== 'idle'
 
+  // Direct current control: a signed goal current held until the next write.
+  // Entering it commands 0 mA, so a loaded motor goes limp until a holding
+  // current is written.
+  const control = motor.control ?? 'position'
+  const ceiling = Math.max(0, Math.round(motor.ceiling_ma ?? 0))
+  const maParsed = Number.parseFloat(maTarget)
+  const maValid = Number.isFinite(maParsed) && Math.abs(maParsed) <= ceiling
+  const sendMa = (ma: number) =>
+    void api.motorsDirectCurrent(motor.id, ma).catch(onError)
+  const setControl = (mode: 'position' | 'current') =>
+    void call(async () => {
+      await api.motorsDirectControl(motor.id, mode)
+      setMaTarget('')
+    })
+
   return (
     <div style={{ borderTop: '1px solid var(--border)', padding: '6px 0' }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -669,8 +685,60 @@ function BenchMotorRow({
             <span style={{ color: 'var(--dim)' }}> {motor.nickname}</span>
           ) : null}
         </span>
+        {motor.current_control && (
+          <select
+            value={control}
+            disabled={disabled || busy || rec.active || finding}
+            onChange={(e) => setControl(e.target.value as 'position' | 'current')}
+            title={
+              'position: goal positions, as on a hand. current: a signed goal ' +
+              'current held until the next write; entering it commands 0 mA'
+            }
+          >
+            <option value="position">position</option>
+            <option value="current">current</option>
+          </select>
+        )}
 
-        {rec.active ? (
+        {control === 'current' ? (
+          <>
+            <input
+              type="range"
+              min={-ceiling}
+              max={ceiling}
+              step={1}
+              value={maValid ? maParsed : (motor.commanded_ma ?? 0)}
+              disabled={disabled}
+              onChange={(e) => {
+                setMaTarget(e.target.value)
+                sendMa(Number.parseFloat(e.target.value))
+              }}
+              style={{ flex: 1, minWidth: 140 }}
+            />
+            <input
+              type="number"
+              min={-ceiling}
+              max={ceiling}
+              step={1}
+              value={maTarget}
+              disabled={disabled}
+              placeholder={String(Math.round(motor.commanded_ma ?? 0))}
+              onChange={(e) => setMaTarget(e.target.value)}
+              style={{ width: 72 }}
+            />
+            <span style={{ color: 'var(--dimmer)' }}>mA / ±{ceiling}</span>
+            <button
+              className="btn btn-primary"
+              disabled={disabled || !maValid}
+              onClick={() => sendMa(maParsed)}
+            >
+              Go
+            </button>
+            <button className="btn btn-secondary" disabled={disabled} onClick={() => sendMa(0)}>
+              Zero
+            </button>
+          </>
+        ) : rec.active ? (
           <>
             <span style={{ color: 'var(--warn)', flex: 1, minWidth: 200 }}>
               Limp — move it to a position and record it. {rec.points.length}{' '}

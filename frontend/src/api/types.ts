@@ -213,6 +213,12 @@ export interface DirectMotorInfo {
   temp_c?: number | null
   hw_error: number | null
   hw_error_flags: string[] | null
+  // Bare bench only: whether the motor is under a signed current instead of a
+  // position, what was last written, and the motor's own current ceiling.
+  control?: 'position' | 'current'
+  commanded_ma?: number | null
+  current_control?: boolean
+  ceiling_ma?: number | null
 }
 
 export interface DirectMotorSnapshot {
@@ -864,6 +870,7 @@ export interface TestingRequest {
   rate_hz: number
   torque_unit: 'ma' | 'nm'
   position_envelope_rad: number
+  comment: string
 }
 
 export interface TestingState {
@@ -901,5 +908,6 @@ export interface TestingRun {
   saved_at: string
   model: string
   model_label: string
+  comment?: string
   spec: TestingRequest
 }

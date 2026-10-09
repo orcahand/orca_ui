@@ -99,6 +99,16 @@ class DirectMotorPositionRequest(BaseModel):
     position: float  # motor position in radians; step-clamped server-side
 
 
+class DirectMotorControlRequest(BaseModel):
+    id: int = Field(ge=0)
+    mode: Literal["position", "current"]
+
+
+class DirectMotorCurrentRequest(BaseModel):
+    id: int = Field(ge=0)
+    ma: float  # signed goal current; clamped to the motor's ceiling server-side
+
+
 class MotorTorqueRequest(BaseModel):
     id: int = Field(ge=0)
     enabled: bool
@@ -238,3 +248,4 @@ class MotorTestRequest(BaseModel):
     rate_hz: float = 200.0
     torque_unit: str = "ma"                # current mode: ma | nm
     position_envelope_rad: float = 1.0
+    comment: str = ""

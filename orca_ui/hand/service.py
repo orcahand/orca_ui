@@ -16,6 +16,7 @@ from typing import Callable, TYPE_CHECKING
 import numpy as np
 
 from orca_core import JointGains
+from orca_core.constants import CURRENT, MODE_MAP
 from orca_core.hardware.motor_client import MotionTimeoutError
 
 if TYPE_CHECKING:
@@ -213,6 +214,9 @@ class HandService:
         # Bench telemetry stands down while an excitation test owns the bus;
         # the test samples at its own rate and publishes its own trace.
         self._bench_telemetry_paused = False
+        # Bare motors under direct current control: id -> {"previous": mode
+        # value to go back to, "ma": the last signed current written}.
+        self._bench_current_mode: dict[int, dict] = {}
         self._motor_testing = None   # built lazily: needs the library root
         self._tactile_mode = "combined"
         self._control_source = ControlSource.MANUAL
@@ -833,6 +837,7 @@ class HandService:
         try:
             report["playback_stopped"] = self.stop_all_playback()
             report["motor_test_stopped"] = self.stop_motor_test()
+            self._leave_direct_current_control()
         except Exception:
             logger.exception("estop: bench playback stop failed")
         teleop = self.teleop_manager
@@ -919,6 +924,7 @@ class HandService:
         # motor and then snap it to the next point when torque returned.
         self.stop_all_playback()
         self.stop_motor_test()
+        self._leave_direct_current_control()
         session.hand.disable_torque()
         self.supervisor.set_torque_flag(False)
         self.worker.reset()
@@ -1419,6 +1425,9 @@ class HandService:
         with self._state_lock:
             direct = self._direct_motor_mode
         span = getattr(type(client), "position_range_rad", None)
+        controls = ({mid: self._motor_control_entry(client, int(mid))
+                     for mid in hand.config.motor_ids}
+                    if self.settings.bare and client is not None else {})
         return {
             "direct_mode": direct,
             # A bench moves a loose motor across its whole travel in one go;
@@ -1443,6 +1452,7 @@ class HandService:
                     "temp_c": temps.get(mid),
                     "hw_error": errors[mid],
                     "hw_error_flags": _decode_hw_error(client, errors[mid]),
+                    **controls.get(mid, {}),
                 }
                 for mid in hand.config.motor_ids
             ],
@@ -1543,6 +1553,7 @@ class HandService:
             self._direct_motor_mode = False
         if not was:
             return
+        self._leave_direct_current_control()
         session = self.session
         loop = getattr(session.hand, "_loop", None) if session else None
         if loop is not None:
@@ -2220,6 +2231,118 @@ class HandService:
                 "range to command past it")
         self._check_within_travel(hand, position)
 
+    # --- direct current control (bare bench) ---------------------------------
+
+    def _motor_control_entry(self, client, motor_id: int) -> dict:
+        supports = getattr(client, "supports_current_control", None)
+        state = getattr(self, "_bench_current_mode", {}).get(motor_id)
+        ceiling = None
+        try:
+            ceiling = client.read_current_limits().get(motor_id)
+        except Exception:
+            pass
+        return {
+            "control": "current" if state is not None else "position",
+            "commanded_ma": state["ma"] if state is not None else None,
+            "current_control": bool(supports(motor_id)) if supports else False,
+            "ceiling_ma": ceiling,
+        }
+
+    def _require_direct_bench_motor(self, motor_id: int):
+        self._require_bench()
+        session = self._require_torque()
+        self._require_manual_control()
+        with self._state_lock:
+            if not self._direct_motor_mode:
+                raise ServiceError(
+                    "direct motor mode is not armed", status_code=409)
+        hand = session.hand
+        if int(motor_id) not in hand.config.motor_ids:
+            raise ServiceError(f"unknown motor id {motor_id}")
+        return hand
+
+    def set_motor_control(self, motor_id: int, mode: str) -> dict:
+        """Put one bare motor under direct current control, or back under
+        position control. Entering current control commands 0 mA, so a
+        loaded motor goes limp until a holding current is written."""
+        if mode not in ("position", "current"):
+            raise ServiceError("mode must be 'position' or 'current'")
+        hand = self._require_direct_bench_motor(motor_id)
+        client = hand.motor_client
+        motor_id = int(motor_id)
+        self._stop_motor_playback(motor_id)
+        if mode == "current":
+            if not client.supports_current_control(motor_id):
+                raise ServiceError(
+                    f"motor {motor_id} cannot be driven in current control mode")
+            if motor_id not in self._bench_current_mode:
+                previous = (client.operating_mode(motor_id)
+                            if hasattr(client, "operating_mode") else None)
+                if previous is None:
+                    previous = MODE_MAP.get(hand.config.control_mode)
+                with hand._motor_lock:
+                    if previous != MODE_MAP[CURRENT]:
+                        hand.set_control_mode(CURRENT, [motor_id])
+                    client.write_goal_current_signed([motor_id], [0.0])
+                self._bench_current_mode[motor_id] = {"previous": previous, "ma": 0.0}
+        else:
+            self._restore_position_control(hand, motor_id)
+        return {"id": motor_id, **self._motor_control_entry(client, motor_id)}
+
+    def set_motor_current(self, motor_id: int, ma: float) -> dict:
+        """Signed current for one motor under direct current control. Held
+        until the next write; clamped to the motor's own ceiling."""
+        hand = self._require_direct_bench_motor(motor_id)
+        client = hand.motor_client
+        motor_id = int(motor_id)
+        state = self._bench_current_mode.get(motor_id)
+        if state is None:
+            raise ServiceError(
+                f"motor {motor_id} is under position control; switch it to "
+                "current first", status_code=409)
+        ma = float(ma)
+        if not math.isfinite(ma):
+            raise ServiceError("current must be finite")
+        ceiling = client.read_current_limits().get(motor_id)
+        if ceiling is not None and abs(ma) > ceiling:
+            ma = math.copysign(ceiling, ma)
+        with hand._motor_lock:
+            client.write_goal_current_signed([motor_id], [ma])
+        state["ma"] = ma
+        return {"id": motor_id, "ma": ma, "ceiling_ma": ceiling}
+
+    def _restore_position_control(self, hand, motor_id: int) -> None:
+        state = self._bench_current_mode.pop(int(motor_id), None)
+        if state is None:
+            return
+        client = hand.motor_client
+        with hand._motor_lock:
+            try:
+                client.write_goal_current_signed([motor_id], [0.0])
+            except Exception:
+                logger.exception("could not zero motor %s before leaving current control", motor_id)
+            previous = state.get("previous")
+            if previous is not None and previous != MODE_MAP[CURRENT]:
+                mode_name = next((k for k, v in MODE_MAP.items() if v == previous), None)
+                if mode_name:
+                    hand.set_control_mode(mode_name, [motor_id])
+
+    def _leave_direct_current_control(self) -> None:
+        """Every motor back under position control. Never raises: used by
+        estop, torque-off and disarming direct mode."""
+        if not self._bench_current_mode:
+            return
+        session = self.session
+        if session is None:
+            self._bench_current_mode.clear()
+            return
+        for mid in list(self._bench_current_mode):
+            try:
+                self._restore_position_control(session.hand, mid)
+            except Exception:
+                logger.exception("could not restore position control on motor %s", mid)
+        self._bench_current_mode.clear()
+
     def set_motor_position(self, motor_id: int, position: float) -> dict:
         """Raw motor-space position write (radians) for one motor."""
         session = self._require_torque()
@@ -2235,6 +2358,10 @@ class HandService:
         position = float(position)
         if not math.isfinite(position):
             raise ServiceError("position must be finite")
+        if motor_id in getattr(self, "_bench_current_mode", {}):
+            raise ServiceError(
+                f"motor {motor_id} is under current control; switch it back "
+                "to position first", status_code=409)
         current = float(hand.get_motor_pos(as_dict=True)[motor_id])
         if (not self.settings.bare
                 and abs(position - current) > MAX_DIRECT_MOTOR_STEP_RAD):

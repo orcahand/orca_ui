@@ -71,6 +71,7 @@ class ChirpSpec:
     rate_hz: float = RATE_HZ_DEFAULT
     torque_unit: str = "ma"         # current mode only
     position_envelope_rad: float = POSITION_ENVELOPE_RAD
+    comment: str = ""              # written as a '#' line under the CSV header
 
     def validate(self) -> None:
         if self.mode not in MODES:
@@ -97,6 +98,8 @@ class ChirpSpec:
             raise MotorTestError("taper_s must be >= 0 and at most half the duration")
         if self.sweep == "exponential" and abs(self.f1_hz - self.f0_hz) < 1e-9:
             raise MotorTestError("an exponential sweep needs f0 != f1")
+        if not isinstance(self.comment, str) or len(self.comment) > 500:
+            raise MotorTestError("comment must be text of at most 500 characters")
 
 
 # --- the signal ------------------------------------------------------------
@@ -388,8 +391,10 @@ class ChirpRunner:
             try:
                 if spec.mode == "current":
                     with hand._motor_lock:
+                        # Back to the bias: zero unloaded, the holding current
+                        # on a loaded bench.
                         try:
-                            client.write_goal_current_signed([spec.motor_id], [0.0])
+                            client.write_goal_current_signed([spec.motor_id], [current_bias])
                         except Exception:
                             pass
                         if previous_mode is not None and previous_mode != MODE_MAP[CURRENT]:
@@ -419,12 +424,17 @@ class ChirpRunner:
         with csv_path.open("w", newline="") as f:
             w = csv.writer(f)
             w.writerow(["t_s", f"command_{unit}", "position_rad", "velocity_rad_s", "current_ma"])
+            # After the header, not before: numpy's genfromtxt takes a leading
+            # '#' line as the column names.
+            if spec.comment.strip():
+                f.write("# " + " ".join(spec.comment.split()) + "\n")
             w.writerows(self._trace)
         meta = {
             "spec": asdict(spec), "centre": centre, "current_bias_ma": current_bias,
             "amplitude_ma": amplitude_ma, "model": model.key, "model_label": model.label,
             "torque_poly_nm": model.torque_poly_nm,
             "torque_poly_current_range_a": model.torque_poly_current_range_a,
+            "comment": spec.comment,
             "status": status, "detail": detail, "samples": len(self._trace),
             "achieved_rate_hz": achieved, "saved_at": datetime.now().isoformat(timespec="seconds"),
         }
