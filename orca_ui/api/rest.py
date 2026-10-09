@@ -348,6 +348,38 @@ def build_router(service: HandService) -> APIRouter:
     def motors_bus_baud_set(body: schemas.BusBaudRequest):
         return guard(service.set_bus_baud, body.baud_rate)
 
+    # --- bench excitation tests -------------------------------------------
+    @router.get("/testing/motors")
+    def testing_motors():
+        return {"motors": guard(service.motor_test_candidates)}
+
+    @router.post("/testing/chirp/start")
+    def testing_chirp_start(body: schemas.MotorTestRequest):
+        return guard(service.start_motor_test, body.model_dump())
+
+    @router.post("/testing/chirp/stop")
+    def testing_chirp_stop():
+        return {"stopped": guard(service.stop_motor_test)}
+
+    @router.get("/testing/state")
+    def testing_state():
+        return guard(service.motor_test_state)
+
+    @router.get("/testing/runs")
+    def testing_runs():
+        return {"runs": guard(service.list_motor_tests)}
+
+    @router.get("/testing/runs/{run_id}.csv")
+    def testing_run_csv(run_id: str):
+        from fastapi.responses import FileResponse
+        path = guard(service.motor_test_path, run_id, ".csv")
+        return FileResponse(str(path), media_type="text/csv", filename=path.name)
+
+    @router.delete("/testing/runs/{run_id}")
+    def testing_run_delete(run_id: str):
+        guard(service.delete_motor_test, run_id)
+        return {"ok": True}
+
     @router.post("/motors/direct/pacing")
     def motors_direct_pacing(body: schemas.BenchPacingRequest):
         return guard(service.set_bench_pacing,

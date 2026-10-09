@@ -210,6 +210,10 @@ class HandService:
         self._bench_period_s = BENCH_DWELL_S
         self._bench_thread: threading.Thread | None = None
         self._bench_stop = threading.Event()
+        # Bench telemetry stands down while an excitation test owns the bus;
+        # the test samples at its own rate and publishes its own trace.
+        self._bench_telemetry_paused = False
+        self._motor_testing = None   # built lazily: needs the library root
         self._tactile_mode = "combined"
         self._control_source = ControlSource.MANUAL
         self._control_owner_label = ControlSource.MANUAL.value
@@ -828,6 +832,7 @@ class HandService:
         # keeps writing on its own timer.
         try:
             report["playback_stopped"] = self.stop_all_playback()
+            report["motor_test_stopped"] = self.stop_motor_test()
         except Exception:
             logger.exception("estop: bench playback stop failed")
         teleop = self.teleop_manager
@@ -913,6 +918,7 @@ class HandService:
         # A running sequence would keep writing goal positions into a limp
         # motor and then snap it to the next point when torque returned.
         self.stop_all_playback()
+        self.stop_motor_test()
         session.hand.disable_torque()
         self.supervisor.set_torque_flag(False)
         self.worker.reset()
@@ -1930,6 +1936,83 @@ class HandService:
             self._check_within_travel(session.hand, value)
         self._bench_points[motor_id] = values
         return {"id": motor_id, "points": values}
+
+    # --- bench excitation tests ---------------------------------------------
+
+    def pause_bench_telemetry(self, paused: bool) -> None:
+        self._bench_telemetry_paused = bool(paused)
+
+    @property
+    def bench_telemetry_paused(self) -> bool:
+        return self._bench_telemetry_paused
+
+    def _motor_tests(self):
+        from orca_ui.hand.motor_testing import ChirpRunner
+        if self._motor_testing is None:
+            self._motor_testing = ChirpRunner(
+                self, self._library_root / "motortestingdata" / self.supervisor.model_name)
+        return self._motor_testing
+
+    def _require_bench(self) -> None:
+        if not self.settings.bare:
+            raise ServiceError(
+                "excitation tests are a bare-bench control: on an assembled hand a "
+                "chirp on one motor pulls on every tendon it shares", status_code=409)
+
+    def motor_test_candidates(self) -> list[dict]:
+        """Each bare motor with what a test may do to it."""
+        self._require_bench()
+        session = self._require_motors()
+        client = session.hand.motor_client
+        ceilings = client.read_current_limits() if client is not None else {}
+        out = []
+        for mid in session.hand.config.motor_ids:
+            decl = self._declaration(session, mid)
+            model = decl.get("identified") or decl.get("model")
+            out.append({
+                "id": int(mid),
+                "model": model,
+                "current_control": bool(client.supports_current_control(mid)) if client else False,
+                "torque_curve": bool(model and model.get("torque_poly_nm")),
+                "range_rad": (list(self._bench_ranges[int(mid)]) if int(mid) in self._bench_ranges else None),
+                "ceiling_ma": ceilings.get(mid),
+            })
+        return out
+
+    def start_motor_test(self, params: dict) -> dict:
+        from orca_ui.hand.motor_testing import ChirpSpec, MotorTestError
+        self._require_bench()
+        try:
+            spec = ChirpSpec(**params)
+            return self._motor_tests().start(spec)
+        except MotorTestError as e:
+            raise ServiceError(str(e))
+        except TypeError as e:
+            raise ServiceError(f"bad test parameters: {e}")
+
+    def stop_motor_test(self) -> bool:
+        if self._motor_testing is None:
+            return False
+        return self._motor_testing.stop()
+
+    def motor_test_state(self) -> dict:
+        return self._motor_tests().state() if self.settings.bare else {"status": "idle"}
+
+    def list_motor_tests(self) -> list[dict]:
+        self._require_bench()
+        return self._motor_tests().list_runs()
+
+    def motor_test_path(self, run_id: str, suffix: str = ".csv"):
+        from orca_ui.hand.motor_testing import MotorTestError
+        self._require_bench()
+        try:
+            return self._motor_tests().run_path(run_id, suffix)
+        except MotorTestError as e:
+            raise ServiceError(str(e), status_code=404)
+
+    def delete_motor_test(self, run_id: str) -> None:
+        self._require_bench()
+        self._motor_tests().delete_run(run_id)
 
     def set_bench_pacing(self, interp_steps: int,
                          max_settle_ms: "int | None",

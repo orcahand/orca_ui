@@ -39,6 +39,7 @@ const TABS: { id: ViewName; label: string }[] = [
   { id: 'teleop', label: 'Teleop' },
   { id: 'setup', label: 'Setup' },
   { id: 'motors', label: 'Motors' },
+  { id: 'testing', label: 'Testing' },
 ]
 
 export function AppHeader() {
@@ -52,11 +53,14 @@ export function AppHeader() {
   // capability-gated one level down, so a motors-only hand gets a shorter
   // page rather than no page. Bare motor mode is the exception — there is no
   // hand to pose, no pose library worth keeping and nothing to calibrate, so
-  // only the two tabs that act on motors are offered.
+  // only the tabs that act on motors are offered. Testing is bare-only the
+  // other way round: a chirp on one motor of an assembled hand pulls on every
+  // tendon it shares.
   const bare = status?.bare ?? false
+  const BARE_TABS = new Set<ViewName>(['dashboard', 'motors', 'testing'])
   const tabs = bare
-    ? TABS.filter((tab) => tab.id === 'dashboard' || tab.id === 'motors')
-    : TABS
+    ? TABS.filter((tab) => BARE_TABS.has(tab.id))
+    : TABS.filter((tab) => tab.id !== 'testing')
 
   const state: HandState = !wsConnected
     ? 'disconnected'

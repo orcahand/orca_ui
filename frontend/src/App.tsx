@@ -13,6 +13,7 @@ import { MotorsView } from './components/views/MotorsView'
 import { PosesView } from './components/views/PosesView'
 import { SetupView } from './components/views/SetupView'
 import { TeleopView } from './components/views/TeleopView'
+import { TestingView } from './components/views/TestingView'
 import { useAppStore } from './state/appStore'
 
 // three.js only loads when the 3D tab first opens.
@@ -76,6 +77,7 @@ export default function App() {
           {view === 'teleop' && <TeleopView />}
           {view === 'setup' && <SetupView />}
           {view === 'motors' && <MotorsView />}
+          {view === 'testing' && <TestingView />}
         </>
       )}
       <ErrorBoundary label="The tensioning dialog">

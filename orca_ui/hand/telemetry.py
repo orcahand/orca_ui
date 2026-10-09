@@ -315,7 +315,8 @@ class TelemetryService:
                 self._hub.publish(T.JOINTS_MEASURED, payload)
             self._sensor_health.feed(_call(session, "encoder_reading"))
 
-        if getattr(self._service.settings, "bare", False) and session.caps.motors:
+        if (getattr(self._service.settings, "bare", False) and session.caps.motors
+                and not getattr(self._service, "bench_telemetry_paused", False)):
             self._bench_tick(session)
 
         if session.caps.tactile:

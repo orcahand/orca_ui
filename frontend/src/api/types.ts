@@ -564,6 +564,8 @@ export const TOPICS = {
   teleopTargets: 'teleop.targets',
   teleopLog: 'teleop.log',
   teleopPreview: 'teleop.preview',
+  testingState: 'testing.state',
+  testingTrace: 'testing.trace',
 } as const
 
 export interface ServerMessage {
@@ -832,4 +834,72 @@ export interface GuidedTensionExtra {
   // exclusion list with a reason per joint.
   absent_joints?: string[]
   excluded?: { joint: string; motor: number; reason: string }[]
+
+// ----- bench excitation tests (bare bench) ----------------------------------
+
+export type TestingMode = 'position' | 'current'
+export type TestingStatus = 'idle' | 'running' | 'done' | 'stopped' | 'error'
+
+export interface TestingMotor {
+  id: number
+  model: MotorModelInfo | null
+  current_control: boolean
+  torque_curve: boolean
+  range_rad: [number, number] | null
+  ceiling_ma: number | null
+}
+
+export interface TestingRequest {
+  motor_id: number
+  mode: TestingMode
+  amplitude: number
+  f0_hz: number
+  f1_hz: number
+  duration_s: number
+  offset: number
+  centre_on_present: boolean
+  sweep: 'linear' | 'exponential'
+  taper: 'cosine' | 'none'
+  taper_s: number
+  rate_hz: number
+  torque_unit: 'ma' | 'nm'
+  position_envelope_rad: number
+}
+
+export interface TestingState {
+  run_id: string | null
+  status: TestingStatus
+  detail: string
+  progress: number
+  samples: number
+  achieved_rate_hz: number | null
+  file: string | null
+  spec: (TestingRequest & {
+    centre: number
+    amplitude_ma: number | null
+    torque_extrapolated: boolean
+    model: string
+  }) | null
+}
+
+export interface TestingTraceSample {
+  run_id: string
+  t: number
+  cmd: number
+  pos: number
+  vel: number
+  cur: number
+}
+
+export interface TestingRun {
+  run_id: string
+  csv: string
+  status: TestingStatus
+  detail: string
+  samples: number
+  achieved_rate_hz: number | null
+  saved_at: string
+  model: string
+  model_label: string
+  spec: TestingRequest
 }

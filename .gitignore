@@ -31,3 +31,5 @@ node_modules/
 
 # Personal Claude Code instructions, never committed
 CLAUDE.local.md
+# Bench excitation recordings: data, never source.
+motortestingdata/

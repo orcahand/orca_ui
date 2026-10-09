@@ -20,6 +20,8 @@ import type {
   ServerMessage,
   StatusSnapshot,
   TeleopSnapshot,
+  TestingState,
+  TestingTraceSample,
 } from './types'
 import { TOPICS } from './types'
 
@@ -330,6 +332,24 @@ function dispatch(message: ServerMessage): void {
       latest.teleop.preview = data as { jpeg: string; seq: number | null }
       markDirty()
       break
+    case TOPICS.testingState: {
+      const state = data as unknown as TestingState
+      const previous = latest.testing.state
+      if (state.run_id && state.run_id !== previous?.run_id) {
+        latest.testing.trace = []
+      }
+      latest.testing.state = state
+      markDirty()
+      break
+    }
+    case TOPICS.testingTrace: {
+      const sample = data as unknown as TestingTraceSample
+      const trace = latest.testing.trace
+      if (trace.length && trace[0].run_id !== sample.run_id) trace.length = 0
+      trace.push(sample)
+      markDirty()
+      break
+    }
     case TOPICS.error: {
       const message = (data.message as string) ?? 'unknown error'
       useAppStore.getState().setError(message)

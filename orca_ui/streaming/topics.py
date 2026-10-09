@@ -28,6 +28,9 @@ MOTORS_TELEMETRY = "motors.telemetry"
 # client logs) and command adherence (target vs sampled pose, stall
 # durations). 1 Hz from telemetry's slow tick; counters reset per session.
 MOTORS_FAULTS = "motors.faults"
+# Bench excitation tests: run state, and a decimated live trace for the plot.
+TESTING_STATE = "testing.state"
+TESTING_TRACE = "testing.trace"
 STATS = "stats"
 
 # Electrical bring-up monitor: per-joint encoder health verdicts, tactile
@@ -52,6 +55,7 @@ ALL_TOPICS = [
     JOINTS_MEASURED, JOINTS_ESTIMATE, JOINTS_TARGET, JOINTS_CORRECTION,
     MOTORS_TELEMETRY, MOTORS_FAULTS, STATS, SENSORS_HEALTH,
     TELEOP_STATE, TELEOP_TARGETS, TELEOP_LOG, TELEOP_PREVIEW,
+    TESTING_STATE, TESTING_TRACE,
 ]
 
 # Broadcast min-interval in seconds (rate ceiling toward the browser).
@@ -61,6 +65,7 @@ MIN_INTERVAL_S = {
     TACTILE_TAXELS: 1.0 / 30.0,
     TELEOP_TARGETS: 1.0 / 30.0,
     TELEOP_PREVIEW: 1.0 / 10.0,
+    TESTING_TRACE: 1.0 / 30.0,
 }
 
 BROADCAST_TICK_S = 1.0 / 60.0

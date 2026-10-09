@@ -34,6 +34,10 @@ import type {
   ServoLimits,
   ServoProfileMap,
   ControlState,
+  TestingMotor,
+  TestingRequest,
+  TestingRun,
+  TestingState,
 } from './types'
 
 export class ApiError extends Error {
@@ -239,6 +243,18 @@ export const api = {
       '/api/motors/direct/position',
       { id, position },
     ),
+
+  // Bench excitation tests: one motor, a chirp, a CSV.
+  testingMotors: () => request<{ motors: TestingMotor[] }>('/api/testing/motors'),
+  testingStart: (body: TestingRequest) =>
+    post<TestingState>('/api/testing/chirp/start', body),
+  testingStop: () => post<{ stopped: boolean }>('/api/testing/chirp/stop'),
+  testingState: () => request<TestingState>('/api/testing/state'),
+  testingRuns: () => request<{ runs: TestingRun[] }>('/api/testing/runs'),
+  testingRunCsvUrl: (runId: string) =>
+    `/api/testing/runs/${encodeURIComponent(runId)}.csv`,
+  testingRunDelete: (runId: string) =>
+    del<{ ok: boolean }>(`/api/testing/runs/${encodeURIComponent(runId)}`),
 
   poses: () => request<{ poses: PoseEntry[] }>('/api/poses'),
   poseSave: (name: string, angles: Record<string, number>) =>

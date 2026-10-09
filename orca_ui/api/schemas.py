@@ -219,3 +219,22 @@ class BusBaudRequest(BaseModel):
     """A new rate for every motor on the bus."""
 
     baud_rate: int
+
+
+class MotorTestRequest(BaseModel):
+    """A chirp excitation on one bare motor."""
+
+    motor_id: int
+    mode: str = "position"                 # position | current
+    amplitude: float
+    f0_hz: float = 0.2
+    f1_hz: float = 5.0
+    duration_s: float = 10.0
+    offset: float = 0.0
+    centre_on_present: bool = True
+    sweep: str = "linear"                  # linear | exponential
+    taper: str = "cosine"                  # cosine | none
+    taper_s: float = 0.5
+    rate_hz: float = 200.0
+    torque_unit: str = "ma"                # current mode: ma | nm
+    position_envelope_rad: float = 1.0

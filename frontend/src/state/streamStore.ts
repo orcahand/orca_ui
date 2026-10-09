@@ -2,7 +2,14 @@
 // WS handler, fanned out to imperative subscribers on requestAnimationFrame.
 // High-rate data never passes through React state.
 
-import type { Finger, MotorsFaults, SensorsHealth, Vec3 } from '../api/types'
+import type {
+  Finger,
+  MotorsFaults,
+  SensorsHealth,
+  TestingState,
+  TestingTraceSample,
+  Vec3,
+} from '../api/types'
 import { RingBuffer } from './ringBuffer'
 
 export interface LatestFrames {
@@ -41,6 +48,12 @@ export interface LatestFrames {
   }
   stats: Record<string, unknown> | null
   health: SensorsHealth | null
+  testing: {
+    state: TestingState | null
+    // Live trace of the current run, decimated by the backend for the plot;
+    // the full-rate record is the CSV on disk. Cleared when a new run starts.
+    trace: TestingTraceSample[]
+  }
 }
 
 export const latest: LatestFrames = {
@@ -60,6 +73,7 @@ export const latest: LatestFrames = {
   teleop: { preview: null },
   stats: null,
   health: null,
+  testing: { state: null, trace: [] },
 }
 
 // ----- sparkline history (measured + target per joint, shared time ring) ----
