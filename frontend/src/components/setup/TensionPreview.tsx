@@ -2,7 +2,8 @@
 // stream. "pose" holds the current stage's pose (other fingers parked out of
 // the way), "sweep" keeps that pose and walks the stage's joints one at a
 // time through their full ROM, and "still" shows the mid-ROM hand.
-// Joints that have not passed yet are tinted on the model.
+// Joints still to tension are tinted red/orange and passed ones a light green;
+// the sweep skips passed joints.
 
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
@@ -23,7 +24,7 @@ export interface PreviewStage {
 
 const FINGERS = ['thumb', 'index', 'middle', 'ring', 'pinky'] as const
 const JOINT_PERIOD_S = 2.4
-const TINT: Partial<Record<SpreadStatus, number>> = { low: 0xe0565b, partial: 0xf29a38 }
+const TINT: Partial<Record<SpreadStatus, number>> = { low: 0xe0565b, partial: 0xf29a38, pass: 0x34b37a }
 const DEG2RAD = Math.PI / 180
 const STATIC_LINKS = new Set(['tower', 'forearm'])
 
@@ -41,15 +42,17 @@ function handBounds(robot: URDFRobot): THREE.Sphere {
 
 const tintCache = new WeakMap<THREE.Material, Map<number, THREE.Material>>()
 
-function tinted(base: THREE.MeshStandardMaterial, color: number): THREE.Material {
+// A passed joint keeps most of its skin colour, so it reads as done rather than as a warning.
+function tinted(base: THREE.MeshStandardMaterial, color: number, light: boolean): THREE.Material {
   let byColor = tintCache.get(base)
   if (!byColor) tintCache.set(base, (byColor = new Map()))
   let material = byColor.get(color)
   if (!material) {
     const clone = base.clone()
-    clone.color.setHex(color)
+    if (light) clone.color.lerp(new THREE.Color(color), 0.45)
+    else clone.color.setHex(color)
     clone.emissive = new THREE.Color(color)
-    clone.emissiveIntensity = 0.35
+    clone.emissiveIntensity = light ? 0.12 : 0.35
     byColor.set(color, (material = clone))
   }
   return material
@@ -69,9 +72,10 @@ function linkMeshes(joint: THREE.Object3D): THREE.Mesh[] {
 // Call right after setSkinTone, which resets every mesh to its untinted material.
 function applyTints(robot: URDFRobot, statuses: Record<string, SpreadStatus>) {
   for (const [name, joint] of Object.entries(robot.joints)) {
-    const color = TINT[statuses[name]]
+    const status = statuses[name]
+    const color = TINT[status]
     for (const mesh of linkMeshes(joint)) {
-      if (color !== undefined) mesh.material = tinted(mesh.material as THREE.MeshStandardMaterial, color)
+      if (color !== undefined) mesh.material = tinted(mesh.material as THREE.MeshStandardMaterial, color, status === 'pass')
     }
   }
 }
@@ -152,9 +156,11 @@ function PreviewRig({
   )
   const sweepJoints = useMemo(() => {
     const known = new Set(joints.map((j) => j.id))
-    if (stage) return stage.joints.filter((id) => known.has(id))
-    return FINGERS.flatMap((f) => joints.filter((j) => fingerOf(j.id) === f).map((j) => j.id))
-  }, [stage, joints])
+    const ids = stage
+      ? stage.joints.filter((id) => known.has(id))
+      : FINGERS.flatMap((f) => joints.filter((j) => fingerOf(j.id) === f).map((j) => j.id))
+    return ids.filter((id) => statuses[id] !== 'pass')
+  }, [stage, joints, statuses])
 
   useFrame(({ clock }) => {
     if (!robot) return

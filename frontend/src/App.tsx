@@ -3,6 +3,7 @@ import { api } from './api/rest'
 import { startStreamClient } from './api/streamClient'
 import { BootHero } from './components/BootHero'
 import { ErrorBanner } from './components/common/ErrorBanner'
+import { ErrorBoundary } from './components/common/ErrorBoundary'
 import { MaintenanceBanner } from './components/common/MaintenanceBanner'
 import { AppHeader } from './components/header/AppHeader'
 import { TensionDialogs } from './components/setup/TensionDialogs'
@@ -77,7 +78,9 @@ export default function App() {
           {view === 'motors' && <MotorsView />}
         </>
       )}
-      <TensionDialogs />
+      <ErrorBoundary label="The tensioning dialog">
+        <TensionDialogs />
+      </ErrorBoundary>
     </div>
   )
 }

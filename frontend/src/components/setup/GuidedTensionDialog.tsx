@@ -16,6 +16,7 @@ import type {
   TensionStep,
 } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
+import { ErrorBoundary } from '../common/ErrorBoundary'
 import { isOperationActive } from '../../state/operationStore'
 import { EXTRA_DEG, PULL_MORE } from '../../state/tensionFlow'
 import type { PreviewMode } from './TensionPreview'
@@ -45,6 +46,12 @@ function fail(error: unknown) {
 
 const answer = (option: string) => void api.operationInput(option).catch(fail)
 const GOTO = 'goto:'
+
+const previewUnavailable = (error: Error) => (
+  <div className="gt-preview" title={error.message}>
+    3D preview unavailable in this window — the steps still work.
+  </div>
+)
 
 function pct(fraction: number | null | undefined): string {
   return fraction == null ? '—' : `${Math.round(fraction * 100)}%`
@@ -106,20 +113,22 @@ export function GuidedTensionDialog({
   const stage = step === 'pose' || step === 'range' ? (extra?.stage ?? null) : null
   const preview =
     metadata && handInfo ? (
-      <Suspense fallback={<div className="gt-preview">loading model…</div>}>
-        <TensionPreview
-          urdfUrl={metadata.urdf_url}
-          joints={handInfo.joints}
-          mode={previewMode}
-          stage={stage}
-          statuses={
-            stage
-              ? Object.fromEntries(Object.entries(statuses).filter(([j]) => stage.joints.includes(j)))
-              : statuses
-          }
-          blackSkin={(caps?.declared?.tactile ?? caps?.tactile) === true}
-        />
-      </Suspense>
+      <ErrorBoundary label="The hand preview" fallback={previewUnavailable}>
+        <Suspense fallback={<div className="gt-preview">loading model…</div>}>
+          <TensionPreview
+            urdfUrl={metadata.urdf_url}
+            joints={handInfo.joints}
+            mode={previewMode}
+            stage={stage}
+            statuses={
+              stage
+                ? Object.fromEntries(Object.entries(statuses).filter(([j]) => stage.joints.includes(j)))
+                : statuses
+            }
+            blackSkin={(caps?.declared?.tactile ?? caps?.tactile) === true}
+          />
+        </Suspense>
+      </ErrorBoundary>
     ) : (
       <div className="gt-preview">loading model…</div>
     )
@@ -330,9 +339,11 @@ function StepContent({
         .sort((a, b) => (a.fraction ?? 0) - (b.fraction ?? 0))
       return (
         <div className="gt-tension">
-          <Suspense fallback={<div className="gt-preview">loading tower…</div>}>
-            <TowerPreview motors={motors} />
-          </Suspense>
+          <ErrorBoundary label="The tower preview" fallback={previewUnavailable}>
+            <Suspense fallback={<div className="gt-preview">loading tower…</div>}>
+              <TowerPreview motors={motors} />
+            </Suspense>
+          </ErrorBoundary>
           <div className="gt-pane">
             <h3 className="gt-heading">Now use the ratchet tool</h3>
             <p className="setup-copy">

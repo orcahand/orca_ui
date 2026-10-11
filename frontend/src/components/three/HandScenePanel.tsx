@@ -7,6 +7,7 @@
 // re-fetches rather than re-renders.
 
 import { lazy, Suspense, useEffect, useState } from 'react'
+import { ErrorBoundary } from '../common/ErrorBoundary'
 import { api } from '../../api/rest'
 import { useAppStore } from '../../state/appStore'
 import { Panel } from '../common/Panel'
@@ -81,11 +82,18 @@ export function HandScenePanel({ height }: { height: string | number }) {
       toolbar={<SceneControls />}
     >
       <div style={{ height, minHeight: 320 }}>
-        <Suspense
-          fallback={<div className="detecting-card">LOADING RENDERER</div>}
+        <ErrorBoundary
+          label="The 3D view"
+          fallback={(error) => (
+            <div className="detecting-card" title={error.message}>3D VIEW UNAVAILABLE IN THIS WINDOW</div>
+          )}
         >
-          <HandScene assets={assets} joints={handInfo.joints} caps={caps} />
-        </Suspense>
+          <Suspense
+            fallback={<div className="detecting-card">LOADING RENDERER</div>}
+          >
+            <HandScene assets={assets} joints={handInfo.joints} caps={caps} />
+          </Suspense>
+        </ErrorBoundary>
       </div>
     </Panel>
   )

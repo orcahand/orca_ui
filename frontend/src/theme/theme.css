@@ -3119,3 +3119,33 @@ header h1 {
   border-color: rgb(var(--accent-rgb) / 0.5);
   background: rgb(var(--accent-rgb) / 0.06);
 }
+
+/* --- Crash panel (ErrorBoundary) --- */
+.crash-panel {
+  position: fixed;
+  inset: auto 16px 16px 16px;
+  z-index: 1000;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 14px 16px;
+  background: var(--bg);
+  border: 1px solid rgb(var(--err-rgb) / 0.7);
+  color: var(--text);
+}
+
+.crash-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.crash-message {
+  white-space: pre-wrap;
+  font-size: 12px;
+  color: var(--dim);
+  margin: 0 0 10px;
+}
+
+.crash-actions {
+  display: flex;
+  gap: 8px;
+}
