@@ -98,6 +98,9 @@ export const api = {
   // device null hands the choice back to "first board to answer".
   selectBoard: (device: string | null) =>
     post<BoardsInfo>('/api/board/select', { device }),
+  // Pins hardware_version in the hand's config.yaml; null = take the board's.
+  setHardwareVersion: (version: number | null) =>
+    post<StatusSnapshot>('/api/hardware_version', { version }),
   // Clears a latched hardware error. The motor returns with torque off.
   rebootMotor: (id: number) =>
     post<{

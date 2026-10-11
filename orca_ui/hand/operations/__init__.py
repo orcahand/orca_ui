@@ -29,6 +29,9 @@ def build_operation_manager(service, settings, publish_topic) -> OperationManage
         from orca_ui.hand.operations.chain import (
             SimulatedConfigureChainOperation,
         )
+        from orca_ui.hand.operations.guided_tension import (
+            SimulatedGuidedTensionOperation,
+        )
         from orca_ui.hand.operations.simulated import (
             SimulatedCalibrateOperation,
             SimulatedTensionOperation,
@@ -36,23 +39,31 @@ def build_operation_manager(service, settings, publish_topic) -> OperationManage
         from orca_ui.hand.operations.wizard import SimulatedWizardOperation
         manager.register(SimulatedCalibrateOperation)
         manager.register(SimulatedTensionOperation)
+        manager.register(SimulatedGuidedTensionOperation)
         manager.register(SimulatedWizardOperation)
         manager.register(SimulatedConfigureChainOperation)
     else:
         from orca_ui.hand.operations.calibrate import CalibrateOperation
         from orca_ui.hand.operations.chain import ConfigureChainOperation
+        from orca_ui.hand.operations.guided_tension import GuidedTensionOperation
         from orca_ui.hand.operations.tension import TensionOperation
         from orca_ui.hand.operations.wizard import WizardOperation
         manager.register(CalibrateOperation)
         manager.register(TensionOperation)
+        manager.register(GuidedTensionOperation)
         manager.register(WizardOperation)
         manager.register(ConfigureChainOperation)
     # In-session ops run for real in mock mode too (the mock stack is the
     # production stack over in-memory links).
-    from orca_ui.hand.operations.player import DemoOperation, ReplayOperation
+    from orca_ui.hand.operations.player import (
+        DemoOperation,
+        ReplayOperation,
+        RunInOperation,
+    )
     from orca_ui.hand.operations.record import RecordOperation
     manager.register(ReplayOperation)
     manager.register(DemoOperation)
+    manager.register(RunInOperation)
     manager.register(RecordOperation)
     return manager
 

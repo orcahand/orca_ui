@@ -353,7 +353,8 @@ def _build_hand(settings: UiSettings, config, feedback: bool, tactile: bool):
     if not feedback and not tactile and isinstance(config, OrcaHandTouchConfig):
         return OrcaHand(config=config)
     return load_hand(config_path=config.config_path,
-                     engage_feedback=feedback)
+                     engage_feedback=feedback,
+                     detected_hardware_version=config.hardware_version)
 
 
 def _connect_with_motors(settings, config, declared, presence: HardwarePresence):
@@ -449,7 +450,8 @@ def _tier_name(feedback: bool, tactile: bool) -> str:
 
 def _connect_sensors_only(settings, config, declared, presence: HardwarePresence):
     """Motors unpowered: tactile viewing and/or encoder viewing only."""
-    hand = load_hand(config_path=config.config_path, engage_feedback=False)
+    hand = load_hand(config_path=config.config_path, engage_feedback=False,
+                     detected_hardware_version=config.hardware_version)
     ports = {"motor": None, "tactile": None, "encoder": None}
     messages: list[str] = []
     owned_links: list[HandSerialLink] = []

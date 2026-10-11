@@ -277,7 +277,24 @@ class HandService:
     def status(self) -> dict:
         return self.supervisor.status().as_dict()
 
+    def _guided_tension_defaults(self) -> dict:
+        from orca_ui.hand.operations.guided_tension import default_currents, motor_family
+
+        family = motor_family(self)
+        return {"motor_type": family, **default_currents(family)}
+
+    def _tension_progress(self, config) -> dict | None:
+        from orca_ui.hand.operations import hand_ops
+
+        if self.settings.mock:
+            from orca_ui.hand.operations.guided_tension import SimulatedGuidedTensionOperation
+            return SimulatedGuidedTensionOperation._progress or None
+        return hand_ops.tension_progress(config, self.supervisor.hand_id)
+
     def hand_info(self) -> dict:
+        from orca_ui.hand.operations import hand_ops
+        from orca_ui.hand.operations.calibrate import calibration_current_info
+
         config = self.supervisor.config
         encoder_backed = set(_encoder_sensed_joints(config))
         session = self.session
@@ -335,6 +352,11 @@ class HandService:
             "core": resolve_core_source().as_dict(),
             "reboot_supported": bool(session is not None and hasattr(
                 getattr(session.hand, "motor_client", None), "reboot_motor")),
+            "guided_tension": hand_ops.guided_tension_supported(),
+            "last_tension": hand_ops.last_tension(config),
+            "tension_progress": self._tension_progress(config),
+            "guided_tension_defaults": self._guided_tension_defaults(),
+            "calibration_current": calibration_current_info(self),
         }
         mapping = getattr(config, "finger_to_sensor_id", None)
         if mapping:
@@ -444,6 +466,23 @@ class HandService:
         except (HandBusyError, ModelSelectError) as e:
             raise ServiceError(str(e), status_code=409)
         return self.boards()
+
+    def set_hardware_version(self, version: int | None) -> dict:
+        """Pin the hardware version in config.yaml (``None`` = auto) and
+        reconnect if that changes the version in force."""
+        if self.settings.bare:
+            raise ServiceError("bare motor mode has no hand to version", status_code=409)
+        manager = self._operation_manager
+        if manager is not None and manager.active():
+            raise ServiceError("an operation is running — stop it before changing "
+                               "the hardware version", status_code=409)
+        try:
+            self.supervisor.set_hardware_version(version)
+        except HandBusyError as e:
+            raise ServiceError(str(e), status_code=409)
+        except OSError as e:
+            raise ServiceError(f"could not write config.yaml: {e}", status_code=500)
+        return self.supervisor.status().as_dict()
 
     def disconnect(self) -> dict:
         """Close the session and hold the ports free until Reconnect."""

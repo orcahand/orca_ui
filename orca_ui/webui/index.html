@@ -7,23 +7,16 @@
     <script>
       // Resolve the theme before the first paint, or the page flashes the
       // wrong one while the bundle loads. Deliberately duplicates the rule in
-      // src/theme/themeStore.ts — a stored choice wins, otherwise the OS
-      // decides — because that module cannot run early enough to matter.
+      // src/theme/themeStore.ts — a stored choice wins, otherwise light —
+      // because that module cannot run early enough to matter.
       // Keep the two in step; the store re-applies the same answer on boot.
       (function () {
-        var theme
+        var theme = 'light'
         try {
           var stored = localStorage.getItem('orca-ui.theme')
           if (stored === 'dark' || stored === 'light') theme = stored
         } catch (e) {
-          /* storage disabled: fall through to the OS preference */
-        }
-        if (!theme) {
-          theme =
-            window.matchMedia &&
-            window.matchMedia('(prefers-color-scheme: light)').matches
-              ? 'light'
-              : 'dark'
+          /* storage disabled: stay on the default */
         }
         var root = document.documentElement
         root.dataset.theme = theme
@@ -33,9 +26,11 @@
         root.style.background = theme === 'light' ? '#f6f5f1' : '#1a1c2a'
       })()
     </script>
-    <script type="module" crossorigin src="/assets/index-e4bYcrfz.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/jsx-runtime-BT_Vm3Qm.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-Dtf02OQU.css">
+    <script type="module" crossorigin src="/assets/index-D7OSKqnW.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/jsx-runtime-DL4fMuYf.js">
+    <link rel="modulepreload" crossorigin href="/assets/rest-B99UqXLP.js">
+    <link rel="modulepreload" crossorigin href="/assets/appStore-CBVytBfq.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-B6sxVObB.css">
   </head>
   <body>
     <div id="root"></div>

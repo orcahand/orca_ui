@@ -117,7 +117,7 @@ def test_simulated_tension_hold_release(client):
     client.post("/api/operation/tension/start", json={"params": FAST})
     snapshot = _wait_op_state(client, "awaiting_input")
     assert snapshot["phase"] == "holding"
-    assert snapshot["awaiting"]["options"] == ["Release"]
+    assert snapshot["awaiting"]["options"] == ["Release", "Pull more"]
     assert _state(client) == "maintenance"
 
     assert client.post("/api/operation/input",
@@ -206,7 +206,7 @@ def test_tension_can_hold_without_winding(client):
     assert "ramping" not in _log_text(client)
 
     # Still a real hold that has to be released, and still ends torque-off.
-    assert snapshot["awaiting"]["options"] == ["Release"]
+    assert snapshot["awaiting"]["options"] == ["Release", "Pull more"]
     client.post("/api/operation/input", json={"value": "Release"})
     done = _wait_op_state(client, "done")
     assert done["phase"] == "released"

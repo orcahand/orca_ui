@@ -7,6 +7,7 @@ import type { ViewName } from '../../state/appStore'
 import { useAppStore } from '../../state/appStore'
 import { BoardPicker } from './BoardPicker'
 import { EStopButton } from './EStopButton'
+import { HardwareVersionBadge } from './HardwareVersion'
 import { LinkControls } from './LinkControls'
 import { ModelPicker } from './ModelPicker'
 import { ThemeToggle } from './ThemeToggle'
@@ -68,10 +69,11 @@ export function AppHeader() {
   return (
     <header>
       <h1 className="brand">
-        <span className="brand-mark">◈ ORCA</span>
+        <span className="brand-logo" role="img" aria-label="ORCA" />
         <span className="brand-sub">HAND CONSOLE</span>
       </h1>
       <ModelPicker />
+      <HardwareVersionBadge />
       <BoardPicker />
       {handInfo?.core?.development && (
         // Only shown off a release: on a dev build the hand's behaviour may

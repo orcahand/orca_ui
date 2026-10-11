@@ -28,6 +28,13 @@ class BoardSelectRequest(BaseModel):
     device: Optional[str] = None
 
 
+class HardwareVersionRequest(BaseModel):
+    """The hand's hardware version to pin in its config.yaml (2 = v2.0,
+    21 = v2.1), or null to put it back on ``auto`` so the board decides."""
+
+    version: Optional[int] = Field(default=None, ge=0, le=255)
+
+
 class TorqueRequest(BaseModel):
     # Reserved for future per-motor control; today torque toggles hand-wide.
     motor_ids: Optional[list[int]] = None

@@ -86,6 +86,13 @@ def build_router(service: HandService) -> APIRouter:
         """
         return guard(service.select_board, body.device)
 
+    @router.post("/hardware_version")
+    def hardware_version(body: schemas.HardwareVersionRequest):
+        """Pin the hand's hardware version in its config.yaml, or (null) back
+        to what the board reports. A hand on a plain adapter has no board, so
+        this is how it becomes v2.1."""
+        return guard(service.set_hardware_version, body.version)
+
     @router.post("/rescan")
     def rescan():
         """Probe again for declared hardware this session did not get.

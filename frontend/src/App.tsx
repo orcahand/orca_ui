@@ -5,6 +5,7 @@ import { BootHero } from './components/BootHero'
 import { ErrorBanner } from './components/common/ErrorBanner'
 import { MaintenanceBanner } from './components/common/MaintenanceBanner'
 import { AppHeader } from './components/header/AppHeader'
+import { TensionDialogs } from './components/setup/TensionDialogs'
 import { TransportBar } from './components/transport/TransportBar'
 import { DashboardView } from './components/views/DashboardView'
 import { MotorsView } from './components/views/MotorsView'
@@ -76,6 +77,7 @@ export default function App() {
           {view === 'motors' && <MotorsView />}
         </>
       )}
+      <TensionDialogs />
     </div>
   )
 }

@@ -80,9 +80,9 @@ def _require_playable(service) -> None:
                            status_code=409)
 
 
-def _segment_frames(start: list, end: list,
-                    rate_hz: float) -> list[list[float]]:
-    """Frames gliding from ``start`` to ``end`` at the cruise speed.
+def _segment_frames(start: list, end: list, rate_hz: float,
+                    speed: float = 1.0) -> list[list[float]]:
+    """Frames gliding from ``start`` to ``end`` at ``speed`` x the cruise speed.
 
     Segment duration is proportional to the largest joint travel, so short
     adjustments and long sweeps move at the same angular speed. ``None``
@@ -92,7 +92,7 @@ def _segment_frames(start: list, end: list,
     deltas = [abs(b - a) for a, b in zip(start, end)
               if a is not None and b is not None]
     segment_s = max(max(deltas, default=0.0) / WAYPOINT_SPEED_DEG_S,
-                    MIN_SEGMENT_S)
+                    MIN_SEGMENT_S) / speed
     steps = max(int(segment_s * rate_hz), 1)
     frames: list[list[float]] = []
     for step in range(steps):
@@ -106,6 +106,7 @@ def _segment_frames(start: list, end: list,
 
 def _interpolate(
     waypoints: list[list[float]], rate_hz: float = WAYPOINT_RATE_HZ,
+    speed: float = 1.0,
 ) -> tuple[list[list[float]], float, list[int]]:
     """Expand sparse waypoints into linearly interpolated frames.
 
@@ -119,7 +120,7 @@ def _interpolate(
     frames: list[list[float]] = [list(waypoints[0])]
     holds = [0]
     for start, end in zip(waypoints, waypoints[1:]):
-        frames.extend(_segment_frames(start, end, rate_hz))
+        frames.extend(_segment_frames(start, end, rate_hz, speed))
         holds.append(len(frames) - 1)
     return frames, rate_hz, holds
 
@@ -621,4 +622,57 @@ class DemoOperation(Operation):
             ctx, name=self.params["name"], joint_ids=joint_ids,
             frames=frames, rate_hz=rate_hz, speed=1.0,
             loop=self.params["loop"],
+        )
+
+
+RUN_IN_DEFAULT_S = 300
+RUN_IN_MIN_S = 30
+RUN_IN_MAX_S = 1800
+# Multiples of the cruise speed; one pass takes about 15 s at x1.
+RUN_IN_SPEEDS = (1.0, 2.0, 3.0, 4.0)
+RUN_IN_DEFAULT_SPEED = 3.0
+
+
+class RunInOperation(Operation):
+    """Loop the full-range run-in sequence for a fixed time after calibration."""
+
+    kind = "run_in"
+    control_source = ControlSource.OPERATION
+
+    @classmethod
+    def validate(cls, service, params: dict) -> dict:
+        from orca_ui.hand.service import ServiceError
+
+        _require_playable(service)
+        if not getattr(service.session.hand, "calibrated", False):
+            raise ServiceError("calibrate the hand before the run-in",
+                               status_code=409)
+        duration_s = int(params.get("duration_s", RUN_IN_DEFAULT_S))
+        if not RUN_IN_MIN_S <= duration_s <= RUN_IN_MAX_S:
+            raise ServiceError(
+                f"duration_s must be {RUN_IN_MIN_S}..{RUN_IN_MAX_S}")
+        speed = float(params.get("speed", RUN_IN_DEFAULT_SPEED))
+        if speed not in RUN_IN_SPEEDS:
+            raise ServiceError(f"speed must be one of {list(RUN_IN_SPEEDS)}")
+        return {"duration_s": duration_s, "speed": speed}
+
+    def run(self, ctx: OpContext) -> dict:
+        from orca_ui.hand.presets import RUN_IN_SEQUENCE
+
+        service = ctx.service
+        hand = service.session.hand
+        joint_ids = list(service.supervisor.config.joint_ids)
+        cycle = []
+        for fractions in RUN_IN_SEQUENCE + RUN_IN_SEQUENCE[:1]:
+            pose = hand_ops.pose_from_fractions(hand, fractions)
+            cycle.append([pose.get(j) for j in joint_ids])
+        # Faster frames rather than a faster feed: the command rate stays at WAYPOINT_RATE_HZ.
+        speed = self.params.get("speed", RUN_IN_DEFAULT_SPEED)
+        frames, rate_hz, _holds = _interpolate(cycle, speed=speed)
+        cycles = max(1, math.ceil(
+            self.params["duration_s"] * rate_hz / len(frames)))
+        ctx.log(f"run-in at ×{speed:g}: one pass {len(frames) / rate_hz:.1f}s")
+        return play_frames(
+            ctx, name="run-in", joint_ids=joint_ids,
+            frames=frames * cycles, rate_hz=rate_hz, speed=1.0, loop=False,
         )

@@ -14,6 +14,44 @@ from orca_ui.hand.operations import hand_ops
 from orca_ui.hand.operations.base import OpContext, Operation
 
 
+MIN_CALIBRATION_CURRENT_MA = 20.0
+CALIBRATION_GROUPS = ("abd", "mcp", "pip")
+
+
+def calibration_current_info(service) -> dict | None:
+    """The connected hand's calibration current, its per-group currents (v2.1
+    hands whose model sets them, else None), and the ceiling its motors allow, in mA."""
+    session = service.session
+    if session is None:
+        return None
+    config = session.hand.config
+    current = getattr(config, "calibration_current", None)
+    client = getattr(session.hand, "motor_client", None)
+    ceiling = getattr(type(client), "max_current_ma", None) if client is not None else None
+    if not isinstance(current, (int, float)):
+        return None
+    groups = getattr(config, "calibration_group_currents", None) or {}
+    return {"default": float(current),
+            "groups": {g: float(groups.get(g, current)) for g in CALIBRATION_GROUPS} if groups else None,
+            "max": float(ceiling) if ceiling else None}
+
+
+def _checked_current(value, info: dict, name: str) -> float:
+    from orca_ui.hand.service import ServiceError
+
+    try:
+        current = float(value)
+    except (TypeError, ValueError):
+        raise ServiceError(f"{name} must be a number of mA", status_code=422)
+    ceiling = info.get("max")
+    if current < MIN_CALIBRATION_CURRENT_MA or (ceiling and current > ceiling):
+        raise ServiceError(
+            f"{name} must be between {MIN_CALIBRATION_CURRENT_MA:.0f} and {ceiling:.0f} mA"
+            if ceiling else f"{name} must be at least {MIN_CALIBRATION_CURRENT_MA:.0f} mA",
+            status_code=422)
+    return current
+
+
 def validate_calibrate_params(service, params: dict) -> dict:
     from orca_ui.hand.service import ServiceError
 
@@ -35,7 +73,63 @@ def validate_calibrate_params(service, params: dict) -> dict:
     if not session.caps.motors:
         raise ServiceError("no motor bus — calibration needs motors",
                            status_code=409)
-    return {"joints": joints, "force_wrist": bool(params.get("force_wrist", False))}
+    clean = {"joints": joints, "force_wrist": bool(params.get("force_wrist", False)),
+             "calibration_current": None, "calibration_currents": None}
+    info = calibration_current_info(service) or {}
+    if params.get("calibration_current") is not None:
+        clean["calibration_current"] = _checked_current(
+            params["calibration_current"], info, "calibration_current")
+    groups = params.get("calibration_currents")
+    if groups is not None:
+        if not info.get("groups"):
+            raise ServiceError("this hand calibrates every joint at one current; "
+                               "set calibration_current instead", status_code=422)
+        if not isinstance(groups, dict) or not set(groups) <= set(CALIBRATION_GROUPS):
+            raise ServiceError(f"calibration_currents must map {', '.join(CALIBRATION_GROUPS)} "
+                               "to a current in mA", status_code=422)
+        clean["calibration_currents"] = {
+            g: _checked_current(v, info, f"calibration_currents.{g}") for g, v in groups.items()}
+    return clean
+
+
+def apply_calibration_current(hand, current: float | None, groups: dict | None,
+                              ctx: OpContext) -> None:
+    """Calibrate this run at ``current`` (a wrist that followed the fingers'
+    current follows it) and/or at the per-group ``groups`` currents."""
+    config = hand.config
+    if current is not None:
+        current = int(round(current))
+        if config.wrist_calibration_current == config.calibration_current:
+            object.__setattr__(config, "wrist_calibration_current", current)
+        object.__setattr__(config, "calibration_current", current)
+        ctx.log(f"calibrating at {current} mA")
+    if groups:
+        merged = {**config.calibration_group_currents,
+                  **{g: int(round(v)) for g, v in groups.items()}}
+        object.__setattr__(config, "calibration_current_v21_dict",
+                           {**config.calibration_current_v21_dict, str(config.motor_type): merged})
+        ctx.log("calibrating at " + ", ".join(f"{g} {c} mA" for g, c in merged.items()))
+
+
+# The v2.1 travel check: how calibration answered a joint whose motor travel
+# fell short of (or beyond) its baseline.
+_TRAVEL_NOTE = {
+    "travel_excess": "beyond the baseline — check the tendon for slip",
+    "travel_retry_started": "short — re-driving at a higher current",
+    "travel_retry_succeeded": "reached on a re-drive",
+    "travel_retry_exhausted": "still short after every re-drive — calibrated over a shortened range",
+    "travel_retry_skipped": "did not move — not re-driven",
+    "travel_retry_unavailable": "short, and its control mode ignores the current cap",
+    "travel_retry_disabled": "short — re-drive disabled",
+}
+
+
+def _travel_line(event: dict, note: str) -> str:
+    line = (f"{event['joint']}: travel {event['travel_deg']:.0f}° of "
+            f"{event['expected_deg']:.0f}° — {note}")
+    if "current" in event and "attempt" in event:
+        line += f" (attempt {event['attempt']}, {event['current']:.0f} mA)"
+    return line
 
 
 def run_calibrate(hand, encoder_client, ctx: OpContext,
@@ -89,6 +183,11 @@ def run_calibrate(hand, encoder_client, ctx: OpContext,
             ctx.log("calibration complete")
         elif kind == "calibration_aborted":
             ctx.log("calibration aborted — completed steps are persisted")
+        elif kind == "travel_checked":
+            if not event["within_margin"]:
+                ctx.log(_travel_line(event, "outside the margin"))
+        elif kind.startswith("travel_") and kind != "travel_baseline_missing":
+            ctx.log(_travel_line(event, _TRAVEL_NOTE.get(kind, kind)))
 
     # calibrate() clears orca_core's stop event at entry: a stop that landed
     # while we were connecting would be swallowed. Check ours first.
@@ -132,9 +231,11 @@ class CalibrateOperation(Operation):
             ctx.check_stop()
             ctx.set_phase("connecting", detail="opening motor-only connection")
             hand = hand_ops.build_maintenance_hand(
-                supervisor.config.config_path, ctx.stop_event,
+                supervisor.config, ctx.stop_event,
                 motor_port=lease.presence.motor_port if lease.presence else None)
             self._hand = hand
+            apply_calibration_current(hand, self.params.get("calibration_current"),
+                                      self.params.get("calibration_currents"), ctx)
             try:
                 encoder_client, encoder_link = hand_ops.open_encoder_client(
                     supervisor.config, lease.presence)

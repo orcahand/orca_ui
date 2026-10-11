@@ -23,16 +23,18 @@ def test_a_maintenance_hand_connects_on_the_leased_port(monkeypatch):
     from orca_ui.hand.operations import hand_ops
 
     class FakeHand:
-        def __init__(self, config_path):
-            self.config = SimpleNamespace(port="auto")
+        def __init__(self, config):
+            self.config = config
 
         def connect(self, interactive=False):
             return True, "ok"
 
     monkeypatch.setattr(orca_core, "OrcaHand", FakeHand)
-    hand = hand_ops.build_maintenance_hand("unused.yaml", threading.Event(),
+    supervisor_config = SimpleNamespace(port="auto")
+    hand = hand_ops.build_maintenance_hand(supervisor_config, threading.Event(),
                                            motor_port="/dev/cu.usbmodemPINNED")
     assert hand.config.port == "/dev/cu.usbmodemPINNED"
+    assert supervisor_config.port == "auto"
 
 
 def test_a_pinned_board_never_falls_back_to_another_hand(monkeypatch):

@@ -59,7 +59,7 @@ class WizardOperation(Operation):
             ctx.check_stop()
             ctx.set_phase("connecting", detail="opening motor-only connection")
             hand = hand_ops.build_maintenance_hand(
-                supervisor.config.config_path, ctx.stop_event,
+                supervisor.config, ctx.stop_event,
                 motor_port=lease.presence.motor_port if lease.presence else None)
             self._hand = hand
             try:
