@@ -390,6 +390,16 @@ def _connect_with_motors(settings, config, declared, presence: HardwarePresence)
                 # Never mutate the supervisor's shared config object.
                 hand.config = copy.copy(config)
             object.__setattr__(hand.config, "port", presence.motor_port)
+        if presence.sensing.tactile and \
+                getattr(getattr(hand, "config", None), "sensor_port", None) == "auto":
+            # The sensing port likewise: left on "auto", orca_core discovers it
+            # machine-wide and, with two boards attached, can open the other
+            # hand's board, which answers but carries none of this hand's sensors.
+            import copy
+
+            if hand.config is config:
+                hand.config = copy.copy(config)
+            object.__setattr__(hand.config, "sensor_port", presence.sensing.tactile)
         try:
             ok, msg = hand.connect(interactive=False)
         except (JointFeedbackConnectError, RuntimeError) as e:
