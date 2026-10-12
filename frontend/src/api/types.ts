@@ -114,6 +114,8 @@ export interface BoardsInfo {
 }
 
 export interface JointInfo {
+  /** Direction the running joint_to_motor_map assigns to this joint. */
+  inverted?: boolean
   id: string
   // Motor driving this joint, or null when the config maps none.
   motor_id: number | null

@@ -328,6 +328,9 @@ class HandService:
                 "motor_id": config.joint_to_motor_map.get(joint),
                 "rom": [float(v) for v in config.joint_roms_dict[joint]],
                 "neutral": float(config.neutral_position.get(joint, 0.0)),
+                # Direction the running map assigns: True when flexing the
+                # joint turns the motor the negative way.
+                "inverted": bool(config.joint_inversion_dict.get(joint, False)),
                 "encoder_backed": joint in encoder_backed,
                 "encoder_calibrated": (
                     None if encoder_calibrated is None or joint not in encoder_backed

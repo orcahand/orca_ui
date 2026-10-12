@@ -88,7 +88,11 @@ export function BootHero() {
         </ul>
       )}
       <div className="boot-footer">
-        {handInfo ? `${handInfo.model_name} · ` : ''}orca-ui
+        {handInfo ? `${handInfo.model_name} · ` : ''}
+        {status?.hardware_version != null
+          ? `hw ${Math.floor(status.hardware_version / 10)}.${status.hardware_version % 10} · `
+          : ''}
+        orca-ui
       </div>
     </div>
   )

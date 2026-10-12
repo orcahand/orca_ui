@@ -245,6 +245,13 @@ class HandSupervisor(threading.Thread):
             return False
         fresh = load_config(self.config.config_path)
         version = fresh.hardware_version if fresh.hardware_version is not None else board_version
+        if (fresh.hardware_version is not None and board_version is not None
+                and fresh.hardware_version != board_version
+                and fresh.hardware_version != self._pinned_hardware_version):
+            logger.warning(
+                "config.yaml pins hardware_version=%r, so the board's %r is not used. "
+                "Set it to 'auto' (or remove it) to take the board's value.",
+                fresh.hardware_version, board_version)
         if version == self.config.hardware_version and fresh.hardware_version == self._pinned_hardware_version:
             return False
         self._pinned_hardware_version = fresh.hardware_version
