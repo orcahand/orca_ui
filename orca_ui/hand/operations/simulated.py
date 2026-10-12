@@ -9,9 +9,17 @@ MAINTENANCE → reconnect) is exercised end-to-end.
 
 from __future__ import annotations
 
+from orca_ui.hand.operations import hand_ops
 from orca_ui.hand.operations.base import OpContext, Operation
 from orca_ui.hand.operations.calibrate import validate_calibrate_params
-from orca_ui.hand.operations.tension import RELEASE_PROMPT, validate_tension_params
+from orca_ui.hand.operations.tension import (
+    DEFAULT_TENSION_OFFSET_DEG,
+    EXTRA_DEG,
+    PULL_MORE,
+    RELEASE,
+    RELEASE_PROMPT,
+    validate_tension_params,
+)
 
 DEFAULT_STEP_S = 0.3
 
@@ -74,7 +82,7 @@ def simulate_calibration(ctx: OpContext, config, joints: list[str] | None,
 
 
 def simulate_tension(ctx: OpContext, move_motors: bool, step_s: float,
-                     detail_prefix: str = "") -> None:
+                     detail_prefix: str = "", offset_deg: float | None = None) -> None:
     """Lease-free simulated tension body: winds, then parks in
     awaiting_input until released (queue path — nothing is blocked)."""
     if move_motors:
@@ -90,7 +98,15 @@ def simulate_tension(ctx: OpContext, move_motors: bool, step_s: float,
     ctx.set_phase("holding",
                   detail=f"{detail_prefix}motors holding — tension the spools")
     ctx.log("holding — tension the spools, then click Release")
-    ctx.wait_input(RELEASE_PROMPT, ["Release"])
+    # The wizard's hold (no offset) only releases; the tension step can also pull more.
+    options = [RELEASE] if offset_deg is None else [RELEASE, PULL_MORE]
+    pulled = offset_deg or 0.0
+    if offset_deg is not None:
+        ctx.set_extra({"pulled_deg": pulled})
+    while ctx.wait_input(RELEASE_PROMPT, options) == PULL_MORE:
+        pulled += EXTRA_DEG
+        ctx.set_extra({"pulled_deg": pulled})
+        ctx.log(f"finger motors turned {pulled:g}° counterclockwise")
     ctx.set_phase("released",
                   detail=f"{detail_prefix}torque off, control mode restored")
     ctx.log("hold released — torque off, control mode restored")
@@ -136,7 +152,9 @@ class SimulatedTensionOperation(Operation):
             ctx.set_phase("connecting", detail="opening motor-only connection")
             ctx.sleep(self.params["step_duration_s"])
             simulate_tension(ctx, self.params["move_motors"],
-                             self.params["step_duration_s"])
+                             self.params["step_duration_s"],
+                             offset_deg=self.params.get("offset_deg", DEFAULT_TENSION_OFFSET_DEG))
+            hand_ops.record_hold_tension(supervisor.config)
             return {"released": True}
         finally:
             supervisor.exit_maintenance()

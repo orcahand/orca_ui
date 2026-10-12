@@ -291,3 +291,31 @@ def test_connect_derives_the_model_before_connecting(monkeypatch):
     assert seen == {"model": "orcahand-full-left", "encoder_port": "/dev/oh"}
     assert sup.model_name == "orcahand-full-left"
     assert len(adopted) == 1
+
+
+# ----- hardware version ------------------------------------------------------
+
+
+def test_the_board_version_flips_the_left_thumb_and_a_pin_wins(tmp_path):
+    """v2.1 left hands turn the thumb MCP/DIP motors the other way: the board's
+    version must reach the config, and a version pinned from the UI beats it."""
+    import shutil
+
+    path = tmp_path / "config.yaml"
+    shutil.copy(_resolve_config_path(None, model_name="orcahand-left"), path)
+    settings = UiSettings(config_path=str(path), mock=False, open_browser=False)
+    sup = HandSupervisor(settings)
+    v20 = dict(sup.config.joint_inversion_dict)
+
+    sup._apply_hardware_version(21)
+    assert sup.config.hardware_version == 21
+    assert sup.config.joint_inversion_dict["thumb_mcp"] != v20["thumb_mcp"]
+
+    sup.set_hardware_version(2)
+    assert sup.config.hardware_version == 2
+    assert sup.config.joint_inversion_dict == v20
+    assert sup.status().hardware_version_pinned
+
+    sup.set_hardware_version(None)
+    assert sup.config.hardware_version == 21
+    assert "hardware_version: auto" in path.read_text()

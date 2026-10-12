@@ -46,6 +46,12 @@ export interface StatusSnapshot {
   // board to answer". Pinned means the backend never opens another board's
   // ports — the way two consoles on one machine each keep to their own hand.
   board_pinned: string | null
+  // Hardware version in force (2 = v2.0, 21 = v2.1; null = unknown), whether
+  // config.yaml pins it, and what the board reports (null with no board).
+  // Only v2.1 gets guided tensioning and travel-checked calibration.
+  hardware_version?: number | null
+  hardware_version_pinned?: boolean
+  board_hardware_version?: number | null
   // Device classes the config declares that this session did not get, and
   // whether the backend is still probing for them. It gives up after a few
   // attempts, so the UI offers an explicit rescan rather than implying it is
@@ -234,9 +240,6 @@ export interface CoreSourceInfo {
 export interface HandInfo {
   model_name: string
   side: 'left' | 'right'
-  /** Board-reported hardware revision, major*10+minor (2 = v2.0, 21 = v2.1);
-   *  null until a session has resolved it. */
-  hardware_version?: number | null
   mock: boolean
   joints: JointInfo[]
   calibration: CalibrationInfo
@@ -246,6 +249,44 @@ export interface HandInfo {
   reboot_supported?: boolean
   finger_to_sensor_id?: Record<Finger, number>
   tactile?: { active_sensors: Finger[]; num_taxels: Record<Finger, number> }
+  // Motors that did not answer when the bus was opened, and their joints.
+  absent_motors?: number[]
+  absent_joints?: string[]
+  // False when the installed orca_core predates guided tensioning.
+  guided_tension?: boolean
+  last_tension?: LastTension | null
+  // Unfinished guided tensioning saved for this hand: best score per joint.
+  tension_progress?: TensionProgress | null
+  // The connected hand's calibration current and its motors' ceiling (mA).
+  calibration_current?: {
+    default: number
+    // v2.1 hands whose model sets a current per joint group; null otherwise.
+    groups: Record<'abd' | 'mcp' | 'pip', number> | null
+    max: number | null
+  } | null
+  // Guided tensioning currents (mA) for this hand's motor family.
+  guided_tension_defaults?: {
+    motor_type: string | null
+    hold_ap: number
+    hold_mcp: number
+    hold_pip: number
+    tension_current: number
+  }
+}
+
+export interface TensionProgress {
+  updated_at: string // ISO 8601
+  rounds: number
+  best: Record<string, number>
+}
+
+export interface LastTension {
+  completed_at: string // ISO 8601
+  // 'hold': a plain hold-and-ratchet, which has nothing to score.
+  mode?: 'hold'
+  rounds?: number
+  pass_fraction?: Record<string, number>
+  spreads?: Record<string, number | null>
 }
 
 export type TactileMode = 'resultant' | 'taxels' | 'combined'
@@ -735,4 +776,60 @@ export interface BusBaudResult {
   changed: number[]
   failed: number[]
   rescanned: boolean
+}
+
+// ----- guided_tension operation extra (orca_ui/hand/operations/guided_tension.py)
+
+export type TensionStep = 'pose' | 'range' | 'score' | 'tension' | 'done'
+
+export interface RangeStage {
+  key: string
+  title: string
+  joints: string[]
+  pose: string
+}
+export type SpreadStatus = 'pass' | 'partial' | 'low' | 'unscored'
+
+export interface MotorSpread {
+  joint: string
+  motor: number
+  expected_deg: number | null
+  offset_deg: number
+  plus_deg: number
+  minus_deg: number
+  spread_deg: number
+  fraction: number | null
+  status: SpreadStatus
+  pass_fraction?: number
+  live_fraction?: number | null
+  // Best score carried in from earlier rounds or a saved session.
+  kept?: number | null
+}
+
+export interface GuidedTensionExtra {
+  step: TensionStep
+  round: number
+  motors: MotorSpread[]
+  passed?: number
+  scored?: number
+  fraction?: number
+  history: { round: number; passed: number; scored: number; fraction: number }[]
+  hold_ap?: number
+  hold_mcp?: number
+  hold_pip?: number
+  tension_current?: number
+  tension_offset_deg?: number
+  pulled_deg?: number
+  pass_fractions?: Record<'ap' | 'mcp' | 'pip', number>
+  completed?: boolean
+  resumed?: { rounds: number; updated_at?: string; joints: number }
+  // Every range-check stage, and the one in progress (pose / range steps).
+  stages?: RangeStage[]
+  stage?: RangeStage
+  stage_index?: number
+  stage_count?: number
+  // Joints the run leaves out (no motor answered), and the score sheet's
+  // exclusion list with a reason per joint.
+  absent_joints?: string[]
+  excluded?: { joint: string; motor: number; reason: string }[]
 }

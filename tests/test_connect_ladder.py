@@ -149,3 +149,26 @@ def test_no_motors_flag_skips_motor_tiers(env, monkeypatch):
                         lambda *args, **kwargs: declared)
 
     assert sessions.connect_session(settings, None) is sentinel
+
+
+def test_discovered_ports_are_pinned_into_the_hand_before_connect(env, monkeypatch):
+    """Both the motor port and the sensing port: left on "auto", orca_core's own
+    discovery runs machine-wide and, with two boards attached, can open the
+    other hand's board for the sensors."""
+    from types import SimpleNamespace
+
+    settings, declared, presence, install = env
+    install({})
+    built = []
+    plain_build = sessions._build_hand
+
+    def build_with_config(_settings, _config, feedback, tactile):
+        hand = plain_build(_settings, _config, feedback, tactile)
+        hand.config = SimpleNamespace(port="auto", sensor_port="auto")
+        built.append(hand)
+        return hand
+
+    monkeypatch.setattr(sessions, "_build_hand", build_with_config)
+    _connect_with_motors(settings, None, declared, presence)
+    assert built and built[0].config.port == "/dev/motor"
+    assert built[0].config.sensor_port == "/dev/oh"

@@ -339,42 +339,6 @@ def _connect_mock(settings: UiSettings, config, declared: dict) -> HandSession:
     )
 
 
-def _hardware_version_of(presence: HardwarePresence | None) -> int | None:
-    """The hand's hardware revision as its controller board reports it.
-
-    None when discovery did not run, the board answered only the legacy ID
-    query, or the motor bus is a plain adapter with no board behind it.
-    """
-    detection = getattr(presence, "detection", None)
-    identity = getattr(detection, "identity", None)
-    return getattr(identity, "hw_version", None)
-
-
-def _for_hardware(config, presence: HardwarePresence | None):
-    """``config`` with the map for this hand's hardware revision in force.
-
-    Done once here, before any hand is built, so both the direct
-    constructions and the factory path below see the same resolved config.
-    load_hand(config_path=...) skips detection, so the board's value is
-    handed to it as *detected* rather than re-discovered -- a
-    ``hardware_version`` pinned in the yaml still wins over it, exactly as it
-    would have over detection, and orca_core logs the clash.
-    """
-    detected = _hardware_version_of(presence)
-    if not hasattr(config, "with_hardware_version"):
-        return config
-    pinned = getattr(config, "hardware_version", None)
-    chosen = pinned if pinned is not None else detected
-    if chosen is None:
-        return config
-    if pinned is not None and detected is not None and pinned != detected:
-        logger.warning(
-            "config.yaml pins hardware_version=%r, so the board's %r is not "
-            "used. Set it to 'auto' (or remove it) to take the board's value.",
-            pinned, detected)
-    return config.with_hardware_version(chosen)
-
-
 def _build_hand(settings: UiSettings, config, feedback: bool, tactile: bool):
     """Fresh hand instance for one ladder rung (never reuse across attempts).
 
@@ -390,11 +354,10 @@ def _build_hand(settings: UiSettings, config, feedback: bool, tactile: bool):
         return OrcaHand(config=config)
     return load_hand(config_path=config.config_path,
                      engage_feedback=feedback,
-                     detected_hardware_version=getattr(config, "hardware_version", None))
+                     detected_hardware_version=config.hardware_version)
 
 
 def _connect_with_motors(settings, config, declared, presence: HardwarePresence):
-    config = _for_hardware(config, presence)
     want_feedback = declared["feedback_loop"] and bool(presence.sensing.encoder)
     want_tactile = declared["tactile"] and bool(presence.sensing.tactile)
 
@@ -427,6 +390,16 @@ def _connect_with_motors(settings, config, declared, presence: HardwarePresence)
                 # Never mutate the supervisor's shared config object.
                 hand.config = copy.copy(config)
             object.__setattr__(hand.config, "port", presence.motor_port)
+        if presence.sensing.tactile and \
+                getattr(getattr(hand, "config", None), "sensor_port", None) == "auto":
+            # The sensing port likewise: left on "auto", orca_core discovers it
+            # machine-wide and, with two boards attached, can open the other
+            # hand's board, which answers but carries none of this hand's sensors.
+            import copy
+
+            if hand.config is config:
+                hand.config = copy.copy(config)
+            object.__setattr__(hand.config, "sensor_port", presence.sensing.tactile)
         try:
             ok, msg = hand.connect(interactive=False)
         except (JointFeedbackConnectError, RuntimeError) as e:
@@ -487,9 +460,8 @@ def _tier_name(feedback: bool, tactile: bool) -> str:
 
 def _connect_sensors_only(settings, config, declared, presence: HardwarePresence):
     """Motors unpowered: tactile viewing and/or encoder viewing only."""
-    config = _for_hardware(config, presence)
     hand = load_hand(config_path=config.config_path, engage_feedback=False,
-                     detected_hardware_version=getattr(config, "hardware_version", None))
+                     detected_hardware_version=config.hardware_version)
     ports = {"motor": None, "tactile": None, "encoder": None}
     messages: list[str] = []
     owned_links: list[HandSerialLink] = []

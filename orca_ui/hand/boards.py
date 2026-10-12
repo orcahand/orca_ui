@@ -15,6 +15,7 @@ together and what keeps a pinned console off everything else.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 from typing import Optional
 
 from orca_core import HandDetection
@@ -32,6 +33,8 @@ from orca_core.hardware.sensing.serial_discovery import (
     port_in_use,
     probe_orca_info,
 )
+
+logger = logging.getLogger(__name__)
 
 _PROBE_PASSES = 3
 """Identity-probe passes; the probe is racy on macOS composite CDC devices
@@ -173,7 +176,8 @@ def _find_mate(pin: str, info: OrcaBoardInfo) -> tuple[Optional[str], list[str]]
     return mate, busy
 
 
-def detect_pinned_board(pin: str) -> Optional[HandDetection]:
+def detect_pinned_board(pin: str,
+                        identity: Optional[OrcaBoardInfo] = None) -> Optional[HandDetection]:
     """Probe only the pinned board and name what it is.
 
     The scoped counterpart of orca_core's ``detect_hand()``: with a board
@@ -182,12 +186,18 @@ def detect_pinned_board(pin: str) -> Optional[HandDetection]:
     CDC reporting the same identity. Returns ``None`` when the pinned device
     is absent, silent, or held by another process; callers decide how loudly
     to say so and must not fall back to a global probe.
+
+    ``identity`` is the board's answer from an earlier detection. Once a
+    session holds the pinned CDC it cannot be probed again, so a later probe
+    for a sensing port that was busy at connect starts from that identity.
     """
     info: Optional[OrcaBoardInfo] = None
     for _ in range(_PROBE_PASSES):
         info = probe_orca_info(pin)
         if info is not None:
             break
+    if info is None and identity is not None and port_in_use(pin):
+        info = identity
     if info is None:
         if pin not in oh_board_ports() and pin in _classic_motor_ports() \
                 and not port_in_use(pin):
@@ -201,6 +211,11 @@ def detect_pinned_board(pin: str) -> Optional[HandDetection]:
         return None
 
     mate, busy = _find_mate(pin, info)
+    if mate is None and busy:
+        logger.warning(
+            "controller board %s answered on %s but its other port is held by "
+            "another process (%s); sensors not probed, retrying on the next probe",
+            info.hand_id or "?", pin, ", ".join(busy))
     if info.role == "motor":
         motor_port, sensing_port = pin, mate
     else:

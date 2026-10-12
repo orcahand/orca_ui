@@ -226,7 +226,7 @@ export function setGhostAppearance(
 
 // Nearest URDF link up the parent chain — links nest through joints, so a
 // mesh's owning link is the first ancestor flagged isURDFLink.
-function owningLinkName(mesh: THREE.Object3D): string {
+export function owningLinkName(mesh: THREE.Object3D): string {
   let node: THREE.Object3D | null = mesh
   while (node) {
     if ((node as unknown as { isURDFLink?: boolean }).isURDFLink) {
