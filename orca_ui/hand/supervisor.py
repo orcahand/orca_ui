@@ -249,8 +249,8 @@ class HandSupervisor(threading.Thread):
                 and fresh.hardware_version != board_version
                 and fresh.hardware_version != self._pinned_hardware_version):
             logger.warning(
-                "config.yaml pins hardware_version=%r, so the board's %r is not used. "
-                "Set it to 'auto' (or remove it) to take the board's value.",
+                "the config pins hardware_version=%r (config.yaml or local_config.yaml), "
+                "so the board's %r is not used. Lift the pin to take the board's value.",
                 fresh.hardware_version, board_version)
         if version == self.config.hardware_version and fresh.hardware_version == self._pinned_hardware_version:
             return False
