@@ -134,8 +134,17 @@ def resolve_config_path(args: argparse.Namespace) -> tuple[str, bool]:
         # because the model stays unpinned, the supervisor revises this guess
         # as soon as a board answers.
         try:
-            from orca_core.hand_factory import detect_hand
-            model_name = detect_hand().model_name
+            if getattr(args, "board", None):
+                # Pinned to one board: ask that board alone. The global probe
+                # would answer with whatever other hand is attached.
+                from orca_ui.hand.boards import detect_pinned_board
+                detection = detect_pinned_board(args.board)
+                if detection is None:
+                    raise RuntimeError(f"nothing answered on {args.board}")
+            else:
+                from orca_core.hand_factory import detect_hand
+                detection = detect_hand()
+            model_name = detection.model_name
             print(f"No model given — auto-detected {model_name}.", file=sys.stderr)
         except Exception as e:
             print(f"Hand autodetection failed ({e}); using the default model.", file=sys.stderr)

@@ -89,3 +89,25 @@ def test_a_held_pin_is_re_detected_from_its_known_identity(monkeypatch):
     assert detection is not None
     assert detection.motor_port == pin and detection.sensing_port == mate
     assert detection.has_tactile and detection.probed_tactile
+
+
+
+def test_a_pinned_console_starts_on_the_pinned_boards_model_not_another_hands(monkeypatch, tmp_path):
+    """With two hands attached, the global probe answers with whichever board
+    it meets first; a console pinned to one board must ask that board alone."""
+    from types import SimpleNamespace
+
+    from orca_ui import cli
+    from orca_ui.hand import boards
+
+    asked = []
+    monkeypatch.setattr(boards, "detect_pinned_board",
+                        lambda pin: asked.append(pin) or SimpleNamespace(model_name="orcahand-right"))
+    import orca_core.hand_factory as factory
+    monkeypatch.setattr(factory, "detect_hand",
+                        lambda: (_ for _ in ()).throw(AssertionError("global detection must not run")))
+    args = SimpleNamespace(config=None, bare=False, mock=False, model=None, side=None,
+                           model_version=None, board="/dev/cu.usbmodemXXXX")
+    path, pinned = cli.resolve_config_path(args)
+    assert asked == ["/dev/cu.usbmodemXXXX"]
+    assert path.endswith("orcahand-right/config.yaml") and not pinned
