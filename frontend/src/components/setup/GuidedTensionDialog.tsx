@@ -37,7 +37,7 @@ const TowerPreview = lazy(() =>
 )
 
 const AFTER_STAGES: { key: TensionStep; title: string; note: string }[] = [
-  { key: 'score', title: 'Score', note: 'how many motors followed' },
+  { key: 'score', title: 'Score', note: 'Tensioning progress markers' },
   { key: 'tension', title: 'Tension', note: 'ratchet tool' },
 ]
 
@@ -395,7 +395,8 @@ function StepContent({
               <p className="setup-copy">
                 {extra.passed === extra.scored
                   ? 'Every motor follows its joint. Finish, then calibrate.'
-                  : 'Highlighted joints still have slack. Tension them, then check again.'}
+                  : `Joints under the tensioning target (${passTargets(extra)}) still have slack. ` +
+                    'We will now tension them and then proceed to the next round.'}
               </p>
             </div>
           </div>
@@ -482,6 +483,13 @@ function stageSubject(stage?: RangeStage): string {
 
 function stagePossessive(stage?: RangeStage): string {
   return stage && stage.title.toLowerCase().includes(' and ') ? 'their' : 'its'
+}
+
+// The pass target per joint group, e.g. "85% APs / 85% MCPs / 85% PIPs".
+function passTargets(extra: GuidedTensionExtra): string {
+  const p = extra.pass_fractions
+  const pct = (f: number | undefined) => `${Math.round((f ?? DEFAULT_PASS.ap) * 100)}%`
+  return `${pct(p?.ap)} APs / ${pct(p?.mcp)} MCPs / ${pct(p?.pip)} PIPs`
 }
 
 function ScoreLine({ extra }: { extra: GuidedTensionExtra }) {
