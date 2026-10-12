@@ -39,8 +39,8 @@ CURRENT_BOUNDS_MA = {"hold_ap": HOLD_BOUNDS_MA, "hold_mcp": HOLD_BOUNDS_MA,
 # Range-check holds per joint group and the tensioning hold, in mA. The Feetech values match
 # the Dynamixel output torque (Feetech draws ~275 mA before producing any).
 DEFAULT_CURRENTS_MA = {
-    "dynamixel": {"hold_ap": 200.0, "hold_mcp": 180.0, "hold_pip": 140.0, "tension_current": 400.0},
-    "feetech": {"hold_ap": 380.0, "hold_mcp": 360.0, "hold_pip": 320.0, "tension_current": 580.0},
+    "dynamixel": {"hold_ap": 200.0, "hold_mcp": 140.0, "hold_pip": 100.0, "tension_current": 400.0},
+    "feetech": {"hold_ap": 380.0, "hold_mcp": 320.0, "hold_pip": 280.0, "tension_current": 580.0},
 }
 
 

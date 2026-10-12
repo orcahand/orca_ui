@@ -136,7 +136,7 @@ def run_calibrate(hand, encoder_client, ctx: OpContext,
                   joints: list[str] | None, force_wrist: bool) -> dict:
     """Blocking calibration with progress mapped onto the op snapshot."""
     progress = {"steps_done": 0, "total": 0, "joints_calibrated": [],
-                "anchors_recorded": [], "anchors_dead": []}
+                "anchors_recorded": [], "anchors_dead": [], "travel_logged": False}
 
     def on_event(event: dict) -> None:
         kind = event.get("event")
@@ -181,14 +181,23 @@ def run_calibrate(hand, encoder_client, ctx: OpContext,
                     f"(ratio {event['ratio']:.4f})")
         elif kind == "calibration_done":
             ctx.log("calibration complete")
+            # What the numbers above mean, so the log reads on its own.
+            ctx.log("ratio: motor radians per joint degree — the motor travel between the two "
+                    "hardstops found, divided by the joint's range of motion")
+            if progress["travel_logged"]:
+                ctx.log("travel: motor-shaft travel between the hardstops in degrees, against the "
+                        "hand's joint_motor_travel baseline; mA: the current the joint was driven "
+                        "onto its hardstops with")
         elif kind == "calibration_aborted":
             ctx.log("calibration aborted — completed steps are persisted")
         elif kind == "joints_skipped":
             ctx.log(f"skipping {', '.join(event['joints'])}: {event['reason']}")
         elif kind == "travel_checked":
             if not event["within_margin"]:
+                progress["travel_logged"] = True
                 ctx.log(_travel_line(event, "outside the margin"))
         elif kind.startswith("travel_") and kind != "travel_baseline_missing":
+            progress["travel_logged"] = True
             ctx.log(_travel_line(event, _TRAVEL_NOTE.get(kind, kind)))
         elif kind == "overrun_retry":
             ctx.log(f"{event['joint']}: turned {event['travel_deg']:.0f}° past its "

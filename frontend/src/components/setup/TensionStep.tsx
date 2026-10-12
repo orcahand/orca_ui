@@ -139,6 +139,8 @@ export function TensionStep({ state }: { state: StepState }) {
         </label>
       </div>
       {guided ? (
+        <details className="flow-advanced">
+          <summary className="flow-field">Advanced settings</summary>
         <div className="flow-fields">
           {CURRENT_FIELDS.map((field) => (
             <label key={field.key} className="flow-field" title={field.hint}>
@@ -165,6 +167,7 @@ export function TensionStep({ state }: { state: StepState }) {
             reset
           </button>
         </div>
+        </details>
       ) : (
         <div className="flow-row">
           <label className="joint-check" title="Wind to the hard stops before holding">

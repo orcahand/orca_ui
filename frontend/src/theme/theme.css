@@ -3150,3 +3150,27 @@ header h1 {
   display: flex;
   gap: 8px;
 }
+
+/* Collapsed by default: the currents and pass thresholds are for a second look. */
+.gt-advanced > summary,
+.flow-advanced > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.gt-advanced > summary::before,
+.flow-advanced > summary::before {
+  content: "▸ ";
+}
+.gt-advanced[open] > summary::before,
+.flow-advanced[open] > summary::before {
+  content: "▾ ";
+}
+.gt-confirm {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 0 16px;
+}
+.gt-confirm > span {
+  flex: 1;
+}

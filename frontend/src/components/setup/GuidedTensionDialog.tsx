@@ -14,6 +14,7 @@ import type {
   OperationSnapshot,
   SpreadStatus,
   TensionStep,
+  RangeStage,
 } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
 import { ErrorBoundary } from '../common/ErrorBoundary'
@@ -81,6 +82,36 @@ export function GuidedTensionDialog({
     ? [awaiting.prompt, extra?.step, extra?.stage?.key, extra?.round, extra?.pulled_deg].join('|')
     : null
   const [sentFor, setSentFor] = useState<string | null>(null)
+  const [confirmRestart, setConfirmRestart] = useState(false)
+
+  // Stop this run, then start a fresh one with the same settings and no saved
+  // progress: resume=false makes the backend drop the scores it kept.
+  const restart = async () => {
+    setConfirmRestart(false)
+    const { defaults: _defaults, ...params } = (operation.params ?? {}) as Record<string, unknown>
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+    try {
+      if (active) await api.operationStop()
+      for (let i = 0; i < 100; i++) {
+        const current = (await api.operation()).operation
+        if (!current || !isOperationActive(current)) break
+        await sleep(300)
+      }
+      let lastError: unknown = null
+      for (let i = 0; i < 60; i++) {
+        try {
+          await api.operationStart('guided_tension', { ...params, resume: false })
+          return
+        } catch (error) {
+          lastError = error   // the hand is still reconnecting after the stopped run
+          await sleep(500)
+        }
+      }
+      fail(lastError)
+    } catch (error) {
+      fail(error)
+    }
+  }
   const sent = promptKey !== null && sentFor === promptKey
   const send = (option: string) => {
     setSentFor(promptKey)
@@ -159,6 +190,13 @@ export function GuidedTensionDialog({
           <span className="gt-header-spacer" />
           {active ? (
             <>
+              <button
+                className="btn btn-secondary"
+                title="Reset the rounds and every saved score, then start again"
+                onClick={() => setConfirmRestart(true)}
+              >
+                Restart
+              </button>
               <button className="btn btn-secondary" title="Keeps the run going" onClick={onClose}>
                 Hide
               </button>
@@ -172,6 +210,20 @@ export function GuidedTensionDialog({
             </button>
           )}
         </header>
+        {confirmRestart && (
+          <div className="gt-warning gt-confirm">
+            <span>
+              Are you sure you wish to reset the tensioning process fully to factory default and
+              delete existing scores?
+            </span>
+            <button className="btn btn-danger" onClick={() => void restart()}>
+              Reset
+            </button>
+            <button className="btn btn-secondary" onClick={() => setConfirmRestart(false)}>
+              Keep going
+            </button>
+          </div>
+        )}
         <div className="gt-body">
           <nav className="gt-steps">
             {steps.map((s, i) => {
@@ -197,8 +249,13 @@ export function GuidedTensionDialog({
                 </div>
               )
             })}
-            {extra && active && <CurrentsEditor extra={extra} step={step} />}
-            {extra && active && <PassEditor extra={extra} step={step} />}
+            {extra && active && (
+              <details className="gt-advanced">
+                <summary className="gt-todo-title">Advanced settings</summary>
+                <CurrentsEditor extra={extra} step={step} />
+                <PassEditor extra={extra} step={step} />
+              </details>
+            )}
             {extra && extra.history.length > 0 && (
               <div className="gt-history">
                 {extra.history.map((h) => (
@@ -283,11 +340,15 @@ function StepContent({
             <div className="gt-todo-title">
               Stage {(extra.stage_index ?? 0) + 1} of {extra.stage_count ?? 1} · {extra.stage?.title}
             </div>
-            <h3 className="gt-heading">Pose the hand like the model</h3>
-            <p className="setup-copy">Torque is off. {extra.stage?.pose}</p>
+            <h3 className="gt-heading">Pose your physical hand similarly to the 3d model</h3>
             <p className="setup-copy">
-              Continue freezes this pose; then you move only the {extra.stage?.title.toLowerCase()}{' '}
-              joints.
+              Left clicking and dragging will allow you to rotate the model for a better view.
+              Torque is currently off, you may move each joint freely.
+            </p>
+            <p className="setup-copy">{extra.stage?.pose}</p>
+            <p className="setup-copy">
+              Pressing continue will enable torque, "freezing" this pose and beginning the next
+              step in the tensioning process.
             </p>
           </div>
         </div>
@@ -302,12 +363,19 @@ function StepContent({
               <div className="gt-todo-title">
                 Stage {(extra.stage_index ?? 0) + 1} of {extra.stage_count ?? 1} · {extra.stage?.title}
               </div>
-              <h3 className="gt-heading">Move the {extra.stage?.title.toLowerCase()} through their range</h3>
+              <h3 className="gt-heading">
+                Move the {stageSubject(extra.stage)}, under tension, through{' '}
+                {stagePossessive(extra.stage)} full range of motion
+              </h3>
               <p className="setup-copy">
                 The motors hold this pose at {extra.hold_ap}/{extra.hold_mcp}/{extra.hold_pip} mA
                 (APs/MCPs/PIPs). Drive each highlighted joint by hand to both ends, one joint at a
-                time, like the model. A motor turns green once it has followed its group's pass
-                threshold (left) of its travel; orange past 30%.
+                time, like the model. You will have to apply a little force as the targeted joints
+                will be putting up some amount of resistance. A motor turns green once it has
+                followed its group's pass threshold (left) of its travel; orange past 30%. Do not
+                worry if you cannot hit the {Math.round(passFraction * 100)} percent target on the
+                first round. Simply press next after driving each joint to the maximum possible
+                value.
               </p>
               <ScoreLine extra={extra} />
             </div>
@@ -403,6 +471,17 @@ function StepContent({
         </div>
       )
   }
+}
+
+// "thumb and index" keeps its title; a single finger is named as one.
+function stageSubject(stage?: RangeStage): string {
+  if (!stage) return 'joints'
+  const title = stage.title.toLowerCase()
+  return title.includes(' and ') ? title : `${title} finger`
+}
+
+function stagePossessive(stage?: RangeStage): string {
+  return stage && stage.title.toLowerCase().includes(' and ') ? 'their' : 'its'
 }
 
 function ScoreLine({ extra }: { extra: GuidedTensionExtra }) {
