@@ -228,10 +228,9 @@ class HandSupervisor(threading.Thread):
                 raise HandBusyError(
                     "an operation holds the hand — stop it before changing "
                     "the hardware version")
-        write_hardware_version(self.config.config_path, version)
+        written = write_hardware_version(self.config.config_path, version)
         logger.info("hardware version %s in %s",
-                    "set to auto" if version is None else f"pinned to {version}",
-                    self.config.config_path)
+                    "set to auto" if version is None else f"pinned to {version}", written)
         if self._apply_hardware_version(self._board_hardware_version):
             self._teardown_session("hardware version changed — reconnecting")
             self._backoff = DETECT_BACKOFF_START_S

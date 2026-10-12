@@ -123,7 +123,8 @@ function HardwareVersionDialog({ onClose }: { onClose: () => void }) {
           </div>
           <p className="hv-note">
             Select the hardware version of your hand from this menu. Your selected change will
-            write into the config.yaml and overwrite any automatic detection.
+            write into the hand's local_config.yaml (next to its config.yaml) and overwrite any
+            automatic detection.
           </p>
           {busy && <div className="gt-warning">An operation is running — stop it first.</div>}
           <div className="gt-actions">
