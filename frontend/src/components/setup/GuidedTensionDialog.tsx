@@ -420,10 +420,16 @@ function StepContent({
             <h3 className="gt-heading">Now use the ratchet tool</h3>
             <p className="setup-copy">
               Hulls off. The finger motors have slowly turned{' '}
-              {extra.pulled_deg ?? extra.tension_offset_deg}° counterclockwise and hold at{' '}
-              {extra.tension_current} mA, loading the bottom spools. Turn the spool of each
-              coloured motor clockwise to take up the slack — red first, then orange. Not enough
-              load? Pull {EXTRA_DEG}° more.
+              {extra.pulled_deg ?? extra.tension_offset_deg}° counterclockwise and are holding
+              with {extra.tension_current} mA of current, the rotation should have placed some
+              tension on all tendons attached to the bottom spools.
+            </p>
+            <p className="setup-copy">
+              If any bottom spool tendons still feel loose, press "{PULL_MORE}" ({EXTRA_DEG}° more).
+            </p>
+            <p className="setup-copy">
+              Now use your tensioning tool to turn the top spools of each red and then orange
+              highlighted motor.
             </p>
             <div className="gt-warning">
               Tension carefully. Stop as soon as the tendon feels firm — overtensioning makes the
