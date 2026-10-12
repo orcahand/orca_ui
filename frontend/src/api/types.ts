@@ -249,6 +249,9 @@ export interface HandInfo {
   reboot_supported?: boolean
   finger_to_sensor_id?: Record<Finger, number>
   tactile?: { active_sensors: Finger[]; num_taxels: Record<Finger, number> }
+  // Motors that did not answer when the bus was opened, and their joints.
+  absent_motors?: number[]
+  absent_joints?: string[]
   // False when the installed orca_core predates guided tensioning.
   guided_tension?: boolean
   last_tension?: LastTension | null
@@ -825,4 +828,8 @@ export interface GuidedTensionExtra {
   stage?: RangeStage
   stage_index?: number
   stage_count?: number
+  // Joints the run leaves out (no motor answered), and the score sheet's
+  // exclusion list with a reason per joint.
+  absent_joints?: string[]
+  excluded?: { joint: string; motor: number; reason: string }[]
 }

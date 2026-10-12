@@ -93,6 +93,7 @@ export function CalibrateStep({ state }: { state: StepState }) {
     ? activeCurrents.map(([k, v]) => (k === 'all' ? `${v} mA` : `${k} ${v}`)).join(' · ')
     : null
   const joints = useMemo(() => handInfo?.joints ?? [], [handInfo])
+  const absent = useMemo(() => new Set(handInfo?.absent_joints ?? []), [handInfo])
   const groups = useMemo(() => {
     const map = new Map<string, JointInfo[]>()
     for (const joint of joints) {
@@ -168,20 +169,26 @@ export function CalibrateStep({ state }: { state: StepState }) {
       <div className="flow-joint-grid">
         {groups.map(([group, groupJoints]) => {
           const ids = groupJoints.map((j) => j.id)
-          const all = ids.every((id) => selected.has(id))
+          const all = ids.filter((id) => !absent.has(id)).every((id) => selected.has(id))
           return (
             <div key={group} className="flow-joint-group">
               <button
                 className={`finger-chip${all ? ' has-selection' : ''}`}
-                onClick={() => toggle(ids, !all)}
+                onClick={() => toggle(ids.filter((id) => !absent.has(id)), !all)}
               >
                 {group}
               </button>
               {groupJoints.map((joint) => (
-                <label key={joint.id} className="joint-check" title={joint.id}>
+                <label
+                  key={joint.id}
+                  className="joint-check"
+                  title={absent.has(joint.id) ? `${joint.id}: no motor answered` : joint.id}
+                  style={absent.has(joint.id) ? { opacity: 0.4 } : undefined}
+                >
                   <input
                     type="checkbox"
                     checked={selected.has(joint.id)}
+                    disabled={absent.has(joint.id)}
                     onChange={(e) => toggle([joint.id], e.target.checked)}
                   />
                   {joint.id.split('_').slice(1).join('_') || joint.id}

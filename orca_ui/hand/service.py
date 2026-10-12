@@ -355,6 +355,10 @@ class HandService:
             "core": resolve_core_source().as_dict(),
             "reboot_supported": bool(session is not None and hasattr(
                 getattr(session.hand, "motor_client", None), "reboot_motor")),
+            # Motors that did not answer when the bus was opened, and their joints:
+            # the maintenance routines leave these out and the Setup tab greys them.
+            "absent_motors": list(getattr(getattr(session, "hand", None), "absent_motor_ids", []) or []),
+            "absent_joints": list(getattr(getattr(session, "hand", None), "absent_joints", []) or []),
             "guided_tension": hand_ops.guided_tension_supported(),
             "last_tension": hand_ops.last_tension(config),
             "tension_progress": self._tension_progress(config),

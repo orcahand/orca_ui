@@ -115,6 +115,11 @@ export function TensionStep({ state }: { state: StepState }) {
           scores this {formatHardwareVersion(version)} hand against the v2.1 baseline
         </div>
       )}
+      {(handInfo?.absent_joints?.length ?? 0) > 0 && (
+        <div className="flow-info warn" title={`motors ${(handInfo?.absent_motors ?? []).join(', ')}`}>
+          no motor answered for {handInfo!.absent_joints!.join(', ')} — these joints are left out
+        </div>
+      )}
       <div className="flow-row">
         <label
           className="flow-field"

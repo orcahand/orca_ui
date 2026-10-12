@@ -313,6 +313,7 @@ function StepContent({
             </div>
           </div>
           <MotorGrid motors={motors} passFraction={passFraction} focus={testing} />
+          <ExcludedNote excluded={extra.excluded} />
         </div>
       )
     }
@@ -331,6 +332,7 @@ function StepContent({
             </div>
           </div>
           <MotorGrid motors={motors} passFraction={passFraction} />
+          <ExcludedNote excluded={extra.excluded} />
         </div>
       )
     case 'tension': {
@@ -410,6 +412,22 @@ function ScoreLine({ extra }: { extra: GuidedTensionExtra }) {
         {extra.passed ?? 0}/{extra.scored ?? 0}
       </b>{' '}
       motors at full travel
+    </div>
+  )
+}
+
+// Joints the run left out, with the reason: nobody should wonder where a finger went.
+function ExcludedNote({ excluded }: { excluded?: GuidedTensionExtra['excluded'] }) {
+  if (!excluded || excluded.length === 0) return null
+  const reasons = new Map<string, string[]>()
+  for (const e of excluded) reasons.set(e.reason, [...(reasons.get(e.reason) ?? []), e.joint])
+  return (
+    <div className="flow-info warn gt-excluded">
+      {[...reasons.entries()].map(([reason, joints]) => (
+        <div key={reason}>
+          not scored — {reason}: {joints.join(', ')}
+        </div>
+      ))}
     </div>
   )
 }

@@ -161,9 +161,13 @@ class _Presenter:
                 self._extra.update(step=event["step"], round=event["round"])
                 if "stage" in event:
                     self._extra.update({k: event[k] for k in ("stage", "stage_index", "stage_count")})
+                if "absent_joints" in event:
+                    self._extra["absent_joints"] = list(event["absent_joints"])
                 self._publish()
             elif kind in ("spread", "score"):
                 self._extra.update({k: event[k] for k in ("motors", "passed", "scored", "fraction")})
+                if "excluded" in event:
+                    self._extra["excluded"] = list(event["excluded"])
                 if kind == "score":
                     self._extra["history"] = self._extra["history"] + [
                         {k: event[k] for k in ("round", "passed", "scored", "fraction")}]
@@ -354,7 +358,7 @@ def _sim_score(motors: list[dict], pass_fraction) -> dict:
     scored = [m for m in motors if m["fraction"] is not None]
     passed = sum(m["status"] == "pass" for m in scored)
     return {"motors": motors, "passed": passed, "scored": len(scored),
-            "fraction": passed / len(scored) if scored else 0.0}
+            "fraction": passed / len(scored) if scored else 0.0, "excluded": []}
 
 
 class SimulatedGuidedTensionOperation(_LiveCurrents):
@@ -438,7 +442,7 @@ class SimulatedGuidedTensionOperation(_LiveCurrents):
                     SimulatedGuidedTensionOperation._progress = {
                         "best": dict(best), "rounds": self._progress.get("rounds", 0) + 1,
                         "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
-                    completed = result["passed"] == result["scored"]
+                    completed = result["scored"] > 0 and result["passed"] == result["scored"]
                     if jump == GOTO_TENSION:
                         presenter.progress({"event": "score", "round": round_no, **result})
                         answer = "Tension"

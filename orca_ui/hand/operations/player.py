@@ -673,6 +673,6 @@ class RunInOperation(Operation):
             self.params["duration_s"] * rate_hz / len(frames)))
         ctx.log(f"run-in at ×{speed:g}: one pass {len(frames) / rate_hz:.1f}s")
         return play_frames(
-            ctx, name="run-in", joint_ids=joint_ids,
+            ctx, name=f"run-in ×{speed:g}", joint_ids=joint_ids,
             frames=frames * cycles, rate_hz=rate_hz, speed=1.0, loop=False,
         )
