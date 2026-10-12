@@ -1324,7 +1324,8 @@ header h1 {
   line-height: 1.6;
   letter-spacing: 0;
   text-transform: none;
-  color: var(--muted);
+  /* Always white: the pop keeps its dark background in both themes. */
+  color: #ffffff;
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.12s ease;
