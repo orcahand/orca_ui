@@ -190,6 +190,17 @@ def run_calibrate(hand, encoder_client, ctx: OpContext,
                 ctx.log(_travel_line(event, "outside the margin"))
         elif kind.startswith("travel_") and kind != "travel_baseline_missing":
             ctx.log(_travel_line(event, _TRAVEL_NOTE.get(kind, kind)))
+        elif kind == "overrun_retry":
+            ctx.log(f"{event['joint']}: turned {event['travel_deg']:.0f}° past its "
+                    f"{event['limit_deg']:.0f}° limit without meeting a stop — the belt is "
+                    f"poorly set (slipping); driving again at {100 * event['pwm_fraction']:.0f}% "
+                    f"output (attempt {event['attempt']})")
+        elif kind == "hardstop_not_found":
+            ctx.log(f"{event['joint']}: no hardstop within {event['limit_deg']:.0f}° — given up, "
+                    "limit not recorded. The belt or tendon is slack or broken: tension it and "
+                    "calibrate again")
+        elif kind == "drive_step_timeout":
+            ctx.log(f"{event['joint']}: never settled on a hardstop — given up, limit not recorded")
 
     # calibrate() clears orca_core's stop event at entry: a stop that landed
     # while we were connecting would be swallowed. Check ours first.

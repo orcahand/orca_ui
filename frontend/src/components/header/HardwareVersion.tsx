@@ -122,8 +122,8 @@ function HardwareVersionDialog({ onClose }: { onClose: () => void }) {
             ))}
           </div>
           <p className="hv-note">
-            Saved as <code>hardware_version</code> in this hand's config.yaml. A version set here
-            wins over the board. Changing it reconnects the hand.
+            Select the hardware version of your hand from this menu. Your selected change will
+            write into the config.yaml and overwrite any automatic detection.
           </p>
           {busy && <div className="gt-warning">An operation is running — stop it first.</div>}
           <div className="gt-actions">
