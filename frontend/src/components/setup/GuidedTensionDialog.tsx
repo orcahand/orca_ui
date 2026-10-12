@@ -286,7 +286,11 @@ export function GuidedTensionDialog({
                       disabled={sent}
                       onClick={() => send(option)}
                     >
-                      {option === PULL_MORE ? `Pull ${EXTRA_DEG}° more` : option}
+                      {option === PULL_MORE
+                        ? `Pull ${EXTRA_DEG}° more`
+                        : option === 'Done' && step === 'tension'
+                          ? `Round ${(extra?.round ?? 1) + 1}`
+                          : option}
                       {primary && <span className="gt-key">↵</span>}
                     </button>
                   )
