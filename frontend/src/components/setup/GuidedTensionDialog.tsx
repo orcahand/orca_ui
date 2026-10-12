@@ -372,7 +372,8 @@ function StepContent({
                 (APs/MCPs/PIPs). Drive each highlighted joint by hand to both ends, one joint at a
                 time, like the model. You will have to apply a little force as the targeted joints
                 will be putting up some amount of resistance. A motor turns green once it has
-                followed its group's pass threshold (left) of its travel; orange past 30%. Do not
+                followed its group's pass threshold ({passTargets(extra)}) of its travel; orange
+                past 30%. Do not
                 worry if you cannot hit the {Math.round(passFraction * 100)} percent target on the
                 first round. Simply press next after driving each joint to the maximum possible
                 value.
