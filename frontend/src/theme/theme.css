@@ -3174,3 +3174,25 @@ header h1 {
 .gt-confirm > span {
   flex: 1;
 }
+
+/* The step's settings drawer toggle: a labelled box, not a bare glyph. */
+.flow-settings-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--dim);
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.flow-settings-toggle:hover,
+.flow-settings-toggle.on {
+  color: var(--text);
+  border-color: var(--accent);
+}

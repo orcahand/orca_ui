@@ -28,6 +28,7 @@ export function HoldTensionDialog({
 }) {
   const gate = useStartGate('motors')
   const wind = useTensionFlow((s) => s.wind)
+  const setWind = useTensionFlow((s) => s.setWind)
   const offsetDeg = useTensionFlow((s) => s.offsetDeg)
   const active = operation !== null && isOperationActive(operation)
   const holding = active && operation.state === 'awaiting_input'
@@ -101,10 +102,21 @@ export function HoldTensionDialog({
               <div className="gt-pane">
                 <h3 className="gt-heading">Tension the hand</h3>
                 <p className="setup-copy">
-                  Activating the current makes every finger motor slowly turn {offsetDeg}°
-                  counterclockwise and hold there, loading the bottom spools. Keep fingers clear of the hand
-                  while it takes up the slack.
+                  {wind
+                    ? `Activating the current first winds every finger to its hard stops and back ` +
+                      `(the tendons seat), then slowly turns the finger motors ${offsetDeg}° ` +
+                      `counterclockwise and holds there, loading the bottom spools.`
+                    : `Activating the current makes every finger motor slowly turn ${offsetDeg}° ` +
+                      `counterclockwise and hold there, loading the bottom spools. The fingers are not ` +
+                      `wound first.`}{' '}
+                  Keep fingers clear of the hand while it takes up the slack.
                 </p>
+                {!active && (
+                  <label className="joint-check" title="Drive every finger to its hard stops and back before holding">
+                    <input type="checkbox" checked={wind} onChange={(e) => setWind(e.target.checked)} />
+                    wind the tendons to the hard stops first
+                  </label>
+                )}
                 {active && (
                   <p className="setup-copy">
                     {operation.phase ?? 'starting'}

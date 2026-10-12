@@ -43,12 +43,13 @@ export function FlowStep({
           {settings && (
             <button
               type="button"
-              className={`flow-icon${open ? ' on' : ''}`}
-              title="Settings"
+              className={`flow-settings-toggle${open ? ' on' : ''}`}
+              title="Additional settings"
               aria-expanded={open}
               onClick={() => setOpen((o) => !o)}
             >
-              ⚙
+              <span>Additional Settings</span>
+              <span aria-hidden="true">⚙</span>
             </button>
           )}
         </span>

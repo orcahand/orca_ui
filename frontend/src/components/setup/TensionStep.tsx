@@ -41,8 +41,6 @@ export function TensionStep({ state }: { state: StepState }) {
   const setForced = useTensionFlow((s) => s.setForced)
   const openHold = useTensionFlow((s) => s.openHold)
   const dismiss = useTensionFlow((s) => s.dismiss)
-  const wind = useTensionFlow((s) => s.wind)
-  const setWind = useTensionFlow((s) => s.setWind)
   const offsetDeg = useTensionFlow((s) => s.offsetDeg)
   const setOffsetDeg = useTensionFlow((s) => s.setOffsetDeg)
 
@@ -67,6 +65,10 @@ export function TensionStep({ state }: { state: StepState }) {
     saveOverrides(family, next)
   }
 
+  useEffect(() => {
+    // Forcing guided on a hand that gets it anyway is a no-op; drop the stale choice.
+    if (forced === 'guided' && natural === 'guided') setForced(null)
+  }, [forced, natural, setForced])
   const guided = mode === 'guided' && handInfo?.guided_tension !== false
   const progress = guided ? (handInfo?.tension_progress ?? null) : null
   const last = handInfo?.last_tension ?? null
@@ -105,7 +107,9 @@ export function TensionStep({ state }: { state: StepState }) {
             <option value="">
               auto · {MODE_LABEL[natural]} ({formatHardwareVersion(version)})
             </option>
-            <option value="guided">force guided</option>
+            {natural === 'hold' && (
+              <option value="guided">force guided (score a non-v2.1 hand against the v2.1 baseline)</option>
+            )}
             <option value="hold">force hold &amp; ratchet</option>
           </select>
         </label>
@@ -168,14 +172,7 @@ export function TensionStep({ state }: { state: StepState }) {
           </button>
         </div>
         </details>
-      ) : (
-        <div className="flow-row">
-          <label className="joint-check" title="Wind to the hard stops before holding">
-            <input type="checkbox" checked={wind} onChange={(e) => setWind(e.target.checked)} />
-            wind first
-          </label>
-        </div>
-      )}
+      ) : null}
     </>
   )
 
