@@ -163,6 +163,7 @@ class HandSupervisor(threading.Thread):
         # Board pin: None = first board to answer. Read/written under the
         # GIL only (str swap), like _model_pinned.
         self._board_pinned: str | None = settings.board or None
+        self._pinned_identity = None
         # The connected hand's serial (or board id) from its last detection;
         # None in mock mode and for boards that report no identity.
         self._hand_id: str | None = None
@@ -687,6 +688,9 @@ class HandSupervisor(threading.Thread):
         identity = getattr(detection, "identity", None)
         if identity is not None and identity.hand_id:
             self._hand_id = identity.hand_id
+        if identity is not None and self._board_pinned:
+            # Kept so a later probe can start from it once the pinned CDC is held.
+            self._pinned_identity = identity
         self._apply_hardware_version(getattr(identity, "hw_version", None))
         config = self.config
         try:
@@ -867,7 +871,7 @@ class HandSupervisor(threading.Thread):
                 self._publish()
         try:
             pin = self._board_pinned
-            detection = (detect_pinned_board(pin) if pin
+            detection = (detect_pinned_board(pin, identity=self._pinned_identity) if pin
                          else run_detection(self.config, force=confirming_model))
             if confirming_model and self._adopt_model(detection, upgrade_only=True):
                 return ("hand reports more hardware than the model declared — "

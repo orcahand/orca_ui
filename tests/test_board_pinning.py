@@ -63,3 +63,29 @@ def test_a_pinned_board_never_falls_back_to_another_hand(monkeypatch):
     assert presence.motor_port is None
     assert presence.sensing.tactile is None
     assert presence.sensing.encoder is None
+
+
+
+def test_a_held_pin_is_re_detected_from_its_known_identity(monkeypatch):
+    """Once the session holds the pinned motor CDC it cannot be probed, so a
+    sensing port that was busy at connect is found from the board's identity."""
+    from orca_core.hardware.sensing.serial_discovery import OrcaBoardInfo
+
+    from orca_ui.hand import boards
+
+    pin, mate = "/dev/cu.usbmodemAAA1", "/dev/cu.usbmodemAAA3"
+    motor = OrcaBoardInfo(role="motor", side="right", hw_version=21, fw_version=2,
+                          serial=None, board_id="0123456789ABCDEF", config=2000)
+    sensor = OrcaBoardInfo(role="sensor", side="right", hw_version=21, fw_version=2,
+                           serial=None, board_id="0123456789ABCDEF", config=2000)
+    monkeypatch.setattr(boards, "oh_board_ports", lambda: [pin, mate])
+    monkeypatch.setattr(boards, "probe_orca_info", lambda port: sensor if port == mate else None)
+    monkeypatch.setattr(boards, "port_in_use", lambda port: port == pin)
+    monkeypatch.setattr(boards, "detect_encoder_stream", lambda port: False)
+    monkeypatch.setattr(boards, "_tactile_responds_at", lambda port, baud: True)
+
+    assert boards.detect_pinned_board(pin) is None, "nothing known: a held pin stays unresolved"
+    detection = boards.detect_pinned_board(pin, identity=motor)
+    assert detection is not None
+    assert detection.motor_port == pin and detection.sensing_port == mate
+    assert detection.has_tactile and detection.probed_tactile
