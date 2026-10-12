@@ -162,7 +162,11 @@ class _Presenter:
                 if "stage" in event:
                     self._extra.update({k: event[k] for k in ("stage", "stage_index", "stage_count")})
                 if "absent_joints" in event:
-                    self._extra["absent_joints"] = list(event["absent_joints"])
+                    absent = set(event["absent_joints"])
+                    self._extra["absent_joints"] = sorted(absent)
+                    # The routine drops a stage with no present joint; the sidebar does too.
+                    self._extra["stages"] = [st for st in hand_ops.range_stages()
+                                             if any(j not in absent for j in st["joints"])]
                 self._publish()
             elif kind in ("spread", "score"):
                 self._extra.update({k: event[k] for k in ("motors", "passed", "scored", "fraction")})

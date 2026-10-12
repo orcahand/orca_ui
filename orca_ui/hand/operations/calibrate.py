@@ -183,6 +183,8 @@ def run_calibrate(hand, encoder_client, ctx: OpContext,
             ctx.log("calibration complete")
         elif kind == "calibration_aborted":
             ctx.log("calibration aborted — completed steps are persisted")
+        elif kind == "joints_skipped":
+            ctx.log(f"skipping {', '.join(event['joints'])}: {event['reason']}")
         elif kind == "travel_checked":
             if not event["within_margin"]:
                 ctx.log(_travel_line(event, "outside the margin"))
