@@ -1,0 +1,498 @@
+/* Scoped to the assembly popup; shared console controls retain their own styles. */
+.assembly-app { max-width: 1680px; margin: -12px auto; color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 15px; line-height: 1.55; }
+.assembly-app button, .assembly-app input { font: inherit; }
+.assembly-app button, .assembly-app a { -webkit-tap-highlight-color: transparent; }
+.assembly-app button { cursor: pointer; }
+.assembly-app button:disabled { opacity: .35; cursor: default; }
+.assembly-app button:focus-visible, .assembly-app a:focus-visible, .assembly-app input:focus-visible, .assembly-app summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.assembly-app a { color: var(--accent); text-underline-offset: 4px; }
+.assembly-app .assembly-header { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 23px 36px; margin: 0; border: 0; border-bottom: 1px solid var(--panel-border); border-radius: 0; background: var(--bg); gap: 24px; }
+.assembly-brand { color: var(--text-bright) !important; font: 700 23px var(--font); text-decoration: none; display: flex; align-items: center; gap: 28px; }
+.assembly-brand span { color: var(--dim); font-size: 10px; letter-spacing: .13em; font-weight: 400; }
+.assembly-header-actions { display: flex; align-items: center; gap: 22px; font-size: 12px; }
+.assembly-header-actions a { text-decoration: none; }
+.assembly-layout { display: grid; grid-template-columns: 278px minmax(0,1fr); }
+.assembly-sidebar { position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 34px 24px; border-right: 1px solid var(--panel-border); scrollbar-width: thin; }
+.assembly-eyebrow { color: var(--dim); font: 10px var(--font); letter-spacing: .13em; }
+.assembly-sidebar-intro h1 { font-size: 32px; line-height: 1.12; letter-spacing: -.045em; font-weight: 500; margin: 15px 0 13px; color: var(--text-bright); }
+.assembly-sidebar-intro p { font-size: 12px; color: var(--dim); }
+.assembly-progress { margin: 26px 0 20px; font: 11px var(--font); }
+.assembly-progress strong { color: var(--accent); }
+.assembly-progress progress { display: block; width: 100%; height: 4px; margin-top: 12px; accent-color: var(--accent); border: none; border-radius: 4px; background: var(--panel-border); }
+.assembly-progress progress::-webkit-progress-bar { background: var(--panel-border); border-radius: 4px; }
+.assembly-progress progress::-webkit-progress-value { background: var(--accent); border-radius: 4px; }
+.assembly-search input { width: 100%; background: var(--panel); border: 1px solid var(--panel-border); border-radius: 7px; padding: 10px 12px; font-size: 12px; color: var(--text); margin-bottom: 22px; }
+.assembly-chapter { margin-bottom: 3px; }
+.assembly-chapter-button { display: flex; gap: 10px; align-items: center; width: 100%; border: 0; padding: 11px 8px; text-align: left; color: var(--muted); background: transparent; border-radius: 6px; font-size: 12px !important; }
+.assembly-chapter-button > span:first-child { font: 10px var(--font); color: var(--dim); }
+.assembly-chapter-button > span:nth-child(2) { flex: 1; }
+.assembly-chapter-button small { font-size: 10px; color: var(--dim); }
+.assembly-chapter-button.active { color: var(--accent); background: rgb(var(--accent-rgb) / .07); }
+.assembly-step-links { border-left: 1px solid var(--panel-border-strong); margin: 7px 0 13px 18px; padding-left: 12px; }
+.assembly-step-links button { display: flex; gap: 8px; width: 100%; text-align: left; border: 0; border-radius: 5px; padding: 7px 6px; color: var(--dim); background: transparent; font-size: 11px; }
+.assembly-step-links button.active { color: var(--accent); font-weight: 600; }
+.assembly-step-links button:hover, .assembly-chapter-button:hover { background: rgb(var(--accent-rgb) / .06); }
+.assembly-save-status { margin: 30px 0 10px; font-size: 11px; color: var(--dim); }
+.assembly-text-button { border: none; background: none; color: var(--accent); padding: 0; font-size: 11px !important; }
+.assembly-reset { font-size: 12px; }
+.assembly-reset button { padding: 6px 10px; margin: 8px 8px 0 0; background: var(--panel); border: 1px solid var(--panel-border); border-radius: 5px; color: var(--text); }
+.assembly-main { min-width: 0; max-width: 1300px; padding: 44px 48px 28px; }
+.assembly-breadcrumb { display: flex; justify-content: space-between; font: 10px var(--font); color: var(--dim); letter-spacing: .06em; }
+.assembly-breadcrumb > span:first-child { color: var(--accent); }
+.assembly-main > h2 { max-width: 840px; font-size: clamp(30px, 3.2vw, 49px); line-height: 1.13; letter-spacing: -.045em; font-weight: 500; color: var(--text-bright); margin: 21px 0 20px; outline: none; }
+.assembly-step-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 34px; }
+.assembly-step-meta > span { font: 9px var(--font); letter-spacing: .03em; color: var(--dim); border: 1px solid var(--panel-border); padding: 5px 8px; border-radius: 4px; }
+.assembly-step-meta .assembly-complete-label { color: var(--ok); }
+.assembly-content-grid { display: grid; grid-template-columns: minmax(220px,.8fr) minmax(0,1.2fr); gap: 32px; align-items: start; }
+.assembly-instructions ol { list-style: none; margin: 18px 0 0; padding: 0; }
+.assembly-instructions li { display: flex; align-items: baseline; gap: 13px; margin-bottom: 19px; }
+.assembly-instructions li > span { font: 10px var(--font); color: var(--accent); background: rgb(var(--accent-rgb) / .08); border-radius: 50%; min-width: 23px; height: 23px; display: inline-grid; place-items: center; }
+.assembly-instructions li p { font-size: 14px; line-height: 1.75; color: var(--muted); }
+.assembly-note { background: rgb(var(--warn-rgb) / .07); border-left: 2px solid var(--warn); padding: 15px 17px; margin-top: 25px; font-size: 12px; line-height: 1.7; }
+.assembly-note strong { color: var(--warn); display: block; margin-bottom: 5px; font-weight: 600; }
+.assembly-note-neutral { border-color: var(--accent); background: rgb(var(--accent-rgb) / .04); }
+.assembly-note-neutral strong { color: var(--accent); }
+.assembly-note a { display: inline-block; margin-top: 12px; }
+.assembly-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.assembly-image-button { display: block; width: 100%; padding: 0; border: 0; border-radius: 6px; background: var(--assembly-image-bg); overflow: hidden; margin-top: 15px; }
+.assembly-image-button img { display: block; width: 100%; height: auto; }
+.assembly-image-button > span { display: block; padding: 60px 20px; color: #fff; }
+.assembly-lightbox { margin: auto; width: min(1500px, 95vw); max-width: 95vw; max-height: 95vh; overflow: auto; border: 1px solid var(--panel-border); border-radius: 12px; padding: 18px; background: var(--bg); color: var(--text); }
+.assembly-lightbox::backdrop { background: rgb(0 0 0 / .75); backdrop-filter: blur(5px); }
+.assembly-lightbox img { display: block; width: 100%; height: auto; margin-top: 15px; }
+.assembly-lightbox .assembly-row button { background: var(--panel); color: var(--text); padding: 8px 16px; border: 1px solid var(--panel-border-strong); border-radius: 6px; }
+.assembly-motion { margin-top: 30px; border: 1px solid var(--panel-border); border-radius: 12px; padding: 21px 24px; background: var(--panel); }
+.assembly-motion svg { display: block; width: 100%; max-width: 650px; margin: 15px auto; }
+.assembly-motion svg text { font: 12px -apple-system, sans-serif; fill: var(--muted); }
+.assembly-part { fill: rgb(var(--overlay-rgb) / .05); stroke: var(--panel-border-strong); stroke-width: 2; }
+.assembly-channel { fill: none; stroke: var(--bg); stroke-width: 25; }
+.assembly-cord { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 8 5; transition: opacity .4s; }
+.assembly-cord-secondary { stroke: var(--purple); }
+.assembly-tube-move { transition: transform 1.2s ease-in-out; }
+.assembly-motion .is-playing { animation: assembly-phase 3s linear infinite; }
+.assembly-motion .is-playing .assembly-cord { animation: assembly-flow 1s linear infinite; }
+.assembly-motion > p { text-align: center; font-size: 13px; margin-bottom: 18px; }
+.assembly-motion > .assembly-row:last-child { align-items: baseline; }
+@keyframes assembly-flow { to { stroke-dashoffset: -26; } }
+@keyframes assembly-phase { from { opacity: .999; } to { opacity: 1; } }
+.assembly-muted { color: var(--dim); font-size: 11px; }
+.assembly-video-section { margin-top: 30px; padding: 23px; background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; }
+.assembly-video-section h3, .assembly-tendons h3 { font-size: 20px; font-weight: 500; letter-spacing: -.02em; margin: 5px 0 16px; }
+.assembly-video-section .assembly-row a { font-size: 11px; }
+.assembly-video-section iframe { width: 100%; aspect-ratio: 16/9; border: 0; border-radius: 8px; background: #171717; display: block; }
+.assembly-video-section > p { margin-top: 13px; }
+.assembly-tendons { margin-top: 30px; border: 1px solid var(--panel-border); border-radius: 12px; padding: 24px; }
+.assembly-tendons .assembly-row > span { font: 11px var(--font); color: var(--accent); }
+.assembly-tendons > p { font-size: 12px; color: var(--dim); margin-bottom: 20px; }
+.assembly-tendon-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
+.assembly-tendon-grid label { display: flex; align-items: center; gap: 8px; font: 10px var(--font); padding: 10px 8px; background: var(--panel); border-radius: 5px; cursor: pointer; }
+.assembly-tendon-grid label:has(:checked) { color: var(--ok); background: rgb(var(--ok-rgb) / .07); }
+.assembly-tendon-grid label > span { color: var(--dim); font-size: 9px; }
+.assembly-app input[type=checkbox] { accent-color: var(--accent); width: 17px; height: 17px; flex-shrink: 0; cursor: pointer; }
+.assembly-check { border-top: 1px solid var(--panel-border); margin-top: 34px; padding-top: 25px; }
+.assembly-check label { display: flex; gap: 15px; align-items: center; cursor: pointer; }
+.assembly-check strong { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.assembly-check label > span > span { font-size: 12px; color: var(--dim); }
+.assembly-footer { display: flex; gap: 16px; align-items: center; margin-top: 29px; }
+.assembly-footer > span { flex: 1; text-align: center; color: var(--dim); font-size: 11px; }
+.assembly-primary, .assembly-secondary { padding: 12px 20px; border: 1px solid var(--panel-border-strong); border-radius: 7px; font-size: 12px !important; }
+.assembly-primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.assembly-secondary { background: var(--panel); color: var(--text); }
+.assembly-inline-link { display: inline-block; color: var(--bg) !important; text-decoration: none; margin-top: 20px; }
+.assembly-footer-note { margin-top: 30px; text-align: center; font-size: 10px; color: var(--dim); }
+.assembly-finished { margin-top: 25px; padding: 20px; background: rgb(var(--ok-rgb) / .08); color: var(--ok); border-radius: 10px; }
+.assembly-mobile-nav { display: none; }
+.assembly-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+@media (min-width: 1500px) { .assembly-main { padding: 50px 60px; } }
+@media (max-width: 1150px) { .assembly-layout { grid-template-columns: 240px minmax(0,1fr); } .assembly-sidebar { padding: 30px 18px; } .assembly-main { padding: 35px 30px; } .assembly-content-grid { grid-template-columns: 1fr; gap: 22px; } .assembly-tendon-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } }
+@media (max-width: 760px) { .assembly-app .assembly-header { padding: 17px 8px; gap: 8px; } .assembly-brand { font-size: 19px; } .assembly-brand span { display: none; } .assembly-header-actions { gap: 12px; font-size: 10px; } .assembly-layout { display: block; } .assembly-mobile-nav { display: block; width: 100%; text-align: left; padding: 15px; color: var(--accent); border: 0; border-bottom: 1px solid var(--panel-border); background: transparent; font-size: 12px !important; } .assembly-sidebar { display: none; position: static; height: auto; border: 0; } .assembly-sidebar.is-open { display: block; } .assembly-sidebar-intro h1 { font-size: 27px; } .assembly-main { padding: 27px 12px; } .assembly-main > h2 { font-size: 34px; } .assembly-tendon-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .assembly-tendons, .assembly-motion, .assembly-video-section { padding: 17px; } .assembly-row { flex-wrap: wrap; gap: 8px; } .assembly-footer { flex-wrap: wrap; justify-content: space-between; } .assembly-footer > span { order: 3; flex-basis: 100%; margin-top: 8px; } .assembly-step-meta { margin-bottom: 25px; } }
+@media (prefers-reduced-motion: reduce) { .assembly-motion .is-playing, .assembly-motion .is-playing .assembly-cord { animation: none; } .assembly-tube-move, .assembly-cord { transition: none; } }
+.assembly-dialog .assembly-app { display: flex; flex-direction: column; height: 100%; max-width: none; margin: 0; overflow: hidden; }
+.assembly-dialog .assembly-header { flex-shrink: 0; padding: 17px 28px; }
+.assembly-dialog .assembly-layout { flex: 1; min-height: 0; }
+.assembly-dialog .assembly-sidebar { position: static; height: auto; overflow-y: auto; }
+.assembly-dialog .assembly-main { overflow-y: auto; padding: 30px 40px; scrollbar-width: thin; }
+.assembly-close { border: 1px solid var(--panel-border-strong); background: var(--panel); color: var(--text); border-radius: 7px; padding: 9px 14px; font-size: 12px !important; }
+.assembly-build-settings { display: flex; flex-wrap: wrap; align-items: center; gap: 15px; margin-bottom: 27px; padding-bottom: 20px; border-bottom: 1px solid var(--panel-border); }
+.assembly-build-settings > span { margin-right: auto; }
+.assembly-build-settings label { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--dim); }
+.assembly-build-settings select { background: var(--panel); color: var(--text); border: 1px solid var(--panel-border-strong); border-radius: 5px; padding: 6px 7px; font: inherit; }
+.assembly-kit { margin: -7px 0 28px; }
+.assembly-kit ul { display: flex; flex-wrap: wrap; list-style: none; gap: 7px; margin-top: 10px; }
+.assembly-kit li { background: var(--panel); padding: 5px 9px; border-radius: 4px; border: 1px solid var(--panel-border); font-size: 11px; color: var(--muted); }
+.assembly-no-figures { grid-template-columns: 1fr; max-width: 800px; }
+.assembly-media { min-width: 0; padding: 16px; background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; }
+.assembly-media .assembly-image-button { background: white; }
+.assembly-media .assembly-image-button > img { height: clamp(220px,27vw,420px); object-fit: contain; padding: 10px; }
+.assembly-figure-caption { font-size: 12px; color: var(--muted); margin: 12px 0 0; }
+.assembly-thumbnails { display: flex; gap: 8px; overflow-x: auto; padding: 12px 0 3px; scrollbar-width: thin; }
+.assembly-thumbnails button { flex: 0 0 112px; color: var(--dim); background: var(--bg); border: 1px solid var(--panel-border); border-radius: 6px; padding: 5px; text-align: left; }
+.assembly-thumbnails button.active { border-color: var(--accent); color: var(--accent); }
+.assembly-thumbnails img { width: 100%; height: 65px; object-fit: contain; background: white; border-radius: 3px; }
+.assembly-thumbnails span { display: block; font-size: 10px; line-height: 1.4; margin-top: 5px; }
+.assembly-media-controls { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 14px; font-size: 12px; }
+.assembly-media-controls button, .assembly-clip-tabs button { color: var(--accent); border: 1px solid var(--panel-border); background: var(--panel); border-radius: 5px; padding: 8px 12px; }
+.assembly-clip-tabs { display: flex; gap: 8px; margin-bottom: 15px; }
+.assembly-clip-tabs button { font-size: 11px; }
+.assembly-clip-tabs [aria-pressed=true] { border-color: var(--accent); }
+.assembly-command { padding: 15px; margin: 18px 0; background: rgb(var(--overlay-rgb) / .05); border-radius: 7px; }
+.assembly-command pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.8 var(--font); margin-bottom: 10px; }
+.assembly-related { border-top: 1px solid var(--panel-border); margin-top: 20px; padding-top: 15px; display: flex; flex-wrap: wrap; gap: 12px; }
+.assembly-related > span { width: 100%; }
+.assembly-inline-resource { display: inline-block; font-size: 12px; margin: 12px 0; }
+.assembly-work-checklist { border: 1px solid var(--panel-border); border-radius: 12px; margin-top: 26px; padding: 24px; }
+.assembly-work-checklist h3 { margin-bottom: 16px; font-size: 20px; font-weight: 500; }
+.assembly-work-checklist label { display: flex; align-items: baseline; gap: 12px; font-size: 13px; line-height: 1.7; padding: 9px 0; cursor: pointer; }
+.assembly-work-checklist input { align-self: flex-start; margin-top: 4px; }
+.assembly-check small { display: block; color: var(--dim); font-size: 11px; margin-top: 6px; }
+.assembly-glossary { position: absolute; z-index: 2; inset: 75px 22px auto auto; width: min(620px,calc(100% - 44px)); max-height: calc(100% - 100px); overflow-y: auto; padding: 25px; background: var(--pop-bg); border: 1px solid var(--panel-border-strong); border-radius: 12px; box-shadow: 0 12px 50px var(--pop-shadow-color); }
+.assembly-glossary h2 { font-size: 24px; font-weight: 500; }
+.assembly-glossary dl, .assembly-inline-glossary { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 22px; }
+.assembly-glossary dt, .assembly-inline-glossary dt { font-size: 13px; font-weight: 600; color: var(--accent); margin-bottom: 4px; }
+.assembly-glossary dd, .assembly-inline-glossary dd { color: var(--muted); font-size: 12px; line-height: 1.7; }
+.assembly-inline-glossary { padding: 23px; border: 1px solid var(--panel-border); border-radius: 12px; }
+@media (max-width: 1100px) { .assembly-dialog .assembly-main { padding: 28px; } .assembly-build-settings > span { width: 100%; } }
+@media (max-width: 760px) {
+  .assembly-dialog .assembly-header { padding: 13px; gap: 9px; flex-wrap: nowrap; }
+  .assembly-dialog .assembly-layout { display: flex; flex-direction: column; overflow: hidden; }
+  .assembly-dialog .assembly-sidebar.is-open { flex: 1; min-height: 0; overflow-y: auto; }
+  .assembly-dialog .assembly-sidebar.is-open + .assembly-main { display: none; }
+  .assembly-dialog .assembly-main { flex: 1; min-height: 0; padding: 23px 17px; }
+  .assembly-dialog .assembly-mobile-nav { flex-shrink: 0; }
+  .assembly-dialog .assembly-header-actions { gap: 10px; }
+  .assembly-close { padding: 8px; font-size: 11px !important; }
+  .assembly-build-settings { gap: 8px 13px; }
+  .assembly-build-settings label { flex-direction: column; align-items: flex-start; }
+  .assembly-glossary dl, .assembly-inline-glossary { grid-template-columns: 1fr; }
+  .assembly-media .assembly-image-button > img { height: 270px; }
+  .assembly-header-actions .btn-estop { padding: 6px; font-size: 10px; }
+}
+.assembly-local-video video { width: 100%; max-height: 520px; background: #171717; border-radius: 8px; display: block; }
+.assembly-local-video .assembly-clip-tabs { flex-wrap: wrap; }
+.assembly-edit-build { margin: -7px 0 18px; }
+.assembly-model-stage { height: 420px; position: relative; background: radial-gradient(ellipse at 50% 50%, #e9edf0, #cbd4dc); border-radius: 14px; overflow: hidden; }
+.assembly-model-stage canvas { touch-action: none; }
+.assembly-model-caption { position: absolute; left: 22px; top: 20px; z-index: 1; pointer-events: none; color: #495868; }
+.assembly-model-caption .assembly-eyebrow { color: #495868; }
+.assembly-model-caption p { font-size: 11px; margin-top: 6px; }
+.assembly-explode-control { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 15px; padding: 8px 15px; border-radius: 30px; background: #fff; box-shadow: 0 3px 20px #0001; }
+.assembly-explode-control button { white-space: nowrap; background: transparent; border: 0; color: #243746; font-size: 12px; }
+.assembly-explode-control input { width: 100px; accent-color: #177d91; vertical-align: middle; }
+.assembly-model-status { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); color: #243746; font-size: 13px; }
+.assembly-model-fallback { color: #243746; padding: 100px 50px; }
+.assembly-part-filters { display: flex; flex-wrap: wrap; gap: 7px; margin: 15px 0 24px; }
+.assembly-part-filters button { border: 1px solid var(--panel-border); background: var(--panel); color: var(--muted); padding: 7px 12px; border-radius: 25px; font-size: 11px; }
+.assembly-part-filters button[aria-pressed=true] { background: rgb(var(--accent-rgb)/.1); border-color: var(--accent); color: var(--accent); }
+.assembly-inventory { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin: 20px 0 32px; }
+.assembly-inventory > div { border: 1px solid var(--panel-border); border-radius: 10px; padding: 18px; }
+.assembly-inventory h4 { margin: 0 0 9px; color: var(--text-bright); font-size: 13px; }
+.assembly-inventory ul { margin: 0; padding-left: 15px; color: var(--muted); font-size: 12px; }
+.assembly-inventory li { margin-bottom: 7px; }
+.assembly-knot { padding: 24px; border: 1px solid var(--panel-border); border-radius: 12px; margin: 0 0 30px; }
+.assembly-knot-layout { display: grid; grid-template-columns: 1.3fr 1fr; align-items: center; gap: 28px; margin: 20px 0; }
+.assembly-knot-layout > img { width: 100%; border-radius: 10px; }
+.assembly-knot-layout p { font-size: 14px; line-height: 1.8; }
+.assembly-knot-frames { display: flex; gap: 5px; overflow-x: auto; padding: 4px; }
+.assembly-knot-frames button { flex: 1; min-width: 48px; padding: 3px; background: var(--panel); color: var(--muted); border: 1px solid var(--panel-border); border-radius: 5px; font-size: 10px; }
+.assembly-knot-frames button[aria-pressed=true] { border-color: var(--accent); color: var(--accent); }
+.assembly-knot-frames img { width: 100%; border-radius: 3px; display: block; }
+@media(max-width:1100px) { .assembly-inventory { grid-template-columns: repeat(2,minmax(0,1fr)); } .assembly-knot-layout { grid-template-columns: 1fr; } }
+@media(max-width:600px) { .assembly-model-stage { height: 340px; } .assembly-inventory { grid-template-columns: 1fr; } .assembly-knot { padding: 16px; } }
+.assembly-config-chips { margin: 0 0 26px; gap: 9px; }
+.assembly-config-chips label { display: inline-flex; }
+.assembly-config-chips select { appearance: none; cursor: pointer; color: var(--text); background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%23758187' stroke-width='1.4'/%3E%3C/svg%3E") no-repeat right 10px center; border: 1px solid var(--panel-border); border-radius: 5px; padding: 8px 30px 8px 12px; font: 11px var(--font); }
+.assembly-config-chips select:hover { border-color: var(--accent); }
+.assembly-intro-checks { display: grid; gap: 18px; }
+.assembly-cad-stage { border: 1px solid var(--panel-border); border-radius: 13px; overflow: hidden; background: radial-gradient(ellipse at 50% 30%, #edf0f2, #d2dbe2); color: #263944; }
+.assembly-cad-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 18px 22px; border-bottom: 1px solid #b8c5ce66; }
+.assembly-cad-toolbar .assembly-eyebrow { color: #526977; }
+.assembly-cad-toolbar p { color: #526977; font-size: 11px; margin: 5px 0 0; }
+.assembly-cad-toolbar button { white-space: nowrap; background: #f8fafb; color: #263944; border-color: #b8c5ce; }
+.assembly-cad-scroll { height: 490px; overflow: auto; scrollbar-width: thin; }
+.assembly-cad-canvas { position: relative; }
+.assembly-cad-canvas canvas { touch-action: none; }
+.assembly-cad-labels { position: absolute; inset: 0; pointer-events: none; animation: assembly-label-reveal .7s ease-out both; }
+.assembly-cad-labels button { position: absolute; pointer-events: auto; border: 0; background: transparent; color: #233e4d; padding: 5px 4px; display: flex; justify-content: center; align-items: baseline; gap: 7px; font-size: 10px; line-height: 1.35; transition: opacity .2s; }
+.assembly-cad-labels button span { max-width: 115px; }
+.assembly-cad-labels strong { font: 11px var(--font); color: #187c8a; white-space: nowrap; }
+.assembly-cad-labels button:hover span { text-decoration: underline; }
+.assembly-cad-labels button.is-muted { opacity: .45; }
+.assembly-cad-key { position: absolute; text-align: center; font-size: 11px; color: #536a77; pointer-events: none; }
+.assembly-cad-key span { font-size: 10px; }
+.assembly-cad-placeholder { height: 340px; display: grid; place-items: center; text-align: center; padding: 40px; font-size: 14px; }
+.assembly-cad-placeholder:has(.assembly-model-recovery) { height:auto; min-height:340px; }
+.assembly-model-recovery { max-width:720px; text-align:left; }
+.assembly-model-recovery h3 { margin:0 0 12px; }
+.assembly-model-recovery code { overflow-wrap:anywhere; font-size:12px; }
+.assembly-recovery-command { display:block; padding:12px; border:1px solid var(--panel-border); border-radius:6px; }
+.assembly-visual-inventory { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; margin: 20px 0 30px; }
+.assembly-part-tray { text-align: left; padding: 15px; border: 1px solid var(--panel-border); border-radius: 10px; background: var(--panel); color: var(--text); transition: border-color .2s, transform .2s; }
+.assembly-part-tray:hover:not(:disabled) { border-color: var(--accent); transform: translateY(-2px); }
+.assembly-part-tray h4 { margin: 0; font-size: 12px; font-weight: 600; }
+.assembly-part-tray > span { display: block; font-size: 10px; color: var(--dim); margin-top: 10px; }
+.assembly-tray-preview { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); grid-template-rows: repeat(2,52px); margin-top: 12px; background: #e3e9ed; border-radius: 6px; }
+.assembly-tray-preview img { width: 100%; height: 100%; object-fit: contain; }
+.assembly-parts-dialog { width: min(1000px,92vw); max-height: 85vh; padding: 0; border: 1px solid var(--panel-border-strong); border-radius: 13px; background: var(--bg); color: var(--text); box-shadow: 0 24px 100px #0005; }
+.assembly-parts-dialog::backdrop { background: #10242ecc; backdrop-filter: blur(3px); }
+.assembly-parts-dialog-header { position: sticky; top: 0; z-index: 1; padding: 24px; background: var(--bg); border-bottom: 1px solid var(--panel-border); }
+.assembly-parts-dialog-header h3 { margin: 7px 0 0; font-size: 24px; }
+.assembly-part-detail-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 18px; padding: 24px; }
+.assembly-part-detail-grid figure { margin: 0; padding: 12px; border: 1px solid var(--panel-border); border-radius: 8px; }
+.assembly-part-detail-grid img { width: 100%; background: #e3e9ed; border-radius: 5px; }
+.assembly-part-detail-grid figcaption { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; font-size: 12px; padding-top: 10px; }
+.assembly-part-detail-grid strong { color: var(--accent); white-space: nowrap; }
+.assembly-tendon-identities { padding: 0 24px 24px; }
+.assembly-tendon-identities p { font-size: 12px; color: var(--muted); }
+.assembly-tendon-identities ul { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; list-style: none; padding: 0; font-size: 12px; }
+.assembly-tendon-identities li span { color: var(--accent); margin-right: 10px; font: 10px var(--font); }
+@keyframes assembly-label-reveal { from { opacity: 0; } 55% { opacity: 0; } to { opacity: 1; } }
+@media(max-width:1150px) { .assembly-visual-inventory { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width:650px) { .assembly-cad-toolbar { padding: 13px; } .assembly-cad-toolbar .assembly-eyebrow { font-size: 8px; } .assembly-part-detail-grid { grid-template-columns: repeat(2,minmax(0,1fr)); padding: 16px; gap: 10px; } .assembly-parts-dialog-header { padding: 16px; } .assembly-parts-dialog-header h3 { font-size: 20px; } .assembly-tendon-identities ul { grid-template-columns: repeat(2,minmax(0,1fr)); } .assembly-visual-inventory + .assembly-row { align-items: start; } }
+@media(prefers-reduced-motion:reduce) { .assembly-cad-labels { animation: none; } }
+.assembly-parts-dialog { margin: auto; overflow: auto; }
+.assembly-part-detail-grid:has(> figure:only-child) { grid-template-columns: minmax(0,440px); justify-content: center; }
+
+.assembly-consumable-note { margin: 0; padding: 0 24px 24px; font-size: 13px; line-height: 1.7; }
+/* Assembly explorer and walkthrough media. */
+.assembly-area-stage { border: 1px solid var(--panel-border); border-radius: 14px; overflow: hidden; background: radial-gradient(ellipse at 45% 20%,#f0f3f4,#d5dfe4); color: #263c48; }
+.assembly-area-canvas { position: relative; }
+.assembly-area-canvas canvas { touch-action: none; }
+.assembly-area-overlays { position: absolute; inset: 0; transition: opacity .1s; }
+.assembly-area-outline { position: absolute; border: 1px solid #9eb4be55; border-radius: 12px; pointer-events: none; }
+.assembly-area-title { pointer-events: auto; display: flex; justify-content: space-between; align-items: center; width: 100%; background: transparent; border: 0; padding: 10px 14px; color: #344d5b; text-align: left; font-size: 14px !important; font-weight: 600 !important; }
+.assembly-area-title span { color: #57818b; font-size: 11px; }
+.assembly-area-icons { position: absolute; bottom: 7px; left: 8px; right: 8px; display: flex; justify-content: center; gap: 8px; pointer-events: auto; }
+.assembly-area-icons button { border: 1px solid #aabdc65c; background: #f7fafb9c; color: #405d6a; border-radius: 8px; padding: 3px 9px 5px; font-size: 9px; min-width: 50px; }
+.assembly-area-icons button:hover { background: #fff; border-color: #348391; }
+.assembly-area-icons svg { display: block; height: 25px; width: 37px; margin: auto; }
+.assembly-area-part-label { position: absolute; padding: 0; border: 0; background: transparent; color: #3f5a67; text-align: center; font-size: 8px !important; line-height: 1.2; }
+.assembly-area-part-label strong { white-space: nowrap; color: #267e89; }
+.assembly-area-slider { display: flex; align-items: center; gap: 16px; border-top: 1px solid #b5c4cc80; padding: 17px 24px; font-size: 12px; background: #eaf0f3; }
+.assembly-area-slider input { flex: 1; min-width: 30px; accent-color: #287f8a; }
+.assembly-area-slider output { width: 38px; font: 11px var(--font); text-align: right; }
+.assembly-bom { margin-top: 35px; }
+.assembly-bom h3 { margin-bottom: 3px; font-size: 24px; }
+.assembly-bom .assembly-muted { margin: 0; font-size: 12px; }
+.assembly-bom-search input { width: 100%; padding: 11px 13px; margin: 18px 0; border: 1px solid var(--panel-border); border-radius: 7px; background: var(--panel); color: var(--text); }
+.assembly-bom-table { max-height: 540px; overflow: auto; border-block: 1px solid var(--panel-border); scrollbar-width: thin; }
+.assembly-bom table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.assembly-bom th { position: sticky; top: 0; background: var(--bg); z-index: 1; text-align: left; padding: 13px 12px; color: var(--dim); font-weight: 500; }
+.assembly-bom td { border-top: 1px solid var(--panel-border); padding: 13px 12px; vertical-align: top; }
+.assembly-bom td:first-child { width: 56%; }
+.assembly-bom td small { display: block; font-size: 11px; color: var(--dim); max-width: 460px; margin-top: 6px; line-height: 1.65; }
+.assembly-bom td .assembly-text-button { text-align: left; font-size: inherit; }
+.assembly-bom td:nth-child(2) { white-space: nowrap; }
+.assembly-part-detail-grid > figure > svg { width: 100%; height: 160px; }
+.assembly-part-detail-grid p { font-size: 11px; color: var(--dim); line-height: 1.65; }
+.assembly-part-detail-grid figcaption { flex-wrap: wrap; }
+.assembly-media { padding: 0; border: 0; background: transparent; }
+.assembly-media .assembly-image-button { background: transparent; border-radius: 0; }
+.assembly-media .assembly-image-button > img { padding: 0; }
+.assembly-app img { mix-blend-mode: multiply; }
+.assembly-lightbox, .assembly-knot, .assembly-thumbnails button, .assembly-part-detail-grid img { background: var(--bg); }
+:root:not([data-theme='light']) .assembly-app img { mix-blend-mode: normal; }
+.assembly-check h3 { font-size: 18px; margin: 0 0 16px; }
+.assembly-anatomy { margin-bottom: 30px; }
+.assembly-anatomy > .assembly-row p { font-size: 13px; color: var(--muted); }
+.assembly-anatomy-map { display: grid; grid-template-columns: 1.5fr 1fr; align-items: center; gap: 24px; border-block: 1px solid var(--panel-border); padding-block: 20px; }
+.assembly-anatomy-map svg { width: 100%; max-height: 570px; }
+.assembly-anatomy-labels { display: flex; gap: 7px; flex-wrap: wrap; }
+.assembly-anatomy-labels button { border: 1px solid var(--panel-border); border-radius: 6px; padding: 6px 10px; background: var(--panel); color: var(--text); font-size: 12px; }
+.assembly-anatomy-labels button[aria-pressed=true], .assembly-clip-tabs button[aria-pressed=true] { border-color: var(--accent); background: rgb(var(--accent-rgb)/.1); color: var(--accent); }
+.assembly-anatomy-definition { min-height: 190px; margin-top: 24px; }
+.assembly-anatomy-definition h3 { font-size: 38px; color: var(--accent); margin: 10px 0; }
+.assembly-anatomy-definition p { font-size: 15px; }
+.assembly-anatomy-terms { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 32px; margin-top: 25px; }
+.assembly-anatomy-terms h4 { margin: 0; font-size: 14px; }
+.assembly-anatomy-terms p { font-size: 13px; color: var(--muted); }
+.assembly-motion-lesson { background: transparent; padding: 25px; }
+.assembly-motion-lesson h3 { font-size: 22px; font-weight: 500; margin: 5px 0; }
+.assembly-motion-lesson svg { max-width: 100%; margin: 20px 0; }
+.assembly-motion-lesson svg text { font-size: 12px; }
+.assembly-motion-lesson svg .assembly-motion-on-dark { fill: #f0f5f6; }
+.assembly-motion-phases { display: flex; gap: 8px; margin-top: 20px; }
+.assembly-motion-phases button { flex: 1; display: flex; align-items: center; gap: 10px; padding: 10px; background: transparent; border: 0; border-bottom: 2px solid var(--panel-border); color: var(--dim); text-align: left; font-size: 12px; }
+.assembly-motion-phases button[aria-pressed=true] { color: var(--accent); border-bottom-color: var(--accent); }
+.assembly-motion-phases span { display: grid; place-items: center; width: 24px; height: 24px; flex-shrink: 0; border: 1px solid currentColor; border-radius: 50%; }
+.assembly-motion-scrubber { display: flex; align-items: center; gap: 20px; color: var(--dim); font-size: 11px; }
+.assembly-motion-scrubber input { accent-color: var(--accent); flex: 1; min-width: 30px; }
+.assembly-motion-lesson .assembly-motion-cue { text-align: left; max-width: 780px; margin: 22px auto 12px; font-size: 14px; line-height: 1.8; min-height: 76px; }
+.assembly-motion-cue strong { color: var(--accent); }
+.assembly-motion-lesson > small { display: block; text-align: center; font-size: 11px; }
+@media(max-width:700px) { .assembly-area-scroll { overflow: auto; max-height: 720px; }.assembly-area-slider { gap: 9px; padding: 14px 12px; font-size: 10px; }.assembly-area-icons { gap: 5px; }.assembly-bom td,.assembly-bom th { padding: 10px 6px; font-size: 10px; }.assembly-bom td:nth-child(2) { white-space: normal; }.assembly-anatomy-map { grid-template-columns: 1fr; }.assembly-anatomy-definition { min-height: 0; }.assembly-anatomy-terms { grid-template-columns: 1fr; }.assembly-motion-phases { gap: 3px; }.assembly-motion-phases button { flex-direction: column; font-size: 10px; padding: 7px 3px; }.assembly-motion-lesson { padding: 14px; }.assembly-motion-scrubber span { display: none; } }
+
+.assembly-area-part-label { font-size: 9px !important; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.25; max-height: 24px; }
+.assembly-media .assembly-image-button > img { height: auto; max-height: 440px; object-fit: contain; }
+
+.assembly-part-detail-grid img { background: transparent; }
+
+/* Each operation keeps its text above independently enlargeable panels. */
+.assembly-content-grid { display:block; }
+.assembly-panel-gallery { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; margin-top:30px; }
+.assembly-panel-gallery figure { margin:0; min-width:0; }
+.assembly-panel-gallery img { width:100%; height:auto; max-height:560px; object-fit:contain; mix-blend-mode:multiply; }
+.assembly-panel-number { display:grid; place-items:center; width:30px; height:30px; border:1px solid var(--panel-border); border-radius:50%; font-family:monospace; }
+.assembly-panel-gallery .assembly-row { margin-bottom:12px; }
+.assembly-bom summary { display:flex; align-items:center; justify-content:space-between; cursor:pointer; gap:16px; }
+.assembly-bom summary h3 { margin:0; }
+.assembly-bom summary span { font-size:13px; }
+.assembly-bom[open] summary { margin-bottom:24px; }
+.assembly-bom[open] summary span { font-size:0; }
+.assembly-bom[open] summary span::after { content:'Collapse list'; font-size:13px; }
+.assembly-hand-label-render { height:560px; position:relative; min-width:0; }
+.assembly-render-direction { position:absolute; top:6px; left:0; right:0; text-align:center; font-size:12px; pointer-events:none; }
+.assembly-tendon-preparation { margin:30px 0; padding:24px; border:1px solid var(--panel-border); border-radius:16px; }
+.assembly-tendon-preparation svg { width:100%; color:var(--text); }
+.assembly-tendon-preparation text { fill:currentColor; font:18px sans-serif; }
+.assembly-knot-conventions { margin:30px 0; }
+.assembly-knot-conventions dl { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+.assembly-knot-conventions dt { font-weight:600; margin-bottom:10px; }
+.assembly-knot-conventions dd { margin:0; }
+.assembly-finger-movements { margin:30px 0; }
+.assembly-finger-movements>div { display:grid; grid-template-columns:repeat(2,1fr); gap:16px; }
+.assembly-finger-movements article { padding:18px; border:1px solid var(--panel-border); border-radius:12px; }
+@media(max-width:650px){.assembly-panel-gallery,.assembly-knot-conventions dl{grid-template-columns:1fr}.assembly-hand-label-render{height:470px}}
+.assembly-bom-thumbnail{width:62px;height:52px;object-fit:contain;vertical-align:middle;margin-right:12px;mix-blend-mode:multiply}
+.assembly-area-tendons{padding:0 28px 24px}.assembly-area-tendons>div{display:inline-block;width:48%;vertical-align:top}.assembly-area-tendons img{height:80px;width:140px;object-fit:contain}
+.assembly-panel-gallery .assembly-image-button{background:transparent;border-radius:0}
+[data-theme=dark] .assembly-panel-gallery img{mix-blend-mode:normal}
+.assembly-joint-motion{height:400px;overflow:hidden;margin:12px 0}
+.assembly-finger-movements>div{display:block}.assembly-finger-movements>.assembly-clip-tabs{display:flex;flex-wrap:wrap;margin-block:12px}.assembly-finger-movements>.assembly-row{display:flex}.assembly-finger-preview{height:370px}.assembly-work-checklist{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:650px){.assembly-work-checklist{grid-template-columns:1fr}}
+.assembly-knot-reinforcement{margin:25px auto;max-width:800px;color:var(--text)}.assembly-knot-reinforcement svg{width:100%}
+
+/* Compact overviews use the full instruction width; enlarged images keep their native detail. */
+.assembly-panel-gallery { grid-template-columns:repeat(var(--panel-columns,2),minmax(0,1fr)); gap:20px; width:100%; }
+.assembly-panel-gallery .assembly-image-button { width:100%; height:clamp(150px,20vw,280px); display:flex; align-items:center; justify-content:center; }
+.assembly-panel-gallery img { width:auto; height:auto; max-width:100%; max-height:100%; object-fit:contain; }
+.assembly-panel-gallery .assembly-row { margin-bottom:8px; }
+.assembly-panel-gallery .assembly-panel-number { width:24px; height:24px; font-size:12px; }
+.assembly-panel-gallery .assembly-text-button { font-size:11px; }
+@media(max-width:650px){.assembly-panel-gallery{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.assembly-panel-gallery .assembly-image-button{height:160px}}
+
+.assembly-knot-reinforcement svg{max-height:290px}.assembly-single-open{transform:translate(0,0);transition:transform 800ms}.assembly-single-tight{transform:translate(140px,89px) scale(.6,.42);transition:transform 800ms}.assembly-knot-reinforcement h3{font-size:20px}
+@media(prefers-reduced-motion:reduce){.assembly-single-open,.assembly-single-tight{transition:none}}
+
+.assembly-joint-and-routing{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;gap:24px;margin:20px 0}.assembly-joint-and-routing .assembly-joint-motion{height:550px;position:sticky;top:0}.assembly-routing-lesson{min-width:0}.assembly-routing-lesson h4{font-size:18px;margin:0 0 10px}.assembly-routing-lesson p{font-size:13px}.assembly-routing-lesson .assembly-clip-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:15px 0}.assembly-routing-lesson button span{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}.assembly-routing-lesson .assembly-clip-tabs button{font-size:11px;padding:6px}.assembly-routing-faces{display:grid;grid-template-columns:1fr 1fr;gap:12px}.assembly-routing-faces figure{margin:0;min-width:0}.assembly-routing-faces figcaption{font-size:11px;min-height:32px;margin-bottom:6px}.assembly-routing-faces svg{width:100%;height:190px;margin:0;background:transparent;border-radius:10px}.assembly-route-trace svg{width:100%;height:auto;max-height:210px;margin:14px 0}.assembly-route-flow{animation:assembly-route-flow 1.8s linear infinite}@keyframes assembly-route-flow{to{stroke-dashoffset:-72}}
+@media(max-width:1000px){.assembly-joint-and-routing{grid-template-columns:1fr}.assembly-joint-and-routing .assembly-joint-motion{height:350px;position:static}.assembly-routing-faces svg{height:220px}}
+@media(prefers-reduced-motion:reduce){.assembly-route-flow{animation:none}}
+
+.assembly-finger-movements>.assembly-movement-views.has-pair-reference{display:grid;grid-template-columns:1.3fr 1fr;gap:30px;align-items:center}.assembly-dp-reference{margin:0;min-width:0}.assembly-dp-reference figcaption{font-size:13px;margin-bottom:12px}.assembly-dp-reference svg{width:100%;max-height:290px;border-radius:10px}.assembly-dp-reference p{font-size:12px}.assembly-pull-key{display:flex!important;align-items:center;gap:10px;padding:12px 0;font-size:13px}.assembly-pull-key>span:first-child{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+@media(max-width:800px){.assembly-finger-movements>.assembly-movement-views.has-pair-reference{grid-template-columns:1fr}.assembly-pull-key{flex-wrap:wrap}}
+
+.assembly-instruction-sequence{display:flex;align-items:center;flex-wrap:wrap;gap:16px;margin-bottom:20px}.assembly-instruction-sequence>span{font-size:12px;color:var(--muted);margin-right:auto}.assembly-instruction-number{display:grid;place-items:center;width:24px;height:24px;flex-shrink:0;border:1px solid transparent;border-radius:50%;background:rgb(var(--accent-rgb)/.1);color:var(--accent);font-size:11px;cursor:pointer}.assembly-instructions li{transition:opacity 180ms,background 180ms}.assembly-instructions li.is-focused{background:rgb(var(--accent-rgb)/.06);border-radius:8px}.assembly-instructions li.is-unfocused,.assembly-panel-gallery figure.is-unfocused{opacity:.48}.assembly-panel-gallery figure.is-focused{outline:1px solid var(--accent);outline-offset:7px;border-radius:2px}.assembly-panel-gallery figure{transition:opacity 180ms}
+
+.assembly-joint-and-routing.assembly-joint-only{display:block}.assembly-joint-only .assembly-joint-motion{height:400px;position:static}.assembly-main>.assembly-routing-lesson{margin:30px 0;padding:24px;border:1px solid var(--panel-border);border-radius:15px}.assembly-main>.assembly-routing-lesson .assembly-routing-faces svg{height:260px}
+
+.assembly-wrist-routing{margin:30px 0;padding:24px;border:1px solid var(--panel-border);border-radius:15px}.assembly-wrist-routing svg{width:100%;max-height:430px;margin:20px 0;mix-blend-mode:multiply}.assembly-wrist-routing .assembly-clip-tabs{display:flex;flex-wrap:wrap;gap:10px}.assembly-wrist-routing p{font-size:13px}[data-theme=dark] .assembly-wrist-routing svg{mix-blend-mode:normal}
+
+.assembly-flashing-walkthrough{border:1px solid var(--panel-border);border-radius:14px;padding:24px;margin:24px 0}.assembly-flashing-walkthrough .assembly-clip-tabs{display:flex;flex-wrap:wrap;gap:8px}.assembly-flash-images{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:24px;min-height:160px;margin:24px 0}.assembly-flash-images img{max-width:100%;max-height:350px;object-fit:contain}.assembly-flash-images img:not(:only-child){max-width:46%}.assembly-after-movement{margin:30px 0}.assembly-area-title{padding:6px 10px}.assembly-area-icons{gap:5px}.assembly-area-icons svg{height:20px}
+.assembly-drive-explorer,.assembly-motor-chain{border:1px solid var(--panel-border);border-radius:14px;padding:24px;margin:28px 0}.assembly-joint-selectors{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:18px 0}.assembly-joint-selectors button,.assembly-motor-ids button{padding:9px 5px;border:1px solid var(--panel-border);background:transparent;border-radius:6px;color:var(--text);font-size:12px}.assembly-joint-selectors [aria-pressed=true],.assembly-motor-ids [aria-pressed=true]{background:rgb(var(--accent-rgb)/.1);border-color:var(--accent);color:var(--accent)}.assembly-drive-layout{display:grid;grid-template-columns:1.5fr 1fr;gap:24px}.assembly-drive-canvas{height:510px}.assembly-drive-checks .assembly-clip-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:15px 0}.assembly-drive-checks img{max-height:220px;width:100%;object-fit:contain;mix-blend-mode:multiply}.assembly-route-check{display:flex;align-items:baseline;gap:10px;margin:14px 0;font-size:13px;line-height:1.6;cursor:pointer}.assembly-cad-callout{white-space:nowrap;background:var(--bg);border:1px solid var(--accent);border-radius:5px;padding:3px 7px;font-size:11px;pointer-events:none}.assembly-motor-chain-canvas{height:430px}.assembly-motor-ids{display:flex;flex-wrap:wrap;gap:5px;margin:16px 0}.assembly-motor-ids button{min-width:34px}.assembly-motor-chain-reference img{max-width:100%;max-height:340px;object-fit:contain}.assembly-drive-explorer small{display:block;line-height:1.6}
+@media(max-width:850px){.assembly-drive-layout{grid-template-columns:1fr}.assembly-drive-canvas{height:400px}.assembly-joint-selectors{grid-template-columns:repeat(3,minmax(0,1fr))}.assembly-drive-explorer,.assembly-motor-chain{padding:14px}.assembly-motor-chain-canvas{height:360px}}
+.assembly-joint-and-routing .assembly-joint-motion{height:450px}.assembly-joint-only .assembly-joint-motion{height:420px}.assembly-routing-faces svg{height:170px}.assembly-motion-lesson .assembly-motion-cue{min-height:48px}
+.assembly-flash-images .assembly-image-button{max-width:100%;display:flex;justify-content:center;align-items:center;flex:1}.assembly-flash-images img:not(:only-child){max-width:100%}.assembly-flash-images img{max-height:350px}.assembly-parts-legend{font-size:12px;line-height:1.8;color:var(--muted);margin:12px 0}.assembly-motor-chain>.assembly-clip-tabs{display:flex;gap:8px;margin:15px 0}
+.assembly-wrist-channel-reference{display:block;max-height:290px;width:100%;margin:16px auto;mix-blend-mode:multiply}
+
+.assembly-flashing-choice { margin:28px 0; padding:22px; border:1px solid var(--panel-border); border-radius:12px; }
+.assembly-flashing-choice p { font-size:13px; line-height:1.7; color:var(--muted); margin:10px 0 16px; }
+.assembly-panel-caption { text-align:center; margin-top:10px; font-size:12px; color:var(--muted); }
+
+.assembly-motor-check {margin:28px 0;padding:28px;border:1px solid var(--panel-border);border-radius:18px;background:var(--panel)}
+.assembly-motor-check h3 {margin:8px 0}
+.assembly-motor-check-selectors {display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px;margin:24px 0}
+.assembly-motor-check-selectors button {display:flex;align-items:center;gap:8px;text-align:left;border:1px solid var(--panel-border);border-radius:8px;padding:9px;background:transparent;color:inherit;font-size:12px}
+.assembly-motor-check-selectors button span {font-family:'Space Mono',monospace;color:var(--accent)}
+.assembly-motor-check-selectors button[aria-pressed=true] {background:#dcebed;border-color:#37838b;color:#173d42}
+.assembly-motor-check-views {display:grid;grid-template-columns:1fr 1.5fr;gap:20px}
+.assembly-motor-check-views>div {min-width:0}
+.assembly-motor-check-views h4 {text-align:center;font-size:15px;font-weight:500;margin:8px}
+.assembly-motor-check-views p {font-size:13px;text-align:center;color:var(--dim)}
+.assembly-motor-check-canvas {height:440px;overflow:hidden;border-radius:14px;background:radial-gradient(ellipse at center,#e2e7e8 0%,transparent 70%)}
+.assembly-motor-check .assembly-route-check {margin:22px 0 12px}
+@media(max-width:650px){.assembly-motor-check{padding:16px}.assembly-motor-check-views{grid-template-columns:1fr;gap:0}.assembly-motor-check-canvas.motor{height:270px}.assembly-motor-check-canvas.hand{height:390px}.assembly-motor-check-selectors{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+.assembly-cad-detail {margin:28px 0;padding:24px;border:1px solid var(--panel-border);border-radius:16px;background:var(--panel)}
+.assembly-cad-detail h3 {margin:8px 0}
+.assembly-cad-detail-canvas {height:420px;overflow:hidden;background:radial-gradient(ellipse at center,rgb(120 145 150 / .09),transparent 70%)}
+.assembly-cad-detail .assembly-clip-tabs {margin:18px 0}
+@media(max-width:650px){.assembly-cad-detail{padding:16px}.assembly-cad-detail-canvas{height:350px}}
+
+.assembly-joint-lesson {margin:28px 0;padding:24px;border:1px solid var(--panel-border);border-radius:16px;background:var(--panel)}
+.assembly-joint-lesson-layout {display:grid;grid-template-columns:1.2fr 1fr;gap:24px;align-items:center}
+.assembly-joint-lesson-canvas {height:420px;min-width:0}
+@media(max-width:650px){.assembly-joint-lesson{padding:16px}.assembly-joint-lesson-layout{grid-template-columns:1fr}.assembly-joint-lesson-canvas{height:360px}}
+
+.assembly-wrist-outlets{margin:22px 0}.assembly-wrist-outlets figcaption{text-align:center;font-size:13px}.assembly-wrist-outlet-canvas{height:410px;position:relative;background:radial-gradient(ellipse,rgb(120 145 150 / .09),transparent 70%)}
+.assembly-outlet-label{font:9px var(--font);color:#163e45;pointer-events:none;white-space:nowrap}.assembly-outlet-label.active{font-weight:bold;color:#fff;background:#277e8e;border-radius:4px;padding:1px 3px}
+.assembly-outlet-palm,.assembly-outlet-back{position:absolute;left:50%;transform:translateX(-50%);font-size:12px;color:var(--dim);pointer-events:none}.assembly-outlet-palm{top:0}.assembly-outlet-back{bottom:0}
+.assembly-joint-lesson .assembly-motion-scrubber {display:flex;flex-direction:column;align-items:stretch;gap:10px;margin-top:20px}
+.assembly-joint-lesson .assembly-motion-scrubber input {width:100%;flex:auto}
+.assembly-outlet-label {font-size:8px;letter-spacing:-.04em}
+
+.assembly-joint-lesson .assembly-clip-tabs button span{width:8px;height:8px;display:inline-block;border-radius:50%;margin-right:6px}
+.assembly-outlet-face{font-size:12px;color:var(--dim);white-space:nowrap;pointer-events:none}
+
+.assembly-outlet-label.active{font-size:12px;min-width:20px;line-height:20px;letter-spacing:0}
+.assembly-outlet-dialog{width:min(900px,94vw)}
+.assembly-outlet-dialog .assembly-wrist-outlet-canvas{height:min(720px,75vh)}
+.assembly-outlet-dialog .assembly-outlet-label{font-size:11px;letter-spacing:0}
+
+.assembly-joint-group{display:flex;flex-direction:column;gap:6px}.assembly-joint-group h4{margin:0 0 5px;text-align:center;font-size:13px;font-weight:500}.assembly-drive-controls{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px 20px;border-top:1px solid var(--panel-border);padding:18px 0 0}.assembly-drive-controls .assembly-clip-tabs{margin:0}.assembly-drive-controls p{grid-column:1/-1;margin:0 0 12px}.assembly-drive-layout{grid-template-columns:1fr 1fr;align-items:start}.assembly-drive-canvas,.assembly-drive-layout .assembly-wrist-outlet-canvas{height:460px}.assembly-drive-layout .assembly-wrist-outlets{margin:0;text-align:center}.assembly-drive-checks{display:flex;gap:20px;align-items:center;justify-content:space-between;border-top:1px solid var(--panel-border);margin-top:18px}.assembly-drive-checks>.assembly-text-button{flex-shrink:0}.assembly-drive-explorer .assembly-joint-selectors{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media(max-width:700px){.assembly-drive-layout{grid-template-columns:1fr}.assembly-drive-canvas,.assembly-drive-layout .assembly-wrist-outlet-canvas{height:350px}.assembly-drive-controls{grid-template-columns:1fr}.assembly-drive-controls p{grid-column:auto}.assembly-drive-checks{align-items:flex-start;flex-direction:column;gap:0}.assembly-joint-group h4{font-size:11px}}
+
+.assembly-drive-layout .assembly-outlet-dialog .assembly-wrist-outlet-canvas{height:min(720px,72vh)}
+.assembly-drive-layout>*,.assembly-drive-canvas,.assembly-wrist-outlet-canvas{min-width:0}
+@media(max-width:700px){.assembly-drive-layout{grid-template-columns:minmax(0,1fr)}}
+
+.assembly-app img[src*="/assembly/renders/"], .assembly-app img[src*="/assembly/parts/"] { mix-blend-mode:normal; }
+
+.assembly-route-dialog svg { display:block; width:100%; height:75vh; max-width:100%; }
+.assembly-wrist-routing .assembly-route-dialog svg { max-height:75vh; }
+
+/* Muted mint separates white cord and liners from the illustration surface. */
+.assembly-app { --assembly-image-bg:#b8cebf; --assembly-label:#24533f; }
+.assembly-app .assembly-image-button,
+.assembly-app .assembly-panel-gallery .assembly-image-button,
+.assembly-app .assembly-lightbox[data-image-kind=cad],
+.assembly-app .assembly-route-dialog,
+.assembly-app .assembly-cad-detail-canvas,
+.assembly-app .assembly-joint-motion,
+.assembly-app .assembly-finger-preview { background:var(--assembly-image-bg); color:var(--assembly-label); border-radius:10px; }
+.assembly-app .assembly-image-button img,
+.assembly-app .assembly-lightbox img { mix-blend-mode:normal; }
+.assembly-app .assembly-panel-gallery .assembly-comparison img { width:100%; max-height:73vh; object-fit:contain; }
+.assembly-app .assembly-comparison[data-image-kind=photo],
+.assembly-app .assembly-flash-images .assembly-image-button { background:#f7f8f7; color:#203e30; }
+.assembly-app .assembly-image-navigation { margin-top:18px; }
+.assembly-flash-images figure { margin:0; min-width:0; flex:1; }
+.assembly-flash-images figcaption { margin-top:10px; font-size:13px; line-height:1.5; color:var(--muted); }
+.assembly-flash-images.is-screens { display:grid; grid-template-columns:minmax(0,1fr); }
+.assembly-flash-images.is-screens img { max-height:620px; }
+.assembly-flash-images.is-photos figure { flex-basis:240px; }
+.assembly-flash-images.is-photos img { max-height:440px; }
+.assembly-panel-gallery figure[data-wide] { grid-column:1/-1; }
+.assembly-panel-gallery figure[data-wide] .assembly-image-button { height:auto; }
+.assembly-panel-gallery figure[data-wide] img { max-height:620px; }
+.assembly-app .assembly-comparison>.assembly-row { flex-wrap:wrap; }
+.assembly-finger-outlets { margin:0; min-width:0; }
+.assembly-finger-outlets figcaption { font-size:16px; color:var(--assembly-label); }
+.assembly-finger-outlet-canvas { height:330px; background:var(--assembly-image-bg); border-radius:10px; }
+.assembly-finger-outlets p { font-size:14px; }
+.assembly-outlet-name { display:block; white-space:nowrap; background:#edf5eff0; color:#24533f; border:1px solid #648571; border-radius:6px; padding:4px 9px; font-size:15px; pointer-events:none; }
+.assembly-app .assembly-model-comparison { background:var(--assembly-image-bg); color:var(--assembly-label); }
+.assembly-app .assembly-model-comparison>img { max-height:72vh; width:100%; object-fit:contain; }
+.assembly-app .assembly-enlarged-model .assembly-joint-motion { height:70vh; }
+.assembly-app .assembly-live-model .assembly-motor-check-canvas { background:var(--assembly-image-bg); }
+.assembly-live-test { margin-top:24px; }
+.assembly-live-test .assembly-motion-scrubber { margin:22px 0 12px; }
+
+.assembly-routing-inspection { margin:28px 0; padding:24px; border:1px solid var(--panel-border); border-radius:14px; }
+.assembly-routing-inspection h3 { margin:0 0 16px; }
+.assembly-routing-inspection .assembly-clip-tabs { flex-wrap:wrap; }
+.assembly-routing-inspection .assembly-joint-motion { height:460px; }
+.assembly-routing-inspection > p { font-size:14px; line-height:1.8; }
+.assembly-crossing-examples { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; margin-top:24px; }
+.assembly-crossing-examples figure { margin:0; background:var(--assembly-image-bg); color:#24533f; border-radius:10px; padding:12px; }
+.assembly-crossing-examples svg { width:100%; height:140px; }
+.assembly-crossing-examples figcaption { display:grid; gap:8px; text-align:center; font-size:13px; line-height:1.6; }
+@media(max-width:600px) { .assembly-routing-inspection { padding:14px; }.assembly-crossing-examples { gap:8px; }.assembly-crossing-examples figure { padding:8px; }.assembly-crossing-examples svg { height:100px; }.assembly-crossing-examples figcaption { font-size:11px; } }

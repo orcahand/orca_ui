@@ -1,0 +1,22 @@
+{
+  "base-right": {
+    "stepSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "jointReference": "assembly/movement/right/hand.urdf",
+    "jointReferenceSha256": "6f6df9880a41018b821c09b09500995f8a7ed9f1a146e68a9c279b1acd04a804"
+  },
+  "base-left": {
+    "stepSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "jointReference": "assembly/movement/left/hand.urdf",
+    "jointReferenceSha256": "5cc0e26a61fd337278e06212102935affa2fea955585ebcdaecac792c2a39314"
+  },
+  "touch-right": {
+    "stepSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
+    "jointReference": "assembly/movement/right/hand.urdf",
+    "jointReferenceSha256": "6f6df9880a41018b821c09b09500995f8a7ed9f1a146e68a9c279b1acd04a804"
+  },
+  "touch-left": {
+    "stepSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
+    "jointReference": "assembly/movement/left/hand.urdf",
+    "jointReferenceSha256": "5cc0e26a61fd337278e06212102935affa2fea955585ebcdaecac792c2a39314"
+  }
+}

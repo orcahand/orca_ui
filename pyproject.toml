@@ -56,7 +56,11 @@ build-backend = "hatchling.build"
 # work without node. Keep it in artifacts anyway so wheels still ship it even
 # if it is ever re-gitignored. Set at build level: uv builds the wheel from
 # the sdist, so both targets need it.
-artifacts = ["/orca_ui/webui/"]
+artifacts = [
+    "/orca_ui/webui/",
+    "!/orca_ui/webui/assembly/parts/*/assembly.glb",
+    "!/orca_ui/webui/assembly/parts/*/.assembly-model.json",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["orca_ui"]

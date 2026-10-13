@@ -4,6 +4,7 @@
 // Cross-tab control of a running operation lives in the TransportBar; these
 // cards start operations and mirror their state in place.
 
+import { AssemblyCard } from '../assembly/AssemblyCard'
 import { CalibrateCard } from '../setup/CalibrateCard'
 import { FullSetupCard } from '../setup/FullSetupCard'
 import { OperationLogPane } from '../setup/OperationLogPane'
@@ -13,6 +14,7 @@ import { TensionCard } from '../setup/TensionCard'
 export function SetupView() {
   return (
     <>
+      <AssemblyCard />
       <SetupStatus />
       <FullSetupCard />
       <div className="setup-section">

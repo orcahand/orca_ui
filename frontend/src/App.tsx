@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { api } from './api/rest'
 import { startStreamClient } from './api/streamClient'
+import { AssemblyCard } from './components/assembly/AssemblyCard'
 import { BootHero } from './components/BootHero'
 import { ErrorBanner } from './components/common/ErrorBanner'
 import { CalibrationBanner } from './components/common/CalibrationBanner'
@@ -38,7 +39,9 @@ export default function App() {
       <AppHeader />
       <TransportBar />
       <ErrorBanner />
-      {booting ? (
+      {booting && view === 'setup' ? (
+        <AssemblyCard />
+      ) : booting ? (
         // Some tabs stay reachable while the backend is up but no hand
         // session exists: Teleop (test a camera/glove against the 3D ghost),
         // Motors (chain configuration happens at ASSEMBLY time, when there
