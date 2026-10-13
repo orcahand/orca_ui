@@ -83,6 +83,18 @@ export function GuidedTensionDialog({
     : null
   const [sentFor, setSentFor] = useState<string | null>(null)
   const [confirmRestart, setConfirmRestart] = useState(false)
+  // Which round last had a range check: a run resumed with every joint already
+  // passed opens straight on the score, where Finish alone would be a dead end.
+  const [checkedRound, setCheckedRound] = useState<number | null>(null)
+  useEffect(() => {
+    if (extra?.step === 'range') setCheckedRound(extra.round)
+  }, [extra?.step, extra?.round])
+  const recheck =
+    extra?.step === 'score' && checkedRound !== extra.round
+      ? (extra.stages ?? [])
+          .filter((st) => awaiting?.options.includes(`${GOTO}${st.key}`))
+          .map((st) => ({ title: st.title, option: `${GOTO}${st.key}` }))
+      : []
 
   // Stop this run, then start a fresh one with the same settings and no saved
   // progress: resume=false makes the backend drop the scores it kept.
@@ -273,6 +285,8 @@ export function GuidedTensionDialog({
               step={step}
               preview={preview}
               passFraction={passFraction}
+              recheck={recheck}
+              onRecheck={sent ? undefined : send}
             />
             {awaiting && (
               <div className="gt-actions">
@@ -311,12 +325,16 @@ function StepContent({
   step,
   preview,
   passFraction,
+  recheck,
+  onRecheck,
 }: {
   operation: OperationSnapshot
   extra: GuidedTensionExtra | null
   step: TensionStep | null
   preview: ReactNode
   passFraction: number
+  recheck: { title: string; option: string }[]
+  onRecheck?: (option: string) => void
 }) {
   if (operation.state === 'error') {
     return (
@@ -405,6 +423,26 @@ function StepContent({
               </p>
             </div>
           </div>
+          {recheck.length > 0 && (
+            <div className="flow-info warn">
+              <div>
+                Nothing was checked this round: every joint passed in an earlier run. Check a
+                finger again, or Finish to keep those scores.
+              </div>
+              <div className="gt-actions" style={{ marginTop: 6 }}>
+                {recheck.map((r) => (
+                  <button
+                    key={r.option}
+                    className="btn btn-secondary"
+                    disabled={!onRecheck}
+                    onClick={onRecheck ? () => onRecheck(r.option) : undefined}
+                  >
+                    Check {r.title.toLowerCase()} again
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <MotorGrid motors={motors} passFraction={passFraction} />
           <ExcludedNote excluded={extra.excluded} />
         </div>

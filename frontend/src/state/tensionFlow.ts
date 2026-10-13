@@ -85,7 +85,7 @@ export const useTensionFlow = create<TensionFlowState>((set) => ({
     set({ offsetDeg })
   },
   holdOpen: false,
-  openHold: () => set({ holdOpen: true, dismissed: null }),
+  openHold: () => set({ holdOpen: true }),
   closeHold: () => set({ holdOpen: false }),
   wind: false,
   setWind: (wind) => set({ wind }),
