@@ -939,13 +939,9 @@ header h1 {
   text-align: center;
 }
 
-.boot-wordmark {
-  font-size: 48px;
-  font-weight: 700;
-  color: var(--text-bright);
-  letter-spacing: 12px;
-  /* Re-center: letter-spacing pads the right edge of the last glyph. */
-  padding-left: 12px;
+.boot-wordmark.brand-logo {
+  width: 240px;
+  height: 53px;
 }
 
 .boot-subtitle {

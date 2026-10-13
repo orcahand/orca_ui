@@ -63,7 +63,7 @@ export function BootHero() {
 
   return (
     <div className="boot-hero">
-      <div className="boot-wordmark">◈ ORCA</div>
+      <div className="boot-wordmark brand-logo" role="img" aria-label="ORCA" />
       <div className="boot-subtitle">HAND CONTROL CONSOLE</div>
       <div className={`boot-status ${wsConnected ? '' : 'offline'}`}>
         {statusLine}
