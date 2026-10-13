@@ -1,41 +1,55 @@
 # ORCA Hand Console
 
-> ## ⚠️ New version — run `uv sync`
+> ## ⚠️ For current users, New version — run `uv sync`
 >
 > ```bash
 > git pull
 > uv sync
 > ```
 >
-> This release needs `orca_core` 0.5.0. `uv sync` is what installs it. Without
+> This release needs `orca_core` 0.6.0. running uv sync will update the orca_core packaged with your orca_ui. Without
 > it the console will not start.
 
-Web interface for the [ORCA Hand](https://www.orcahand.com): live sensor
-visualization (tactile taxels + joint encoders), motor control, a 3D hand
-view, pose/trajectory playback, and the hand's lifecycle operations
-(tensioning, calibration, guided setup). Uses
+## Welcome to ORCA UI!
+Orca Ui is the web based user-interface for the [ORCA Hand](https://www.orcahand.com), it offers: 
+ 1. Helpful and guided/automated setup and maintenance procedures for you ORCA Hand
+ 2. Pose and trajectory capture, visualization, and playback.
+ 3. Detailed tunable parameters for each joint, study how each affects your trajectory!
+ 4. Live sensor and 3D hand visualization.
+ 5. Coming soon, simple data collection interface, select exactly the data you need and where to write it to.
+
+Uses
 [orca_core](https://github.com/orcahand/orca_core) for all hardware
 communication.
 
 The UI adapts to the hand described by the config: tactile-only hands get the
 taxel/force views, joint-sensing hands get encoder gauges and the closed-loop
-control panel, full hands get everything. Hardware is auto-detected and
-connected on startup — no connect button.
+control panel, full hands support everything. 
 
-## Installation
+To get started with Orca UI, follow these steps:
 
-This project uses [uv](https://docs.astral.sh/uv/).
+**Pre-installation steps**
 
+1. **Git clone the orca_ui repository**:
+   ```
+   #use any preferred method, ssh clone shown here
+   git clone git@github.com:orcahand/orca_ui.git
+    ```
+
+2. **Install uv (found at: https://docs.astral.sh/uv/getting-started/)**
+
+**Installing the repository**
+
+1. **Path into your cloned orca_ui repository and uv sync**
 ```bash
+cd orca_ui
 uv sync
 ```
 
-That installs the published `orca_core` from PyPI, so a plain clone works with
-no sibling checkout. The built frontend is committed to git
-(`orca_ui/webui/`), so it also runs without node.
+Amongst other setup procedures uv sync installs the latest published `orca_core` from PyPI, this allows you to utilize the ui WITHOUT using or affecting your local orca repository.
 
-Working on the console itself — running from source, rebuilding the frontend,
-or developing against an unreleased `orca_core` — is covered in
+2. IF you wish to run the ui from your local orca_core, rebuild the frontend,
+or developing against an unreleased `orca_core` make sure to consult
 [DEVELOPMENT.md](DEVELOPMENT.md). Enable the hooks once per clone if you will
 be committing:
 
