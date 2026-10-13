@@ -92,7 +92,13 @@ export function TensionStep({ state }: { state: StepState }) {
   const chip = progress ? (
     <ProgressChip progress={progress} />
   ) : last ? (
-    shortDate(last.completed_at)
+    <span
+      title={`Last tensioned ${new Date(last.completed_at).toLocaleString()} (${
+        last.mode === 'hold' ? 'hold and ratchet' : `guided, ${last.rounds ?? '?'} round${last.rounds === 1 ? '' : 's'}`
+      })`}
+    >
+      {shortDate(last.completed_at)}
+    </span>
   ) : undefined
 
   const settings = (

@@ -39,3 +39,21 @@ def test_the_exclusion_list_rides_along_with_every_score():
     presenter.progress({"event": "spread", "round": 1, "motors": [], "passed": 0, "scored": 0,
                         "fraction": 0.0, "excluded": excluded})
     assert ctx.extra["excluded"] == excluded
+
+
+def test_rounds_count_on_from_the_saved_progress():
+    """A run that resumes after two scored rounds opens on round 3; only a
+    restart (no saved progress) begins at round 1."""
+    ctx = _Ctx()
+    presenter = _Presenter(ctx, {})
+    presenter.progress({"event": "resumed", "best": {"index_mcp": 0.9}, "rounds": 2})
+    presenter.progress({"event": "step", "step": "pose", "round": 1})
+    assert ctx.extra["round"] == 3
+    presenter.progress({"event": "score", "round": 1, "motors": [], "passed": 1, "scored": 1,
+                        "fraction": 1.0})
+    assert ctx.extra["history"][-1]["round"] == 3
+    assert ctx.lines[-1].startswith("round 3:")
+
+    fresh = _Ctx()
+    _Presenter(fresh, {}).progress({"event": "step", "step": "pose", "round": 1})
+    assert fresh.extra["round"] == 1

@@ -20,12 +20,21 @@ export function TensionDialogs() {
   const tension =
     operation?.kind === 'guided_tension' || operation?.kind === 'tension' ? operation : null
   const active = tension !== null && isOperationActive(tension)
+  // Activating from the fresh hold dialog starts a run; from then on the run
+  // is what is shown, and its finished pane stays readable until closed.
+  useEffect(() => {
+    if (active && holdOpen) closeHold()
+  }, [active, holdOpen, closeHold])
   useEffect(() => {
     if (active) setWatched(tension.run_id)
   }, [active, tension?.run_id])
 
+  // A finished run stays readable until closed; asking for the hold dialog
+  // again means a new run, so a finished one must not come back in its place.
   const shown =
-    tension && tension.run_id !== dismissed && (active || tension.run_id === watched)
+    tension &&
+    tension.run_id !== dismissed &&
+    (active || (tension.run_id === watched && !holdOpen))
       ? tension
       : null
   const close = () => {
