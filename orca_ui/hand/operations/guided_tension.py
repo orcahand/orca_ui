@@ -135,6 +135,7 @@ class _Presenter:
                              "stages": hand_ops.range_stages(), **currents}
         self._lock = threading.Lock()
         self._last_publish = 0.0
+        self._rounds_before = 0
 
     @property
     def step(self) -> str:
@@ -152,13 +153,18 @@ class _Presenter:
         self._last_publish = now
         self._ctx.set_extra(dict(self._extra))
 
+    def _round(self, run_round: int) -> int:
+        """The routine numbers rounds per run; the operator counts across resumes."""
+        return int(run_round) + self._rounds_before
+
     def progress(self, event: dict) -> None:
         kind = event.get("event")
         with self._lock:
             if kind == "step":
-                if event["round"] != self._extra["round"]:
+                round_no = self._round(event["round"])
+                if round_no != self._extra["round"]:
                     self._extra.update(motors=[], passed=0, scored=0, fraction=0.0)
-                self._extra.update(step=event["step"], round=event["round"])
+                self._extra.update(step=event["step"], round=round_no)
                 if "stage" in event:
                     self._extra.update({k: event[k] for k in ("stage", "stage_index", "stage_count")})
                 if "absent_joints" in event:
@@ -173,15 +179,17 @@ class _Presenter:
                 if "excluded" in event:
                     self._extra["excluded"] = list(event["excluded"])
                 if kind == "score":
+                    round_no = self._round(event["round"])
                     self._extra["history"] = self._extra["history"] + [
-                        {k: event[k] for k in ("round", "passed", "scored", "fraction")}]
-                    self._ctx.log(f"round {event['round']}: {event['passed']}/{event['scored']} "
+                        {"round": round_no, **{k: event[k] for k in ("passed", "scored", "fraction")}}]
+                    self._ctx.log(f"round {round_no}: {event['passed']}/{event['scored']} "
                                   f"motors reached their travel")
                 self._publish(force=kind == "score")
             elif kind == "pulled":
                 self._extra["pulled_deg"] = event["total_deg"]
                 self._publish()
             elif kind == "resumed":
+                self._rounds_before = int(event["rounds"])
                 self._extra["resumed"] = {"rounds": event["rounds"], "updated_at": event.get("updated_at"),
                                           "joints": len(event["best"])}
                 self._ctx.log(f"resumed saved progress: {len(event['best'])} joints scored "
@@ -194,7 +202,7 @@ class _Presenter:
         action = prompt["action"]
         with self._lock:
             self._publish()
-        self._ctx.set_phase(action, detail=f"round {prompt.get('round', 1)}")
+        self._ctx.set_phase(action, detail=f"round {self._round(prompt.get('round', 1))}")
         if self._on_prompt is not None:
             self._on_prompt()
         return self._ctx.wait_input(PROMPTS[action], list(prompt["options"]))
