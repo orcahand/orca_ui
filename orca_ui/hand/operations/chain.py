@@ -184,10 +184,16 @@ def _progress_mapper(ctx: OpContext, grid: _ChainGrid, mode: str):
                     f"while ID {event['target_id']} is programmed")
         elif kind == "still_waiting":
             # The poll is unbounded by design; this is what shows it is alive.
+            checked = "; ".join(event.get("checked") or ["the factory defaults"])
+            hint = (" — a motor at an unusual ID and baud? stop and use the "
+                    "chain scan" if event.get("escalated") else "")
             ctx.set_detail(f"still scanning for a factory-default "
                            f"{event['expected_model']} → ID {event['target_id']} "
-                           f"({event['elapsed_s']} s) — nothing at the factory "
-                           "defaults, nothing else on the bus to take")
+                           f"({event['elapsed_s']} s); checked {checked}{hint}")
+        elif kind == "survey_progress":
+            found = ", ".join(f"ID {m['id']} {m['model_name']}"
+                              for m in event["motors"]) or "nothing"
+            ctx.log(f"survey {event['motor_type']} @ {event['baudrate']:,} bps: {found}")
         elif kind == "half_programmed_motor_adopted":
             ctx.log(f"found a motor at the default ID already at the target "
                     f"baud (an interrupted run) — finishing it as ID "
