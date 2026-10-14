@@ -172,3 +172,30 @@ def test_discovered_ports_are_pinned_into_the_hand_before_connect(env, monkeypat
     _connect_with_motors(settings, None, declared, presence)
     assert built and built[0].config.port == "/dev/motor"
     assert built[0].config.sensor_port == "/dev/oh"
+
+
+def test_a_sensor_that_failed_on_its_port_is_refused_not_retried(env):
+    """orca_core rolls the motor bus back when the sensor link fails, so the
+    touch tier reports plain failure. The sensor's port is still there, which
+    is exactly what the upgrade probe would find again: unless the session
+    records the refusal, the console reconnects on it, fails the same way,
+    and loops forever. That loop is what this guards against."""
+    settings, declared, presence, install = env
+    install({(True, True): "raise", (True, False): "raise",
+             (False, True): "fail"})
+    session = _connect_with_motors(settings, None, declared, presence)
+    assert session.tier == "motors"
+    assert set(session.refused) == {"encoders", "tactile"}
+
+
+def test_a_sensor_tier_failing_without_its_port_refuses_nothing(env):
+    """No port, no device to refuse: a later probe finding the port is news."""
+    from orca_ui.hand.detection import HardwarePresence, SensingPorts
+
+    settings, declared, _presence, install = env
+    presence = HardwarePresence(motor_port="/dev/motor",
+                                sensing=SensingPorts(tactile=None, encoder=None))
+    install({(False, True): "fail"})
+    session = _connect_with_motors(settings, None, declared, presence)
+    assert session.tier == "motors"
+    assert session.refused == ()

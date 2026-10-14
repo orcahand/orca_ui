@@ -319,10 +319,21 @@ def resolve_motor_port(config, presence) -> str | None:
                         getattr(config, "motor_type", None))
 
 
-def detect_motor_type(port: str, progress_callback=None) -> str | None:
+def detect_motor_type(port: str, progress_callback=None, chain_config: dict | None = None) -> str | None:
+    """The family on ``port``: from a motor at factory defaults, else — given
+    ``chain_config`` — from the configured chain that config describes."""
     from orca_core.maintenance.motor_chain import detect_motor_type as detect
 
-    return detect(port, progress_callback=progress_callback)
+    return detect(port, progress_callback=progress_callback, chain_config=chain_config)
+
+
+def chain_config_mapping(config) -> dict:
+    """The raw config mapping the motor-chain library works from."""
+    return {
+        "motor_ids": list(config.motor_ids),
+        "joint_to_motor_map": dict(config.joint_to_motor_map or {}),
+        "baudrate": getattr(config, "baudrate", None),
+    }
 
 
 def build_chain_plan(config, port: str, motor_type: str):
@@ -331,11 +342,7 @@ def build_chain_plan(config, port: str, motor_type: str):
     from orca_core.maintenance.motor_chain import plan_motor_chain
 
     return plan_motor_chain(
-        {
-            "motor_ids": list(config.motor_ids),
-            "joint_to_motor_map": dict(config.joint_to_motor_map or {}),
-            "baudrate": getattr(config, "baudrate", None),
-        },
+        chain_config_mapping(config),
         port,
         motor_type,
     )
@@ -354,14 +361,23 @@ def run_chain_configure(plan, *, progress_callback, prompt_callback,
     )
 
 
+def reset_motor(plan, motor: dict) -> bool:
+    """Revert one motor, as scanned (id, baud_rate), to factory defaults."""
+    from orca_core.maintenance.motor_chain import reset_motor_to_factory
+
+    return reset_motor_to_factory(plan, motor["id"], motor["baud_rate"])
+
+
 def reset_motors_once(plan, *, progress_callback, prompt_callback,
-                      should_stop) -> list[dict]:
-    """One reset pass over whatever is on the bus (the caller loops)."""
+                      should_stop, all_rates: bool = False) -> list[dict]:
+    """One reset pass over whatever is on the bus (the caller loops);
+    ``all_rates`` also sweeps the baud rates hands never use."""
     from orca_core.maintenance.motor_chain import reset_all_motors
 
     return reset_all_motors(
         plan,
         progress_callback=progress_callback,
         prompt_callback=prompt_callback,
+        all_rates=all_rates,
         should_stop=should_stop,
     )

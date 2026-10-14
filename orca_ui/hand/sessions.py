@@ -443,6 +443,15 @@ def _connect_with_motors(settings, config, declared, presence: HardwarePresence)
                                tier=_tier_name(feedback, False),
                                message=msg, ports=ports,
                                refused=tuple(sorted(refused)))
+        # A sensing hand rolls its motor bus back when the sensor link fails,
+        # so a sensor that was found on its port but did not answer lands
+        # here. The port is what a later probe would see again; without the
+        # refusal the upgrade probe reconnects on it, fails the same way and
+        # loops. Only a Rescan may try again.
+        if tactile and presence.sensing.tactile:
+            refused.add("tactile")
+        if feedback and presence.sensing.encoder:
+            refused.add("encoders")
         attempts.append(f"{tier}: {msg}")
         logger.warning("connect tier %s failed: %s", tier, msg)
 
