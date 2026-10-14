@@ -71,9 +71,12 @@ def _wire(monkeypatch, runs, resets):
 
 
 def _aborted():
-    return MotorChainAborted("motors [2] answer at the target baud but the chain before them "
-                             "is incomplete", invalid_ids=[2],
-                             invalid_motors=[{"id": 2, "model_name": "XC330", "baud_rate": 1_000_000}])
+    # Built the way any orca_core >= 0.6.0 can raise it; invalid_motors is what
+    # 0.6.1 adds, and the operation reads it with getattr for the same reason.
+    exc = MotorChainAborted("motors [2] answer at the target baud but the chain before them "
+                            "is incomplete", invalid_ids=[2])
+    exc.invalid_motors = [{"id": 2, "model_name": "XC330", "baud_rate": 1_000_000}]
+    return exc
 
 
 def test_an_abort_offers_a_reset_and_the_chain_runs_again(monkeypatch):
