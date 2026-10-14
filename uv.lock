@@ -610,7 +610,7 @@ wheels = [
 
 [[package]]
 name = "orca-core"
-version = "0.6.0"
+version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dynamixel-sdk" },
@@ -621,9 +621,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "uvicorn" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/93/83/9383ee142edd0bb120b69b0e9764ddc267a137e411796331990b835a9dfb/orca_core-0.6.0.tar.gz", hash = "sha256:5139b60f19800966353a2021be1772f3ced5276aac1e64203111ece9c9cd44df", size = 620389, upload-time = "2026-10-12T15:57:55.546Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e8/e0/c0a443ede09ab4cbda0b0cb935797f7114c288b6d6a7942f705689e27fe8/orca_core-0.7.0.tar.gz", hash = "sha256:6a08b9389d2ef40090a84fc6797b39f044b15a976e7a9ce0b06c79e3537ccb65", size = 638940, upload-time = "2026-10-14T12:47:09.901Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0d/8c/3f4b529f5b846a6ca8c10e10ab4713ab79060e831997375ebb4dea034d68/orca_core-0.6.0-py3-none-any.whl", hash = "sha256:d6369e6d3f6ca17e3a69d71280914921c7e9c661e8c639029919e2a01c1a6660", size = 300144, upload-time = "2026-10-12T15:57:54.141Z" },
+    { url = "https://files.pythonhosted.org/packages/77/3d/af62e1f2a97cbc9fceb8060c31918de1dd4b1e4b11362c644ef57661869f/orca_core-0.7.0-py3-none-any.whl", hash = "sha256:9ad03b9b46004edd8508c12924974f95f03882adbe026104942ea515f37c0188", size = 307285, upload-time = "2026-10-14T12:47:08.531Z" },
 ]
 
 [[package]]
@@ -661,7 +661,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "mcp", specifier = ">=1.12,<2" },
     { name = "numpy", specifier = ">=1.24" },
-    { name = "orca-core", specifier = ">=0.6.0,<0.7" },
+    { name = "orca-core", specifier = ">=0.7.0,<0.8" },
     { name = "pyserial", specifier = ">=3.5,<4.0.0" },
     { name = "pyyaml", specifier = ">=6,<7" },
     { name = "uvicorn", specifier = ">=0.30" },
