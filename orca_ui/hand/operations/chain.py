@@ -208,6 +208,18 @@ def _progress_mapper(ctx: OpContext, grid: _ChainGrid, mode: str):
             ctx.set_detail(f"configured motor(s) {event['missing']} stopped "
                            "answering — check their connectors and power")
             ctx.log(f"configured motor(s) {event['missing']} stopped answering")
+        elif kind == "chain_shortened":
+            for motor_id in event["missing"]:
+                grid.mark(motor_id, "expected")
+            ctx.set_extra(grid.extra(mode))
+            ctx.set_progress(len(event["configured_ids"]) / max(total, 1))
+            behind = (f"; {event['stranded']} behind the gap rejoin once it "
+                      "closes" if event.get("stranded") else "")
+            ctx.log(f"chain is now {sorted(event['configured_ids'], reverse=True)}: "
+                    f"{event['missing']} dropped off — reconnect, or plug a fresh "
+                    f"motor into that slot{behind}")
+        elif kind == "configured_motor_returned":
+            ctx.log(f"motor {event['target_id']} answers again — carrying on")
         elif kind == "port_lost":
             ctx.set_detail(f"{event['port']} disappeared — check the USB cable "
                            "and board power; waiting for it to come back")
@@ -266,7 +278,8 @@ class ConfigureChainOperation(Operation):
                 ctx.set_phase("detecting",
                               detail="probing the motor family at factory "
                                      "defaults")
-                motor_type = hand_ops.detect_motor_type(port)
+                motor_type = hand_ops.detect_motor_type(
+                    port, chain_config=hand_ops.chain_config_mapping(supervisor.config))
                 if motor_type is None:
                     raise RuntimeError(
                         "could not detect the motor family (nothing at "
