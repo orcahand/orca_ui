@@ -241,6 +241,11 @@ def _progress_mapper(ctx: OpContext, grid: _ChainGrid, mode: str):
             ctx.log(f"chain is now {sorted(event['configured_ids'], reverse=True)}: "
                     f"{event['missing']} dropped off — reconnect, or plug a fresh "
                     f"motor into that slot{behind}")
+        elif kind == "configured_motors_back":
+            for motor_id in event["motor_ids"]:
+                grid.mark(motor_id, "configured")
+            ctx.set_extra(grid.extra(mode))
+            ctx.log(f"motor(s) {event['motor_ids']} answer again")
         elif kind == "configured_motor_returned":
             grid.mark(event["target_id"], "configured")
             ctx.set_extra(grid.extra(mode))
