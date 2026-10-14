@@ -235,6 +235,12 @@ def _progress_mapper(ctx: OpContext, grid: _ChainGrid, mode: str):
             what = "ID" if event["setting"] == "id" else "baud rate"
             ctx.log(f"motor did not take the {what} write (attempt "
                     f"{event['attempt']}) — retrying")
+        elif kind == "verify_failed":
+            ctx.log(f"{event['error']} — re-reading the chain from the bus")
+        elif kind == "phantom_baud":
+            ctx.log(f"the bus does not switch to {event['baudrate']:,} bps (the "
+                    f"chain's own motors {event['motor_ids']} answered there); "
+                    "that rate is skipped from now on")
         elif kind == "verify_retry":
             ctx.log(f"chain check missed {event['missing']} — scanning again")
         elif kind == "unrecognised_motor_model":
