@@ -463,10 +463,13 @@ class HandSupervisor(threading.Thread):
         self._publish()
         self._wake.set()
 
-    def enter_maintenance(self, kind: str, timeout: float = 15.0) -> MaintenanceLease:
+    def enter_maintenance(self, kind: str, timeout: float = 15.0,
+                          probe: bool = True) -> MaintenanceLease:
         """Hand the hardware to an operation: the run loop tears the session
         down, suspends health checks and reconnects, and acks. Blocks the
-        calling (operation) thread until the hardware is actually free."""
+        calling (operation) thread until the hardware is actually free.
+        ``probe=False`` skips the port probe that follows, for an operation
+        that only needs the motor port and resolves it itself."""
         with self._lock:
             if self._released:
                 raise RuntimeError(
@@ -489,7 +492,7 @@ class HandSupervisor(threading.Thread):
         presence = None
         if self._settings.bare:
             presence = self._bare_presence()
-        elif not self._settings.mock:
+        elif not self._settings.mock and probe:
             # Ports are closed now — a probe finally sees the real picture.
             try:
                 presence = self._probe_hardware()

@@ -369,13 +369,15 @@ def reset_motor(plan, motor: dict) -> bool:
 
 
 def reset_motors_once(plan, *, progress_callback, prompt_callback,
-                      should_stop) -> list[dict]:
-    """One reset pass over whatever is on the bus (the caller loops)."""
+                      should_stop, all_rates: bool = False) -> list[dict]:
+    """One reset pass over whatever is on the bus (the caller loops);
+    ``all_rates`` also sweeps the baud rates hands never use."""
     from orca_core.maintenance.motor_chain import reset_all_motors
 
     return reset_all_motors(
         plan,
         progress_callback=progress_callback,
         prompt_callback=prompt_callback,
+        all_rates=all_rates,
         should_stop=should_stop,
     )

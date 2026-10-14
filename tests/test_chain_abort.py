@@ -48,7 +48,8 @@ class _Supervisor:
                                       baudrate=1_000_000, motor_type="dynamixel")
         self.left = False
 
-    def enter_maintenance(self, kind):
+    def enter_maintenance(self, kind, probe=True):
+        self.probed = probe
         return SimpleNamespace(presence=None)
 
     def exit_maintenance(self):
@@ -84,6 +85,7 @@ def test_an_abort_offers_a_reset_and_the_chain_runs_again(monkeypatch):
     assert op.run(ctx) == {"configured": [3, 2, 1]}
     assert resets == [2]
     assert ctx.prompts[0][1] == ["Reset and continue", "Stop"]
+    assert ctx.service.supervisor.probed is False, "chain work skips the slow post-hand-off probe"
     assert [s["state"] for s in ctx.extra["chain"]] == ["pending", "pending", "pending"]
     assert ctx.service.supervisor.left
 

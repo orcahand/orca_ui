@@ -24,11 +24,14 @@ snapshot's ``extra`` field: ``{"mode", "motor_type", "target_baud", "chain":
 
 from __future__ import annotations
 
+import time
+
 from orca_ui.hand.operations import hand_ops
 from orca_ui.hand.operations.base import OpContext, Operation
 from orca_ui.hand.operations.events import OperationStopped
 
 RESET_PASS_PERIOD_S = 1.0
+OTHER_RATES_AFTER_S = 30.0   # the reset sweeps the other baud rates only after this long without a find
 
 # A family that cannot be hot-plugged onto a live bus is power-cycled around
 # the operator prompt (MotorClient.requires_unpowered_hotplug, which the plan
@@ -199,7 +202,8 @@ def _progress_mapper(ctx: OpContext, grid: _ChainGrid, mode: str):
             checked = "; ".join(event.get("checked") or ["the factory defaults"])
             hint = (" — a motor at an unusual ID and rate? stop and run "
                     "scripts/configure_motor_chain.py --scan"
-                    if event.get("escalated") else "")
+                    if event.get("escalated") else
+                    "" if event.get("other_rates") else "; other rates join after 30 s")
             ctx.set_detail(f"still scanning for a factory-default "
                            f"{event['expected_model']} → ID {event['target_id']} "
                            f"({event['elapsed_s']} s); checked {checked}{hint}")
@@ -250,6 +254,9 @@ def _progress_mapper(ctx: OpContext, grid: _ChainGrid, mode: str):
             what = "ID" if event["setting"] == "id" else "baud rate"
             ctx.log(f"motor did not take the {what} write (attempt "
                     f"{event['attempt']}) — retrying")
+        elif kind == "bus_error":
+            ctx.log(f"bus error while scanning (attempt {event['attempt']}): "
+                    f"{event['error']} — trying again")
         elif kind == "verify_failed":
             ctx.log(f"{event['error']} — re-reading the chain from the bus")
         elif kind == "phantom_baud":
@@ -291,7 +298,9 @@ class ConfigureChainOperation(Operation):
         supervisor = ctx.service.supervisor
         mode = self.params["mode"]
         ctx.set_phase("acquiring", detail="taking the bus into maintenance")
-        lease = supervisor.enter_maintenance(self.kind)
+        # No hardware probe after the hand-off: chain work needs the motor
+        # port alone, and a full probe of a bus of bare motors is slow.
+        lease = supervisor.enter_maintenance(self.kind, probe=False)
         try:
             ctx.check_stop()
             port = hand_ops.resolve_motor_port(supervisor.config,
@@ -391,12 +400,21 @@ class ConfigureChainOperation(Operation):
             detail=f"reverting motors to factory defaults (ID "
                    f"{plan.default_id}, {plan.default_baud:,} bps) — connect "
                    "motors, stop when done")
+        last_found = time.monotonic()
+        widened = False
         while True:
             ctx.check_stop()
+            all_rates = time.monotonic() - last_found >= OTHER_RATES_AFTER_S
+            if all_rates and not widened:
+                ctx.log(f"nothing new for {OTHER_RATES_AFTER_S:.0f} s — also sweeping "
+                        "the other baud rates from now on")
+            widened = all_rates
             try:
-                hand_ops.reset_motors_once(
+                found = hand_ops.reset_motors_once(
                     plan, progress_callback=on_event, prompt_callback=prompt,
-                    should_stop=ctx.stop_event.is_set)
+                    should_stop=ctx.stop_event.is_set, all_rates=all_rates)
+                if found:
+                    last_found = time.monotonic()
             except OperationStopped:
                 raise
             except chain_error:
