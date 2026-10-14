@@ -182,6 +182,43 @@ def _progress_mapper(ctx: OpContext, grid: _ChainGrid, mode: str):
             ctx.log(f"a second factory-default motor is answering at "
                     f"{event['baudrate']:,} bps — only one may be connected "
                     f"while ID {event['target_id']} is programmed")
+        elif kind == "still_waiting":
+            # The poll is unbounded by design; this is what shows it is alive.
+            ctx.set_detail(f"still scanning for a factory-default "
+                           f"{event['expected_model']} → ID {event['target_id']} "
+                           f"({event['elapsed_s']} s) — nothing at the factory "
+                           "defaults, nothing else on the bus to take")
+        elif kind == "half_programmed_motor_adopted":
+            ctx.log(f"found a motor at the default ID already at the target "
+                    f"baud (an interrupted run) — finishing it as ID "
+                    f"{event['target_id']}")
+        elif kind == "stray_motor_reset":
+            motor = event["motor"]
+            ctx.log(f"ID {motor['id']} ({motor['model_name']} @ "
+                    f"{motor['baud_rate']:,} bps) is not part of this chain — "
+                    "reset to factory defaults, programming it next")
+        elif kind == "stray_motor_reset_failed":
+            motor = event["motor"]
+            ctx.log(f"could not reset ID {motor['id']} @ "
+                    f"{motor['baud_rate']:,} bps: {event['error']} — unplug it")
+        elif kind == "configured_motor_missing":
+            for motor_id in event["missing"]:
+                grid.mark(motor_id, "invalid")
+            ctx.set_extra(grid.extra(mode))
+            ctx.set_detail(f"configured motor(s) {event['missing']} stopped "
+                           "answering — check their connectors and power")
+            ctx.log(f"configured motor(s) {event['missing']} stopped answering")
+        elif kind == "port_lost":
+            ctx.set_detail(f"{event['port']} disappeared — check the USB cable "
+                           "and board power; waiting for it to come back")
+            ctx.log(f"{event['port']} disappeared while waiting for ID "
+                    f"{event['target_id']}")
+        elif kind == "write_retry":
+            what = "ID" if event["setting"] == "id" else "baud rate"
+            ctx.log(f"motor did not take the {what} write (attempt "
+                    f"{event['attempt']}) — retrying")
+        elif kind == "verify_retry":
+            ctx.log(f"chain check missed {event['missing']} — scanning again")
         elif kind == "unrecognised_motor_model":
             ctx.log(f"model number {event.get('model_number')} is not in the "
                     f"lookup table (reported {event.get('model_name')!r}); "
