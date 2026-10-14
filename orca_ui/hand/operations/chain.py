@@ -94,6 +94,18 @@ class _ChainGrid:
         if motor_id in self.states:
             self.states[motor_id] = state
 
+    def step(self, target_id: int) -> None:
+        """The chain as a step begins: everything before ``target_id`` in
+        chain order is configured (the routine only steps past a valid
+        prefix), the target is expected, the rest is still to come."""
+        state = "configured"
+        for motor_id in self.order:
+            if motor_id == target_id:
+                self.states[motor_id] = "expected"
+                state = "pending"
+            else:
+                self.states[motor_id] = state
+
     def extra(self, mode: str) -> dict:
         plan = self._plan
         return {
@@ -130,7 +142,7 @@ def _progress_mapper(ctx: OpContext, grid: _ChainGrid, mode: str):
                         f"{sorted(event['already_configured'], reverse=True)}")
             ctx.set_extra(grid.extra(mode))
         elif kind == "step_started":
-            grid.mark(event["target_id"], "expected")
+            grid.step(event["target_id"])
             ctx.set_phase(
                 "configuring",
                 detail=f"step {event['step']}/{event['total']}: "
@@ -226,6 +238,8 @@ def _progress_mapper(ctx: OpContext, grid: _ChainGrid, mode: str):
                     f"{event['missing']} dropped off — reconnect, or plug a fresh "
                     f"motor into that slot{behind}")
         elif kind == "configured_motor_returned":
+            grid.mark(event["target_id"], "configured")
+            ctx.set_extra(grid.extra(mode))
             ctx.log(f"motor {event['target_id']} answers again — carrying on")
         elif kind == "port_lost":
             ctx.set_detail(f"{event['port']} disappeared — check the USB cable "
