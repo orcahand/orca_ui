@@ -361,6 +361,13 @@ def run_chain_configure(plan, *, progress_callback, prompt_callback,
     )
 
 
+def reset_motor(plan, motor: dict) -> bool:
+    """Revert one motor, as scanned (id, baud_rate), to factory defaults."""
+    from orca_core.maintenance.motor_chain import reset_motor_to_factory
+
+    return reset_motor_to_factory(plan, motor["id"], motor["baud_rate"])
+
+
 def reset_motors_once(plan, *, progress_callback, prompt_callback,
                       should_stop) -> list[dict]:
     """One reset pass over whatever is on the bus (the caller loops)."""

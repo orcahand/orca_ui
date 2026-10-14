@@ -185,8 +185,9 @@ def _progress_mapper(ctx: OpContext, grid: _ChainGrid, mode: str):
         elif kind == "still_waiting":
             # The poll is unbounded by design; this is what shows it is alive.
             checked = "; ".join(event.get("checked") or ["the factory defaults"])
-            hint = (" — a motor at an unusual ID and baud? stop and use the "
-                    "chain scan" if event.get("escalated") else "")
+            hint = (" — a motor at an unusual ID and rate? stop and run "
+                    "scripts/configure_motor_chain.py --scan"
+                    if event.get("escalated") else "")
             ctx.set_detail(f"still scanning for a factory-default "
                            f"{event['expected_model']} → ID {event['target_id']} "
                            f"({event['elapsed_s']} s); checked {checked}{hint}")
@@ -316,15 +317,21 @@ class ConfigureChainOperation(Operation):
             try:
                 if mode == "reset":
                     return self._run_reset(ctx, plan, grid, on_event, prompt)
-                configured = hand_ops.run_chain_configure(
-                    plan, progress_callback=on_event, prompt_callback=prompt,
-                    should_stop=ctx.stop_event.is_set)
-                return {"configured": configured}
-            except chain_aborted as e:
-                for motor_id in e.invalid_ids:
-                    grid.mark(motor_id, "invalid")
-                ctx.set_extra(grid.extra(mode))
-                raise RuntimeError(str(e)) from e
+                while True:
+                    try:
+                        configured = hand_ops.run_chain_configure(
+                            plan, progress_callback=on_event, prompt_callback=prompt,
+                            should_stop=ctx.stop_event.is_set)
+                        return {"configured": configured}
+                    except chain_aborted as e:
+                        # Motors the run cannot place without guessing: the
+                        # operator decides, as at the script's prompt.
+                        for motor_id in e.invalid_ids:
+                            grid.mark(motor_id, "invalid")
+                        ctx.set_extra(grid.extra(mode))
+                        ctx.log(str(e))
+                        if not self._offer_reset(ctx, plan, grid, mode, e):
+                            raise RuntimeError(str(e)) from e
             except chain_error as e:
                 # the library's should_stop cancellation surfaces as a
                 # MotorChainError — map it back to a clean stop
@@ -332,6 +339,33 @@ class ConfigureChainOperation(Operation):
                 raise RuntimeError(str(e)) from e
         finally:
             supervisor.exit_maintenance()
+
+    def _offer_reset(self, ctx: OpContext, plan, grid: _ChainGrid, mode: str,
+                     aborted) -> bool:
+        """Ask whether to reset the motors a run could not place; do it and
+        say the chain should be configured again (True), or leave them (False)."""
+        motors = getattr(aborted, "invalid_motors", None) or []
+        if not motors:
+            return False
+        ids = [m["id"] for m in motors]
+        answer = ctx.wait_input(
+            f"Motors {ids} answer but the chain before them is incomplete. "
+            "If a motor before them is loose, stop and fix it. If they are "
+            "leftovers from another hand, reset them to factory defaults and "
+            "continue.", ["Reset and continue", "Stop"])
+        if answer != "Reset and continue":
+            return False
+        chain_error, _ = hand_ops.chain_error_types()
+        for m in motors:
+            try:
+                hand_ops.reset_motor(plan, m)
+            except chain_error as e:
+                ctx.log(f"could not reset ID {m['id']}: {e}")
+                return False
+            grid.mark(m["id"], "pending")
+            ctx.log(f"reset ID {m['id']} ({m['model_name']}) → factory defaults")
+        ctx.set_extra(grid.extra(mode))
+        return True
 
     def _run_reset(self, ctx: OpContext, plan, grid: _ChainGrid,
                    on_event, prompt) -> dict:
