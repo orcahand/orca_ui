@@ -1,5 +1,5 @@
-import {useEffect,useMemo,useRef,useState} from 'react'
-import {Canvas,useFrame} from '@react-three/fiber'
+import {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react'
+import {Canvas,useFrame,useThree} from '@react-three/fiber'
 import {OrbitControls} from '@react-three/drei'
 import * as THREE from 'three'
 import {loadBundle,type Bundle} from './cadAssets'
@@ -12,6 +12,7 @@ import {TENDONS} from './guide'
 import type {Build} from './buildContent'
 function Trace({bundle,build,joint,tendon,wristOnly}:{bundle:Bundle;build:Build;joint:string;tendon:number;wristOnly:boolean}){
  const bead=useRef<THREE.Mesh>(null)
+ const container=useRef<THREE.Group>(null),size=useThree(s=>s.size)
  const scene=useMemo(()=>{
   const pieces=cadPieces(bundle,build),group=new THREE.Group(),label=jointName(joint),segment=pieces.find(p=>p.part.label===label)!,motor=motorPieces(pieces).get(motorId(joint,build))!
   const excluded=['Hull cover','Rear hull cover','Side plate','Fan cover · two fans','Arm mounting adapter (optional)','Arm mounting rod (optional)','Tendon paths']
@@ -20,11 +21,19 @@ function Trace({bundle,build,joint,tendon,wristOnly}:{bundle:Bundle;build:Build;
   const view=framed(group,build,390),offset=group.position.clone()
   return {pieces,view,curve,tube,offset,segment,motor}
  },[bundle,build,joint,tendon,wristOnly])
+ useLayoutEffect(()=>{
+  const wrapper=container.current!
+  wrapper.scale.setScalar(1);wrapper.position.set(0,0,0)
+  wrapper.updateMatrixWorld(true)
+  const bounds=new THREE.Box3().setFromObject(scene.view),extent=bounds.getSize(new THREE.Vector3()),center=bounds.getCenter(new THREE.Vector3())
+  const scale=Math.max(.01,Math.min(1,(size.width-32)/extent.x,(size.height-32)/extent.y))
+  wrapper.scale.setScalar(scale);wrapper.position.copy(center).multiplyScalar(-scale)
+ },[scene,size.width,size.height])
  useEffect(()=>()=>{disposePieces(scene.pieces);scene.tube.geometry.dispose();(scene.tube.material as THREE.Material).dispose()},[scene])
  useFrame(({clock})=>{bead.current?.position.copy(scene.curve.getPoint((clock.elapsedTime*.23)%1)).add(scene.offset)})
- return <primitive object={scene.view}>
+ return <group ref={container}><primitive object={scene.view}>
   <mesh ref={bead}><sphereGeometry args={[.8,12,12]}/><meshBasicMaterial color="#fff"/></mesh>
- </primitive>
+ </primitive></group>
 }
 export function DriveExplorer({build,checked,onCheck,stage='wrist'}:{build:Build;checked:number[];onCheck:(index:number)=>void;stage?:'wrist'|'bottom'|'top'}){
  const wristOnly=stage==='wrist'

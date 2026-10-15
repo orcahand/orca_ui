@@ -3135,8 +3135,8 @@
       "Lower 2 \u00d7 6 pin",
       "DP tendons"
     ],
-    "meshes": 70364,
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 90833
   },
   {
     "key": "base-right-dynamixel",
@@ -3182,8 +3182,8 @@
       "Lower 2 \u00d7 6 pin",
       "DP tendons"
     ],
-    "meshes": 71182,
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 90775
   },
   {
     "key": "base-left-dynamixel",
@@ -3229,8 +3229,8 @@
       "Lower 2 \u00d7 6 pin",
       "DP tendons"
     ],
-    "meshes": 72100,
-    "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
+    "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
+    "meshes": 102888
   },
   {
     "key": "touch-right-dynamixel",
@@ -3276,8 +3276,8 @@
       "Lower 2 \u00d7 6 pin",
       "DP tendons"
     ],
-    "meshes": 72914,
-    "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
+    "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
+    "meshes": 102764
   },
   {
     "key": "touch-left-dynamixel",
@@ -5136,7 +5136,7 @@
       "Guide pin 2 \u00b7 2 \u00d7 30"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 250780
+    "meshes": 284662
   },
   {
     "key": "base-left-dynamixel",
@@ -5147,7 +5147,7 @@
       "Guide pin 2 \u00b7 2 \u00d7 30"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 249619
+    "meshes": 283563
   },
   {
     "key": "touch-right-dynamixel",
@@ -5158,7 +5158,7 @@
       "Guide pin 2 \u00b7 2 \u00d7 30"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
-    "meshes": 265076
+    "meshes": 303956
   },
   {
     "key": "touch-left-dynamixel",
@@ -5169,7 +5169,7 @@
       "Guide pin 2 \u00b7 2 \u00d7 30"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
-    "meshes": 264860
+    "meshes": 303878
   },
   {
     "key": "base-right-dynamixel",
@@ -5180,7 +5180,7 @@
       "Bearing 2 \u00b7 4 \u00d7 8 \u00d7 3"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 254812
+    "meshes": 288694
   },
   {
     "key": "base-left-dynamixel",
@@ -5191,7 +5191,7 @@
       "Bearing 2 \u00b7 4 \u00d7 8 \u00d7 3"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 253651
+    "meshes": 287595
   },
   {
     "key": "touch-right-dynamixel",
@@ -5202,7 +5202,7 @@
       "Bearing 2 \u00b7 4 \u00d7 8 \u00d7 2"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
-    "meshes": 269108
+    "meshes": 307988
   },
   {
     "key": "touch-left-dynamixel",
@@ -5213,7 +5213,7 @@
       "Bearing 2 \u00b7 4 \u00d7 8 \u00d7 2"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
-    "meshes": 268892
+    "meshes": 307910
   },
   {
     "key": "base-right-dynamixel",

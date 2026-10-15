@@ -234,3 +234,88 @@ Apply the same configuration filtering, visual language and explicit completion 
 4. Resolve the outstanding hardware specifications with the build owner and record the authoritative decisions next to the relevant content.
 5. Make focused changes, preserve the design tokens and stable progress IDs, rebuild the packaged UI and verify against an isolated mock backend.
 6. Arrange a physical walkthrough for assembly and service procedures. Record remaining uncertainties explicitly rather than hiding them with polished visuals.
+
+## Tendon visibility fixes — 14 October 2026
+
+These changes are local and uncommitted. The packaged frontend has been rebuilt.
+The issue had two causes: cameras fitted the part bodies without accounting for
+the complete tendon paths, and the thumb finishing stills omitted DP/PP bodies
+while drawing their tendons. No measured routing coordinates or model archives
+were changed.
+
+Use the titles below to locate the steps; timeline numbers vary with configuration.
+The `p…` identifiers are stable internal IDs, not displayed step numbers.
+
+| Step | Visible change to verify |
+| --- | --- |
+| Fingers → Check the PP joint (`p35`) | The pin-clearance illustration now includes the complete DP/PP bodies and tendon ends (`panel-036-2`). |
+| Fingers → Prepare and seat the AP tendons (`p37`) | The tucked-tail illustration includes the full free tendon end instead of framing only the AP housing (`panel-041-5`). |
+| Thumb → Seat the thumb AP knots (`p52`) | The tucked-tail illustration uses the same complete tendon framing (`panel-053-5`). |
+| Thumb → Finish the thumb (`p62`) | Both guide-pin and bearing illustrations now show translucent DP/PP bodies around the previously floating routes and fit the complete thumb paths (`panel-063-1`, `panel-063-2`). Its interactive view also fits the current canvas. |
+| Wrist & routing → Inspect every tendon path (`p80`) | All three inspection tabs fit the full model and tendon paths to both canvas dimensions, including the enlarged inspection zoom. |
+| Wrist & routing → Verify all 32 tendon identities (`p83`) | Selecting a tendon now recenters and fits its complete view, including narrow canvases where thumb, middle-PP and pinky selections were clipped. |
+
+The same responsive animation framing applies to **Join DP and PP** (`p33`),
+**Assemble the AP** (`p42`), **Assemble thumb DP and PP** (`p46`),
+**Assemble the thumb AP** (`p54`), **Attach the four fingers** (`p64`),
+**Attach the thumb** (`p68`), **Seat the hand in the wrist** (`p89`),
+**Thread the bottom spools** (`p123`) and **Fit the top spools** (`p126`).
+The two spooling steps also use the corrected tendon-selection viewer.
+Framing updates on slider changes and resizing. Manual orbit, pan and zoom remain
+available; deliberately zooming or panning outside the model is not prevented.
+
+Twenty stills were regenerated: five illustrations for each of Base/Touch ×
+left/right Dynamixel. Source and packaged copies match. Existing colors, labels,
+checklists and saved progress are preserved.
+
+Verification: the production build and frontend lint pass (five pre-existing
+CalibrationRomChart export warnings). A scene audit found no clipped sampled tube vertices
+in 208 tendon-containing stills across the four configurations. Runtime checks
+covered 624 animation/inspection states at multiple canvas sizes and 256 tendon
+selections (all 32 identities × four configurations × wrist/spool views), with no
+clipped sampled tendon vertices. Six affected steps were opened in the packaged
+UI on an isolated mock backend and screenshots reviewed. This verifies rendering,
+not physical routing or assembly correctness. Full/FeeTech do not gain new CAD
+coverage from this change.
+
+Temporary review evidence is under `/tmp/orca-tendon-review-oct14/`, including
+`after-scenes.json`, `motions-verified.json`, `drive-verified.json`,
+`packaged-review.json` and screenshots. These are development artifacts and are
+not required to run the guide. The user's preview progress was not modified.
+
+### Second sweep and standalone comparison
+
+A second sweep on 14 October reviewed all 328 current illustrations across the
+four complete CAD configurations. No further image or route edits were needed.
+The audit now checks every tube vertex and reproduces the renderer's special
+carpal-exit crop. This corrects a limitation of the first audit: `panel-017-1`
+intentionally clips internal PTFE lengths in all four configurations while keeping
+all 128 exits fully inside the frame. The other 204 tendon/PTFE-containing stills
+are fully framed. All 512 published overlay coordinates agree with projections
+from the current scene geometry.
+
+Repeated runtime checks passed for 624 animation/inspection states and 384 tendon
+selections, now explicitly including both bottom- and top-spool viewers. Assembly
+scene bounds and detached-geometry candidates were also inspected at 21 slider
+positions (840 states). Pulled-out knots, free working ends and the spool's 8 cm
+measurement are intentional; these were reviewed rather than moved arbitrarily.
+Evidence is in `/tmp/orca-tendon-sweep2/`.
+
+Open [the standalone image comparison](tendon-image-comparison.html) directly in a
+browser. It defaults to the 20 before/after pairs and offers a full-sweep view of
+all 328 current illustrations. Unchanged images appear once. Configuration and
+step/image search filters, enlarged views, and the review summary work offline;
+all images are embedded. The original baseline remains commit `3985b50`, before
+the first tendon-visibility pass. This is a still-image comparison, not an embedded
+interactive CAD viewer.
+
+The comparison can be regenerated without Node or CAD software:
+
+```sh
+python3 scripts/build_tendon_comparison.py --review-report docs/assembly-tendon-review.json
+```
+
+The JSON report records this completed sweep; update it after a new review rather
+than assuming that regenerated images have been reviewed. The generator embeds
+the actual current renders and the saved Git originals, deduplicating unchanged
+images. No ORCA runtime behavior was changed during this second sweep.

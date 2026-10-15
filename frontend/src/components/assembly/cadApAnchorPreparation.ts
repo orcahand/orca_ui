@@ -69,5 +69,5 @@ export function cadApAnchorPreparation(bundle:Bundle,build:Build,phase:ApAnchorP
    }else labels.push({text:'Second stopper',point:knot.group.position.clone()})
   })
  }
- return {group,labels,cordOutlines,direction:up.clone().addScaledVector(front,thumb?-.3:.65).addScaledVector(across,thumb?.65:.45).normalize(),up:across,frameObjects:seated?[phase==='tuck'?part.object:group]:undefined,dispose:()=>{disposePieces(pieces);stopper.dispose();seatedStoppers.forEach(k=>k.dispose());extra.forEach(m=>{m.geometry.dispose();(m.material as THREE.Material).dispose()})}}
+ return {group,labels,cordOutlines,direction:up.clone().addScaledVector(front,thumb?-.3:.65).addScaledVector(across,thumb?.65:.45).normalize(),up:across,frameObjects:seated?[group]:undefined,dispose:()=>{disposePieces(pieces);stopper.dispose();seatedStoppers.forEach(k=>k.dispose());extra.forEach(m=>{m.geometry.dispose();(m.material as THREE.Material).dispose()})}}
 }

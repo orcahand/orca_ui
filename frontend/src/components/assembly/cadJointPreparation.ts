@@ -42,6 +42,7 @@ export function cadJointPreparation(bundle:Bundle,build:Build,kind:JointPreparat
   for(const p of pieces.filter(p=>p.part.label.startsWith('Bearing')&&p.owner==='Index DP'))group.add(p.object)
   fade(pp,kind==='pin-clearance'?.32:.65);fade(dp,.5)
   strands=channelStrands(build,pieces);strands.update();group.add(strands.group)
+  if(focus)focus.union(pp.bounds).union(dp.bounds).union(new THREE.Box3().setFromObject(strands.group))
   labels.push({text:'Upper 2 × 6 pin',point:upper.center.clone().add(upper.object.position)})
   labels.push({text:'Lower 2 × 6 pin',point:lower.center.clone()})
   if(kind==='pin-clearance'){
