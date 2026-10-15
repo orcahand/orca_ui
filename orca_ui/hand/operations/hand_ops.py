@@ -129,14 +129,18 @@ def calibrate(
     force_wrist: bool,
     joint_encoder_client,
     progress_callback: Callable[[dict], None],
+    prompt_callback: Callable[[dict], str] | None = None,
 ) -> None:
-    """Blocking calibration on the calling thread; interrupt via request_stop."""
+    """Blocking calibration on the calling thread; interrupt via request_stop.
+    A ``prompt_callback`` makes it manual: each hardstop is captured from a hand-held pose."""
     hand.calibrate(
         blocking=True,
         force_wrist=force_wrist,
         joints=joints,
         joint_encoder_client=joint_encoder_client,
         progress_callback=progress_callback,
+        manual=prompt_callback is not None,
+        prompt_callback=prompt_callback,
     )
 
 

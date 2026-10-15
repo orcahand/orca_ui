@@ -12,6 +12,7 @@ import {
 } from '../../state/operationStore'
 import { FlowProgress, FlowRunning, FlowStep, type StepState } from './FlowStep'
 import { failToBanner } from './setupUtils'
+import { useTensionFlow } from '../../state/tensionFlow'
 
 const GROUP_ORDER = ['wrist', 'thumb', 'index', 'middle', 'ring', 'pinky']
 const MIN_CURRENT_MA = 20
@@ -119,14 +120,15 @@ export function CalibrateStep({ state }: { state: StepState }) {
       return next
     })
 
-  const start = () =>
+  const start = (manual = false) =>
     void api
       .operationStart('calibrate', {
         joints: selected.size > 0 ? [...selected] : null,
         force_wrist: redoWrist || wristSelected,
-        ...currentParams,
+        ...(manual ? { manual: true } : currentParams),
       })
       .catch(failToBanner)
+  const manualActive = active?.params?.manual === true
 
   const settings = (
     <>
@@ -241,16 +243,31 @@ export function CalibrateStep({ state }: { state: StepState }) {
         <>
           <FlowRunning phase={active.phase} detail={active.detail} />
           <FlowProgress value={active.progress} />
+          {manualActive && (
+            <button className="btn btn-secondary" onClick={() => useTensionFlow.getState().dismiss(null)}>
+              Show manual calibration
+            </button>
+          )}
         </>
       ) : (
-        <button
-          className="btn btn-primary"
-          disabled={gate.blocked || !currentValid}
-          title={gate.reason ?? (!currentValid ? 'calibration current out of range' : undefined)}
-          onClick={start}
-        >
-          {selected.size > 0 ? `Calibrate ${selected.size}` : 'Calibrate'}
-        </button>
+        <div className="flow-row">
+          <button
+            className="btn btn-primary"
+            disabled={gate.blocked || !currentValid}
+            title={gate.reason ?? (!currentValid ? 'calibration current out of range' : undefined)}
+            onClick={() => start()}
+          >
+            {selected.size > 0 ? `Calibrate ${selected.size}` : 'Calibrate'}
+          </button>
+          <button
+            className="btn btn-secondary"
+            disabled={gate.blocked}
+            title={gate.reason ?? 'Torque off: hold each joint on its end stops by hand and press Enter to record'}
+            onClick={() => start(true)}
+          >
+            {selected.size > 0 ? `Manual calibration ${selected.size}` : 'Manual calibration'}
+          </button>
+        </div>
       )}
       {joints.length > 0 && (
         <div className="flow-dots">

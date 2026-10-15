@@ -234,6 +234,11 @@ def build_router(service: HandService) -> APIRouter:
         guard(service.go_neutral)
         return {"ok": True}
 
+    @router.post("/joints/zero")
+    def joints_zero():
+        guard(service.go_zero)
+        return {"ok": True}
+
     @router.get("/control/gains")
     def control_gains_state():
         return guard(service.gains_state)

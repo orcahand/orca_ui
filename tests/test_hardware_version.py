@@ -46,7 +46,7 @@ def test_a_v20_board_leaves_the_base_map(tmp_path):
     sup, _ = _supervisor(tmp_path, LEFT)
     base = sup.config
     sup._apply_hardware_version(2)
-    assert sup.config.hardware_version == 2
+    assert sup.config.hardware_version == 200
     assert sup.config.joint_inversion_dict == base.joint_inversion_dict
 
 
@@ -75,7 +75,7 @@ def test_a_pinned_version_wins_over_the_board_and_says_so(tmp_path, caplog):
         sup._apply_hardware_version(2)
     assert sup.config.hardware_version == HARDWARE_VERSION_V21
     assert sup.status().hardware_version_pinned
-    assert "pins hardware_version=21" in caplog.text
+    assert "pins hardware_version=210" in caplog.text
 
 
 def test_auto_takes_the_board(tmp_path):

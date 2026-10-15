@@ -7,7 +7,7 @@
 
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import * as THREE from 'three'
 import type { URDFRobot } from 'urdf-loader'
 import type { JointInfo, SpreadStatus } from '../../api/types'
@@ -100,6 +100,7 @@ function PreviewRig({
   stage,
   statuses,
   blackSkin,
+  overrides,
   onJoint,
 }: {
   urdfUrl: string
@@ -108,6 +109,7 @@ function PreviewRig({
   stage?: PreviewStage | null
   statuses: Record<string, SpreadStatus>
   blackSkin: boolean
+  overrides?: Record<string, number>
   onJoint: (joint: string | null) => void
 }) {
   const [robot, setRobot] = useState<URDFRobot | null>(null)
@@ -151,8 +153,8 @@ function PreviewRig({
   }, [robot, controls, camera, joints])
 
   const pose = useMemo(
-    () => stagePose(mode === 'still' ? null : (stage?.key ?? null), joints, toward),
-    [mode, stage?.key, joints, toward],
+    () => ({ ...stagePose(mode === 'still' ? null : (stage?.key ?? null), joints, toward), ...overrides }),
+    [mode, stage?.key, joints, toward, overrides],
   )
   const sweepJoints = useMemo(() => {
     const known = new Set(joints.map((j) => j.id))
@@ -191,7 +193,11 @@ export function TensionPreview(props: {
   stage?: PreviewStage | null
   statuses: Record<string, SpreadStatus>
   blackSkin: boolean
+  // Joint angles (deg) that replace the stage pose, e.g. one joint held at an end stop.
+  overrides?: Record<string, number>
+  caption?: ReactNode
 }) {
+  const { caption, ...rig } = props
   const { scene } = usePalette()
   const [joint, setJoint] = useState<string | null>(null)
   return (
@@ -205,8 +211,9 @@ export function TensionPreview(props: {
         <directionalLight position={[0.4, 0.8, 0.6]} intensity={1.6} />
         <directionalLight position={[-0.5, 0.3, -0.4]} intensity={0.6} />
         <OrbitControls makeDefault enableDamping={false} />
-        <PreviewRig {...props} onJoint={setJoint} />
+        <PreviewRig {...rig} onJoint={setJoint} />
       </Canvas>
+      {caption}
       {props.mode === 'sweep' && joint && (
         <div className="gt-preview-caption"><b>{joint.replace('_', ' ')}</b> · full range</div>
       )}

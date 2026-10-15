@@ -171,6 +171,7 @@ export const api = {
   jointsTarget: (angles: Record<string, number>) =>
     post('/api/joints/target', { angles }),
   jointsNeutral: () => post('/api/joints/neutral'),
+  jointsZero: () => post('/api/joints/zero'),
   // joints omitted = every loop-controlled joint; a joint list writes
   // exactly those and leaves the rest as they are.
   setGains: (gains: {

@@ -54,6 +54,11 @@ const previewUnavailable = (error: Error) => (
   </div>
 )
 
+function fixedHolds(extra: GuidedTensionExtra): string {
+  const fixed = Object.entries(extra.hold_fixed ?? {}).filter(([j]) => extra.stage?.joints.includes(j))
+  return fixed.map(([j, ma]) => `, ${j.replace('_', ' ')} at ${ma} mA`).join('')
+}
+
 function pct(fraction: number | null | undefined): string {
   return fraction == null ? '—' : `${Math.round(fraction * 100)}%`
 }
@@ -156,7 +161,7 @@ export function GuidedTensionDialog({
                 ? Object.fromEntries(Object.entries(statuses).filter(([j]) => stage.joints.includes(j)))
                 : statuses
             }
-            blackSkin={(caps?.declared?.tactile ?? caps?.tactile) === true}
+            blackSkin={(handInfo.tactile_skin ?? caps?.declared?.tactile ?? caps?.tactile) === true}
           />
         </Suspense>
       </ErrorBoundary>
@@ -205,8 +210,8 @@ export function GuidedTensionDialog({
               </button>
             </>
           ) : (
-            <button className="btn btn-secondary" onClick={onClose}>
-              Close
+            <button className="gt-close" aria-label="Close" title="Close" onClick={onClose}>
+              ✕
             </button>
           )}
         </header>
@@ -373,7 +378,7 @@ function StepContent({
               </h3>
               <p className="setup-copy">
                 The motors hold this pose at {extra.hold_ap}/{extra.hold_mcp}/{extra.hold_pip} mA
-                (APs/MCPs/PIPs). Drive each highlighted joint by hand to both ends, one joint at a
+                (APs/MCPs/PIPs){fixedHolds(extra)}. Drive each highlighted joint by hand to both ends, one joint at a
                 time, like the model. You will have to apply a little force as the targeted joints
                 will be putting up some amount of resistance. A motor turns green once it has
                 followed its group's pass threshold ({passTargets(extra)}) of its travel; orange

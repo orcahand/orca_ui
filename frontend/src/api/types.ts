@@ -240,6 +240,8 @@ export interface CoreSourceInfo {
 export interface HandInfo {
   model_name: string
   side: 'left' | 'right'
+  // The model has a tactile skin (drawn black), connected or not.
+  tactile_skin?: boolean
   mock: boolean
   joints: JointInfo[]
   calibration: CalibrationInfo
@@ -332,6 +334,29 @@ export interface OperationSnapshot {
   result: Record<string, unknown> | null
   error: string | null
   started_at: number
+}
+
+// ----- manual calibrate operation extra (orca_ui/hand/operations/calibrate.py) ----
+
+export type CaptureDirection = 'flex' | 'extend'
+
+export interface ManualCalibrationExtra {
+  manual: true
+  plan: { joint: string; direction: CaptureDirection }[]
+  index: number
+  total: number
+  // The hardstop asked for; the finger abductions come as one group (joints, motors).
+  current: {
+    joint: string
+    joints: string[]
+    motor: number
+    motors: Record<string, number>
+    direction: CaptureDirection
+  } | null
+  // Live motor position per joint while the operator moves it, and where it started.
+  position_deg: Record<string, number>
+  start_deg: Record<string, number>
+  captured: { joint: string; direction: CaptureDirection | null; outcome: 'recorded' | 'skipped'; position_deg: number | null }[]
 }
 
 // ----- configure_chain operation extra (orca_ui/hand/operations/chain.py) ----
@@ -817,6 +842,8 @@ export interface GuidedTensionExtra {
   hold_ap?: number
   hold_mcp?: number
   hold_pip?: number
+  // Joints the hand's config holds at a fixed current (mA) instead of their group's.
+  hold_fixed?: Record<string, number>
   tension_current?: number
   tension_offset_deg?: number
   pulled_deg?: number

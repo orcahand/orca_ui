@@ -15,6 +15,13 @@ import random
 import threading
 import time
 
+from orca_core.constants import (
+    CALIBRATION_GROUPS,
+    DEFAULT_GUIDED_TENSION_CURRENTS,
+    DYNAMIXEL,
+    SUPPORTED_MOTOR_TYPES,
+)
+
 from orca_ui.hand.operations import hand_ops
 from orca_ui.hand.operations.base import OpContext, Operation
 from orca_ui.hand.operations.tension import DEFAULT_TENSION_OFFSET_DEG, EXTRA_DEG
@@ -36,14 +43,6 @@ HOLD_BOUNDS_MA = (20.0, 500.0)
 CURRENT_BOUNDS_MA = {"hold_ap": HOLD_BOUNDS_MA, "hold_mcp": HOLD_BOUNDS_MA,
                      "hold_pip": HOLD_BOUNDS_MA, "tension_current": (50.0, 1000.0),
                      "tension_offset_deg": (0.0, 45.0)}
-# Range-check holds per joint group and the tensioning hold, in mA. The Feetech values match
-# the Dynamixel output torque (Feetech draws ~275 mA before producing any).
-DEFAULT_CURRENTS_MA = {
-    "dynamixel": {"hold_ap": 200.0, "hold_mcp": 140.0, "hold_pip": 100.0, "tension_current": 400.0},
-    "feetech": {"hold_ap": 380.0, "hold_mcp": 320.0, "hold_pip": 280.0, "tension_current": 580.0},
-}
-
-
 # Input values "current:<key>=<mA>" change a current mid-run instead of answering a prompt.
 CURRENT_INPUT = "current:"
 LIVE_STEP = {"hold_ap": "range", "hold_mcp": "range", "hold_pip": "range",
@@ -55,9 +54,22 @@ PASS_BOUNDS = (0.1, 1.0)
 DEFAULT_PASS_FRACTION = 0.85
 
 
-def default_currents(motor_type: str | None) -> dict:
-    return {**DEFAULT_CURRENTS_MA.get(motor_type or "", DEFAULT_CURRENTS_MA["dynamixel"]),
+def default_currents(config=None, family: str | None = None) -> dict:
+    """The run's starting currents: the hand config's guided_tension_currents for ``family``."""
+    if config is None:
+        entry = DEFAULT_GUIDED_TENSION_CURRENTS[family if family in SUPPORTED_MOTOR_TYPES else DYNAMIXEL]
+    else:
+        entry = config.guided_tension_currents_for(family)
+    hold = entry["hold"]
+    return {"hold_ap": float(hold["abd"]), "hold_mcp": float(hold["mcp"]),
+            "hold_pip": float(hold["pip"]), "tension_current": float(entry["tension"]),
             "tension_offset_deg": DEFAULT_TENSION_OFFSET_DEG}
+
+
+def fixed_holds(config, family: str | None = None) -> dict:
+    """Joints the hand config holds at their own current instead of their group's."""
+    hold = config.guided_tension_currents_for(family)["hold"]
+    return {joint: ma for joint, ma in hold.items() if joint not in CALIBRATION_GROUPS}
 
 
 def _unit(key: str) -> str:
@@ -69,7 +81,7 @@ def motor_family(service) -> str | None:
     session = service.session
     config = session.hand.config if session is not None else service.supervisor.config
     family = getattr(config, "motor_type", None)
-    return family if family in DEFAULT_CURRENTS_MA else None
+    return family if family in SUPPORTED_MOTOR_TYPES else None
 
 
 def joint_group(joint: str) -> str:
@@ -121,7 +133,7 @@ def validate_guided_tension_params(service, params: dict) -> dict:
         raise ServiceError(
             "guided tensioning needs v2.1 hardware — use the hold dialog, or "
             "force guided in the tension settings", status_code=409)
-    clean["defaults"] = default_currents(motor_family(service))
+    clean["defaults"] = default_currents(service.supervisor.config, motor_family(service))
     return clean
 
 
@@ -296,7 +308,8 @@ class GuidedTensionOperation(_LiveCurrents):
         ctx.set_phase("acquiring", detail="taking the hand into maintenance")
         lease = supervisor.enter_maintenance(self.kind)
         hand = None
-        presenter = self._presenter = _Presenter(ctx, self.settings(), self._new_prompt)
+        extra = {**self.settings(), "hold_fixed": fixed_holds(supervisor.config, motor_family(ctx.service))}
+        presenter = self._presenter = _Presenter(ctx, extra, self._new_prompt)
         try:
             ctx.check_stop()
             ctx.set_phase("connecting", detail="opening motor-only connection")
@@ -376,7 +389,8 @@ class SimulatedGuidedTensionOperation(_LiveCurrents):
         supervisor = ctx.service.supervisor
         ctx.set_phase("acquiring", detail="taking the hand into maintenance")
         supervisor.enter_maintenance(self.kind)
-        presenter = self._presenter = _Presenter(ctx, self.settings(), self._new_prompt)
+        extra = {**self.settings(), "hold_fixed": fixed_holds(supervisor.config, motor_family(ctx.service))}
+        presenter = self._presenter = _Presenter(ctx, extra, self._new_prompt)
         targets = _sim_targets(supervisor.config, self.params.get("any_hardware", False))
         best = dict(self._progress.get("best", {})) if self.params.get("resume", True) else {}
         if not self.params.get("resume", True):

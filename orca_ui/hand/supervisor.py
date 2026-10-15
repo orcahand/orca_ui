@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from orca_core import HandDetection
+from orca_core.constants import normalize_hardware_version
 from orca_core.hand_config import (
     OrcaHandConfig,
     OrcaHandTouchConfig,
@@ -240,6 +241,7 @@ class HandSupervisor(threading.Thread):
     def _apply_hardware_version(self, board_version: int | None) -> bool:
         """Put in force the version config.yaml pins, else the board's.
         Returns True when that changed the config in force."""
+        board_version = normalize_hardware_version(board_version)
         self._board_hardware_version = board_version
         if self._settings.bare:
             return False

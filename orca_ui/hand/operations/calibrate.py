@@ -10,12 +10,18 @@ tension + calibrate rounds under one lease.
 
 from __future__ import annotations
 
+import math
+import threading
+
 from orca_ui.hand.operations import hand_ops
 from orca_ui.hand.operations.base import OpContext, Operation
 
 
 MIN_CALIBRATION_CURRENT_MA = 20.0
 CALIBRATION_GROUPS = ("abd", "mcp", "pip")
+RECORD = "Record"
+SKIP = "Skip"
+LIVE_PERIOD_S = 0.2
 
 
 def calibration_current_info(service) -> dict | None:
@@ -74,6 +80,7 @@ def validate_calibrate_params(service, params: dict) -> dict:
         raise ServiceError("no motor bus — calibration needs motors",
                            status_code=409)
     clean = {"joints": joints, "force_wrist": bool(params.get("force_wrist", False)),
+             "manual": bool(params.get("manual", False)),
              "calibration_current": None, "calibration_currents": None}
     info = calibration_current_info(service) or {}
     if params.get("calibration_current") is not None:
@@ -132,14 +139,125 @@ def _travel_line(event: dict, note: str) -> str:
     return line
 
 
+def manual_capture_steps(config, joints: list[str] | None) -> list[dict]:
+    """The steps a manual run asks for, in order; one answer records a whole step.
+    The wrist is always included; absent motors are trimmed by ManualCapture."""
+    sequence = getattr(config, "manual_calibration_sequence", None) or config.calibration_sequence
+    steps = [dict(step["joints"]) for step in sequence]
+    if not any("wrist" in step for step in steps) and "wrist" in config.joint_ids:
+        steps += [{"wrist": "flex"}, {"wrist": "extend"}]
+    wanted = set(joints) if joints is not None else None
+    steps = [{j: d for j, d in step.items() if wanted is None or j in wanted} for step in steps]
+    return [step for step in steps if step]
+
+
+def manual_capture_plan(steps: list[dict]) -> list[dict]:
+    return [{"joint": j, "direction": d} for step in steps for j, d in step.items()]
+
+
+class ManualCapture:
+    """Publishes the manual run (the hardstop asked for, the live motor positions,
+    what was captured) and asks the operator to record or skip each step's hardstops."""
+
+    def __init__(self, ctx: OpContext, plan: list[dict], motor_of, read_deg=None):
+        self._ctx = ctx
+        self._motor_of = motor_of
+        self._read_deg = read_deg
+        self._lock = threading.Lock()
+        self.extra = {"manual": True, "plan": plan, "index": 0, "total": len(plan),
+                      "current": None, "position_deg": {}, "start_deg": {}, "captured": []}
+
+    def _publish(self) -> None:
+        with self._lock:
+            self._ctx.set_extra({**self.extra, "captured": list(self.extra["captured"]),
+                                 "position_deg": dict(self.extra["position_deg"]),
+                                 "start_deg": dict(self.extra["start_deg"])})
+
+    def on_event(self, event: dict) -> None:
+        kind = event.get("event")
+        if kind in ("wrist_skipped", "joints_skipped"):
+            gone = {"wrist"} if kind == "wrist_skipped" else set(event["joints"])
+            self.extra["plan"] = [c for c in self.extra["plan"] if c["joint"] not in gone]
+            self.extra["total"] = len(self.extra["plan"])
+            self._publish()
+        elif kind == "limit_recorded":
+            self._captured(event["joint"], "recorded", event["limit"])
+        elif kind == "manual_capture_skipped":
+            self._captured(event["joint"], "skipped", None)
+
+    def _captured(self, joint: str, outcome: str, limit) -> None:
+        current = self.extra["current"] or {}
+        self.extra["captured"].append({"joint": joint, "direction": current.get("direction"),
+                                       "outcome": outcome,
+                                       "position_deg": None if limit is None else math.degrees(limit)})
+        self._publish()
+
+    def prompt(self, prompt: dict) -> str:
+        step = prompt.get("joints") or {prompt["joint"]: prompt["direction"]}
+        joints, direction = list(step), prompt["direction"]
+        motors = {j: abs(int(m)) for j, m in (prompt.get("motors") or {}).items()} or \
+            {j: abs(int(self._motor_of(j))) for j in joints}
+        index = next((i for i, c in enumerate(self.extra["plan"])
+                      if c["joint"] == joints[0] and c["direction"] == direction), self.extra["index"])
+        self.extra.update(index=index, position_deg={}, start_deg={},
+                          current={"joint": joints[0], "joints": joints, "motor": prompt["motor"],
+                                   "motors": motors, "direction": direction})
+        self._ctx.set_phase("capturing", progress=index / max(self.extra["total"], 1),
+                            detail=f"{', '.join(joints)} {direction}")
+        self._publish()
+        what = ", ".join(j.replace("_", " ") for j in joints)
+        done = threading.Event()
+        live = threading.Thread(target=self._follow, args=(motors, done), daemon=True)
+        live.start()
+        try:
+            answer = self._ctx.wait_input(f"Hold {what} on the {direction} end stop, then record",
+                                          [RECORD, SKIP])
+        finally:
+            done.set()
+            live.join()
+        return "record" if answer == RECORD else "skip"
+
+    def _follow(self, motors: dict[str, int], done: threading.Event) -> None:
+        """Streams the asked motors' positions while the operator moves the joints."""
+        if self._read_deg is None:
+            return
+        while not done.is_set():
+            try:
+                degs = self._read_deg(list(motors.values()))
+            except Exception:
+                degs = None
+            if degs is not None and not done.is_set():
+                for joint, motor in motors.items():
+                    self.extra["start_deg"].setdefault(joint, degs[motor])
+                    self.extra["position_deg"][joint] = degs[motor]
+                self._publish()
+            done.wait(LIVE_PERIOD_S)
+
+
+def _motor_reader(hand):
+    from orca_core.maintenance.motor_reads import read_motor_pos_checked
+
+    def read_deg(motors: list[int]) -> dict[int, float]:
+        pos = read_motor_pos_checked(hand)
+        idx = hand.config.motor_id_to_idx_dict
+        return {m: math.degrees(float(pos[idx[m]])) for m in motors}
+    return read_deg
+
+
 def run_calibrate(hand, encoder_client, ctx: OpContext,
-                  joints: list[str] | None, force_wrist: bool) -> dict:
+                  joints: list[str] | None, force_wrist: bool, manual: bool = False) -> dict:
     """Blocking calibration with progress mapped onto the op snapshot."""
     progress = {"steps_done": 0, "total": 0, "joints_calibrated": [],
                 "anchors_recorded": [], "anchors_dead": [], "travel_logged": False}
 
+    plan = manual_capture_plan(manual_capture_steps(hand.config, joints))
+    capture = ManualCapture(ctx, plan, hand.config.joint_to_motor_map.get,
+                            _motor_reader(hand)) if manual else None
+
     def on_event(event: dict) -> None:
         kind = event.get("event")
+        if capture is not None:
+            capture.on_event(event)
         if kind == "encoder_anchor_recorded":
             progress["anchors_recorded"].append(event["joint"])
             ctx.log(f"encoder anchor recorded: {event['joint']} "
@@ -220,6 +338,7 @@ def run_calibrate(hand, encoder_client, ctx: OpContext,
         force_wrist=force_wrist,
         joint_encoder_client=encoder_client,
         progress_callback=on_event,
+        prompt_callback=capture.prompt if capture is not None else None,
     )
     ctx.check_stop()
     return {
@@ -270,6 +389,7 @@ class CalibrateOperation(Operation):
                 hand, encoder_client, ctx,
                 joints=self.params["joints"],
                 force_wrist=self.params["force_wrist"],
+                manual=self.params.get("manual", False),
             )
         finally:
             self._hand = None

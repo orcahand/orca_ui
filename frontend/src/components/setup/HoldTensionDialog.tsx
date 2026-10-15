@@ -32,12 +32,30 @@ export function HoldTensionDialog({
   const offsetDeg = useTensionFlow((s) => s.offsetDeg)
   const active = operation !== null && isOperationActive(operation)
   const holding = active && operation.state === 'awaiting_input'
-  const step: HoldStep = operation === null ? 'activate' : active && holding ? 'ratchet' : active ? 'activate' : 'done'
+  const runStep: HoldStep = operation === null ? 'activate' : active && holding ? 'ratchet' : active ? 'activate' : 'done'
+  // Jumping back to "Tension the hand" re-activates: a holding run is released first.
+  const [again, setAgain] = useState(false)
+  const [restarting, setRestarting] = useState(false)
+  useEffect(() => setAgain(false), [operation?.run_id])
+  const step: HoldStep = again ? 'activate' : runStep
   const stepIndex = STEPS.findIndex((s) => s.key === step)
 
   const activate = () =>
     void api.operationStart('tension', { move_motors: wind, offset_deg: offsetDeg }).catch(failToBanner)
   const release = () => void api.operationInput('Release').catch(failToBanner)
+  const activateAgain = () => {
+    setRestarting(true)
+    void api.operationStop().catch((error) => {
+      setRestarting(false)
+      failToBanner(error)
+    })
+  }
+  useEffect(() => {
+    if (restarting && !active) {
+      setRestarting(false)
+      activate()
+    }
+  }, [restarting, active])
   const pulled = (operation?.extra as { pulled_deg?: number } | null)?.pulled_deg ?? null
   // Locked until the pull it asked for has been reported, so a double click pulls once.
   const [pullSentAt, setPullSentAt] = useState<number | null | undefined>(undefined)
@@ -51,10 +69,13 @@ export function HoldTensionDialog({
   }
   // A cancelled hold also ends "done", but without a result.
   const released = (operation?.result as { released?: boolean } | null)?.released === true
-  const primary = step === 'activate' && !active ? activate : step === 'ratchet' ? release : null
+  const primary =
+    step === 'activate' && !active ? activate
+      : step === 'activate' && again && !restarting ? activateAgain
+        : step === 'ratchet' ? release : null
 
   useEffect(() => {
-    if (!primary || (step === 'activate' && gate.blocked)) return
+    if (!primary || (step === 'activate' && !active && gate.blocked)) return
     const onKey = (e: KeyboardEvent) => {
       // A focused button answers Enter itself.
       if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) {
@@ -64,7 +85,7 @@ export function HoldTensionDialog({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [primary, step, gate.blocked])
+  }, [primary, step, active, gate.blocked])
 
   return createPortal(
     <div className="gt-overlay" role="dialog" aria-modal="true" aria-label="Tensioning">
@@ -77,25 +98,34 @@ export function HoldTensionDialog({
               Cancel
             </button>
           ) : (
-            <button className="btn btn-secondary" onClick={onClose}>
-              Close
+            <button className="gt-close" aria-label="Close" title="Close" onClick={onClose}>
+              ✕
             </button>
           )}
         </header>
         <div className="gt-body">
           <nav className="gt-steps">
-            {STEPS.map((s, i) => (
-              <div
-                key={s.key}
-                className={`gt-step${i === stepIndex ? ' active' : i < stepIndex ? ' done' : ''}`}
-              >
-                <span className="gt-step-num">{i < stepIndex ? '✓' : i + 1}</span>
-                <span>
-                  <div className="gt-step-title">{s.title}</div>
-                  <div className="gt-step-note">{s.note}</div>
-                </span>
-              </div>
-            ))}
+            {STEPS.map((s, i) => {
+              const jump =
+                s.key === 'activate' && runStep !== 'activate' && !again ? () => setAgain(true)
+                  : s.key === 'ratchet' && again && holding && !restarting ? () => setAgain(false)
+                    : null
+              return (
+                <div
+                  key={s.key}
+                  className={`gt-step${i === stepIndex ? ' active' : i < stepIndex ? ' done' : ''}${jump ? ' jump' : ''}`}
+                  role={jump ? 'button' : undefined}
+                  title={jump ? `Go to ${s.title.toLowerCase()}` : undefined}
+                  onClick={jump ?? undefined}
+                >
+                  <span className="gt-step-num">{i < stepIndex ? '✓' : i + 1}</span>
+                  <span>
+                    <div className="gt-step-title">{s.title}</div>
+                    <div className="gt-step-note">{s.note}</div>
+                  </span>
+                </div>
+              )
+            })}
           </nav>
           <section className="gt-content">
             {step === 'activate' && (
@@ -111,13 +141,16 @@ export function HoldTensionDialog({
                       `wound first.`}{' '}
                   Keep fingers clear of the hand while it takes up the slack.
                 </p>
-                {!active && (
+                {(!active || again) && (
                   <label className="joint-check" title="Drive every finger to its hard stops and back before holding">
                     <input type="checkbox" checked={wind} onChange={(e) => setWind(e.target.checked)} />
                     wind the tendons to the hard stops first
                   </label>
                 )}
-                {active && (
+                {again && holding && (
+                  <p className="setup-copy">The motors are released first, then the current is activated again.</p>
+                )}
+                {active && !again && (
                   <p className="setup-copy">
                     {operation.phase ?? 'starting'}
                     {operation.detail ? ` — ${operation.detail}` : ''}…
@@ -162,11 +195,11 @@ export function HoldTensionDialog({
                 )}
                 <button
                   className="btn btn-primary"
-                  disabled={step === 'activate' && gate.blocked}
+                  disabled={step === 'activate' && !active && gate.blocked}
                   title={step === 'activate' ? (gate.reason ?? undefined) : undefined}
                   onClick={primary}
                 >
-                  {step === 'activate' ? 'Activate current' : 'Done — release motors'}
+                  {step === 'activate' ? (active ? 'Release & activate again' : 'Activate current') : 'Done — release motors'}
                   <span className="gt-key">↵</span>
                 </button>
               </div>

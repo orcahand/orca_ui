@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../api/rest'
 import type { PortInfo } from '../api/types'
 import { useAppStore } from '../state/appStore'
+import { formatHardwareVersion } from '../state/tensionFlow'
 
 const PORT_KIND_BY_ITEM: Record<string, string[]> = {
   MOTORS: ['dynamixel', 'feetech'],
@@ -90,7 +91,7 @@ export function BootHero() {
       <div className="boot-footer">
         {handInfo ? `${handInfo.model_name} · ` : ''}
         {status?.hardware_version != null
-          ? `hw ${Math.floor(status.hardware_version / 10)}.${status.hardware_version % 10} · `
+          ? `hw ${formatHardwareVersion(status.hardware_version)} · `
           : ''}
         orca-ui
       </div>

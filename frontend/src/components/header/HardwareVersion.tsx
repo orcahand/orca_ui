@@ -10,10 +10,9 @@ import { createPortal } from 'react-dom'
 import { api, ApiError } from '../../api/rest'
 import { useAppStore } from '../../state/appStore'
 import { isOperationActive, useOperationStore } from '../../state/operationStore'
-import { formatHardwareVersion, V21 } from '../../state/tensionFlow'
+import { formatHardwareVersion, V20, V21, V211 } from '../../state/tensionFlow'
 
-const V20 = 2
-type Choice = 'auto' | typeof V20 | typeof V21
+type Choice = 'auto' | typeof V20 | typeof V21 | typeof V211
 
 async function save(version: number | null): Promise<boolean> {
   try {
@@ -77,13 +76,18 @@ function HardwareVersionDialog({ onClose }: { onClose: () => void }) {
     },
     {
       value: V20,
-      title: 'v2.0',
+      title: 'v2.0.0',
       note: 'hold-and-ratchet tensioning, one plain calibration pass',
     },
     {
       value: V21,
-      title: 'v2.1',
+      title: 'v2.1.0',
       note: `guided tensioning, travel-checked calibration${side === 'left' ? ', thumb MCP/DIP motors reversed' : ''}`,
+    },
+    {
+      value: V211,
+      title: 'v2.1.1',
+      note: 'as v2.1.0, with its own wrist range of motion',
     },
   ]
 
@@ -168,10 +172,13 @@ export function HardwareVersionPrompt() {
         tensioning and calibration steps.
       </span>
       <button className="btn btn-secondary btn-sm" disabled={saving} onClick={() => void pick(V20)}>
-        v2.0
+        v2.0.0
       </button>
       <button className="btn btn-secondary btn-sm" disabled={saving} onClick={() => void pick(V21)}>
-        v2.1
+        v2.1.0
+      </button>
+      <button className="btn btn-secondary btn-sm" disabled={saving} onClick={() => void pick(V211)}>
+        v2.1.1
       </button>
     </div>
   )

@@ -1,4 +1,4 @@
-// The one place tensioning dialogs are mounted: whichever tension operation is
+// The one place tensioning (and manual calibration) dialogs are mounted: whichever such operation is
 // running gets its dialog, whoever started it, and stays readable after it
 // ends until closed. The hold dialog can also be opened before its operation
 // exists, to explain the step before any current flows.
@@ -8,6 +8,7 @@ import { isOperationActive, useOperationStore } from '../../state/operationStore
 import { useTensionFlow } from '../../state/tensionFlow'
 import { GuidedTensionDialog } from './GuidedTensionDialog'
 import { HoldTensionDialog } from './HoldTensionDialog'
+import { ManualCalibrationDialog } from './ManualCalibrationDialog'
 
 export function TensionDialogs() {
   const operation = useOperationStore((s) => s.operation)
@@ -17,8 +18,11 @@ export function TensionDialogs() {
   const dismiss = useTensionFlow((s) => s.dismiss)
   const [watched, setWatched] = useState<string | null>(null)
 
+  const manualCalibration = operation?.kind === 'calibrate' && operation.params?.manual === true
   const tension =
-    operation?.kind === 'guided_tension' || operation?.kind === 'tension' ? operation : null
+    operation?.kind === 'guided_tension' || operation?.kind === 'tension' || manualCalibration
+      ? operation
+      : null
   const active = tension !== null && isOperationActive(tension)
   useEffect(() => {
     if (active) setWatched(tension.run_id)
@@ -36,6 +40,7 @@ export function TensionDialogs() {
   if (shown?.kind === 'guided_tension') {
     return <GuidedTensionDialog operation={shown} onClose={close} />
   }
+  if (shown?.kind === 'calibrate') return <ManualCalibrationDialog operation={shown} onClose={close} />
   if (shown?.kind === 'tension') return <HoldTensionDialog operation={shown} onClose={close} />
   if (holdOpen) return <HoldTensionDialog operation={null} onClose={closeHold} />
   return null

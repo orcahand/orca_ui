@@ -11,7 +11,12 @@ from __future__ import annotations
 
 from orca_ui.hand.operations import hand_ops
 from orca_ui.hand.operations.base import OpContext, Operation
-from orca_ui.hand.operations.calibrate import validate_calibrate_params
+from orca_ui.hand.operations.calibrate import (
+    ManualCapture,
+    manual_capture_plan,
+    manual_capture_steps,
+    validate_calibrate_params,
+)
 from orca_ui.hand.operations.tension import (
     DEFAULT_TENSION_OFFSET_DEG,
     EXTRA_DEG,
@@ -81,6 +86,44 @@ def simulate_calibration(ctx: OpContext, config, joints: list[str] | None,
     }
 
 
+def simulate_manual_calibration(ctx: OpContext, config, joints: list[str] | None) -> dict:
+    """Simulated manual run: asks for every hardstop; the motor drifts while it waits."""
+    import math
+    import random
+    import time
+
+    steps = manual_capture_steps(config, joints)
+    plan = manual_capture_plan(steps)
+    drift: dict[int, float] = {}
+
+    def read_deg(motors: list[int]) -> dict[int, float]:
+        for m in motors:
+            drift[m] = drift.get(m, 0.0) + random.uniform(-3, 6)
+        return {m: 180.0 + drift[m] + 10 * math.sin(time.monotonic() + m) for m in motors}
+
+    motor_of = lambda joint: abs(config.joint_to_motor_map.get(joint, 0))  # noqa: E731
+    capture = ManualCapture(ctx, plan, motor_of, read_deg)
+    ctx.log(f"manual calibration started: {len(plan)} hardstops in {len(steps)} steps")
+    recorded: dict[str, set] = {}
+    for step in steps:
+        first = next(iter(step))
+        motors = {j: motor_of(j) for j in step}
+        drift.clear()
+        answer = capture.prompt({"joint": first, "direction": step[first], "motor": motors[first],
+                                 "joints": step, "motors": motors})
+        for joint, direction in step.items():
+            if answer == "record":
+                capture.on_event({"event": "limit_recorded", "joint": joint,
+                                  "limit": math.radians(read_deg([motors[joint]])[motors[joint]])})
+                recorded.setdefault(joint, set()).add(direction)
+            else:
+                capture.on_event({"event": "manual_capture_skipped", "joint": joint})
+        ctx.log(f"{', '.join(step)} {step[first]}: {'recorded' if answer == 'record' else 'skipped'}")
+    ctx.log("manual calibration complete")
+    calibrated = [j for j, d in recorded.items() if d == {"flex", "extend"}]
+    return {"steps_done": len(steps), "joints_calibrated": calibrated, "calibrated": True}
+
+
 def simulate_tension(ctx: OpContext, move_motors: bool, step_s: float,
                      detail_prefix: str = "", offset_deg: float | None = None) -> None:
     """Lease-free simulated tension body: winds, then parks in
@@ -128,6 +171,8 @@ class SimulatedCalibrateOperation(Operation):
         try:
             ctx.set_phase("connecting", detail="opening motor-only connection")
             ctx.sleep(self.params["step_duration_s"])
+            if self.params.get("manual"):
+                return simulate_manual_calibration(ctx, supervisor.config, self.params["joints"])
             return simulate_calibration(
                 ctx, supervisor.config, self.params["joints"],
                 self.params["step_duration_s"])

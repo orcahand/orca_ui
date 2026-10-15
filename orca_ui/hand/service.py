@@ -15,7 +15,7 @@ from typing import Callable, TYPE_CHECKING
 
 import numpy as np
 
-from orca_core import JointGains
+from orca_core import JointGains, OrcaHandTouchConfig
 from orca_core.hardware.motor_client import MotionTimeoutError
 
 if TYPE_CHECKING:
@@ -281,7 +281,7 @@ class HandService:
         from orca_ui.hand.operations.guided_tension import default_currents, motor_family
 
         family = motor_family(self)
-        return {"motor_type": family, **default_currents(family)}
+        return {"motor_type": family, **default_currents(self.supervisor.config, family)}
 
     def _tension_progress(self, config) -> dict | None:
         from orca_ui.hand.operations import hand_ops
@@ -347,6 +347,8 @@ class HandService:
         info = {
             "model_name": model_name_of(config),
             "side": config.type,
+            # The model has a tactile skin, whether or not its sensors are connected.
+            "tactile_skin": isinstance(config, OrcaHandTouchConfig),
             "mock": self.settings.mock,
             "joints": joints,
             "calibration": self._calibration_state(
@@ -998,6 +1000,18 @@ class HandService:
                 num_steps=num_steps, step_size=_MOVE_STEP_S))
         with self._state_lock:
             self._targets.update(neutral)
+        self._publish_targets()
+
+    def go_zero(self) -> None:
+        """Every joint to 0°, gliding like go_neutral."""
+        session = self._require_torque()
+        self._require_manual_control()
+        zero = {j: 0.0 for j in session.hand.config.joint_ids}
+        num_steps = self._move_steps(session, zero)
+        self.worker.submit_op(
+            lambda: session.hand.set_zero_position(num_steps=num_steps, step_size=_MOVE_STEP_S))
+        with self._state_lock:
+            self._targets.update(zero)
         self._publish_targets()
 
     def _move_steps(self, session, target: dict[str, float]) -> int:

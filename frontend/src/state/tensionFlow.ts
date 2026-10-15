@@ -10,7 +10,10 @@ import { useAppStore } from './appStore'
 
 export type TensionMode = 'guided' | 'hold'
 
-export const V21 = 21
+// Board versions are major*100 + minor*10 + patch; boards provisioned earlier report 2 or 21.
+export const V20 = 200
+export const V21 = 210
+export const V211 = 211
 const FORCED_KEY = 'orca.tension.forcedMode'
 const OFFSET_KEY = 'orca.tension.offsetDeg'
 // How far the finger motors slowly turn counterclockwise while you ratchet, and what one
@@ -20,10 +23,18 @@ export const EXTRA_DEG = 15
 export const PULL_MORE = 'Pull more'
 export const OFFSET_BOUNDS_DEG = [0, 45] as const
 
+export function normalizeHardwareVersion(version: number): number {
+  return version < 10 ? version * 100 : version < 100 ? version * 10 : version
+}
+
 export function formatHardwareVersion(version: number | null | undefined): string {
   if (version == null) return '?'
-  const [major, minor] = version < 10 ? [version, 0] : [Math.floor(version / 10), version % 10]
-  return `v${major}.${minor}`
+  const v = normalizeHardwareVersion(version)
+  return `v${Math.floor(v / 100)}.${Math.floor(v / 10) % 10}.${v % 10}`
+}
+
+export function isV21Family(version: number | null | undefined): boolean {
+  return version != null && Math.floor(normalizeHardwareVersion(version) / 10) === V21 / 10
 }
 
 function loadForced(): TensionMode | null {
@@ -52,7 +63,7 @@ interface TensionFlowState {
   setForced: (mode: TensionMode | null) => void
   // Hold dialog opened by the operator, before any operation exists.
   holdOpen: boolean
-  openHold: () => void
+  openHold: (staleRunId: string | null) => void
   closeHold: () => void
   offsetDeg: number
   setOffsetDeg: (offsetDeg: number) => void
@@ -85,7 +96,7 @@ export const useTensionFlow = create<TensionFlowState>((set) => ({
     set({ offsetDeg })
   },
   holdOpen: false,
-  openHold: () => set({ holdOpen: true, dismissed: null }),
+  openHold: (staleRunId) => set({ holdOpen: true, dismissed: staleRunId }),
   closeHold: () => set({ holdOpen: false }),
   wind: false,
   setWind: (wind) => set({ wind }),
@@ -101,7 +112,7 @@ export function useTensionMode(): {
 } {
   const version = useAppStore((s) => s.status?.hardware_version ?? null)
   const forced = useTensionFlow((s) => s.forced)
-  const isV21 = version === V21
+  const isV21 = isV21Family(version)
   const natural: TensionMode = isV21 ? 'guided' : 'hold'
   return { mode: forced ?? natural, natural, forced, isV21 }
 }

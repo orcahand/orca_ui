@@ -199,7 +199,7 @@ export function TensionStep({ state }: { state: StepState }) {
             className="btn btn-primary"
             disabled={blocked}
             title={blockedReason}
-            onClick={() => (guided ? startGuided(true) : openHold())}
+            onClick={() => (guided ? startGuided(true) : openHold(operation?.run_id ?? null))}
           >
             {guided && progress ? 'Resume' : 'Start'}
           </button>
@@ -245,8 +245,8 @@ const overridesKey = (family: string) => `orca.guidedTension.currents.v3.${famil
 // Only used until the backend reports the hand's family defaults.
 const DEFAULT_CURRENTS: GuidedCurrents = {
   hold_ap: 200,
-  hold_mcp: 180,
-  hold_pip: 140,
+  hold_mcp: 140,
+  hold_pip: 100,
   tension_current: 400,
 }
 // Bounds mirror CURRENT_BOUNDS_MA in orca_ui/hand/operations/guided_tension.py.
