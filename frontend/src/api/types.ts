@@ -840,6 +840,7 @@ export interface GuidedTensionExtra {
   // exclusion list with a reason per joint.
   absent_joints?: string[]
   excluded?: { joint: string; motor: number; reason: string }[]
+}
 
 // ----- bench excitation tests (bare bench) ----------------------------------
 
