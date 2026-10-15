@@ -5198,8 +5198,8 @@
     "file": "panel-063-2",
     "step": "p62",
     "labels": [
-      "Bearing 1 \u00b7 4 \u00d7 8 \u00d7 2",
-      "Bearing 2 \u00b7 4 \u00d7 8 \u00d7 2"
+      "Joint bearing 1",
+      "Joint bearing 2"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
     "meshes": 307988
@@ -5209,8 +5209,8 @@
     "file": "panel-063-2",
     "step": "p62",
     "labels": [
-      "Bearing 1 \u00b7 4 \u00d7 8 \u00d7 2",
-      "Bearing 2 \u00b7 4 \u00d7 8 \u00d7 2"
+      "Joint bearing 1",
+      "Joint bearing 2"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 307910

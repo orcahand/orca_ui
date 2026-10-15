@@ -22,6 +22,6 @@ export function cadThumbFinishing(bundle:Bundle,build:Build,kind:'pins'|'bearing
  focus.union(ap.bounds).union(new THREE.Box3().setFromObject(strands.group))
  upstream.forEach(p=>focus.union(p.bounds))
  const labels=kind==='pins'?pins.map((p,i)=>({text:`Guide pin ${i+1} · 2 × 30`,point:p.center.clone()})):
-  bearings.map((p,i)=>({text:p.part.label.replace('Bearing',`Bearing ${i+1}`),point:p.center.clone()}))
+  bearings.map((p,i)=>({text:build.version==='touch'?`Joint bearing ${i+1}`:p.part.label.replace('Bearing',`Bearing ${i+1}`),point:p.center.clone()}))
  return {group,labels,focus,direction:axes[kind==='pins'?1:0].clone().multiplyScalar(kind==='pins'?1:-1).addScaledVector(axes[2],kind==='pins'?1.2:.3).normalize(),up:axes[2],dispose:()=>{disposePieces(pieces);strands.dispose()}}
 }

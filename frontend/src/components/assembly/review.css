@@ -1,0 +1,50 @@
+/* Review edition: the existing palette with instruction-local media. */
+.assembly-guided-content { min-width: 0; }
+.assembly-guided-instructions { list-style: none; padding: 0; margin: 20px 0; }
+.assembly-guided-instructions > li { margin: 0 0 28px; min-width: 0; }
+.assembly-guided-text { display: flex; align-items: baseline; gap: 14px; font-size: 15px; line-height: 1.7; max-width: 900px; }
+.assembly-guided-text > span { flex: 0 0 26px; height: 26px; text-align: center; border: 1px solid var(--panel-border-strong); border-radius: 50%; color: var(--accent); font-size: 12px; }
+.assembly-guided-instructions .assembly-panel-gallery { margin: 18px 0 0; grid-template-columns: repeat(auto-fit,minmax(min(100%,300px),1fr)); }
+.assembly-guided-instructions .assembly-panel-gallery figure { min-width: 0; }
+.assembly-app .assembly-guided-instructions .assembly-image-button { height: auto; min-height: 0; }
+.assembly-app .assembly-guided-instructions .assembly-image-button img { width: 100%; height: auto; max-height: 560px; object-fit: contain; }
+.assembly-app .assembly-guided-instructions .assembly-image-button:has(img[src*="/touch/"]) { background: transparent; }
+.assembly-app .assembly-guided-instructions img[src*="/touch/"] { mix-blend-mode: multiply; }
+[data-theme=dark] .assembly-app .assembly-guided-instructions img[src*="/touch/"] { mix-blend-mode: normal; }
+.assembly-app .assembly-kit { border: 1px solid var(--panel-border); border-radius: 10px; padding: 18px 22px; margin: 0 0 24px; }
+.assembly-app .assembly-kit > span { font-size: 13px; font-weight: 600; letter-spacing: 0; }
+.assembly-app .assembly-kit ul { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,260px),1fr)); gap: 7px 24px; padding-left: 18px; margin: 12px 0 0; list-style: disc; }
+.assembly-app .assembly-kit li { border: 0; border-radius: 0; background: transparent; padding: 0; font-size: 12px; }
+.assembly-instruction-sequence { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.assembly-instruction-sequence > span { margin-right: auto; }
+.assembly-instruction-sequence > .assembly-walkthrough-play { margin-left: 0; min-width: 44px; }
+.assembly-instruction-sequence > button { min-height: 36px; }
+.assembly-flashing-choice { margin: 0 0 24px; padding: 20px; }
+.assembly-flashing-choice h3 { font-size: 20px; }
+.assembly-flashing-choice .assembly-clip-tabs button { font-size: 15px; padding: 12px 18px; }
+.assembly-review-notes { border: 1px dashed var(--panel-border-strong); border-radius: 10px; padding: 18px 22px; margin: 30px 0 20px; background: rgb(var(--accent-rgb) / .04); font-size: 12px; }
+.assembly-review-notes summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+.assembly-review-notes dl { margin: 16px 0 0; }
+.assembly-review-notes dl > div { display: grid; grid-template-columns: 80px minmax(0,1fr); gap: 16px; margin: 10px 0; }
+.assembly-review-notes dt { font-weight: 600; }
+.assembly-review-notes dd { margin: 0; color: var(--muted); }
+.assembly-review-open { border-top: 1px solid var(--panel-border); padding-top: 12px; margin-top: 16px; }
+.assembly-sensor-ids { border-collapse: collapse; width: min(100%,480px); margin: 20px 0; }
+.assembly-sensor-ids caption { text-align: left; font-weight: 600; margin-bottom: 10px; }
+.assembly-sensor-ids th, .assembly-sensor-ids td { text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--panel-border); }
+.assembly-tendon-legend { display: flex; flex-wrap: wrap; gap: 8px 0; margin: 16px 0; font-size: 12px; }
+.assembly-tendon-legend > span { display: flex; align-items: center; gap: 7px; border-right: 1px solid var(--panel-border-strong); padding: 0 13px; }
+.assembly-tendon-legend > span:last-child { border: 0; }
+.assembly-tendon-legend i { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #0003; }
+.assembly-tendon-legend > button { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--panel-border); border-radius: 6px; background: transparent; color: var(--text); margin: 0 6px 0 0; font-size: 12px; }
+.assembly-tendon-legend > button[aria-pressed=true] { border-color: var(--accent); background: rgb(var(--accent-rgb) / .08); }
+@media (min-width: 901px) {
+ .assembly-layout.is-sidebar-collapsed { grid-template-columns: minmax(0,1fr); }
+ .assembly-layout.is-sidebar-collapsed .assembly-sidebar { display: none; }
+ .assembly-layout.is-sidebar-collapsed .assembly-main { max-width: 100%; }
+}
+@media (max-width: 900px) {
+ .assembly-sidebar-toggle { display: none; }
+ .assembly-header-actions { flex-wrap: wrap; gap: 12px; }
+ .assembly-review-notes dl > div { grid-template-columns: 1fr; gap: 3px; }
+}

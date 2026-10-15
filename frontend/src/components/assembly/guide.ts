@@ -1,4 +1,5 @@
 import mediaCatalog from './media-catalog.json'
+import { TOUCH_STEPS } from './touchGuide'
 
 export type AnimationKind = 'straight' | 'tube' | 'wrist'
 export interface AssemblyStep {
@@ -77,7 +78,7 @@ add('Appendix · silicone', 'Prepare silicone materials', 145, 146, ['Gather the
 add('Appendix · silicone', 'Check skins and quantities', 147, 147, ['Review the skin checklist: 3× M-DP, 1× P-DP, 1× T-DP, 1× carpal skin; 2× M-PP, 1× P-PP, 1× T-PP and 1× I-PP.', 'Measure 70 g A (140 g total) for one pentafunnel and 20 g A (40 g total) for carpals.'], 'The skin quantities and batch sizes are checked.')
 add('Appendix · silicone', 'Mix and pour', 148, 149, ['Assemble molds, tare the scale, measure A, then gently stir in thinner and pigment.', 'Measure B separately in equal proportion to A, mix A and B, then pour.', 'The specified silicone has a 20-minute pot life; confirm this on your product before mixing. Stir gently and keep the A and B utensils separate to avoid contamination.'], 'The mixing and pouring instructions have been reviewed.')
 
-export const STEPS = steps
+export const STEPS = [...steps, ...TOUCH_STEPS]
 export const CHAPTERS = [...new Set(steps.map(s => s.chapter))]
 export const MEDIA = mediaCatalog as Record<string, { src: string; side: string | null; panels?: {src: string; caption: string; side: string | null}[] }>
 export const TENDONS = ['P-AP-p','P-PP-flex','P-DP-ext','M-PP-flex','M-PP-ext','P-DP-flex','P-PP-ext','P-AP-t','T-AP-p','T-PP-flex','T-DP-flex','T-TP-flex','T-TP-ext','T-DP-ext','T-PP-ext','T-AP-t','M-AP-t','I-AP-t','I-PP-flex','I-DP-flex','I-DP-ext','I-PP-ext','I-AP-p','M-AP-p','R-AP-t','R-PP-ext','R-DP-flex','M-DP-flex','M-DP-ext','R-DP-ext','R-PP-flex','R-AP-p']

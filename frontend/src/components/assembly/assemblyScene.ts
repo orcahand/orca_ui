@@ -27,8 +27,8 @@ export function assemblyScene(bundle:Bundle,build:Build,step:string){
     const nut=p.part.label==='M2 hex nut',spool=p.part.label==='Bottom spool',screw=p.part.label.includes('screw')
     stage(p,axis.clone().multiplyScalar(nut?-18:spool?30:screw?48:58),nut?0:spool?.22:screw?.45:.73,nut?.22:spool?.45:screw?.73:1)
    } else if(step==='p126'&&['Top spool / tensioner','Spool cover','Spool ORCA insert','Bearing · 4 × 8 × 3','M2.5 × 8 socket screw'].includes(p.part.label)){
-    const bearing=p.part.label.startsWith('Bearing'),screw=p.part.label.includes('screw')
-    stage(p,axis.clone().multiplyScalar(screw?55:bearing?42:28),screw?.92:bearing?.8:.6,screw?1:bearing?.92:.8)
+    const screw=p.part.label.includes('screw')
+    stage(p,axis.clone().multiplyScalar(screw?55:28),screw?.9:.65,screw?1:.9)
    }else add(p)
   })
   if(step==='p123'||step==='p126'){
@@ -151,10 +151,18 @@ export function assemblyScene(bundle:Bundle,build:Build,step:string){
   }
   for(const s of stages){s.piece.object.position.copy(s.offset).multiplyScalar(1-ease((position-s.from)/(s.to-s.from)));if(s.carry)s.piece.object.position.y+=35*(1-ease((position-.5)/.3))}
   if(step==='p99')for(const s of stages)if(s.piece.part.label==='M2 hex nut')s.piece.object.position.z+=30*Math.sign(s.piece.center.z)*(1-ease((position-.22)/.23))
-  winding?.update(step==='p126'?Math.min(1,position/.6):position)
-  if(winding)for(const p of included)fade(p,p.part.label===(step==='p126'?'Spool cover':'Bottom spool')?(channels?.35:1):.26)
+  winding?.update(step==='p126'?Math.max(0,Math.min(1,(position-.18)/.47)):position)
+  if(step==='p126'){
+   const top=selected.find(p=>p.part.label==='Spool cover')!,bearing=selected.find(p=>p.part.label==='Bearing · 4 × 8 × 3')!
+   bearing.object.position.copy(top.object.position).addScaledVector(new THREE.Vector3(0,0,Math.sign(top.center.z)||1),14*(1-ease(position/.18)))
+   if(winding){winding.group.position.copy(top.object.position);winding.group.visible=position>=.18}
+  }
+  if(winding)for(const p of included){
+   const cover=p.part.label===(step==='p126'?'Spool cover':'Bottom spool')
+   fade(p,step==='p126'&&p.part.label.startsWith('Bearing')?1:cover?(channels?(position<.18?.65:.35):1):.26)
+  }
   if(inspection)for(const joint of inspections){
-   const angle=inspection==='rotation'?Math.sin(checkPhase*Math.PI*2)*.2:0,shift=inspection==='axial'?Math.sin(checkPhase*Math.PI*2)*.65:0
+   const angle=inspection==='rotation'?Math.sin(checkPhase*Math.PI*2)*.55:0,shift=inspection==='axial'?Math.sin(checkPhase*Math.PI*2)*.65:0
    const rotation=new THREE.Quaternion().setFromAxisAngle(joint.axis,angle),offset=joint.pivot.clone().sub(joint.pivot.clone().applyQuaternion(rotation)).addScaledVector(joint.axis,shift)
    for(const piece of joint.moving){piece.object.quaternion.copy(rotation);piece.object.position.copy(offset)}
   }
@@ -168,7 +176,7 @@ export function assemblyScene(bundle:Bundle,build:Build,step:string){
     const inspectable=step==='p68'?piece.part.label==='Thumb TP'||['Carpals','Touch carpals','Carpal core'].includes(piece.part.label):step==='p64'?piece.part.label.endsWith(' AP')||['Carpals','Touch carpals','Carpal core'].includes(piece.part.label):step!=='p89'||['Carpals','Touch carpals','Carpal core','Wrist frame'].includes(piece.part.label)
     fade(piece,channels&&!inspection&&inspectable?.32:1)
    }
-   if(!inspection)strands?.group.traverse(n=>{if(n instanceof THREE.Mesh){n.geometry.computeBoundingBox();bounds.union(n.geometry.boundingBox!)}})
+   if(!inspection)strands?.group.traverse(n=>{if(n instanceof THREE.Mesh){n.geometry.computeBoundingBox();n.updateMatrix();bounds.union(n.geometry.boundingBox!.clone().applyMatrix4(n.matrix))}})
    group.position.copy(bounds.getCenter(new THREE.Vector3()).negate())
    const rotated=bounds.clone().translate(group.position).applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(view.rotation)).getSize(new THREE.Vector3())
    view.scale.setScalar(Math.min(340/rotated.y,400/rotated.x))

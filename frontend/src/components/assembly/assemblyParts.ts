@@ -1,3 +1,5 @@
+import touchRight from '../../../public/assembly/parts/touch-right-dynamixel/inventory.json'
+import touchLeft from '../../../public/assembly/parts/touch-left-dynamixel/inventory.json'
 import type { Build } from './buildContent'
 export const AREAS = ['Thumb','Fingers','Carpals','Wrist','Tower'] as const
 export type Area = typeof AREAS[number]
@@ -25,7 +27,18 @@ export function partQuantityLabel(part:Part,stock:Supply[],area?:string){
 }
 export const supplyQuantity=(s:Supply)=>`${s.quantity}${s.optional?' · optional':''}`
 export function supplies(build:Build):Supply[] {
+  const touchInventory=build.side==='left'?touchLeft:touchRight
+  const touchScrews:Supply[]=build.version==='touch'?[
+    {length:3,area:'Fingers' as const,total:8}, {length:4,area:'Fingers' as const,total:8},
+    {length:4,area:'Thumb' as const,total:2}, {length:6,area:'Thumb' as const,total:2},
+    {length:6,area:'Carpals' as const,total:2},
+  ].flatMap(({length,area,total})=>{
+    const label=`M1.4 × ${length} cheese-head screw`
+    const represented=touchInventory.parts.filter(p=>p.label===label).reduce((n,p)=>n+(p.areas[area]?.length??0),0)
+    return total>represented?[{id:`touch-screw-${length}-${area}`,label,partLabel:label,quantity:String(total-represented),areas:[area],kind:'hardware' as const,note:`${total} required in ${area.toLowerCase()} by the Touch instructions; ${represented} already represented in this CAD. Board screws are self-tapping. The initial kit list and CAD differ; see Touch kit review notes.`}]:[]
+  }):[]
   const list:Supply[] = [
+    ...touchScrews,
     {id:'cord',label:'Tendon cord',quantity:'29 m + spare',areas:['Thumb','Fingers','Carpals','Wrist','Tower'],kind:'cord',note:'Ten 2 m lengths and twelve 75 cm lengths. These form 32 routed tendon ends; the same ends continue through carpals, wrist and tower.'},
     {id:'ptfe',label:'PTFE channel liner · OD 1.5 / ID 0.9 mm',quantity:'74 cut pieces',areas:['Thumb','Fingers','Carpals','Wrist'],kind:'tube',note:'2 thumb AP liners + 8 finger AP liners + 32 carpal liners + 32 wrist liners. Cut and trim during preparation.'},
     {id:'sleeves',label:'PTFE screw sleeve · OD 6 / ID 4 mm',quantity:'2 cut pieces',areas:['Wrist'],kind:'tube',note:'Sleeves over the two wrist screw threads. Trim to fit at the wrist preparation step.'},
@@ -45,7 +58,11 @@ export function supplies(build:Build):Supply[] {
     {id:'fan-leads',label:'Fan leads',quantity:'2 · with fans',areas:['Tower'],kind:'cable',note:'Included with the two fans; route through the lower tower slot.'},
     ...(build.version!=='base'?[
       {id:'board-lead',label:'4-wire connector-board cable',quantity:'1',areas:['Carpals','Wrist','Tower'] as Area[],kind:'cable' as const,note:'Connects the OH board and the selected version’s connector board.'},
-      {id:'sensor-harness',label:`${build.version==='touch'?'Touch':'Full'} finger harness`,quantity:'1 matching set',areas:['Thumb','Fingers','Carpals'] as Area[],kind:'cable' as const,note:'Use the harness supplied for the selected hand side and version; check connector lengths against the kit.'},
+      ...(build.version==='touch'?[
+        {id:'touch-short',label:'Touch sensor cable · 130 mm',quantity:'3',areas:['Thumb','Fingers','Carpals'] as Area[],kind:'cable' as const,note:'Three short cables. Finger allocation needs confirmation; the cable-wrapping step shows the short-cable dimensions.'},
+        {id:'touch-long',label:'Touch sensor cable · 280 mm',quantity:'2',areas:['Thumb','Fingers','Carpals'] as Area[],kind:'cable' as const,note:'Two long cables. Confirm the finger allocation and wrap position before fixing the copper wrap.'},
+        {id:'touch-wire',label:'Copper wrapping wire · Ø0.2 mm',quantity:'2.5 m + spare',areas:['Thumb','Fingers'] as Area[],kind:'cord' as const,note:'Approximately 50 cm per cable, five cables. Secure each end with a clove hitch.'},
+      ]:[{id:'sensor-harness',label:'Full finger harness',quantity:'1 matching set',areas:['Thumb','Fingers','Carpals'] as Area[],kind:'cable' as const,note:'Use the harness supplied for the selected hand side and version; check connector lengths against the kit.'}]),
     ]:[]),
     {id:'power',label:'12 V power supply',quantity:'1',areas:['Tower'],kind:'equipment',note:'Power connection to the OH board.'},
     {id:'usb',label:'USB-C data cable',quantity:'1',areas:['Tower'],kind:'cable',note:'A data-capable cable for programming and controlling the hand.'},
@@ -61,6 +78,6 @@ export function areaSupplyQuantity(s:Supply,area:Area) {
 
 export function areaSupplyNote(s:Supply,area:Area) {
   if(s.id==='cord')return area==='Thumb'?'Cut two 2 m lengths and four 75 cm lengths. These make the thumb’s eight routed ends.':area==='Fingers'?'For each of the four fingers: two 2 m lengths and two 75 cm lengths. Together these make 24 routed ends.':'Continue the same 32 tendon ends through this assembly; no additional cord is counted here.'
-  if(s.id==='ptfe')return area==='Thumb'?'Cut two liners approximately 8–10 mm long for the thumb AP; trim to approximately 1 mm protruding at each end.':area==='Fingers'?'Two liners per AP across the four fingers. Cut approximately 8–10 mm, then trim as shown in preparation.':`Cut 32 liners to the depth of the individual ${area.toLowerCase()} channels plus approximately 2 mm. Leave approximately 1 mm at each end; a single fixed cut length is not specified.`
+  if(s.id==='ptfe')return area==='Thumb'?'Cut two thumb AP liners to channel depth plus approximately 2 mm. Leave about 1 mm protruding at each end; 5–8 mm is only a starting estimate.':area==='Fingers'?'Two liners per AP across the four fingers. Measure channel depth and leave about 1 mm at each end; do not use a fixed cut length for every print.':`Cut 32 liners to the depth of the individual ${area.toLowerCase()} channels plus approximately 2 mm. Leave approximately 1 mm at each end; a single fixed cut length is not specified.`
   return s.note
 }

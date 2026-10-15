@@ -319,3 +319,36 @@ The JSON report records this completed sweep; update it after a new review rathe
 than assuming that regenerated images have been reviewed. The generator embeds
 the actual current renders and the saved Git originals, deduplicating unchanged
 images. No ORCA runtime behavior was changed during this second sweep.
+
+### Feedback and Touch review branch · 15 October 2026
+
+The recent rendering improvements above are preserved on
+`feature/assembly-feedback-touch`, starting with commit `d89768b`. The original
+`feature/better_stat_logging` worktree's assembly guide was restored to `3985b50`;
+its existing dependency development overrides were left untouched.
+
+This review edition integrates the two newly supplied PDFs without replacing the
+guide's design. It adds eleven Touch-only steps, instruction-local media and
+commands, a single Parts box, collapsible desktop navigation, named thumb-to-carpal
+routes, bearing-first top-spool assembly, and mold/skin references. Touch bench
+flashing happens before connector-board installation and palm closure. Normal
+Setup and hardware operations retain their existing implementations.
+
+Read [the feedback analysis and implementation map](docs/assembly-feedback-review.md)
+before editing. It records each concern, source discrepancies and verification.
+Several mechanical facts are still unconfirmed: thumb pin diameter/position,
+the reversed thumb AP channel assignment, long Touch cable wrapping/allocation,
+and discrepancies between fastener lists and CAD. These are explicitly visible
+in the affected steps. Do not replace them with inferred dimensions.
+
+Every step includes a removable Structure / Content / Images review box. Users can
+toggle them in the header. Maintainers can set `SHOW_ASSEMBLY_REVIEW_NOTES = false`
+in `ReviewChanges.tsx` to remove the entire review layer. Assembly cautions remain
+separate. Touch content lives in `touchGuide.ts`; the original guide IDs and explicit
+completion behavior remain intact. The `oct15-v1` feedback marker resets only the
+affected mechanical completion checks once.
+
+The standalone comparison above records the earlier tendon-visibility sweep;
+it is not a complete before/after report for this feedback edition. The new review
+boxes and analysis document describe the additional changes, including the two
+Touch bearing-image label corrections.

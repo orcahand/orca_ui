@@ -35,7 +35,7 @@ export const CAD_ILLUSTRATIONS: Recipe[] = [
   {step:'p136',file:'panel-138-4',caption:'OH board · seated face down in the rear hull',instruction:3,parts:['Rear hull cover','OH control board'],labelParts:['OH control board'],view:[.25,.15,-1]},
   {step:'p70',file:'panel-072-1',caption:'Carpal underside · identify the 16 palmar and 16 dorsal tendons before threading the wrist',instruction:1,routingReference:'carpal-rows'},
   {step:'p62',file:'panel-063-1',caption:'TP · the six passing tendons run between the two 2 × 30 guide pins',instruction:1,thumbFinishing:'pins'},
-  {step:'p62',file:'panel-063-2',caption:'Thumb AP · seat both bearings fully in the TP; use the size shown for your build',instruction:2,thumbFinishing:'bearings'},
+  {step:'p62',file:'panel-063-2',caption:'Thumb joint · seat both 4 × 8 × 3 mm bearings fully',instruction:2,thumbFinishing:'bearings'},
   {step:'p122',file:'panel-092-1',caption:'Wrist drive · align the pulley, its pin and bearing with the motor carrier',instruction:2,scene:'motion',position:.4,motorSpecific:true},
   {step:'p122',file:'panel-092-2',caption:'Wrist drive · engage the motor carrier before joining the wrist to the tower',instruction:2,scene:'motion',position:.5,motorSpecific:true},
   {step:'p56',file:'panel-058-1',caption:'TP · thread both 75 cm anchors from outside to inside; pull 20 cm through',instruction:1,tpAnchorPreparation:'thread'},

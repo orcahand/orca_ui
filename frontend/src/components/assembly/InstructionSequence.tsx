@@ -7,11 +7,11 @@ export function InstructionSequence({instructions,index,onSelect}:{instructions:
   return()=>clearTimeout(timer)
  },[playing,index,instructions,onSelect])
  if(instructions.length<2)return null
- return <div className="assembly-instruction-sequence" aria-label="Walk through this step">
-  <span>{index<0?'Walk through this step':`Instruction ${index+1} of ${instructions.length}`}</span>
-  <button className="assembly-text-button" disabled={index<=0} onClick={()=>{setPlaying(false);onSelect(index-1)}}>← Back</button>
-  <button className="assembly-secondary" onClick={()=>{if(index<0||index>=instructions.length-1)onSelect(0);setPlaying(!playing)}}>{playing?'Pause walkthrough':'Play walkthrough'}</button>
-  <button className="assembly-text-button" disabled={index>=instructions.length-1} onClick={()=>{setPlaying(false);onSelect(index+1)}}>Next →</button>
-  {index>=0&&<button className="assembly-text-button" onClick={()=>{setPlaying(false);onSelect(-1)}}>Show all</button>}
+ return <div className="assembly-instruction-sequence" aria-label="Instruction controls">
+  <span aria-live="polite">{index<0?'All instructions':`${index+1} / ${instructions.length}`}</span>
+  <button className="assembly-text-button" onClick={()=>{setPlaying(false);onSelect(index<0?0:-1)}}>{index<0?'One at a time':'Show all'}</button>
+  <button className="assembly-text-button" aria-label="Previous instruction" disabled={index<=0} onClick={()=>{setPlaying(false);onSelect(index-1)}}>←</button>
+  <button className="assembly-text-button" aria-label="Next instruction" disabled={index>=instructions.length-1} onClick={()=>{setPlaying(false);onSelect(index+1)}}>→</button>
+  <button className="assembly-secondary assembly-walkthrough-play" aria-label={playing?'Pause walkthrough':'Play walkthrough'} aria-pressed={playing} onClick={()=>{if(index<0||index>=instructions.length-1)onSelect(0);setPlaying(!playing)}}>{playing?'Ⅱ':'▶'}</button>
  </div>
 }
