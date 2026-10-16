@@ -17,6 +17,9 @@ import { ASSEMBLY_MOTIONS } from './assemblyMotions'
 import { TendonRouting } from './TendonRouting'
 import { HandLabels } from './HandLabels'
 import { KnotLesson } from './KnotLesson'
+import { CloveHitchLesson } from './CloveHitchLesson'
+import { TouchCableWrap } from './TouchCableWrap'
+import { TouchScrewGuide } from './TouchScrewGuide'
 import localClips from './local-clips.json'
 import { ThreadingAnimation } from './ThreadingAnimation'
 import { EMPTY_PROGRESS, changeBuildProgress, flashingMethod } from './progress'
@@ -125,7 +128,7 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
           </div>}
         {build.audience==='internal'&&step.chapter.startsWith('Flashing')&&<section className="assembly-flashing-choice"><h3>Choose one flashing method</h3><p>Both methods prepare the same boards. Complete the selected method; you do not need to flash them twice.</p><div className="assembly-clip-tabs"><button aria-pressed={method==='console'} onClick={()=>chooseFlashing('console')}>ORCA Console</button><button aria-pressed={method==='firmware'} onClick={()=>chooseFlashing('firmware')}>orca_firmware · terminal</button></div></section>}
         {step.id !== 'p1' && kit(step,build).length>0 && <div className="assembly-kit"><span className="assembly-eyebrow">Parts</span><ul>{kit(step,build).map(item => <li key={item}>{item}</li>)}</ul></div>}
-        {step.id === 'p1' && <><Suspense fallback={<p>Loading your hand…</p>}><PartsExplorer build={build}/></Suspense>{build.version==='touch'&&<p className="assembly-muted">Includes Touch sensor preparation, cable wrapping, installation and connector-board flashing before closing the palm.</p>}{build.version==='full'&&<p className="assembly-note">Full-specific sensor installation and harness routing still need a verified procedure before closing the hand.</p>}</>}
+        {step.id === 'p1' && <><Suspense fallback={<p>Loading your hand…</p>}><PartsExplorer build={build}/></Suspense>{build.version==='touch'&&<p className="assembly-muted">Complete the hand and tower assembly first, then prepare and install the Touch sensors, cables and connector board before the final checks and tensioning. Touch has no DP skins.</p>}{build.version==='full'&&<p className="assembly-note">Full-specific sensor installation and harness routing still need a verified procedure before closing the hand.</p>}</>}
         {step.id === 'p6' && <><KnotLesson/><StepVideos key="knot-video" step={step} build={build}/></>}
         {step.id === 'p23' && <HandLabels build={build}/>}
         {step.id.startsWith('touch-')&&['touch-ids','touch-test'].includes(step.id)&&<table className="assembly-sensor-ids"><caption>Sensor IDs</caption><thead><tr><th scope="col">Finger</th><th scope="col">ID</th></tr></thead><tbody>{['Thumb','Index','Middle','Ring','Pinky'].map((finger,id)=><tr key={finger}><th scope="row">{finger}</th><td>{id}</td></tr>)}</tbody></table>}
@@ -145,8 +148,11 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
         {i===(DETAIL_AT[step.id]??copy.length-1)&&CAD_DETAILS[step.id]&&step.id!=='p46'&&!(build.motor==='feetech'&&CAD_DETAILS[step.id].motorSpecific)&&<CadDetail key={step.id} build={build} step={step.id}/>}
         {i===0&&step.id==='p115'&&<MotorChain build={build}/>}
         {i===1&&['p37','p49','p56'].includes(step.id)&&<KnotReinforcement count={step.id==='p37'?1:3}/>}
+        {i===0&&['touch-wrap-short','touch-wrap-long'].includes(step.id)&&<CloveHitchLesson key={step.id}/>}
+        {i===1&&step.id==='touch-wrap-short'&&<TouchCableWrap/>}
+        {i===1&&step.id==='touch-mount'&&<TouchScrewGuide build={build}/>}
         {i===1&&step.id === 'p26' && <TendonPreparation/>}
-        {i===1&&step.id === 'p59' && <TendonRouting step={step.id} build={build}/>}
+        {i===2&&step.id === 'p59' && <TendonRouting step={step.id} build={build}/>}
         {i===1&&step.id === 'p77' && <WristRouting build={build}/>}
         {i===0&&step.id === 'p80' && <RoutingInspection build={build}/>}
         {i===(step.id==='p35'?1:2)&&['p35','p45'].includes(step.id) && <FingerMotion build={build} indexOnly={step.id==='p35'}/>}
@@ -190,7 +196,7 @@ function MediaGallery({ items, saved, onSelect, focused }: { items: Figure[]; fo
   function enlarge(index:number){setSelected(index);setPhoto(false);onSelect(items[index].src);dialog.current?.showModal()}
   return <section className="assembly-panel-gallery" style={{'--panel-columns':items.length===1?1:Math.min(5,Math.max(2,Math.ceil(items.length/2))) } as React.CSSProperties} aria-label="Assembly photos and diagrams">
     {items.map((item,i)=><figure key={item.src} data-contrast={item.contrast??false} data-wide={item.wide||undefined} className={focused<0?'':(item.instruction??i+1)===focused+1?'is-focused':'is-unfocused'}>
-      <div className="assembly-row"><span className="assembly-panel-number" aria-label={`Instruction ${item.instruction??i+1}`}>{item.instruction??i+1}</span><button className="assembly-text-button" onClick={()=>enlarge(i)} aria-label={`Enlarge image ${i+1}`}>⤢</button></div>
+      <div className="assembly-row" style={{justifyContent:'flex-end'}}><button className="assembly-text-button" onClick={()=>enlarge(i)} aria-label={`Enlarge image ${i+1}`}>⤢</button></div>
       <button className="assembly-image-button" data-image-kind={item.photo?'cad':'photo'} onClick={()=>enlarge(i)} aria-label={`Enlarge detail ${i+1}`}><img src={item.src} alt={item.caption} loading="lazy"/></button>{item.showCaption&&<figcaption className="assembly-panel-caption">{item.caption}</figcaption>}
     </figure>)}
     <dialog ref={dialog} className="assembly-lightbox assembly-comparison" data-contrast={photo?false:item.contrast??false} data-image-kind={photo||!item.photo?'photo':'cad'} aria-label="Enlarged assembly image" onKeyDown={e=>{if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();cycle(e.key==='ArrowRight'?1:-1)}}} onCancel={e=>e.stopPropagation()} onClick={e=>{if(e.target===e.currentTarget)dialog.current?.close()}}>

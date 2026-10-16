@@ -2,7 +2,7 @@ import {useEffect,useMemo,useRef,useState} from 'react'
 import {Canvas,useThree} from '@react-three/fiber'
 import {OrbitControls} from '@react-three/drei'
 import {loadBundle,type Bundle} from './cadAssets'
-import {CAD_DETAILS,cadDetailScene} from './cadDetails'
+import {cadDetailSpec,cadDetailScene} from './cadDetails'
 import {AssemblyComparison} from './AssemblyComparison'
 import type {Build} from './buildContent'
 function Model({bundle,build,step,amount,highlight}:{bundle:Bundle;build:Build;step:string;amount:number;highlight:string}){
@@ -10,7 +10,7 @@ function Model({bundle,build,step,amount,highlight}:{bundle:Bundle;build:Build;s
  useEffect(()=>()=>scene.dispose(),[scene]);useEffect(()=>{scene.update(amount,highlight);invalidate()},[scene,amount,highlight,invalidate]);return <group scale={Math.min(1,(size.width-24)/530,(size.height-24)/340)}><primitive object={scene.view}/></group>
 }
 export function CadDetail({build,step}:{build:Build;step:string}){
- const spec=CAD_DETAILS[step],key=`${build.version==='touch'?'touch':'base'}-${build.side}-dynamixel`
+ const spec=cadDetailSpec(build,step),key=`${build.version==='touch'?'touch':'base'}-${build.side}-dynamixel`
  const startAmount=useRef(1)
  const [loaded,setLoaded]=useState<{key:string;bundle:Bundle}|null>(null),[failed,setFailed]=useState(false),[amount,setAmount]=useState(step==='p139'?0:1),[playing,setPlaying]=useState(false)
  useEffect(()=>{let live=true;setFailed(false);loadBundle(key).then(bundle=>{if(live)setLoaded({key,bundle})}).catch(()=>{if(live)setFailed(true)});return()=>{live=false}},[key])

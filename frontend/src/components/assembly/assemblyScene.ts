@@ -74,7 +74,11 @@ export function assemblyScene(bundle:Bundle,build:Build,step:string){
   const movingBox=new THREE.Box3(),fixedBox=new THREE.Box3();moving.forEach(p=>movingBox.union(p.bounds));fixed.forEach(p=>fixedBox.union(p.bounds))
   direction=movingBox.getCenter(new THREE.Vector3()).sub(fixedBox.getCenter(new THREE.Vector3())).normalize()
   gap=Math.max(42,movingBox.getSize(new THREE.Vector3()).length()*.22)
-  moving.forEach(p=>stage(p,direction.clone().multiplyScalar(gap),.25,.78))
+  moving.forEach(p=>{
+   // Opposite tower side plates approach independently along the lateral axis.
+   const approach=step==='p135'?new THREE.Vector3(Math.sign(p.center.x-fixedBox.getCenter(new THREE.Vector3()).x),0,0):direction.clone()
+   stage(p,approach.multiplyScalar(gap),.25,.78)
+  })
   if(step==='p42'||step==='p54'){
    const finger=step==='p54'?'Thumb':'Index',pinLength=step==='p54'?10:8
    const pp=moving.find(p=>p.part.label===`${finger} PP`)!,ap=fixed.find(p=>p.part.label===`${finger} AP`)!
@@ -103,6 +107,13 @@ export function assemblyScene(bundle:Bundle,build:Build,step:string){
   }
   if(step==='p89'){
    const wrist=fixed.find(p=>p.part.label==='Wrist frame')!
+   // The hand already has its skins and pins at this stage. Touch DP sensors
+   // are fitted later, so only its PP skins and palm skin belong here.
+   for(const p of all){
+    const skin=p.part.category==='Skins'&&(p.part.label==='Palm skin'||/ (DP|PP) skin$/.test(p.part.label))&&!(build.version==='touch'&&p.part.label.includes('DP skin'))
+    const pin=p.part.label.startsWith('Pin ·')&&(spec.moving.includes(p.owner??'')||p.part.label==='Pin · 3 × 50')
+    if(skin||pin)stage(p,direction.clone().multiplyScalar(gap),.25,.78)
+   }
    matching(['M4 square nut']).forEach(add)
    matching(['M4 washer','M4 × 20 socket screw']).forEach(p=>{
     const axis=p.axis.clone();if(axis.dot(p.center.clone().sub(wrist.center))<0)axis.negate()
@@ -127,7 +138,7 @@ export function assemblyScene(bundle:Bundle,build:Build,step:string){
   const bearings=all.filter(p=>p.part.label.startsWith('Bearing')&&(name==='Wrist'?p.part.label==='Bearing · 8 × 13 × 4':p.owner===name))
   const pivot=bearings[0].center.clone().add(bearings[1].center).multiplyScalar(.5),axis=bearings[1].center.clone().sub(bearings[0].center).normalize()
   const [finger,segment]=name.split(' '),names=['DP','PP','AP','TP'].slice(0,['DP','PP','AP','TP'].indexOf(segment)+1).map(s=>`${finger} ${s}`)
-  const moving=[...included].filter(p=>name==='Wrist'?(spec.moving.includes(p.part.label)||p.part.label==='Bearing · 8 × 13 × 4'):names.includes(p.part.label)||names.includes(p.owner??pinOwners.get(p)??''))
+  const moving=[...included].filter(p=>name==='Wrist'?(!spec.fixed.includes(p.part.label)&&!['M4 square nut','M4 washer','M4 × 20 socket screw'].includes(p.part.label)):names.includes(p.part.label)||names.includes(p.owner??pinOwners.get(p)??''))
   const joint=name==='Wrist'?'wrist':`${finger.toLowerCase()}_${segment==='TP'?'cmc':segment==='AP'?'abd':segment==='PP'?'mcp':finger==='Thumb'?'dip':'pip'}`
   return {pivot,axis,moving,range:illustratedJointRange(build,joint,axis)}
  })
@@ -157,7 +168,8 @@ export function assemblyScene(bundle:Bundle,build:Build,step:string){
   if(step==='p126'){
    const top=selected.find(p=>p.part.label==='Spool cover')!,bearing=selected.find(p=>p.part.label==='Bearing · 4 × 8 × 3')!
    bearing.object.position.copy(top.object.position).addScaledVector(new THREE.Vector3(0,0,Math.sign(top.center.z)||1),14*(1-ease(position/.18)))
-   if(winding){winding.group.position.copy(top.object.position);winding.group.visible=position>=.18}
+   // spoolWinding already follows the spool center plus its assembly offset.
+   if(winding)winding.group.visible=position>=.18
   }
   if(winding)for(const p of included){
    const cover=p.part.label===(step==='p126'?'Spool cover':'Bottom spool')

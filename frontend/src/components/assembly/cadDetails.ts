@@ -12,13 +12,20 @@ export const CAD_DETAILS:Record<string,CadDetail>={
  p129:{title:'Match the tower and wrist magnet seats',fixed:['Motor tower','Wrist frame'],moving:['Magnet · 5 × 3 mm'],caption:'Four tower magnets and four wrist magnets. Check mating polarity before applying glue.'},
  p139:{title:'Your assembled hand',fixed:[],moving:[],caption:'Rotate the completed assembly to review the palm, dorsum and wrist before tensioning.'},
 }
+export function cadDetailSpec(build:Build,step:string):CadDetail {
+ const spec=CAD_DETAILS[step]
+ if(build.version!=='touch'||!['finishing-pp','p46'].includes(step))return spec
+ return {...spec,title:step==='p46'?'Fit the thumb PP skin and bearings':'Fit the PP skin and bearings',
+  moving:spec.moving.filter(label=>!label.includes('touch module')&&!label.includes('DP skin')),
+  caption:'Fit the PP skin and bearings. Leave DP bare; fit the Touch sensor after assembly, just before tensioning.'}
+}
 export function cadDetailScene(bundle:Bundle,build:Build,step:string){
  const skinStep=['finishing-pp','p46'].includes(step),finger=step==='p46'?'Thumb':'Index'
- const spec=CAD_DETAILS[step],pieces=cadPieces(bundle,build),group=new THREE.Group()
+ const spec=cadDetailSpec(build,step),pieces=cadPieces(bundle,build),group=new THREE.Group()
  const fixed=pieces.filter(p=>spec.fixed.includes(p.part.label)||(skinStep&&p.part.label.startsWith('Bearing')&&p.owner===`${finger} DP`)),center=new THREE.Box3();fixed.forEach(p=>center.union(p.bounds));const anchor=center.isEmpty()?new THREE.Vector3():center.getCenter(new THREE.Vector3())
  const screws=pieces.filter(p=>p.part.label==='M3 × 14 socket screw')
  const moving=pieces.filter(p=>spec.moving.includes(p.part.label)).filter(p=>!skinStep||(p.part.label.startsWith('Bearing')?p.owner===`${finger} PP`:p.part.label.includes('touch module')&&step==='finishing-pp'?nearest(pieces.filter(b=>/^(Index|Middle|Ring) DP$/.test(b.part.label)),p.center)?.part.label==='Index DP':true)).filter(p=>step!=='p127'||p.part.label!=='M3 hex nut'||screws.some(s=>s.center.distanceTo(p.center)<25))
- const selected=step==='p139'?pieces.filter(p=>p.part.category!=='Tendons'&&!p.part.label.includes('(optional)')):[...fixed,...moving]
+ const selected=step==='p139'?pieces.filter(p=>p.part.category!=='Tendons'&&!p.part.label.includes('(optional)')&&!(build.version==='touch'&&p.part.category==='Skins'&&/DP skin|Pinky touch skin/.test(p.part.label))):[...fixed,...moving]
  const offsets=new Map<CadPiece,THREE.Vector3>()
  for(const p of selected){group.add(p.object);if(!moving.includes(p))continue
   let direction=p.center.clone().sub(anchor).normalize()

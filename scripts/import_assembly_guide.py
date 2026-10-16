@@ -12,7 +12,10 @@ import pymupdf, re, json
 from PIL import Image, ImageChops
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('pdf',type=Path)
+parser.add_argument('--dpi',type=int,default=300,help='Rasterization resolution (default: 300 DPI). Source photo detail remains the limit.')
 args=parser.parse_args()
+if args.dpi<=0:parser.error('--dpi must be positive')
+scale=args.dpi/72
 root=Path(__file__).resolve().parents[1]
 doc=pymupdf.open(args.pdf)
 out=root/'frontend/public/assembly/media'; out.mkdir(parents=True,exist_ok=True)
@@ -31,14 +34,14 @@ for n,p in enumerate(doc,1):
   if n not in {39,44,51,55,58,60,61,66,67,81,101,110,124,126,128,138} or rect.y0<88 or rect.y0>=365 or (' = ' in txt and rect.y0>=340) or len(txt)>140:
    p.add_redact_annot(rect,fill=(1,1,1))
  p.apply_redactions(images=0,graphics=0)
- pix=p.get_pixmap(matrix=pymupdf.Matrix(2.5,2.5),clip=crop,alpha=False)
+ pix=p.get_pixmap(matrix=pymupdf.Matrix(scale,scale),clip=crop,alpha=False)
  im=Image.frombytes('RGB',[pix.width,pix.height],pix.samples)
  mask=ImageChops.difference(im,Image.new('RGB',im.size,'white')).convert('L').point(lambda v:255 if v>35 else 0)
  box=mask.getbbox()
  if not box: continue
  box=(max(0,box[0]-18),max(0,box[1]-18),min(im.width,box[2]+18),min(im.height,box[3]+18))
  im=im.crop(box)
- filename=f'detail-{n:03}.jpg'; im.save(out/filename,quality=92)
+ filename=f'detail-{n:03}.png'; im.save(out/filename)
  side='right' if n in (60,66,84,116) else 'left' if n in (61,67,85) else None
  media[str(n)]={'src':f'./assembly/media/{filename}','side':side}
 (root/'frontend/src/components/assembly/media-catalog.json').write_text(json.dumps(media,indent=2)+'\n')
@@ -49,8 +52,8 @@ for n, side in [(84, 'right'), (85, 'left')]:
     panels = []
     for label, clip in [('Wrist channel numbering', (27,92,262,362)), ('Joint and palm-side mapping', (272,3,498,368)), ('Back-side spool mapping', (508,51,700,367))]:
         j=len(panels)+1
-        filename=f'mapping-{side}-{j}.jpg'
-        doc[n-1].get_pixmap(matrix=pymupdf.Matrix(3,3),clip=pymupdf.Rect(clip),alpha=False).save(out/filename, jpg_quality=93)
+        filename=f'mapping-{side}-{j}.png'
+        doc[n-1].get_pixmap(matrix=pymupdf.Matrix(scale,scale),clip=pymupdf.Rect(clip),alpha=False).save(out/filename)
         panels.append({'src':f'./assembly/media/{filename}','caption':f'{label} · {side} hand','side':side})
     media[str(n)]['panels']=panels
 (root/'frontend/src/components/assembly/media-catalog.json').write_text(json.dumps(media,indent=2)+'\n')

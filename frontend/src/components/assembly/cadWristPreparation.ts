@@ -3,14 +3,45 @@ import {cadPieces,disposePieces,fade,nearest} from './cadScene'
 import type {Bundle} from './cadAssets'
 import type {Build} from './buildContent'
 
-export type WristPreparation='screw-sleeves'|'belt-position'|'fan-mounts'|'fans-fitted'
+export type WristPreparation='tower-nuts'|'square-nuts'|'screw-sleeves'|'belt-position'|'fan-mounts'|'fans-fitted'
 
 export function cadWristPreparation(bundle:Bundle,build:Build,kind:WristPreparation){
  const pieces=cadPieces(bundle,build),group=new THREE.Group(),extra:THREE.Mesh[]=[]
  const labels:{text:string;point:THREE.Vector3}[]=[]
  const matching=(names:string[])=>pieces.filter(p=>names.includes(p.part.label))
  let direction=new THREE.Vector3(-1,.35,-.3),focus:THREE.Box3|undefined
- if(kind==='fan-mounts'||kind==='fans-fitted'){
+ if(kind==='tower-nuts'){
+  const tower=matching(['Motor tower'])[0],nuts=matching(['M4 hex nut'])
+  if(nuts.length!==3)throw new Error('Expected three tower M4 nuts')
+  group.add(tower.object);fade(tower,.18)
+  focus=new THREE.Box3()
+  for(const [i,nut] of nuts.entries()){
+   const inward=nut.axis.clone()
+   if(inward.dot(tower.center.clone().sub(nut.center))<0)inward.negate()
+   nut.object.position.copy(inward).multiplyScalar(12);group.add(nut.object)
+   const from=nut.center.clone().add(nut.object.position)
+   group.add(new THREE.ArrowHelper(inward.clone().negate(),from.clone().addScaledVector(inward,-2),8,0x298a92,2,1))
+   labels.push({text:`M4 nut ${i+1} · from inside`,point:from})
+   focus.union(nut.bounds)
+  }
+  focus.expandByScalar(15)
+  direction.set(.35,1,-1)
+ }else if(kind==='square-nuts'){
+  const wrist=matching(['Wrist frame'])[0],nuts=matching(['M4 square nut'])
+  if(nuts.length!==2)throw new Error('Expected two wrist square nuts')
+  group.add(wrist.object)
+  fade(wrist,.18)
+  for(const [i,nut] of nuts.entries()){
+   // Negative X is the wrist interior; the nuts enter the pockets from this side.
+   nut.object.position.set(-12,0,0);group.add(nut.object)
+   const from=nut.center.clone().add(nut.object.position)
+   const arrow=new THREE.ArrowHelper(new THREE.Vector3(1,0,0),from.clone().add(new THREE.Vector3(2,0,0)),8,0x298a92,2,1)
+   group.add(arrow)
+   labels.push({text:`Square nut ${i+1} · insert from inside`,point:from})
+  }
+  focus=wrist.bounds.clone()
+  direction.set(-1,.6,-.7)
+ }else if(kind==='fan-mounts'||kind==='fans-fitted'){
   const tower=matching(['Motor tower'])[0],fans=matching(['Cooling fan']),screws=matching(['M3 × 12 socket screw'])
   const nuts=matching(['M3 hex nut']).filter(p=>screws.some(s=>Math.abs(s.center.y-p.center.y)<.01&&Math.abs(s.center.z-p.center.z)<.01))
   if(fans.length!==2||screws.length!==2||nuts.length!==2)throw new Error('Expected two fan mounting sets')
@@ -50,5 +81,5 @@ export function cadWristPreparation(bundle:Bundle,build:Build,kind:WristPreparat
    direction.set(-.65,.6,-1)
   }
  }
- return {group,labels,direction,focus,parts:pieces.filter(p=>p.object.parent===group).map(p=>p.part.label),dispose:()=>{disposePieces(pieces);extra.forEach(m=>{m.geometry.dispose();(m.material as THREE.Material).dispose()})}}
+ return {group,labels,direction,focus,parts:pieces.filter(p=>p.object.parent===group).map(p=>p.part.label),dispose:()=>{group.traverse(o=>{if(o instanceof THREE.ArrowHelper)o.dispose()});disposePieces(pieces);extra.forEach(m=>{m.geometry.dispose();(m.material as THREE.Material).dispose()})}}
 }

@@ -52,7 +52,15 @@ connectors, so it cannot replace the connector-identification and wiring photos.
 Those photos remain the connection reference. The rear-hull instructions specify
 the upper motor/connector-board exit and lower fan exit, viewed from inside the hull.
 
-The slider moves components into Thumb, Fingers, Carpals, Wrist and Tower areas.
+The slider moves components into Fingers & thumb, Carpals, Wrist and Tower areas.
+Thumb and finger stock share one area: 32 tendon ends and 10 AP liners.
+The explorer groups matching labels, displays explicit quantities, and excludes
+the internal `orcahand` and `Ratchet_Main` CAD solids from separate parts lists;
+those solids remain visible in the assembled hand.
+Carpal covers are supplemental parts because the complete exports omit them.
+Their left/right STL downloads and mesh-derived SVG previews come from the
+Touch `02_Carpals/Coav-L.stl` and `Coav-R.stl` hardware sources.
+Supplemental cheese-head screws use a screw illustration rather than the cable fallback.
 Standard hardware collapses into one kit icon in each area. Area-title dialogs include the complete kit. “Standard components” shows only
 fasteners, bearings and pins; Tendons/PTFE/Cables each show only that section’s stock.
 The modeled tower tendon spans collapse into the two counted material groups
@@ -153,7 +161,12 @@ The recording predates some parts and the OH board; video measurements do not
 supersede current written instructions. Motor programming commands are supplied
 as copyable text, never executed by the guide.
 
-Rebuild imported PDF panels (requires reviewing crops if the PDF changes):
+Rebuild imported PDF panels (requires reviewing crops if the PDF changes).
+Both importers default to 300 DPI and lossless PNG output; `--dpi` can override
+the rasterization resolution. This avoids another JPEG encode but cannot recover
+detail already missing from embedded source photos. Existing extracted assets
+require the source PDF to regenerate. Photo views retain intrinsic dimensions
+when the available crop is smaller than the image container:
 
 ```sh
 uv run --no-project --with pymupdf --with pillow python scripts/import_assembly_guide.py '/path/Assembly Instructions.pdf'
@@ -725,3 +738,28 @@ Unresolved assembly information:
   Dynamixel 180 mm 3-pin cable. FeeTech and Full retain the original reference
   photographs; the Dynamixel-only tower render is not shown for those builds.
   The three M4 nut picture is linked to the final instruction in this step.
+
+## Touch DP flexion through PP
+
+- The Join DP and PP viewer uses the Touch PP's internal flexion passage. Its
+  depth changes near the entrance; the previous constant-depth route went around
+  the outside of the body. Both Touch hand sides now follow the measured passage.
+- `scripts/repair_assembly_touch_pp_routes.py` recreates the route from the Base
+  path in joint coordinates, adjusts its depth against the actual Touch mesh,
+  and plans the short entrance bend around both seated DP and PP surfaces.
+  It requires NumPy and writes a staging JSON via `--output`.
+- Dense samples of the 0.16 mm checking envelope clear DP, PP and the installed
+  pins; the viewer's cord radius is 0.14 mm. The Base and extension paths retain
+  their existing coordinates. These are illustration checks against CAD meshes.
+
+## Touch sensor fitting order
+
+- Touch DPs have no skins. Early finger/thumb assembly fits PP skins and
+  bearings only; the fitting and movement viewers leave fingertip sensors off.
+- The complete Touch section follows hand, tower and hull assembly: sensor kit
+  preparation, IDs, cable preparation/routing, sensor fitting, connector-board
+  mounting and harness connection, then sensor testing. Board flashing remains
+  with the electronics steps after Tower.
+- Review the completed hand after sensor installation, then continue to
+  tensioning in Setup.
+  Stable step IDs preserve saved progress while navigation follows this order.

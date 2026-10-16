@@ -4,7 +4,7 @@ import type {Figure} from './buildContent'
 const step=(id:string,title:string,instructions:string[],check:string,chapter='Touch sensors'):AssemblyStep=>({id,chapter,title,pages:[],instructions,check})
 export const TOUCH_STEPS:AssemblyStep[]=[
  step('touch-parts','Prepare the Touch sensor kit',[
-  'Sort the five sensors: thumb, three middle-size sensors (index, middle and ring), and pinky.',
+  'Sort the five sensors: thumb, three middle-size sensors (index, middle and ring), and pinky. Touch has no DP skins; keep the sensors off the fingertips until the hand is assembled, just before tensioning.',
   'Lay out the three 130 mm cables, two 280 mm cables, copper wire, connector board and 4-wire board cable.',
   'Sort the M1.4 screws into 3, 4 and 6 mm lengths. The fastening steps show where each length goes.',
  ],'I have the correct sensors, cables, wire and all three screw lengths.'),
@@ -14,8 +14,8 @@ export const TOUCH_STEPS:AssemblyStep[]=[
   'Touch the sensor and check its response in the software. Repeat for all five.',
  ],'All five sensors have the correct unique IDs and have passed the software response check.'),
  step('touch-wrap-short','Wrap the 130 mm cables',[
-  'Cut about 50 cm of Ø0.2 mm copper wire. Tie its first end to the cable with the pictured clove hitch.',
-  'Wind evenly with about 1 mm between turns. Match the pictured 3 cm wrap and 7 cm offset to the right-hand connector (±5 mm).',
+  'Cut about 50 cm of Ø0.2 mm copper wire. Tie its first end to the cable with the clove hitch shown below.',
+  'Wind evenly with about 1 mm between turns. Match the 3 cm wrap and 7 cm offset to the right-hand connector (±5 mm).',
   'Finish with a clove hitch and trim both wire tails below 2 mm. Repeat for all three short cables.',
  ],'All three short cables have even wraps, secure end knots and wire tails shorter than 2 mm.'),
  step('touch-wrap-long','Wrap the 280 mm cables',[
@@ -33,11 +33,11 @@ export const TOUCH_STEPS:AssemblyStep[]=[
   'Check that each cable reaches both connectors without strain. Choose the cable length to suit the route and leave the sensor end accessible.',
  ],'All five cables are routed gently, with the wrapped sections at the APs and enough slack to connect.'),
  step('touch-connect','Connect the cables to the Paxini sensors',[
-  'Match the sensor and exposed plug contacts to the correct close-up.',
+  'With the mechanical hand assembled and power off, match each sensor and exposed plug contacts to the correct close-up. Connect and fit the sensors now, just before tensioning.',
   'Insert the plug squarely and gently. Check its orientation against the correct and reversed examples.',
  ],'Each sensor connector matches the correct orientation and is fully seated.'),
  step('touch-mount','Fasten the Touch sensors',[
-  'Place each labeled sensor on its matching fingertip, keeping the cable clear of the mounting surfaces.',
+  'After completing the mechanical hand assembly, place each labeled sensor on its matching bare DP, keeping the cable clear of the mounting surfaces. Touch uses this sensor instead of a DP skin; fit it just before tensioning.',
   'Fit the screws shown: fingers use two M1.4×3 at the tip and two M1.4×4 below; the thumb uses two M1.4×4 at the tip and two M1.4×6 below.',
   'Tighten gently with a hand screwdriver. Check that each sensor sits flush and its cable is free.',
  ],'All five sensors are flush, gently secured with the correct screws, and their cables are clear.'),
@@ -73,12 +73,12 @@ export const TOUCH_KITS:Record<string,string[]>={
 const photo=(name:string,caption:string,instruction:number):Figure=>({src:`./assembly/touch/${name}.png`,caption,instruction,showCaption:/correct|wrong|paint-|board-map|clove-hitch/.test(name)})
 export const TOUCH_FIGURES:Record<string,Figure[]>={
  'touch-parts':[photo('parts-sensors','Five Paxini sensors and copper wire',1),photo('parts-cables','Three short and two long cables, connector board and board cable',2)],
- 'touch-wrap-short':[photo('clove-hitch','Clove hitch: follow the sequence from upper left to lower right',1),photo('wrap-start','Secure the first copper-wire end',1),photo('wrap-short','130 mm cable · approximately 3 cm wrap and 7 cm to the pictured right connector',2)],
- 'touch-wrap-long':[photo('clove-hitch','Use a clove hitch to secure each wire end',1)],
+ 'touch-wrap-short':[],
+ 'touch-wrap-long':[],
  'touch-paint':[photo('paint-before','Copper wrap before coloring',1),photo('paint-after','Copper wrap colored black',1)],
  'touch-route':[photo('route-thumb','Cable route into the thumb',1),photo('route-finger','Cable route through a finger; the wrap sits at the AP',2)],
  'touch-connect':[photo('sensor-plug-face','Correct exposed-contact face of the sensor plug',1),photo('sensor-correct','Correct · sensor connector orientation',2),photo('sensor-correct-angle','Correct · seated connector viewed from the side',2),photo('sensor-wrong','Wrong · reversed sensor connector',2)],
- 'touch-mount':[photo('sensor-seat','Cable seated beneath the sensor',1),photo('screws-fingers','Finger screw map · green M1.4×3, blue M1.4×4',2),photo('screws-thumb','Thumb screw map · blue M1.4×4, orange M1.4×6',2),photo('sensor-flush','Sensor sits flush on the fingertip',3)],
+ 'touch-mount':[photo('sensor-seat','Cable seated beneath the sensor',1),photo('sensor-flush','Sensor sits flush on the fingertip',3)],
  'touch-board-mount':[photo('board-mount','Connector board seated in the carpals',2)],
  'touch-board-connect':[photo('board-correct','Correct · connector-board plug orientation',1),photo('board-wrong','Wrong · reversed connector-board plug',1),photo('board-map','Mounted board: T thumb, M middle, I index, R ring, P pinky',2)],
 }

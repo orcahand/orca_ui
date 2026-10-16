@@ -5,7 +5,7 @@
     "step": "p49",
     "labels": [
       "Tendon",
-      "Working end \u00b7 20 cm"
+      "Working end · 20 cm"
     ],
     "meshes": 85744,
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
@@ -16,7 +16,7 @@
     "step": "p37",
     "labels": [
       "Tendon",
-      "Working end \u00b7 20 cm"
+      "Working end · 20 cm"
     ],
     "meshes": 59694,
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
@@ -58,7 +58,7 @@
     "file": "panel-032-3",
     "step": "p31",
     "labels": [
-      "Smooth underside \u00b7 preserve the curved profile"
+      "Smooth underside · preserve the curved profile"
     ],
     "meshes": 25430,
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
@@ -402,8 +402,8 @@
     "file": "panel-015-1",
     "step": "p15",
     "labels": [
-      "PTFE \u00b7 \u00d81.5 / \u00d80.9 mm",
-      "Liner end \u00b7 1 mm"
+      "PTFE · Ø1.5 / Ø0.9 mm",
+      "Liner end · 1 mm"
     ],
     "meshes": 55854,
     "points": [
@@ -439,8 +439,8 @@
     "file": "panel-015-2",
     "step": "p15",
     "labels": [
-      "PTFE \u00b7 \u00d81.5 / \u00d80.9 mm",
-      "Liner end \u00b7 1 mm"
+      "PTFE · Ø1.5 / Ø0.9 mm",
+      "Liner end · 1 mm"
     ],
     "meshes": 55854,
     "points": [
@@ -657,38 +657,6 @@
   },
   {
     "key": "base-right-dynamixel",
-    "file": "panel-076-1",
-    "step": "p75",
-    "labels": [
-      "M4 \u00d7 20 socket screw",
-      "M4 washer"
-    ],
-    "meshes": 457851,
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-076-2",
-    "step": "p75",
-    "labels": [
-      "M4 square nut"
-    ],
-    "meshes": 456535,
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-096-2",
-    "step": "p93",
-    "labels": [
-      "M4 hex nut",
-      "M3 hex nut"
-    ],
-    "meshes": 40400,
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
-  },
-  {
-    "key": "base-right-dynamixel",
     "file": "panel-122-1",
     "step": "p122",
     "labels": [],
@@ -700,8 +668,8 @@
     "file": "panel-091-1",
     "step": "p122",
     "labels": [
-      "Pin \u00b7 4 \u00d7 10",
-      "Bearing \u00b7 4 \u00d7 8 \u00d7 3"
+      "Pin · 4 × 10",
+      "Bearing · 4 × 8 × 3"
     ],
     "meshes": 96336,
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
@@ -712,7 +680,7 @@
     "step": "p122",
     "labels": [
       "Wrist motor adapter",
-      "M2 \u00d7 8 socket screw"
+      "M2 × 8 socket screw"
     ],
     "meshes": 175604,
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
@@ -741,7 +709,7 @@
     "step": "p49",
     "labels": [
       "Tendon",
-      "Working end \u00b7 20 cm"
+      "Working end · 20 cm"
     ],
     "meshes": 85069,
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
@@ -752,7 +720,7 @@
     "step": "p37",
     "labels": [
       "Tendon",
-      "Working end \u00b7 20 cm"
+      "Working end · 20 cm"
     ],
     "meshes": 59964,
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
@@ -794,7 +762,7 @@
     "file": "panel-032-3",
     "step": "p31",
     "labels": [
-      "Smooth underside \u00b7 preserve the curved profile"
+      "Smooth underside · preserve the curved profile"
     ],
     "meshes": 25410,
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
@@ -1138,8 +1106,8 @@
     "file": "panel-015-1",
     "step": "p15",
     "labels": [
-      "PTFE \u00b7 \u00d81.5 / \u00d80.9 mm",
-      "Liner end \u00b7 1 mm"
+      "PTFE · Ø1.5 / Ø0.9 mm",
+      "Liner end · 1 mm"
     ],
     "meshes": 56124,
     "points": [
@@ -1175,8 +1143,8 @@
     "file": "panel-015-2",
     "step": "p15",
     "labels": [
-      "PTFE \u00b7 \u00d81.5 / \u00d80.9 mm",
-      "Liner end \u00b7 1 mm"
+      "PTFE · Ø1.5 / Ø0.9 mm",
+      "Liner end · 1 mm"
     ],
     "meshes": 56124,
     "points": [
@@ -1393,38 +1361,6 @@
   },
   {
     "key": "base-left-dynamixel",
-    "file": "panel-076-1",
-    "step": "p75",
-    "labels": [
-      "M4 \u00d7 20 socket screw",
-      "M4 washer"
-    ],
-    "meshes": 457851,
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-076-2",
-    "step": "p75",
-    "labels": [
-      "M4 square nut"
-    ],
-    "meshes": 456535,
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-096-2",
-    "step": "p93",
-    "labels": [
-      "M4 hex nut",
-      "M3 hex nut"
-    ],
-    "meshes": 40400,
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
-  },
-  {
-    "key": "base-left-dynamixel",
     "file": "panel-122-1",
     "step": "p122",
     "labels": [],
@@ -1436,8 +1372,8 @@
     "file": "panel-091-1",
     "step": "p122",
     "labels": [
-      "Pin \u00b7 4 \u00d7 10",
-      "Bearing \u00b7 4 \u00d7 8 \u00d7 3"
+      "Pin · 4 × 10",
+      "Bearing · 4 × 8 × 3"
     ],
     "meshes": 96336,
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
@@ -1448,7 +1384,7 @@
     "step": "p122",
     "labels": [
       "Wrist motor adapter",
-      "M2 \u00d7 8 socket screw"
+      "M2 × 8 socket screw"
     ],
     "meshes": 175604,
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
@@ -1477,7 +1413,7 @@
     "step": "p49",
     "labels": [
       "Tendon",
-      "Working end \u00b7 20 cm"
+      "Working end · 20 cm"
     ],
     "meshes": 79222,
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
@@ -1488,7 +1424,7 @@
     "step": "p37",
     "labels": [
       "Tendon",
-      "Working end \u00b7 20 cm"
+      "Working end · 20 cm"
     ],
     "meshes": 60480,
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
@@ -1530,7 +1466,7 @@
     "file": "panel-032-3",
     "step": "p31",
     "labels": [
-      "Smooth underside \u00b7 preserve the curved profile"
+      "Smooth underside · preserve the curved profile"
     ],
     "meshes": 27164,
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
@@ -1874,8 +1810,8 @@
     "file": "panel-015-1",
     "step": "p15",
     "labels": [
-      "PTFE \u00b7 \u00d81.5 / \u00d80.9 mm",
-      "Liner end \u00b7 1 mm"
+      "PTFE · Ø1.5 / Ø0.9 mm",
+      "Liner end · 1 mm"
     ],
     "meshes": 56640,
     "points": [
@@ -1911,8 +1847,8 @@
     "file": "panel-015-2",
     "step": "p15",
     "labels": [
-      "PTFE \u00b7 \u00d81.5 / \u00d80.9 mm",
-      "Liner end \u00b7 1 mm"
+      "PTFE · Ø1.5 / Ø0.9 mm",
+      "Liner end · 1 mm"
     ],
     "meshes": 56640,
     "points": [
@@ -2129,38 +2065,6 @@
   },
   {
     "key": "touch-right-dynamixel",
-    "file": "panel-076-1",
-    "step": "p75",
-    "labels": [
-      "M4 \u00d7 20 socket screw",
-      "M4 washer"
-    ],
-    "meshes": 457851,
-    "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
-  },
-  {
-    "key": "touch-right-dynamixel",
-    "file": "panel-076-2",
-    "step": "p75",
-    "labels": [
-      "M4 square nut"
-    ],
-    "meshes": 456535,
-    "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
-  },
-  {
-    "key": "touch-right-dynamixel",
-    "file": "panel-096-2",
-    "step": "p93",
-    "labels": [
-      "M4 hex nut",
-      "M3 hex nut"
-    ],
-    "meshes": 40400,
-    "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
-  },
-  {
-    "key": "touch-right-dynamixel",
     "file": "panel-122-1",
     "step": "p122",
     "labels": [],
@@ -2172,8 +2076,8 @@
     "file": "panel-091-1",
     "step": "p122",
     "labels": [
-      "Pin \u00b7 4 \u00d7 10",
-      "Bearing \u00b7 4 \u00d7 8 \u00d7 3"
+      "Pin · 4 × 10",
+      "Bearing · 4 × 8 × 3"
     ],
     "meshes": 96336,
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
@@ -2184,7 +2088,7 @@
     "step": "p122",
     "labels": [
       "Wrist motor adapter",
-      "M2 \u00d7 8 socket screw"
+      "M2 × 8 socket screw"
     ],
     "meshes": 175604,
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
@@ -2213,7 +2117,7 @@
     "step": "p49",
     "labels": [
       "Tendon",
-      "Working end \u00b7 20 cm"
+      "Working end · 20 cm"
     ],
     "meshes": 79198,
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
@@ -2224,7 +2128,7 @@
     "step": "p37",
     "labels": [
       "Tendon",
-      "Working end \u00b7 20 cm"
+      "Working end · 20 cm"
     ],
     "meshes": 60640,
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
@@ -2266,7 +2170,7 @@
     "file": "panel-032-3",
     "step": "p31",
     "labels": [
-      "Smooth underside \u00b7 preserve the curved profile"
+      "Smooth underside · preserve the curved profile"
     ],
     "meshes": 27142,
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
@@ -2610,8 +2514,8 @@
     "file": "panel-015-1",
     "step": "p15",
     "labels": [
-      "PTFE \u00b7 \u00d81.5 / \u00d80.9 mm",
-      "Liner end \u00b7 1 mm"
+      "PTFE · Ø1.5 / Ø0.9 mm",
+      "Liner end · 1 mm"
     ],
     "meshes": 56800,
     "points": [
@@ -2647,8 +2551,8 @@
     "file": "panel-015-2",
     "step": "p15",
     "labels": [
-      "PTFE \u00b7 \u00d81.5 / \u00d80.9 mm",
-      "Liner end \u00b7 1 mm"
+      "PTFE · Ø1.5 / Ø0.9 mm",
+      "Liner end · 1 mm"
     ],
     "meshes": 56800,
     "points": [
@@ -2865,38 +2769,6 @@
   },
   {
     "key": "touch-left-dynamixel",
-    "file": "panel-076-1",
-    "step": "p75",
-    "labels": [
-      "M4 \u00d7 20 socket screw",
-      "M4 washer"
-    ],
-    "meshes": 457851,
-    "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
-  },
-  {
-    "key": "touch-left-dynamixel",
-    "file": "panel-076-2",
-    "step": "p75",
-    "labels": [
-      "M4 square nut"
-    ],
-    "meshes": 456535,
-    "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
-  },
-  {
-    "key": "touch-left-dynamixel",
-    "file": "panel-096-2",
-    "step": "p93",
-    "labels": [
-      "M4 hex nut",
-      "M3 hex nut"
-    ],
-    "meshes": 40400,
-    "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
-  },
-  {
-    "key": "touch-left-dynamixel",
     "file": "panel-122-1",
     "step": "p122",
     "labels": [],
@@ -2908,8 +2780,8 @@
     "file": "panel-091-1",
     "step": "p122",
     "labels": [
-      "Pin \u00b7 4 \u00d7 10",
-      "Bearing \u00b7 4 \u00d7 8 \u00d7 3"
+      "Pin · 4 × 10",
+      "Bearing · 4 × 8 × 3"
     ],
     "meshes": 96336,
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
@@ -2920,7 +2792,7 @@
     "step": "p122",
     "labels": [
       "Wrist motor adapter",
-      "M2 \u00d7 8 socket screw"
+      "M2 × 8 socket screw"
     ],
     "meshes": 175604,
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
@@ -2945,22 +2817,11 @@
   },
   {
     "key": "base-right-dynamixel",
-    "file": "panel-076-3",
-    "step": "p75",
-    "labels": [
-      "PTFE \u00b7 4 mm inside / 6 mm outside",
-      "PTFE sleeve"
-    ],
-    "meshes": 468875,
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
-  },
-  {
-    "key": "base-right-dynamixel",
     "file": "panel-089-1",
     "step": "p89",
     "labels": [
       "Wrist belt",
-      "Carpal pulley \u00b7 hand side"
+      "Carpal pulley · hand side"
     ],
     "meshes": 493847,
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
@@ -2970,7 +2831,7 @@
     "file": "panel-030-4",
     "step": "p29",
     "labels": [
-      "Bearing \u00b7 4 \u00d7 8 \u00d7 3"
+      "Bearing · 4 × 8 × 3"
     ],
     "meshes": 19633,
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
@@ -2980,22 +2841,11 @@
     "file": "panel-034-3",
     "step": "prepare-pp",
     "labels": [
-      "Pin \u00b7 2 \u00d7 8",
-      "Pin \u00b7 2 \u00d7 6"
+      "Pin · 2 × 8",
+      "Pin · 2 × 6"
     ],
     "meshes": 25564,
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-076-3",
-    "step": "p75",
-    "labels": [
-      "PTFE \u00b7 4 mm inside / 6 mm outside",
-      "PTFE sleeve"
-    ],
-    "meshes": 468875,
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
   },
   {
     "key": "base-left-dynamixel",
@@ -3003,7 +2853,7 @@
     "step": "p89",
     "labels": [
       "Wrist belt",
-      "Carpal pulley \u00b7 hand side"
+      "Carpal pulley · hand side"
     ],
     "meshes": 493847,
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
@@ -3013,7 +2863,7 @@
     "file": "panel-030-4",
     "step": "p29",
     "labels": [
-      "Bearing \u00b7 4 \u00d7 8 \u00d7 3"
+      "Bearing · 4 × 8 × 3"
     ],
     "meshes": 19593,
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
@@ -3023,22 +2873,11 @@
     "file": "panel-034-3",
     "step": "prepare-pp",
     "labels": [
-      "Pin \u00b7 2 \u00d7 8",
-      "Pin \u00b7 2 \u00d7 6"
+      "Pin · 2 × 8",
+      "Pin · 2 × 6"
     ],
     "meshes": 25546,
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
-  },
-  {
-    "key": "touch-right-dynamixel",
-    "file": "panel-076-3",
-    "step": "p75",
-    "labels": [
-      "PTFE \u00b7 4 mm inside / 6 mm outside",
-      "PTFE sleeve"
-    ],
-    "meshes": 468875,
-    "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
   },
   {
     "key": "touch-right-dynamixel",
@@ -3046,7 +2885,7 @@
     "step": "p89",
     "labels": [
       "Wrist belt",
-      "Carpal pulley \u00b7 hand side"
+      "Carpal pulley · hand side"
     ],
     "meshes": 493847,
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
@@ -3056,7 +2895,7 @@
     "file": "panel-030-4",
     "step": "p29",
     "labels": [
-      "Bearing \u00b7 4 \u00d7 8 \u00d7 3"
+      "Bearing · 4 × 8 × 3"
     ],
     "meshes": 29952,
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
@@ -3066,22 +2905,11 @@
     "file": "panel-034-3",
     "step": "prepare-pp",
     "labels": [
-      "Pin \u00b7 2 \u00d7 8",
-      "Pin \u00b7 2 \u00d7 6"
+      "Pin · 2 × 8",
+      "Pin · 2 × 6"
     ],
     "meshes": 27300,
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
-  },
-  {
-    "key": "touch-left-dynamixel",
-    "file": "panel-076-3",
-    "step": "p75",
-    "labels": [
-      "PTFE \u00b7 4 mm inside / 6 mm outside",
-      "PTFE sleeve"
-    ],
-    "meshes": 468875,
-    "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
   },
   {
     "key": "touch-left-dynamixel",
@@ -3089,7 +2917,7 @@
     "step": "p89",
     "labels": [
       "Wrist belt",
-      "Carpal pulley \u00b7 hand side"
+      "Carpal pulley · hand side"
     ],
     "meshes": 493847,
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
@@ -3099,7 +2927,7 @@
     "file": "panel-030-4",
     "step": "p29",
     "labels": [
-      "Bearing \u00b7 4 \u00d7 8 \u00d7 3"
+      "Bearing · 4 × 8 × 3"
     ],
     "meshes": 29850,
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
@@ -3109,8 +2937,8 @@
     "file": "panel-034-3",
     "step": "prepare-pp",
     "labels": [
-      "Pin \u00b7 2 \u00d7 8",
-      "Pin \u00b7 2 \u00d7 6"
+      "Pin · 2 × 8",
+      "Pin · 2 × 6"
     ],
     "meshes": 27278,
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
@@ -3120,8 +2948,8 @@
     "file": "panel-036-1",
     "step": "p35",
     "labels": [
-      "Upper 2 \u00d7 6 pin",
-      "Lower 2 \u00d7 6 pin"
+      "Upper 2 × 6 pin",
+      "Lower 2 × 6 pin"
     ],
     "meshes": 90833,
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
@@ -3131,8 +2959,8 @@
     "file": "panel-036-2",
     "step": "p35",
     "labels": [
-      "Upper 2 \u00d7 6 pin",
-      "Lower 2 \u00d7 6 pin",
+      "Upper 2 × 6 pin",
+      "Lower 2 × 6 pin",
       "DP tendons"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
@@ -3167,8 +2995,8 @@
     "file": "panel-036-1",
     "step": "p35",
     "labels": [
-      "Upper 2 \u00d7 6 pin",
-      "Lower 2 \u00d7 6 pin"
+      "Upper 2 × 6 pin",
+      "Lower 2 × 6 pin"
     ],
     "meshes": 90775,
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
@@ -3178,8 +3006,8 @@
     "file": "panel-036-2",
     "step": "p35",
     "labels": [
-      "Upper 2 \u00d7 6 pin",
-      "Lower 2 \u00d7 6 pin",
+      "Upper 2 × 6 pin",
+      "Lower 2 × 6 pin",
       "DP tendons"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
@@ -3214,8 +3042,8 @@
     "file": "panel-036-1",
     "step": "p35",
     "labels": [
-      "Upper 2 \u00d7 6 pin",
-      "Lower 2 \u00d7 6 pin"
+      "Upper 2 × 6 pin",
+      "Lower 2 × 6 pin"
     ],
     "meshes": 102888,
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
@@ -3225,8 +3053,8 @@
     "file": "panel-036-2",
     "step": "p35",
     "labels": [
-      "Upper 2 \u00d7 6 pin",
-      "Lower 2 \u00d7 6 pin",
+      "Upper 2 × 6 pin",
+      "Lower 2 × 6 pin",
       "DP tendons"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
@@ -3261,8 +3089,8 @@
     "file": "panel-036-1",
     "step": "p35",
     "labels": [
-      "Upper 2 \u00d7 6 pin",
-      "Lower 2 \u00d7 6 pin"
+      "Upper 2 × 6 pin",
+      "Lower 2 × 6 pin"
     ],
     "meshes": 102764,
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
@@ -3272,8 +3100,8 @@
     "file": "panel-036-2",
     "step": "p35",
     "labels": [
-      "Upper 2 \u00d7 6 pin",
-      "Lower 2 \u00d7 6 pin",
+      "Upper 2 × 6 pin",
+      "Lower 2 × 6 pin",
       "DP tendons"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
@@ -4588,7 +4416,7 @@
     "file": "panel-058-1",
     "step": "p56",
     "labels": [
-      "Working end \u00b7 20 cm",
+      "Working end · 20 cm",
       "TP anchor housing"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
@@ -4622,7 +4450,7 @@
     "step": "p52",
     "labels": [
       "Reinforced stopper",
-      "Tail \u00b7 5 mm"
+      "Tail · 5 mm"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 167728,
@@ -4645,7 +4473,7 @@
     "step": "p37",
     "labels": [
       "Reinforced stopper",
-      "Tail \u00b7 5 mm"
+      "Tail · 5 mm"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 94830
@@ -4708,7 +4536,7 @@
     "file": "panel-058-1",
     "step": "p56",
     "labels": [
-      "Working end \u00b7 20 cm",
+      "Working end · 20 cm",
       "TP anchor housing"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
@@ -4742,7 +4570,7 @@
     "step": "p52",
     "labels": [
       "Reinforced stopper",
-      "Tail \u00b7 5 mm"
+      "Tail · 5 mm"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 167053,
@@ -4765,7 +4593,7 @@
     "step": "p37",
     "labels": [
       "Reinforced stopper",
-      "Tail \u00b7 5 mm"
+      "Tail · 5 mm"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 95100
@@ -4828,7 +4656,7 @@
     "file": "panel-058-1",
     "step": "p56",
     "labels": [
-      "Working end \u00b7 20 cm",
+      "Working end · 20 cm",
       "TP anchor housing"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
@@ -4862,7 +4690,7 @@
     "step": "p52",
     "labels": [
       "Reinforced stopper",
-      "Tail \u00b7 5 mm"
+      "Tail · 5 mm"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
     "meshes": 161206,
@@ -4885,7 +4713,7 @@
     "step": "p37",
     "labels": [
       "Reinforced stopper",
-      "Tail \u00b7 5 mm"
+      "Tail · 5 mm"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
     "meshes": 95616
@@ -4948,7 +4776,7 @@
     "file": "panel-058-1",
     "step": "p56",
     "labels": [
-      "Working end \u00b7 20 cm",
+      "Working end · 20 cm",
       "TP anchor housing"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
@@ -4982,7 +4810,7 @@
     "step": "p52",
     "labels": [
       "Reinforced stopper",
-      "Tail \u00b7 5 mm"
+      "Tail · 5 mm"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 161182,
@@ -5005,7 +4833,7 @@
     "step": "p37",
     "labels": [
       "Reinforced stopper",
-      "Tail \u00b7 5 mm"
+      "Tail · 5 mm"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 95776
@@ -5132,8 +4960,8 @@
     "file": "panel-063-1",
     "step": "p62",
     "labels": [
-      "Guide pin 1 \u00b7 2 \u00d7 30",
-      "Guide pin 2 \u00b7 2 \u00d7 30"
+      "Guide pin 1 · 2 × 30",
+      "Guide pin 2 · 2 × 30"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 284662
@@ -5143,8 +4971,8 @@
     "file": "panel-063-1",
     "step": "p62",
     "labels": [
-      "Guide pin 1 \u00b7 2 \u00d7 30",
-      "Guide pin 2 \u00b7 2 \u00d7 30"
+      "Guide pin 1 · 2 × 30",
+      "Guide pin 2 · 2 × 30"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 283563
@@ -5154,8 +4982,8 @@
     "file": "panel-063-1",
     "step": "p62",
     "labels": [
-      "Guide pin 1 \u00b7 2 \u00d7 30",
-      "Guide pin 2 \u00b7 2 \u00d7 30"
+      "Guide pin 1 · 2 × 30",
+      "Guide pin 2 · 2 × 30"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
     "meshes": 303956
@@ -5165,8 +4993,8 @@
     "file": "panel-063-1",
     "step": "p62",
     "labels": [
-      "Guide pin 1 \u00b7 2 \u00d7 30",
-      "Guide pin 2 \u00b7 2 \u00d7 30"
+      "Guide pin 1 · 2 × 30",
+      "Guide pin 2 · 2 × 30"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 303878
@@ -5176,8 +5004,8 @@
     "file": "panel-063-2",
     "step": "p62",
     "labels": [
-      "Bearing 1 \u00b7 4 \u00d7 8 \u00d7 3",
-      "Bearing 2 \u00b7 4 \u00d7 8 \u00d7 3"
+      "Bearing 1 · 4 × 8 × 3",
+      "Bearing 2 · 4 × 8 × 3"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 288694
@@ -5187,8 +5015,8 @@
     "file": "panel-063-2",
     "step": "p62",
     "labels": [
-      "Bearing 1 \u00b7 4 \u00d7 8 \u00d7 3",
-      "Bearing 2 \u00b7 4 \u00d7 8 \u00d7 3"
+      "Bearing 1 · 4 × 8 × 3",
+      "Bearing 2 · 4 × 8 × 3"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 287595
@@ -5220,8 +5048,8 @@
     "file": "panel-072-1",
     "step": "p70",
     "labels": [
-      "Dorsal row \u00b7 16 tendons",
-      "Palmar row \u00b7 16 tendons"
+      "Dorsal row · 16 tendons",
+      "Palmar row · 16 tendons"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 613400,
@@ -5557,8 +5385,8 @@
     "file": "panel-072-1",
     "step": "p70",
     "labels": [
-      "Dorsal row \u00b7 16 tendons",
-      "Palmar row \u00b7 16 tendons"
+      "Dorsal row · 16 tendons",
+      "Palmar row · 16 tendons"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 613108,
@@ -5894,8 +5722,8 @@
     "file": "panel-072-1",
     "step": "p70",
     "labels": [
-      "Dorsal row \u00b7 16 tendons",
-      "Palmar row \u00b7 16 tendons"
+      "Dorsal row · 16 tendons",
+      "Palmar row · 16 tendons"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
     "meshes": 655653,
@@ -6231,8 +6059,8 @@
     "file": "panel-072-1",
     "step": "p70",
     "labels": [
-      "Dorsal row \u00b7 16 tendons",
-      "Palmar row \u00b7 16 tendons"
+      "Dorsal row · 16 tendons",
+      "Palmar row · 16 tendons"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 654950,
@@ -6789,7 +6617,7 @@
     "step": "p142",
     "labels": [
       "Adapter plate",
-      "Mounting rods \u00b7 \u00d72"
+      "Mounting rods · ×2"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 7754
@@ -6811,7 +6639,7 @@
     "step": "p142",
     "labels": [
       "Adapter plate",
-      "Mounting rods \u00b7 \u00d72"
+      "Mounting rods · ×2"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 7754
@@ -6833,7 +6661,7 @@
     "step": "p142",
     "labels": [
       "Adapter plate",
-      "Mounting rods \u00b7 \u00d72"
+      "Mounting rods · ×2"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
     "meshes": 7754
@@ -6855,7 +6683,7 @@
     "step": "p142",
     "labels": [
       "Adapter plate",
-      "Mounting rods \u00b7 \u00d72"
+      "Mounting rods · ×2"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 7754
@@ -6877,7 +6705,7 @@
     "step": "p142",
     "labels": [
       "Adapter plate",
-      "Mounting rods \u00b7 \u00d72",
+      "Mounting rods · ×2",
       "Motor tower"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
@@ -6889,7 +6717,7 @@
     "step": "p142",
     "labels": [
       "Adapter plate",
-      "Mounting rods \u00b7 \u00d72",
+      "Mounting rods · ×2",
       "Motor tower"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
@@ -6901,7 +6729,7 @@
     "step": "p142",
     "labels": [
       "Adapter plate",
-      "Mounting rods \u00b7 \u00d72",
+      "Mounting rods · ×2",
       "Motor tower"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
@@ -6913,7 +6741,7 @@
     "step": "p142",
     "labels": [
       "Adapter plate",
-      "Mounting rods \u00b7 \u00d72",
+      "Mounting rods · ×2",
       "Motor tower"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
@@ -7108,8 +6936,8 @@
     "file": "panel-096-3",
     "step": "p93",
     "labels": [
-      "Motor lead \u00b7 upper slot",
-      "Fan leads \u00b7 lower slot"
+      "Motor lead · upper slot",
+      "Fan leads · lower slot"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 106864
@@ -7119,8 +6947,8 @@
     "file": "panel-096-3",
     "step": "p93",
     "labels": [
-      "Motor lead \u00b7 upper slot",
-      "Fan leads \u00b7 lower slot"
+      "Motor lead · upper slot",
+      "Fan leads · lower slot"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 106864
@@ -7130,8 +6958,8 @@
     "file": "panel-096-3",
     "step": "p93",
     "labels": [
-      "Motor lead \u00b7 upper slot",
-      "Fan leads \u00b7 lower slot"
+      "Motor lead · upper slot",
+      "Fan leads · lower slot"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
     "meshes": 106864
@@ -7141,8 +6969,8 @@
     "file": "panel-096-3",
     "step": "p93",
     "labels": [
-      "Motor lead \u00b7 upper slot",
-      "Fan leads \u00b7 lower slot"
+      "Motor lead · upper slot",
+      "Fan leads · lower slot"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 106864
@@ -7164,22 +6992,6 @@
     "meshes": 96592
   },
   {
-    "key": "base-right-dynamixel",
-    "file": "panel-126-1",
-    "step": "p126",
-    "labels": [],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 193444
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-126-2",
-    "step": "p126",
-    "labels": [],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 193444
-  },
-  {
     "key": "base-left-dynamixel",
     "file": "panel-125-1",
     "step": "p123",
@@ -7194,22 +7006,6 @@
     "labels": [],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 96592
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-126-1",
-    "step": "p126",
-    "labels": [],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 193444
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-126-2",
-    "step": "p126",
-    "labels": [],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 193444
   },
   {
     "key": "touch-right-dynamixel",
@@ -7228,22 +7024,6 @@
     "meshes": 96592
   },
   {
-    "key": "touch-right-dynamixel",
-    "file": "panel-126-1",
-    "step": "p126",
-    "labels": [],
-    "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
-    "meshes": 193444
-  },
-  {
-    "key": "touch-right-dynamixel",
-    "file": "panel-126-2",
-    "step": "p126",
-    "labels": [],
-    "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
-    "meshes": 193444
-  },
-  {
     "key": "touch-left-dynamixel",
     "file": "panel-125-1",
     "step": "p123",
@@ -7258,22 +7038,6 @@
     "labels": [],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 96592
-  },
-  {
-    "key": "touch-left-dynamixel",
-    "file": "panel-126-1",
-    "step": "p126",
-    "labels": [],
-    "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
-    "meshes": 193444
-  },
-  {
-    "key": "touch-left-dynamixel",
-    "file": "panel-126-2",
-    "step": "p126",
-    "labels": [],
-    "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
-    "meshes": 193444
   },
   {
     "key": "base-right-dynamixel",
@@ -7418,5 +7182,249 @@
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 60440
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-076-3",
+    "step": "p75",
+    "labels": [
+      "PTFE · 4 mm inside / 6 mm outside",
+      "PTFE sleeve"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 468875
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-076-1",
+    "step": "p75",
+    "labels": [
+      "M4 × 20 socket screw",
+      "M4 washer"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 457851
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-076-2",
+    "step": "p75",
+    "labels": [
+      "Square nut 1 · insert from inside",
+      "Square nut 2 · insert from inside"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 456555
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-076-3",
+    "step": "p75",
+    "labels": [
+      "PTFE · 4 mm inside / 6 mm outside",
+      "PTFE sleeve"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 468875
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-076-1",
+    "step": "p75",
+    "labels": [
+      "M4 × 20 socket screw",
+      "M4 washer"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 457851
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-076-2",
+    "step": "p75",
+    "labels": [
+      "Square nut 1 · insert from inside",
+      "Square nut 2 · insert from inside"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 456555
+  },
+  {
+    "key": "touch-right-dynamixel",
+    "file": "panel-076-3",
+    "step": "p75",
+    "labels": [
+      "PTFE · 4 mm inside / 6 mm outside",
+      "PTFE sleeve"
+    ],
+    "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
+    "meshes": 468875
+  },
+  {
+    "key": "touch-right-dynamixel",
+    "file": "panel-076-1",
+    "step": "p75",
+    "labels": [
+      "M4 × 20 socket screw",
+      "M4 washer"
+    ],
+    "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
+    "meshes": 457851
+  },
+  {
+    "key": "touch-right-dynamixel",
+    "file": "panel-076-2",
+    "step": "p75",
+    "labels": [
+      "Square nut 1 · insert from inside",
+      "Square nut 2 · insert from inside"
+    ],
+    "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
+    "meshes": 456555
+  },
+  {
+    "key": "touch-left-dynamixel",
+    "file": "panel-076-3",
+    "step": "p75",
+    "labels": [
+      "PTFE · 4 mm inside / 6 mm outside",
+      "PTFE sleeve"
+    ],
+    "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
+    "meshes": 468875
+  },
+  {
+    "key": "touch-left-dynamixel",
+    "file": "panel-076-1",
+    "step": "p75",
+    "labels": [
+      "M4 × 20 socket screw",
+      "M4 washer"
+    ],
+    "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
+    "meshes": 457851
+  },
+  {
+    "key": "touch-left-dynamixel",
+    "file": "panel-076-2",
+    "step": "p75",
+    "labels": [
+      "Square nut 1 · insert from inside",
+      "Square nut 2 · insert from inside"
+    ],
+    "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
+    "meshes": 456555
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-096-2",
+    "step": "p93",
+    "labels": [
+      "M4 nut 1 · from inside",
+      "M4 nut 2 · from inside",
+      "M4 nut 3 · from inside"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 37542
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-096-2",
+    "step": "p93",
+    "labels": [
+      "M4 nut 1 · from inside",
+      "M4 nut 2 · from inside",
+      "M4 nut 3 · from inside"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 37542
+  },
+  {
+    "key": "touch-right-dynamixel",
+    "file": "panel-096-2",
+    "step": "p93",
+    "labels": [
+      "M4 nut 1 · from inside",
+      "M4 nut 2 · from inside",
+      "M4 nut 3 · from inside"
+    ],
+    "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
+    "meshes": 37542
+  },
+  {
+    "key": "touch-left-dynamixel",
+    "file": "panel-096-2",
+    "step": "p93",
+    "labels": [
+      "M4 nut 1 · from inside",
+      "M4 nut 2 · from inside",
+      "M4 nut 3 · from inside"
+    ],
+    "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
+    "meshes": 37542
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-126-1",
+    "step": "p126",
+    "labels": [],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 193444
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-126-2",
+    "step": "p126",
+    "labels": [],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 193444
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-126-1",
+    "step": "p126",
+    "labels": [],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 193444
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-126-2",
+    "step": "p126",
+    "labels": [],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 193444
+  },
+  {
+    "key": "touch-right-dynamixel",
+    "file": "panel-126-1",
+    "step": "p126",
+    "labels": [],
+    "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
+    "meshes": 193444
+  },
+  {
+    "key": "touch-right-dynamixel",
+    "file": "panel-126-2",
+    "step": "p126",
+    "labels": [],
+    "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
+    "meshes": 193444
+  },
+  {
+    "key": "touch-left-dynamixel",
+    "file": "panel-126-1",
+    "step": "p126",
+    "labels": [],
+    "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
+    "meshes": 193444
+  },
+  {
+    "key": "touch-left-dynamixel",
+    "file": "panel-126-2",
+    "step": "p126",
+    "labels": [],
+    "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
+    "meshes": 193444
   }
 ]

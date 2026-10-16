@@ -3,7 +3,7 @@
 .assembly-guided-instructions { list-style: none; padding: 0; margin: 20px 0; }
 .assembly-guided-instructions > li { margin: 0 0 28px; min-width: 0; }
 .assembly-guided-text { display: flex; align-items: baseline; gap: 14px; font-size: 15px; line-height: 1.7; max-width: 900px; }
-.assembly-guided-text > span { flex: 0 0 26px; height: 26px; text-align: center; border: 1px solid var(--panel-border-strong); border-radius: 50%; color: var(--accent); font-size: 12px; }
+.assembly-guided-text > span { flex: 0 0 26px; text-align: left; color: var(--accent); font-size: 18px; font-weight: 700; line-height: inherit; font-variant-numeric: tabular-nums; }
 .assembly-guided-instructions .assembly-panel-gallery { margin: 18px 0 0; grid-template-columns: repeat(auto-fit,minmax(min(100%,300px),1fr)); }
 .assembly-guided-instructions .assembly-panel-gallery figure { min-width: 0; }
 .assembly-app .assembly-guided-instructions .assembly-image-button { height: auto; min-height: 0; }

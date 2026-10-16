@@ -6,11 +6,11 @@ import { finishMaterial, loadBundle, type Bundle } from './cadAssets'
 import type { Part } from './assemblyParts'
 import type { Build } from './buildContent'
 
-function matchesPart(part:Part,selected:string) {
+function matchesPart(part:Part,selected:string,instanceNode:string) {
   if(['DP','PP','AP','TP'].includes(selected))return new RegExp(`\\b${selected}\\b`).test(part.label)
   if(selected==='Carpals')return part.category==='Carpals'||part.label==='Palm skin'
-  if(selected==='Wrist')return Object.keys(part.areas).includes('Wrist')
-  if(selected==='Tower')return Object.keys(part.areas).includes('Tower')
+  if(selected==='Wrist')return part.areas.Wrist?.includes(instanceNode)??false
+  if(selected==='Tower')return part.areas.Tower?.includes(instanceNode)??false
   return part.label===selected
 }
 function Render({bundle,build,selected,face}:{bundle:Bundle;build:Build;selected:string;face:string}) {
@@ -19,10 +19,10 @@ function Render({bundle,build,selected,face}:{bundle:Bundle;build:Build;selected
     const map=new Map<string,Part>();bundle.inventory.parts.forEach(p=>p.nodes.forEach(n=>map.set(n,p)))
     clone.traverse(node=>{
       if(!(node instanceof THREE.Mesh))return
-      let current:THREE.Object3D|null=node,part:Part|undefined
-      while(current&&!part){part=map.get(current.name);current=current.parent}
+      let current:THREE.Object3D|null=node,part:Part|undefined,instanceNode=''
+      while(current&&!part){part=map.get(current.name);if(part)instanceNode=current.name;current=current.parent}
       if(!part)return
-      const mat=finishMaterial(part,build,node.geometry),match=matchesPart(part,selected)
+      const mat=finishMaterial(part,build,node.geometry),match=matchesPart(part,selected,instanceNode)
       mat.transparent=!match;mat.opacity=match?1:.10;mat.depthWrite=match
       node.material=mat;node.renderOrder=match?2:0
     })

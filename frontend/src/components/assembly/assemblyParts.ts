@@ -8,7 +8,7 @@ export type Inventory = {key:string;parts:Part[];instanceCount:number}
 export function groupStandardParts(parts:Part[]):Part[] {
   const grouped=new Map<string,Part>()
   for(const part of parts){
-    const key=part.category==='Standard components'?`${part.category}:${part.label}`:part.id
+    const key=`${part.category}:${part.label}`
     const existing=grouped.get(key)
     if(!existing){grouped.set(key,{...part,nodes:[...part.nodes],areas:Object.fromEntries(Object.entries(part.areas).map(([area,nodes])=>[area,[...nodes]]))});continue}
     existing.count+=part.count
@@ -16,6 +16,14 @@ export function groupStandardParts(parts:Part[]):Part[] {
     for(const [area,nodes] of Object.entries(part.areas))existing.areas[area]=[...(existing.areas[area]??[]),...nodes]
   }
   return [...grouped.values()]
+}
+// These are CAD solids within the spool assembly, not separately supplied parts.
+export const isInternalSpoolPart=(part:Part)=>['Spool ORCA insert','Top spool / tensioner'].includes(part.label)
+export function explorerParts(parts:Part[]):Part[] {
+  return groupStandardParts(parts.map(part=>({...part,areas:Object.fromEntries(
+    [...new Set(Object.keys(part.areas).map(area=>area==='Thumb'?'Fingers':area))]
+      .map(area=>[area,area==='Fingers'?[...(part.areas.Fingers??[]),...(part.areas.Thumb??[])]:part.areas[area]])
+  )})))
 }
 export type Supply = {id:string;label:string;quantity:string;areas:Area[];kind:'tube'|'cord'|'cable'|'equipment'|'hardware';note:string; partLabel?:string; optional?:boolean; image?:string; files?:{label:string;src:string}[]}
 export function supplementalParts(part:Part,stock:Supply[],area?:string){return stock.filter(s=>s.partLabel===part.label&&(!area||s.areas.includes(area as Area)))}
@@ -39,6 +47,7 @@ export function supplies(build:Build):Supply[] {
   }):[]
   const list:Supply[] = [
     ...touchScrews,
+    {id:`carpal-cover-${build.side}`,label:'Carpal cover',quantity:'1',areas:['Carpals'],kind:'hardware',note:'Separate printed carpal cover; omitted from the complete CAD assembly export.',image:`./assembly/supplies/carpal-cover-${build.side}.svg`,files:[{label:'STL',src:`./assembly/supplies/carpal-cover-${build.side}.stl`}]},
     {id:'cord',label:'Tendon cord',quantity:'29 m + spare',areas:['Thumb','Fingers','Carpals','Wrist','Tower'],kind:'cord',note:'Ten 2 m lengths and twelve 75 cm lengths. These form 32 routed tendon ends; the same ends continue through carpals, wrist and tower.'},
     {id:'ptfe',label:'PTFE channel liner · OD 1.5 / ID 0.9 mm',quantity:'74 cut pieces',areas:['Thumb','Fingers','Carpals','Wrist'],kind:'tube',note:'2 thumb AP liners + 8 finger AP liners + 32 carpal liners + 32 wrist liners. Cut and trim during preparation.'},
     {id:'sleeves',label:'PTFE screw sleeve · OD 6 / ID 4 mm',quantity:'2 cut pieces',areas:['Wrist'],kind:'tube',note:'Sleeves over the two wrist screw threads. Trim to fit at the wrist preparation step.'},
@@ -68,16 +77,24 @@ export function supplies(build:Build):Supply[] {
     {id:'usb',label:'USB-C data cable',quantity:'1',areas:['Tower'],kind:'cable',note:'A data-capable cable for programming and controlling the hand.'},
     {id:'tools',label:'Assembly tools',quantity:'1 set',areas:[],kind:'equipment',note:'Hex keys / screw bits, ruler, cutters, file or sandpaper, wiping cloth, and superglue for the magnets. Approximately 0.45 mm iron wire only if reused PTFE is blocked.'},
   ]
-  return list.map(s=>({...s,image:s.image??`./assembly/supplies/${['chain-a','chain-b','board-cover'].includes(s.id)?s.id+'.png':(['cord','ptfe','sleeves','usb','power','tools'].includes(s.id)?s.id:'cable')+'.svg'}`,files:['chain-a','chain-b','board-cover'].includes(s.id)?[{label:'STL',src:`./assembly/supplies/${s.id}.stl`}]:undefined}))
+  const mapped=list.map(s=>({...s,areas:[...new Set(s.areas.map(area=>area==='Thumb'?'Fingers' as const:area))],image:s.image??(s.kind==='hardware'&&s.partLabel?.includes('cheese-head screw')?'./assembly/supplies/cheese-head-screw.svg':undefined)??`./assembly/supplies/${['chain-a','chain-b','board-cover'].includes(s.id)?s.id+'.png':(['cord','ptfe','sleeves','usb','power','tools'].includes(s.id)?s.id:'cable')+'.svg'}`,files:s.files??(['chain-a','chain-b','board-cover'].includes(s.id)?[{label:'STL',src:`./assembly/supplies/${s.id}.stl`}]:undefined)}))
+  const grouped=new Map<string,Supply>()
+  for(const supply of mapped){
+    const key=supply.partLabel&&!supply.optional?`${supply.partLabel}:${supply.areas.join(',')}`:supply.id
+    const existing=grouped.get(key)
+    if(existing){existing.quantity=String(Number(existing.quantity)+Number(supply.quantity));existing.note+=` ${supply.note}`}
+    else grouped.set(key,supply)
+  }
+  return [...grouped.values()]
 }
 export function areaSupplyQuantity(s:Supply,area:Area) {
-  if(s.id==='ptfe')return `${area==='Thumb'?2:area==='Fingers'?8:32} liners`
-  if(s.id==='cord')return area==='Thumb'?'8 ends · 7 m cut stock':area==='Fingers'?'24 ends · 22 m cut stock':'32 passing ends'
+  if(s.id==='ptfe')return `${area==='Thumb'?2:area==='Fingers'?10:32} liners`
+  if(s.id==='cord')return area==='Thumb'?'8 ends · 7 m cut stock':area==='Fingers'?'32 ends · 29 m cut stock':'32 passing ends'
   return supplyQuantity(s)
 }
 
 export function areaSupplyNote(s:Supply,area:Area) {
-  if(s.id==='cord')return area==='Thumb'?'Cut two 2 m lengths and four 75 cm lengths. These make the thumb’s eight routed ends.':area==='Fingers'?'For each of the four fingers: two 2 m lengths and two 75 cm lengths. Together these make 24 routed ends.':'Continue the same 32 tendon ends through this assembly; no additional cord is counted here.'
-  if(s.id==='ptfe')return area==='Thumb'?'Cut two thumb AP liners to channel depth plus approximately 2 mm. Leave about 1 mm protruding at each end; 5–8 mm is only a starting estimate.':area==='Fingers'?'Two liners per AP across the four fingers. Measure channel depth and leave about 1 mm at each end; do not use a fixed cut length for every print.':`Cut 32 liners to the depth of the individual ${area.toLowerCase()} channels plus approximately 2 mm. Leave approximately 1 mm at each end; a single fixed cut length is not specified.`
+  if(s.id==='cord')return area==='Thumb'?'Cut two 2 m lengths and four 75 cm lengths. These make the thumb’s eight routed ends.':area==='Fingers'?'For each of the four fingers: two 2 m lengths and two 75 cm lengths. For the thumb: two 2 m lengths and four 75 cm lengths. Together these make 32 routed ends.':'Continue the same 32 tendon ends through this assembly; no additional cord is counted here.'
+  if(s.id==='ptfe')return area==='Thumb'?'Cut two thumb AP liners to channel depth plus approximately 2 mm. Leave about 1 mm protruding at each end; 5–8 mm is only a starting estimate.':area==='Fingers'?'Two liners per AP across the four fingers and thumb (10 total). Measure channel depth and leave about 1 mm at each end; do not use a fixed cut length for every print.':`Cut 32 liners to the depth of the individual ${area.toLowerCase()} channels plus approximately 2 mm. Leave approximately 1 mm at each end; a single fixed cut length is not specified.`
   return s.note
 }

@@ -4,25 +4,26 @@ import { OrbitControls } from '@react-three/drei'
 import { loadBundle, finishMaterial, type Bundle } from './cadAssets'
 import * as THREE from 'three'
 import type { Build } from './buildContent'
-import { areaSupplyNote, areaSupplyQuantity, supplies, partQuantityLabel, supplyQuantity, supplementalParts, groupStandardParts, type Area, type Part, type Supply } from './assemblyParts'
+import { areaSupplyNote, areaSupplyQuantity, supplies, partQuantityLabel, supplyQuantity, supplementalParts, explorerParts, isInternalSpoolPart, type Area, type Part, type Supply } from './assemblyParts'
 
 type Item={part:Part;area:string;nodes:string[]}
 type Region={area:Area;x:number;y:number;width:number;height:number}
 type Target={x:number;y:number;size:number;labelWidth:number}
 type Layout={width:number;height:number;regions:Region[];targets:Map<string,Target>}
-function itemsFor(bundle:Bundle):Item[] {
-  return groupStandardParts(bundle.inventory.parts).flatMap(part=>part.category==='Tendons'
-    ? [{part,area:'Thumb',nodes:part.nodes.slice(0,8)},{part,area:'Fingers',nodes:part.nodes.slice(8)}]
+function itemsFor(bundle:Bundle,stock:Supply[]):Item[] {
+  const modeled=explorerParts(bundle.inventory.parts).flatMap(part=>part.category==='Tendons'
+    ? [{part,area:'Fingers',nodes:part.nodes}]
     : Object.entries(part.areas).map(([area,nodes])=>({part,area,nodes})))
+  const covers=stock.filter(s=>s.id.startsWith('carpal-cover-')).map(s=>({area:'Carpals',nodes:[s.id],part:{id:s.id,label:s.label,category:'Carpals',count:1,nodes:[s.id],areas:{Carpals:[s.id]},thumbnail:s.image!}}))
+  return [...modeled,...covers]
 }
 const itemKey=(item:Item)=>`${item.area}:${item.part.id}`
-const isHardware=(part:Part)=>['Standard components','Tendons'].includes(part.category)
+const isHardware=(part:Part)=>['Standard components','Tendons'].includes(part.category)||isInternalSpoolPart(part)
 function layoutFor(width:number,items:Item[]):Layout {
   const uiScale=Math.min(1,width/1000),height=width*.68,padding=10*uiScale,gap=10*uiScale,available=width-padding*2
   const topHeight=height*.46-gap,lowerY=padding+topHeight+gap,lowerHeight=height-lowerY-padding
   const regions:Region[]=[
-    {area:'Thumb',x:padding,y:padding,width:available*.3-gap/2,height:topHeight},
-    {area:'Fingers',x:padding+available*.3+gap/2,y:padding,width:available*.7-gap/2,height:topHeight},
+    {area:'Fingers',x:padding,y:padding,width:available,height:topHeight},
     {area:'Carpals',x:padding,y:lowerY,width:available*.25-gap,height:lowerHeight},
     {area:'Wrist',x:padding+available*.25,y:lowerY,width:available*.25-gap,height:lowerHeight},
     {area:'Tower',x:padding+available*.5,y:lowerY,width:available*.5,height:lowerHeight},
@@ -100,7 +101,7 @@ export function PartsExplorer({build}:{build:Build}) {
   const hasArchive=(build.version==='base'||build.version==='touch')&&build.motor==='dynamixel'
   const stage=useRef<HTMLDivElement>(null),dialog=useRef<HTMLDialogElement>(null)
   const bundle=loaded?.key===key?loaded.bundle:null
-  const items=useMemo(()=>bundle?itemsFor(bundle):[],[bundle]),stock=useMemo(()=>supplies(build),[build])
+  const stock=useMemo(()=>supplies(build),[build]),items=useMemo(()=>bundle?itemsFor(bundle,stock):[],[bundle,stock])
   const layout=useMemo(()=>layoutFor(width,items),[width,items])
   useEffect(()=>{let active=true;setFailed(false);setAmount(0);setDetail(null);dialog.current?.close();loadBundle(key).then(bundle=>{if(active)setLoaded({key,bundle})}).catch(()=>{if(active)setFailed(true)});return()=>{active=false}},[key,retry])
   useEffect(()=>{if(!stage.current)return;const observer=new ResizeObserver(([entry])=>setWidth(entry.contentRect.width));observer.observe(stage.current);return()=>observer.disconnect()},[])
@@ -108,11 +109,11 @@ export function PartsExplorer({build}:{build:Build}) {
   function inspect(area:Area,kind?:'standard'|'cord'|'tube'|'cable'){
     const label=kind==='standard'?'standard components':kind==='cord'?'tendons':kind==='tube'?'PTFE tubes':kind==='cable'?'cables':'all parts'
     setDetail({title:`${area} · ${label}`,area,
-      items:items.filter(i=>i.area===area&&i.part.category!=='Tendons'&&(!kind||(kind==='standard'&&i.part.category==='Standard components'))),
-      supplies:stock.filter(s=>s.areas.includes(area)&&(!kind||(kind==='standard'?!!s.partLabel:s.kind===kind)))})
+      items:items.filter(i=>i.area===area&&i.part.category!=='Tendons'&&!i.part.id.startsWith('carpal-cover-')&&!isInternalSpoolPart(i.part)&&(!kind||(kind==='standard'&&i.part.category==='Standard components'))),
+      supplies:stock.filter(s=>s.areas.includes(area)&&(!kind||(kind==='standard'?s.kind==='hardware':s.kind===kind)))})
   }
   const opacity=amount===1&&settled?1:0
-  const bom=groupStandardParts(bundle?.inventory.parts??[]).filter(p=>p.category!=='Tendons')
+  const bom=explorerParts(bundle?.inventory.parts??[]).filter(p=>p.category!=='Tendons'&&!isInternalSpoolPart(p))
   const rows=[...bom.map(p=>({id:p.id,label:p.label,quantity:partQuantityLabel(p,stock),category:p.category,areas:[...new Set([...Object.keys(p.areas),...supplementalParts(p,stock).flatMap(s=>s.areas)])].join(', '),note:supplementalParts(p,stock).map(s=>s.note).join(' '),part:p,supply:null as Supply|null})),...stock.filter(s=>!bom.some(p=>p.label===s.partLabel)).map(s=>({id:s.id,label:s.label,quantity:supplyQuantity(s),category:s.kind==='equipment'?'Tools & supplies':s.kind==='hardware'?'Other components':'Cables & consumables',areas:s.areas.join(', '),note:s.note,part:null,supply:s}))]
   // The control board is required even when absent from an individual assembly export.
   if(bundle&&!bom.some(p=>p.label==='OH control board'))rows.push({id:'oh-board',label:'OH control board',quantity:'1',category:'Drive & electronics',areas:'Tower',note:'Required for the completed hand.',part:null,supply:{id:'oh-board',label:'OH control board',quantity:'1',kind:'hardware',areas:['Tower'],note:'Required for the completed hand.',image:'./assembly/parts/base-right-dynamixel/e2fd92904c.png'}})
@@ -124,8 +125,8 @@ export function PartsExplorer({build}:{build:Build}) {
       {!bundle?<div className="assembly-cad-placeholder" role="status">{failed?(hasArchive?<div className="assembly-model-recovery"><h3>The 3D model could not load</h3><p>The UI normally unpacks this model automatically when it starts. If the model files have not been extracted, restart the UI or run this from your <code>orca_ui</code> checkout:</p><code className="assembly-recovery-command">uv run python -m orca_ui.assembly_assets</code><p>The archive for your selection is <code>orca_ui/models/assembly/{key}.zip</code>. You can also unzip its <code>assembly.glb</code> into <code>orca_ui/webui/assembly/parts/{key}/</code>. For frontend development, extract it into <code>frontend/public/assembly/parts/{key}/</code> too.</p><button type="button" className="assembly-secondary" onClick={()=>setRetry(n=>n+1)}>Retry model</button></div>:'The complete assembly for this configuration is not available yet.'):'Loading the detailed assembly…'}</div>:<div className="assembly-area-scroll"><div className="assembly-area-canvas" style={{height:layout.height,'--explorer-scale':Math.min(1,width/1000)} as React.CSSProperties}>
         <ModelBoundary key={key}><Canvas orthographic frameloop="demand" dpr={[1,2]} camera={{position:[0,0,1400],zoom:1,near:.1,far:5000}} gl={{alpha:true,antialias:true}} aria-label={`${build.version} ${build.side} hand assembly`}><ambientLight intensity={1.2}/><hemisphereLight args={['#f5f9ff','#6d7e88',1.5]}/><directionalLight position={[300,450,850]} intensity={3}/><directionalLight position={[-400,120,-500]} intensity={2}/><Model bundle={bundle} build={build} items={items} layout={layout} amount={amount} onSettled={setSettled} onPart={item=>setDetail({title:item.part.label,items:[item],supplies:[]})}/></Canvas></ModelBoundary>
         <div className="assembly-area-overlays" inert={!opacity} style={{opacity,pointerEvents:opacity?'auto':'none'}} aria-hidden={!opacity}>
-          {layout.regions.map(region=><section key={region.area} className="assembly-area-outline" style={{left:region.x,top:region.y,width:region.width,height:region.height}}><button className="assembly-area-title" tabIndex={opacity?0:-1} onClick={()=>inspect(region.area)}>{region.area}<span>↗</span></button><div className="assembly-area-icons"><button tabIndex={opacity?0:-1} onClick={()=>inspect(region.area,'standard')} aria-label={`${region.area} standard components`}><SupplyIcon kind="hardware"/><span>Hardware</span></button>{(['cord','tube','cable'] as const).filter(kind=>stock.some(s=>s.kind===kind&&s.areas.includes(region.area))).map(kind=><button key={kind} tabIndex={opacity?0:-1} onClick={()=>inspect(region.area,kind)} aria-label={`${region.area} ${kind==='cord'?'tendons':kind==='tube'?'PTFE':'cables'}`}><SupplyIcon kind={kind}/><span>{kind==='cord'?'Tendons':kind==='tube'?'PTFE':'Cables'}</span></button>)}</div></section>)}
-          {items.filter(i=>!isHardware(i.part)).map(item=>{const point=layout.targets.get(itemKey(item));return point&&<button tabIndex={opacity?0:-1} className="assembly-area-part-label" title={item.part.label} key={itemKey(item)} style={{left:point.x-point.labelWidth/2,top:point.y+point.size/2+3*Math.min(1,width/1000),width:point.labelWidth}} onClick={()=>setDetail({title:item.part.label,items:[item],supplies:[]})}>{item.part.label}{item.nodes.length>1&&<strong> ×{item.nodes.length}</strong>}</button>})}
+          {layout.regions.map(region=><section key={region.area} className="assembly-area-outline" style={{left:region.x,top:region.y,width:region.width,height:region.height}}><button className="assembly-area-title" tabIndex={opacity?0:-1} onClick={()=>inspect(region.area)}>{region.area==='Fingers'?'Fingers & thumb':region.area}<span>↗</span></button><div className="assembly-area-icons"><button tabIndex={opacity?0:-1} onClick={()=>inspect(region.area,'standard')} aria-label={`${region.area} standard components`}><SupplyIcon kind="hardware"/><span>Hardware</span></button>{(['cord','tube','cable'] as const).filter(kind=>stock.some(s=>s.kind===kind&&s.areas.includes(region.area))).map(kind=><button key={kind} tabIndex={opacity?0:-1} onClick={()=>inspect(region.area,kind)} aria-label={`${region.area} ${kind==='cord'?'tendons':kind==='tube'?'PTFE':'cables'}`}><SupplyIcon kind={kind}/><span>{kind==='cord'?'Tendons':kind==='tube'?'PTFE':'Cables'}</span></button>)}</div></section>)}
+          {items.filter(i=>!isHardware(i.part)).map(item=>{const point=layout.targets.get(itemKey(item));return point&&<span key={itemKey(item)}>{item.part.id.startsWith('carpal-cover-')&&<img src={item.part.thumbnail} alt="" style={{position:'absolute',left:point.x-point.size/2,top:point.y-point.size/2,width:point.size,height:point.size,pointerEvents:'none'}}/>}<button tabIndex={opacity?0:-1} className="assembly-area-part-label" title={item.part.label} key={itemKey(item)} style={{left:point.x-point.labelWidth/2,top:point.y+point.size/2+3*Math.min(1,width/1000),width:point.labelWidth}} onClick={()=>setDetail({title:item.part.label,items:item.part.id.startsWith('carpal-cover-')?[]:[item],supplies:stock.filter(s=>s.id===item.part.id)})}>{item.part.label}<strong> ×{partQuantityLabel(item.part,stock,item.area)}</strong></button></span>})}
         </div>
       </div></div>}
       <label className="assembly-area-slider"><span>Assembled</span><input aria-label="Explode assembly" type="range" min="0" max="100" value={Math.round(amount*100)} disabled={!bundle} onChange={e=>setAmount(Number(e.target.value)/100)}/><span>Exploded</span><output>{Math.round(amount*100)}%</output></label>
@@ -138,7 +139,7 @@ export function PartsExplorer({build}:{build:Build}) {
     <dialog ref={dialog} className="assembly-parts-dialog" aria-label={detail?.title??'Assembly parts'} onClose={()=>setDetail(null)} onCancel={e=>e.stopPropagation()}>
       <div className="assembly-row assembly-parts-dialog-header"><div><span className="assembly-eyebrow">{build.side.toUpperCase()} HAND · {build.motor.toUpperCase()} · {build.version.toUpperCase()}</span><h3>{detail?.title}</h3></div><button autoFocus className="assembly-secondary" onClick={()=>dialog.current?.close()}>Close parts ×</button></div>
       <div className="assembly-part-detail-grid">{detail?.items.map(item=><figure key={itemKey(item)}><img src={item.part.thumbnail} alt={item.part.label}/><figcaption><span>{item.part.label}</span><strong>×{partQuantityLabel(item.part,stock,item.area||undefined)}</strong></figcaption>{supplementalParts(item.part,stock,item.area||undefined).map(s=><p key={s.id}>{s.note}</p>)}</figure>)}{detail?.supplies.filter(s=>!detail.items.some(i=>i.part.label===s.partLabel&&(!i.area||s.areas.includes(i.area as Area)))).map(s=><figure key={s.id}><img src={s.image} alt={s.label}/><figcaption><span>{s.label}</span><strong>{s.partLabel?'×':''}{detail.area?areaSupplyQuantity(s,detail.area):supplyQuantity(s)}</strong></figcaption><p>{detail.area?areaSupplyNote(s,detail.area):s.note}</p>{s.files?.map(file=><a key={file.src} className="assembly-text-button" href={file.src} download>Download {file.label} ↓</a>)}</figure>)}</div>
-      {detail?.area&&detail.supplies.some(s=>s.kind==='cord')&&['Fingers','Thumb'].includes(detail.area)&&<div className="assembly-area-tendons"><h4>Tendon groups</h4>{(detail.area==='Thumb'?['Thumb']:['Index','Middle','Ring','Pinky']).map(finger=><div key={finger}><strong>{finger}</strong><p>DP flex · DP ext · PP flex · PP ext · AP toward pinky · AP toward thumb{finger==='Thumb'?' · TP flex · TP ext':''}</p><img src="./assembly/supplies/cord.svg" alt={`${finger} tendon cord`}/></div>)}</div>}
+      {detail?.area&&detail.supplies.some(s=>s.kind==='cord')&&['Fingers','Thumb'].includes(detail.area)&&<div className="assembly-area-tendons"><h4>Tendon groups</h4>{(detail.area==='Thumb'?['Thumb']:['Thumb','Index','Middle','Ring','Pinky']).map(finger=><div key={finger}><strong>{finger}</strong><p>DP flex · DP ext · PP flex · PP ext · AP toward pinky · AP toward thumb{finger==='Thumb'?' · TP flex · TP ext':''}</p><img src="./assembly/supplies/cord.svg" alt={`${finger} tendon cord`}/></div>)}</div>}
       {detail?.supplies.some(s=>s.kind==='cord')&&<p className="assembly-consumable-note">Tendons and shared cables pass through several assemblies. They are counted once in the total BOM. Routing icons show the material, not an exact cable shape.</p>}
     </dialog>
   </section>
