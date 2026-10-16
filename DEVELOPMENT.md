@@ -50,7 +50,8 @@ needed it goes quiet. (The fun-sound mp3s were in exactly that state.)
 
 The console talks to the hand through
 [orca_core](https://github.com/orcahand/orca_core). A plain `uv sync` installs
-the **released** `orca_core` from PyPI, which is what you want almost always.
+the pinned **`orca_core 0.6.0` release** from PyPI. This is the supported setup
+for running the assembly guide; no sibling checkout is needed.
 
 When you are changing both repos at once, point the console at your own
 `orca_core` checkout instead. One command:

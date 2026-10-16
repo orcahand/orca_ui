@@ -450,7 +450,7 @@
 .assembly-wrist-routing .assembly-route-dialog svg { max-height:75vh; }
 
 /* Muted mint separates white cord and liners from the illustration surface. */
-.assembly-app { --assembly-image-bg:#b8cebf; --assembly-label:#24533f; }
+.assembly-app { --assembly-image-bg:#91a89a; --assembly-label:#24533f; }
 .assembly-app .assembly-image-button,
 .assembly-app .assembly-panel-gallery .assembly-image-button,
 .assembly-app .assembly-lightbox[data-image-kind=cad],

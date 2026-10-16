@@ -1,4 +1,4 @@
-# Assembly guide feedback review · 15 October 2026
+# Assembly guide feedback review · updated 16 October 2026
 
 This edition preserves the existing guide and adds the supplied feedback and Touch
 installation procedure. It lives on `feature/assembly-feedback-touch` in the
@@ -30,31 +30,32 @@ from an imagined connector or cable route.
 
 Retain the warm neutral page, dark green/teal accents, mint model background,
 restrained typography and existing interactive controls. The principal layout
-change is one instruction followed immediately by its media. A **Show all** control
-preserves access to the complete sequence. Progress remains explicitly checked;
+change is that **all numbered instructions stay visible together**, with each
+image, command or interactive model directly below its relevant instruction. There
+is no instruction paging or walkthrough playback toolbar. Progress remains explicitly checked;
 viewing an instruction or playing an animation never marks a step complete.
 
 ## Feedback coverage
 
 | Concern | Implementation / remaining limit |
 | --- | --- |
-| Thumb PP needs a 5 mm pin | Calls out the missing pin specification in Parts, the instruction and review notes. Diameter and hole are not supplied; no guessed substitution. |
+| Thumb DP/PP pins | Resolved by the owner on 16 October: use the finger recipe, Ø2×8 mm middle pin and Ø2×6 mm lower and upper pins. Removed the earlier 5 mm ambiguity warning. |
 | Thumb AP routing is reversed | The step explicitly marks the current route as awaiting a corrected channel assignment. Existing CAD paths are retained for review, not silently swapped. |
-| Thumb AP / TP bearings are 3 mm | Parts and instructions use 4×8×3 mm for both, including Touch. Review notes identify the 2 mm labels still present in the supplied Touch CAD. |
+| Thumb AP / TP bearings are 3 mm | Parts and instructions use 4×8×3 mm for both, including Touch. This handover records the 2 mm labels still present in the supplied Touch CAD. |
 | Connector probe appears on wrong side | Touch instructions specify the back-side pads and flashing before mounting. Ambiguous probe-placement images are removed from those steps. |
 | AP PTFE too long | Use measured channel depth plus about 2 mm; leave about 1 mm at either end. 5–8 mm is an estimate, not a universal cut dimension. BOM notes agree. |
 | Flashing choices prominent | Method selector is immediately below the title, above Parts and instructions. Console and terminal remain alternatives. |
 | One Parts box with sizes | Parts/tools are listed together at the top of every applicable step. Bearing dimensions are there; vague “confirm size below” is removed. Actual source conflicts are stated upfront. |
-| Guided sequence by default | One instruction is visible initially; image galleries and commands are placed inside that instruction. Playback is user-triggered. |
+| All instructions together | Every numbered instruction is visible; media and commands follow the matching instruction. Supplementary videos are below the checklist and Previous/Next navigation. The primary knot video remains inside its lesson. |
 | Repeated text | Removed “Walk through this step,” duplicate flashing walkthrough and redundant image captions where they repeated the full instruction. |
 | Clear tendon legend | Dedicated separated swatches replace the run-on top-right text; colors match each scene's actual palette. |
-| Rotation too small | Larger illustrative movement with an explicit statement that the animation is not a calibrated range limit. Physical checks ask for free movement without forcing stops. |
+| Full-range rotation | Demonstrations use the complete joint limits from the bundled left/right V2 URDFs, converted through the existing CAD axis/rest-angle calibration. This affects visual demonstrations only; connected-hand test limits are unchanged. |
 | Named thumb-to-carpal channels | Eight named selectors highlight the corresponding existing CAD path; white rings mark the selected TP exit and carpal entrance. Other routes fade. |
 | Random assembly/side labels | Removed the redundant RIGHT/TOUCH ASSEMBLY header from detail cards. |
 | Forward-looking instructions | Removed unnecessary later-step commentary from affected thumb, pulley and wrist steps; footer navigation still identifies the next step. |
-| Icon controls | Walkthrough and fitting playback, static image enlargement and shared model enlargement use icons with accessible labels. |
+| Icon controls | Fitting playback and image/model enlargement use accessible icons. A left-edge chevron collapses or expands the chapter sidebar. |
 | Overlap / room for models | Desktop sidebar can collapse. Instruction images occupy the main width; images retain their full aspect ratio, including tall screw diagrams. |
-| Play at right edge | Walkthrough playback is the final toolbar control, with the instruction count on the left. |
+| Movement controls | Flexion/extension and tendon selectors play their movement directly. No extra Play movement button. Fitting animations retain their own playback and scrubber. |
 | Commands with instructions | Firmware setup, flash command, connector flash and motor configuration are attached to their corresponding numbered instruction. |
 | Consistent electronics appearance | Adds the OH-board CAD identification render while retaining the port-labeled diagram and factual connector orientation photos. |
 | Final checklist placement | “Final assembly checklist” precedes the completed-hand model. All its checks are still required. |
@@ -96,7 +97,7 @@ The supplied procedure includes:
 
 These are visible at the affected step, not buried only in this document:
 
-1. **Thumb PP pin:** full diameter × length and exact hole for the reported 5 mm pin.
+1. **Thumb PP pin — resolved:** owner explicitly confirmed the finger pin sizes (Ø2×8 mm middle; Ø2×6 mm lower and upper).
 2. **Thumb AP:** which channels reverse, in which viewing orientation. A verbal
    “other way around” does not define a reliable replacement geometry.
 3. **Touch cables:** allocation of the three short/two long leads to fingers, and
@@ -153,3 +154,94 @@ Development evidence is in `/tmp/orca-guide-review-oct15/`. The preview uses a
 dedicated mock backend and progress file; it does not modify the user's normal
 assembly progress. Two Touch bearing stills were regenerated with neutral bearing
 labels so that the older CAD dimension does not contradict the corrected Parts box.
+
+## 16 October layout revision
+
+- The Ashley stopper lesson has no second generic numbered instruction block.
+- Palmar/dorsal controls sit within the anatomy model surface. DP/PP/AP/TP use
+  **phalanx** terminology; the direction legend defines distal, proximal, palmar
+  and dorsal together.
+- Reference/inspection steps without required materials omit the Parts card.
+- `prepare-pp` precedes `p33`. Its three preparation images and first video excerpt
+  are separated from the three joining images and second excerpt. Migration
+  clears prior `p33` completion once so the newly separated checks are explicit.
+- Repeated captions, “Need a reminder?” boxes and in-product review notes are
+  removed. Unique orientation labels, correct/wrong comparisons and tendon color
+  legends remain. Skin fitting directions are in the numbered instructions.
+- Illustration background is `#91a89a`. Connector PCB materials and six board
+  thumbnails are black; four arm-cover stills containing connector PCBs were
+  regenerated from the same CAD scenes.
+- Exploded models have dedicated model/label slots in a fixed 1:0.68 viewport. All five areas fit without a separate viewport scrollbar.
+  Labels and area controls appear only after the fully exploded layout settles;
+  they are inert during movement. Hardware, tendon, PTFE and cable detail views
+  and the full BOM remain available.
+
+Validation for this revision: 48 configuration/edition/method combinations,
+442 image sources, all 69 Touch-console steps rendered, desktop and 390 px mobile,
+sidebar collapse/expand, selector-triggered movement, component drilldown and
+video ordering. The 68 joint scenes (17 × four CAD builds) were sampled in both
+movement directions at five positions, including exact ROM endpoints and framing;
+32 assembly rotation scenes were also checked. Temporary audit scripts/results
+are under `/tmp/orca-guide-review-oct16/`, not part of the shipped application.
+
+The review worktree also contains unrelated local tuning/calibration edits that
+predate this revision. They are not guide changes and must not be staged with it.
+The rebuilt local bundle preserves those existing source changes. No push or
+commit is made by this revision.
+
+Packaged UI verification also passed across all 69 Touch-console steps. The
+explosion was checked against actual projected mesh bounds and DOM label boxes
+for Base/Touch × left/right at widths 390, 1000 and 1440 px: no model/label or
+label/label intersections. Production build and the existing test suite passed
+(106 tests). Unrelated local source files match their pre-task SHA-256 snapshots.
+
+## 16 October refinement pass
+
+- The explosion slider preserves the viewer dimensions from assembled through fully
+  exploded. All five areas use the available frame; part/hardware drilldowns and
+  the full BOM remain available.
+- Palmar/dorsal buttons share their background, text and border colors. An inset
+  underline indicates the selected face. See-through controls sit inside the model frame.
+- Rotation and axial-play demonstrations are separate from assembly animations and
+  appear below the relevant later instruction. PP skins and bearings share one instruction.
+- TP routing includes a rotatable, zoomable CAD view and named tendon selection,
+  alongside the entry/exit diagrams. The seating lesson has shorter captions and
+  removes the repeated routing legend and explanatory paragraphs.
+- White is used behind views without white cord/material. Mint remains where it
+  provides needed contrast for white tendons, PTFE or skins.
+- `beltGuideGeometry.ts` corrects the displayed belt waist between the two sleeved
+  M4 screws using their model-space centers and 6 mm sleeve outer diameter. This
+  is a guide-only geometry correction; source STEP/GLB archives are untouched.
+  The five affected stills are regenerated for all four supplied CAD configurations.
+- Touch steps retain the supplied pictures, connector comparisons, screw sizes,
+  wrapping dimensions, sensor IDs and port map with shorter numbered instructions.
+- Additional native video excerpts cover the Ashley stopper, thumb joints, TP
+  routing/seating, carpal finishing, motor setup and hull closure. Finger skin
+  clips move to the skin/bearing step. The importer records every excerpt boundary.
+  The old tutorial has no Touch or current OH-board flashing footage; those steps
+  retain their supplied pictures and current procedure instead of unrelated clips.
+
+Refinement verification:
+
+- Fixed viewport ratio and dimensions checked at 0%, 50% and 100% explosion,
+  for Base/Touch × left/right at 1440, 1000 and 390 px window widths. All five
+  areas fit; projected mesh bounds do not overlap labels or area controls.
+- Browser checks verified all eight joint-check placements, matching palmar/dorsal
+  colors, the inside-frame toggle, the combined skin/bearing instruction, thumb pin
+  text, actual TP camera rotation/zoom and named tendon selection.
+- The complete 69-step Touch walkthrough has no browser errors. Content validation
+  covers 48 side/version/motor/audience/flashing combinations and 442 image sources.
+- All 48 native video excerpts and posters exist, match their declared durations,
+  and are embedded in the corresponding 36 visible steps (the AP trim excerpts
+  share the AP preparation step). Sampled playback advanced continuously; range
+  requests work. Packaged clips and posters match frontend source assets.
+- Belt waist geometry stays between both 6 mm sleeves for all four CAD builds;
+  the minimum sampled clearance is 0.34 mm. This validates the illustration,
+  not the manufactured belt's installation clearance.
+- All 68 joint scenes and 32 inspection scenes pass the geometry/motion audit.
+- Frontend production build and all 106 existing tests pass. The existing large
+  JavaScript chunk warning remains. Packaged-UI smoke checks passed, including
+  explicit checkbox completion and progress persistence after reload.
+- Existing non-assembly source files match the pre-work hashes. No hardware was
+  operated. No commit or push was made. Temporary evidence for this pass is in
+  `/tmp/orca-guide-review-oct16b/`.

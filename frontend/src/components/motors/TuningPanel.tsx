@@ -81,7 +81,7 @@ export function TuningPanel() {
   const liveMaxCurrent = control?.max_current
   const seenMaxCurrent = useRef<number | null>(null)
   useEffect(() => {
-    if (liveMaxCurrent === undefined) return
+    if (liveMaxCurrent == null) return
     if (seenMaxCurrent.current === liveMaxCurrent) return
     seenMaxCurrent.current = liveMaxCurrent
     setMaxCurrent(String(liveMaxCurrent))

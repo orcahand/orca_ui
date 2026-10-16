@@ -17,7 +17,7 @@ export function thumbTpStrands(build:Build,pieces:CadPiece[]){
   for(const path of strands){
    const points=[...transform(path.moving,ap),...transform(path.fixed,tp)]
    path.mesh.geometry.dispose();path.mesh.geometry=new THREE.TubeGeometry(new ChannelCurve(points),1000,.14,10,false)
-   path.material.opacity=path.selection<0||path.selection===selected?1:.8
+   path.material.opacity=path.selection<0?.45:path.selection===selected?1:.2
   }
  }
  return {group,count:strands.length,update,dispose:()=>strands.forEach(p=>{p.mesh.geometry.dispose();p.material.dispose()})}

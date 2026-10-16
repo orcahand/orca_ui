@@ -3,6 +3,8 @@ import {Canvas,useFrame} from '@react-three/fiber'
 import {OrbitControls} from '@react-three/drei'
 import {loadBundle,type Bundle} from './cadAssets'
 import {motorCheckScene} from './motorCheckScene'
+import {illustratedJointRange,rangeAngle,fitIllustratedRange} from './illustratedJointRange'
+import {testJoint} from './jointTestControl'
 import {motorId} from './driveMap'
 import type {Build} from './buildContent'
 
@@ -10,14 +12,17 @@ function Movement({bundle,build,finger,movement,playing,replay,isolated}:{bundle
  const elapsed=useRef(0)
  const scene=useMemo(()=>{
   const name=finger[0].toUpperCase()+finger.slice(1),code=finger==='pinky'?'P':name[0],segment=movement<2?'DP':movement<4?'PP':'AP'
-  return motorCheckScene(bundle,build,motorId(`${code}-${segment}`,build),'hand',undefined,{owners:isolated?[`${name} DP`,`${name} PP`]:[`${name} DP`,`${name} PP`,`${name} AP`],bare:isolated})
+  const id=motorId(`${code}-${segment}`,build)
+  const scene=motorCheckScene(bundle,build,id,'hand',undefined,{owners:isolated?[`${name} DP`,`${name} PP`]:[`${name} DP`,`${name} PP`,`${name} AP`],bare:isolated})
+  const range=illustratedJointRange(build,testJoint(id,build),scene.axis);fitIllustratedRange(scene,range)
+  return {...scene,range}
  },[bundle,build,finger,movement,isolated])
  useEffect(()=>{elapsed.current=0},[scene,replay])
  useEffect(()=>()=>scene.dispose(),[scene])
  useFrame((_,delta)=>{
   if(playing)elapsed.current+=delta
   const t=Math.min(elapsed.current/2.4,1),smooth=(1-Math.cos(t*Math.PI))/2
-  scene.setAngle(movement>=4?scene.towardPinkySign*(movement===4?1:-1)*.25*smooth:scene.sign*.6*(movement%2===0?smooth:1-smooth))
+  scene.setAngle(rangeAngle(scene.range,movement%2===0?smooth:1-smooth,movement>=4?scene.towardPinkySign:scene.sign))
  })
  return <primitive object={scene.view}/>
 }

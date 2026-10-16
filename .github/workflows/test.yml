@@ -8,6 +8,8 @@ name: Run Tests on Pull Request
 # entry that would break every other machine.
 
 on:
+  push:
+    branches: [feature/assembly-feedback-touch]
   pull_request:
     # `edited` catches a retarget: a PR moved onto main must be re-checked
     # against the published core rather than keeping the paired job's verdict.
@@ -15,13 +17,13 @@ on:
 
 # A new push or edit supersedes the run still going for the same PR.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   published:
     name: tests (published orca_core)
-    if: github.base_ref == 'main'
+    if: github.base_ref == 'main' || github.ref_name == 'feature/assembly-feedback-touch' || github.head_ref == 'feature/assembly-feedback-touch'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -45,7 +47,7 @@ jobs:
 
   paired:
     name: tests (paired orca_core)
-    if: github.base_ref != 'main'
+    if: github.event_name == 'pull_request' && github.base_ref != 'main' && github.head_ref != 'feature/assembly-feedback-touch'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 

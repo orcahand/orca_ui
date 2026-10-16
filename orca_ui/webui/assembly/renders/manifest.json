@@ -2978,7 +2978,7 @@
   {
     "key": "base-right-dynamixel",
     "file": "panel-034-3",
-    "step": "p33",
+    "step": "prepare-pp",
     "labels": [
       "Pin \u00b7 2 \u00d7 8",
       "Pin \u00b7 2 \u00d7 6"
@@ -3021,7 +3021,7 @@
   {
     "key": "base-left-dynamixel",
     "file": "panel-034-3",
-    "step": "p33",
+    "step": "prepare-pp",
     "labels": [
       "Pin \u00b7 2 \u00d7 8",
       "Pin \u00b7 2 \u00d7 6"
@@ -3064,7 +3064,7 @@
   {
     "key": "touch-right-dynamixel",
     "file": "panel-034-3",
-    "step": "p33",
+    "step": "prepare-pp",
     "labels": [
       "Pin \u00b7 2 \u00d7 8",
       "Pin \u00b7 2 \u00d7 6"
@@ -3107,7 +3107,7 @@
   {
     "key": "touch-left-dynamixel",
     "file": "panel-034-3",
-    "step": "p33",
+    "step": "prepare-pp",
     "labels": [
       "Pin \u00b7 2 \u00d7 8",
       "Pin \u00b7 2 \u00d7 6"
@@ -4653,7 +4653,7 @@
   {
     "key": "base-right-dynamixel",
     "file": "panel-034-1",
-    "step": "p33",
+    "step": "prepare-pp",
     "labels": [
       "Ashley stopper + single knot",
       "Knot housing"
@@ -4664,7 +4664,7 @@
   {
     "key": "base-right-dynamixel",
     "file": "panel-034-2",
-    "step": "p33",
+    "step": "prepare-pp",
     "labels": [
       "Knot housing"
     ],
@@ -4773,7 +4773,7 @@
   {
     "key": "base-left-dynamixel",
     "file": "panel-034-1",
-    "step": "p33",
+    "step": "prepare-pp",
     "labels": [
       "Ashley stopper + single knot",
       "Knot housing"
@@ -4784,7 +4784,7 @@
   {
     "key": "base-left-dynamixel",
     "file": "panel-034-2",
-    "step": "p33",
+    "step": "prepare-pp",
     "labels": [
       "Knot housing"
     ],
@@ -4893,7 +4893,7 @@
   {
     "key": "touch-right-dynamixel",
     "file": "panel-034-1",
-    "step": "p33",
+    "step": "prepare-pp",
     "labels": [
       "Ashley stopper + single knot",
       "Knot housing"
@@ -4904,7 +4904,7 @@
   {
     "key": "touch-right-dynamixel",
     "file": "panel-034-2",
-    "step": "p33",
+    "step": "prepare-pp",
     "labels": [
       "Knot housing"
     ],
@@ -5013,7 +5013,7 @@
   {
     "key": "touch-left-dynamixel",
     "file": "panel-034-1",
-    "step": "p33",
+    "step": "prepare-pp",
     "labels": [
       "Ashley stopper + single knot",
       "Knot housing"
@@ -5024,7 +5024,7 @@
   {
     "key": "touch-left-dynamixel",
     "file": "panel-034-2",
-    "step": "p33",
+    "step": "prepare-pp",
     "labels": [
       "Knot housing"
     ],

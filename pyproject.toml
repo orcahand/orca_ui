@@ -19,9 +19,9 @@ dependencies = [
     # MCP server (orca_ui/mcp): agent access to the running backend.
     "mcp>=1.12,<2",
     "httpx>=0.27",
-    # 0.4.1 drops the outer loop's i_clamp gain and brings the wrist into the
-    # feedback loop; 0.4.0 cannot satisfy this package's imports.
-    "orca-core",
+    # Tested release for the assembly guide, including JointGains and
+    # motor-family current defaults. No sibling core checkout is needed.
+    "orca-core==0.6.0",
 ]
 
 [project.scripts]

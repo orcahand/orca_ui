@@ -1,6 +1,6 @@
 # ORCA assembly guide — handover
 
-Updated: 13 October 2026. Intended for the next Astra/Codex instance and human maintainers.
+Updated: 16 October 2026. Intended for the next Astra/Codex instance and human maintainers.
 
 ## Start here
 
@@ -10,7 +10,31 @@ The goal is a self-contained guide that makes building the hand straightforward 
 
 Read this document first, then [the assembly implementation notes](frontend/src/components/assembly/README.md), [DEVELOPMENT.md](DEVELOPMENT.md) and [CLAUDE.md](CLAUDE.md). The assembly README contains detailed historical development notes; some early statements are superseded. In particular, its opening statement that the guide never starts a hand operation predates the explicitly enabled connected-hand test described below.
 
-## Repository state at handover
+## Current review edition
+
+The latest feedback revision is in `orca_ui_assembly_review`, branch
+`feature/assembly-feedback-touch`. See [the feedback review](docs/assembly-feedback-review.md)
+for current layout behavior, validation and unresolved mechanical specifications.
+All numbered instructions are visible together; media follow their matching
+instruction; supplementary video comes after the checklist and navigation. Review
+notes are kept in documentation rather than shown inside the build flow. The PP
+preparation now has its own step before joining PP to DP. Joint demonstrations
+cover the bundled model's full ROM; live hardware test limits are unchanged.
+
+### Reproducible installation
+
+This branch pins the published `orca_core==0.6.0` in `pyproject.toml` and
+`uv.lock`. No local core source override belongs in the shared branch. The
+current-default compatibility fixes and frontend build are included. Follow the
+README's assembly quick start (`uv run orca-ui --mock --host 127.0.0.1 --port 5005`).
+The four model ZIPs extract at startup; Node and a separate core repo are not
+required. CI tests the assembly branch against the locked release, including on
+push, rather than substituting a local core checkout.
+
+The repository observations below describe the earlier handover, not the latest
+review worktree or current remote state.
+
+## Repository state at original handover
 
 - Working checkout: `/Users/kaistewart/Documents/Projects/orca/orca_ui`.
 - Local branch: `feature/better_stat_logging`.
@@ -43,14 +67,14 @@ The visual direction is a quiet, practical assembly workspace: clear hierarchy, 
 | Element | Current choice | Purpose |
 | --- | --- | --- |
 | Light page surface | Warm off-white `#f6f5f1` | Comfortable reading and a continuous workspace |
-| Illustration surface | Muted mint `#b8cebf` | Contrast for white tendons and PTFE |
+| Illustration surface | Muted mint `#91a89a` | Contrast for white tendons and PTFE |
 | Illustration labels | Dark green `#24533f` | Readable, restrained annotations |
 | Light-theme action accent | Teal `#0f6f78` | Navigation and interactive states |
 | Headings/body | System sans-serif; large, tightly spaced headings | Clear reading hierarchy |
 | Small metadata | Space Mono | Step numbers, compact labels and technical context |
 | Panels | Thin borders, modest rounding, minimal shadow | Group content without visual clutter |
 
-The user explicitly requested progressively darker illustration backgrounds so white tendons remain visible. The latest value is `--assembly-image-bg: #b8cebf` in `assembly.css`; do not revert to the earlier pale mint. Routing diagram masking strokes use the same variable. Some baked label backplates retain a lighter mint, which helps separate their text from the illustration.
+The user explicitly requested progressively darker illustration backgrounds so white tendons remain visible. The latest value is `--assembly-image-bg: #91a89a` in `assembly.css`; do not revert to the earlier pale mint. Routing diagram masking strokes use the same variable. Some baked label backplates retain a lighter mint, which helps separate their text from the illustration.
 
 Presentation conventions:
 
@@ -336,15 +360,14 @@ Setup and hardware operations retain their existing implementations.
 
 Read [the feedback analysis and implementation map](docs/assembly-feedback-review.md)
 before editing. It records each concern, source discrepancies and verification.
-Several mechanical facts are still unconfirmed: thumb pin diameter/position,
-the reversed thumb AP channel assignment, long Touch cable wrapping/allocation,
+Several mechanical facts are still unconfirmed: the reversed thumb AP channel
+assignment, long Touch cable wrapping/allocation,
 and discrepancies between fastener lists and CAD. These are explicitly visible
 in the affected steps. Do not replace them with inferred dimensions.
 
-Every step includes a removable Structure / Content / Images review box. Users can
-toggle them in the header. Maintainers can set `SHOW_ASSEMBLY_REVIEW_NOTES = false`
-in `ReviewChanges.tsx` to remove the entire review layer. Assembly cautions remain
-separate. Touch content lives in `touchGuide.ts`; the original guide IDs and explicit
+The Structure / Content / Images review boxes are disabled by
+`SHOW_ASSEMBLY_REVIEW_NOTES = false` in `ReviewChanges.tsx`. Assembly cautions
+remain separate. Touch content lives in `touchGuide.ts`; the original guide IDs and explicit
 completion behavior remain intact. The `oct15-v1` feedback marker resets only the
 affected mechanical completion checks once.
 
@@ -352,3 +375,31 @@ The standalone comparison above records the earlier tendon-visibility sweep;
 it is not a complete before/after report for this feedback edition. The new review
 boxes and analysis document describe the additional changes, including the two
 Touch bearing-image label corrections.
+
+### 16 October walkthrough refinements
+
+The viewer keeps a fixed 1:0.68 aspect ratio throughout the explosion slider.
+Joint checks live under the later fitting/checking instruction, independently of
+assembly animation playback. `JointInspection.tsx` owns these demonstrations;
+connected-hand test limits are unchanged. `p59` has its own interactive TP routing
+view. Palmar/dorsal selectors share colors and use an underline for selection.
+
+White image surfaces are restored where no white material needs contrast;
+`Figure.contrast` and the motion card's `data-contrast` select mint where needed.
+Colored-tendon joint and routing windows, including AP and TP, use white; short
+ancillary anchor tails do not make the entire routing window mint. Spooling views
+with white cord and the sleeved wrist assembly retain mint.
+Touch photographs stay photographs, with concise text and their critical dimensions.
+The owner resolved thumb DP/PP pin sizes: Ø2×8 mm middle and Ø2×6 mm lower/upper,
+as on the fingers. The earlier 5 mm warning is superseded.
+
+`beltGuideGeometry.ts` adjusts only the displayed belt waist to pass between both
+sleeved screws. Keep runtime scenes and regenerated stills consistent when changing
+this geometry. The original archives are not modified. Added video cuts are listed
+in `scripts/import_assembly_clips.py`; playback uses local native MP4 elements.
+The earlier tutorial has no Touch installation or current board-flashing footage.
+
+The standalone `orca-assembly-image-comparison.html` embeds original guide panels
+and current renders for offline review. It also compares against revision `3985b50`.
+It is a review artifact, not a UI dependency. See the feedback document for the
+complete change map and remaining source uncertainties.

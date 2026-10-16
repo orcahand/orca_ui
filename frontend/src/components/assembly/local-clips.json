@@ -161,18 +161,6 @@
       "poster": "./assembly/clips/p35-416-review.jpg",
       "title": "Check free movement",
       "duration": 10
-    },
-    {
-      "src": "./assembly/clips/p35-329-review.mp4",
-      "poster": "./assembly/clips/p35-329-review.jpg",
-      "title": "Fit the DP skin",
-      "duration": 17
-    },
-    {
-      "src": "./assembly/clips/p35-426-review.mp4",
-      "poster": "./assembly/clips/p35-426-review.jpg",
-      "title": "Fit the PP skin",
-      "duration": 19
     }
   ],
   "p37": [
@@ -253,6 +241,122 @@
       "poster": "./assembly/clips/p126-4448-review.jpg",
       "title": "Repeat and check joint pairing",
       "duration": 157
+    }
+  ],
+  "p59": [
+    {
+      "src": "./assembly/clips/p59-1305-walkthrough.mp4",
+      "poster": "./assembly/clips/p59-1305-walkthrough.jpg",
+      "title": "Route the six tendons through TP",
+      "duration": 100
+    }
+  ],
+  "p54": [
+    {
+      "src": "./assembly/clips/p54-1006-walkthrough.mp4",
+      "poster": "./assembly/clips/p54-1006-walkthrough.jpg",
+      "title": "Route and join the thumb AP",
+      "duration": 102
+    }
+  ],
+  "p62": [
+    {
+      "src": "./assembly/clips/p62-1405-walkthrough.mp4",
+      "poster": "./assembly/clips/p62-1405-walkthrough.jpg",
+      "title": "Seat the thumb joint and bearings",
+      "duration": 60
+    }
+  ],
+  "p136": [
+    {
+      "src": "./assembly/clips/p136-4985-walkthrough.mp4",
+      "poster": "./assembly/clips/p136-4985-walkthrough.jpg",
+      "title": "Seat the rear hull cover",
+      "duration": 40
+    }
+  ],
+  "p49": [
+    {
+      "src": "./assembly/clips/p49-1108-walkthrough.mp4",
+      "poster": "./assembly/clips/p49-1108-walkthrough.jpg",
+      "title": "Anchor the thumb AP tendons",
+      "duration": 87
+    }
+  ],
+  "p52": [
+    {
+      "src": "./assembly/clips/p52-1195-walkthrough.mp4",
+      "poster": "./assembly/clips/p52-1195-walkthrough.jpg",
+      "title": "Trim and seat the thumb AP stoppers",
+      "duration": 25
+    }
+  ],
+  "p56": [
+    {
+      "src": "./assembly/clips/p56-1220-walkthrough.mp4",
+      "poster": "./assembly/clips/p56-1220-walkthrough.jpg",
+      "title": "Prepare the TP tendon anchors",
+      "duration": 60
+    }
+  ],
+  "p135": [
+    {
+      "src": "./assembly/clips/p135-5035-walkthrough.mp4",
+      "poster": "./assembly/clips/p135-5035-walkthrough.jpg",
+      "title": "Fit the side and hull covers",
+      "duration": 100
+    }
+  ],
+  "p6": [
+    {
+      "src": "./assembly/clips/p6-86-walkthrough.mp4",
+      "poster": "./assembly/clips/p6-86-walkthrough.jpg",
+      "title": "Tie an Ashley stopper",
+      "duration": 32
+    }
+  ],
+  "p112": [
+    {
+      "src": "./assembly/clips/p112-3479-walkthrough.mp4",
+      "poster": "./assembly/clips/p112-3479-walkthrough.jpg",
+      "title": "Motor setup reference",
+      "duration": 21
+    }
+  ],
+  "p46": [
+    {
+      "src": "./assembly/clips/p46-768-walkthrough.mp4",
+      "poster": "./assembly/clips/p46-768-walkthrough.jpg",
+      "title": "Prepare the thumb DP and PP pins",
+      "duration": 120
+    },
+    {
+      "src": "./assembly/clips/p46-888-walkthrough.mp4",
+      "poster": "./assembly/clips/p46-888-walkthrough.jpg",
+      "title": "Seat the thumb tendons, joint and skins",
+      "duration": 118
+    }
+  ],
+  "finishing-pp": [
+    {
+      "src": "./assembly/clips/p35-329-review.mp4",
+      "poster": "./assembly/clips/p35-329-review.jpg",
+      "title": "Fit the DP skin",
+      "duration": 17
+    },
+    {
+      "src": "./assembly/clips/p35-426-review.mp4",
+      "poster": "./assembly/clips/p35-426-review.jpg",
+      "title": "Fit the PP skin",
+      "duration": 19
+    }
+  ],
+  "p73": [
+    {
+      "src": "./assembly/clips/p73-1845-walkthrough.mp4",
+      "poster": "./assembly/clips/p73-1845-walkthrough.jpg",
+      "title": "Fit the carpal pins, pulley and skin",
+      "duration": 71
     }
   ]
 }

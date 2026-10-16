@@ -2,7 +2,7 @@ import type {AssemblyStep} from './guide'
 import type {Build} from './buildContent'
 
 // Set to false to remove the review boxes and their toolbar control together.
-export const SHOW_ASSEMBLY_REVIEW_NOTES = true
+export const SHOW_ASSEMBLY_REVIEW_NOTES = false
 type Changes = {structure?:string; content?:string; images?:string; unresolved?:string}
 const CHANGES:Record<string,Changes>={
  p1:{structure:'The chapter sidebar can collapse to give the model more room. Configuration controls, BOM and explicit completion checks are retained.',content:'Touch builds now include sensor preparation, installation and connector-board work before the palm is closed.',images:'The recent tendon framing and joint-context improvements are included on this branch.'},
@@ -11,12 +11,13 @@ const CHANGES:Record<string,Changes>={
  p15:{content:'AP liners are cut to the measured channel depth plus approximately 1 mm at each end. The feedback’s 5–8 mm suggestion is a starting estimate, not a universal dimension.'},
  p18:{content:'Removed the instruction to choose an unspecified screw by trial. Only loose debris is cleared until the correct cleanup tool is confirmed.',unresolved:'The source does not specify the cleanup screw diameter or thread. A hardware owner must confirm it before a screw-based method can be documented.'},
  p29:{content:'Joint bearing dimensions are listed in Parts before assembly.'},
+ 'prepare-pp':{content:'Prepare the PP tendon and pins in a separate step before joining the DP.'},
  p33:{content:'The pin dimensions are explicit in Parts; joint seating and friction checks stay with the assembly action.'},
  p35:{images:'The pin-clearance image now includes the complete DP/PP bodies and tendon ends. Live views fit the available width.'},
  'finishing-pp':{content:'The Parts box distinguishes Base skins from Touch fingertip modules and gives the selected PP bearing dimensions.'},
  p37:{images:'The tucked-tail image includes the complete free tendon beyond the AP housing.'},
  p42:{content:'Bearing sizes and pins appear in Parts; named tendon routes are retained.'},
- p46:{unresolved:'The feedback specifies a 5 mm thumb PP pin but does not identify its diameter or exact hole. The finger pin recipe must not be copied blindly to the thumb.'},
+ p46:{content:'Use the finger pin sizes as confirmed by the owner: Ø2×8 mm middle, Ø2×6 mm lower and upper.'},
  p52:{images:'The thumb AP tucked-tail view includes the full tendon geometry.'},
  p54:{content:'Thumb AP bearings are corrected to 4×8×3 mm, including Touch.',unresolved:'The feedback says the thumb AP route is reversed but does not identify the swapped holes or viewing direction. The existing routing cannot be signed off until this is resolved.'},
  p62:{content:'Thumb TP bearings are corrected to 4×8×3 mm, including Touch. The premature “all fingers assembled” instruction is removed.',images:'The guide-pin and bearing images include translucent DP/PP context and complete tendon paths.'},
@@ -55,7 +56,7 @@ export function ReviewChanges({step,build}:{step:AssemblyStep;build:Build}){
  const guided=!['p1','p23'].includes(step.id)
  return <aside className="assembly-review-notes" aria-label="Changes in this review version">
   <details open><summary>Review notes · changes on this step</summary><dl>
-   <div><dt>Structure</dt><dd>{changes.structure??(guided?'One instruction is shown at a time by default. Associated images and commands follow that instruction; Show all keeps the full sequence available.':'The existing interactive layout is retained.')}</dd></div>
+   <div><dt>Structure</dt><dd>{changes.structure??(guided?'All numbered instructions remain visible together. Associated images, models and commands follow the instruction that uses them. Supplementary video follows the checklist and navigation.':'The existing interactive layout is retained.')}</dd></div>
    <div><dt>Content</dt><dd>{changes.content??(touch?'New Touch installation instructions.':'Assembly meaning and completion checks are retained. Parts and tools are grouped at the top where specified.')}</dd></div>
    <div><dt>Images</dt><dd>{changes.images??(touch?(step.id==='touch-ids'||step.id==='touch-test'?'Finger IDs are presented as a text table; no new hardware image is invented.':'Relevant images are extracted from the supplied Touch instructions and placed beside their instruction.'):'Existing images and interactive models are retained; each static image follows its matching instruction.')}</dd></div>
   </dl>{changes.unresolved&&<p className="assembly-review-open"><strong>Needs confirmation:</strong> {changes.unresolved}</p>}

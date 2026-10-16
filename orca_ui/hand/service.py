@@ -37,6 +37,12 @@ from orca_ui.settings import UiSettings
 
 logger = logging.getLogger(__name__)
 
+
+def _current_ma(value) -> int | None:
+    """Family defaults have no numeric value until core identifies the motors."""
+    return None if value is None or value == "default" else int(value)
+
+
 TACTILE_MODES = {
     "resultant": (True, False),
     "taxels": (False, True),
@@ -165,7 +171,7 @@ class HandService:
             get_session=lambda: self.supervisor.session,
             on_error=self._publish_error,
         )
-        self._max_current = int(self.supervisor.config.max_current)
+        self._max_current = _current_ma(self.supervisor.config.max_current)
         # What config.yaml asked for — the value "default" restores to, kept
         # separately because set_max_current overwrites the live one.
         self._config_max_current = self._max_current
@@ -430,17 +436,17 @@ class HandService:
         connect ladder has already dropped to a non-feedback tier by then, so
         joint sensing is gone from the UI with no other explanation.
         """
-        config = self.supervisor.config
+        config = session.hand.config if session is not None else self.supervisor.config
         state: dict = {"motors": None, "joint_feedback": None,
                        "missing_anchors": [], "needs_calibration": False,
                        "hint": None,
                        # config.yaml defaults for the sweep's hardstop
                        # current — what a per-run override replaces.
                        "calibration_current":
-                           int(getattr(config, "calibration_current", 0))
+                           _current_ma(getattr(config, "calibration_current", 0))
                            or None,
                        "wrist_calibration_current":
-                           int(getattr(config, "wrist_calibration_current", 0))
+                           _current_ma(getattr(config, "wrist_calibration_current", 0))
                            or None}
         if session is None or not session.caps.motors:
             return state
@@ -579,7 +585,7 @@ class HandService:
         that was off at startup, or a different one plugged in since). Repoint
         everything keyed by model; the browser refetches ``/hand/info`` off
         the model field in the status stream."""
-        self._max_current = int(config.max_current)
+        self._max_current = _current_ma(config.max_current)
         self._config_max_current = self._max_current
         # Poses and recordings are per-model — a left hand's library must not
         # follow the right hand that replaced it.
@@ -591,6 +597,13 @@ class HandService:
         # actually installed as the set "reset" returns to.
         config_gains = self._live_gains()
         with self._state_lock:
+            resolved_current = _current_ma(session.hand.config.max_current)
+            # Preserve tuning across reconnects to the same defaults, but
+            # adopt a newly identified motor family's own current limit.
+            if (self._max_current == self._config_max_current
+                    or resolved_current != self._config_max_current):
+                self._max_current = resolved_current
+            self._config_max_current = resolved_current
             self._targets = {}
             # Fresh session, fresh (unpaused) loop: a stale armed flag must
             # not survive the reconnect and block joint targets.
@@ -1066,12 +1079,14 @@ class HandService:
                                  if joint not in controlled],
         }
 
-    def max_current_floor(self) -> int:
+    def max_current_floor(self) -> int | None:
         """Lowest ceiling orca_core will accept: its config validation refuses
         a max_current below the calibration current (calibration would then
         stall against its own limit). Published so the UI's control can stop
         at the floor instead of learning about it from a failed write."""
-        return int(getattr(self.supervisor.config, "calibration_current", 0) or 0)
+        session = self.session
+        config = session.hand.config if session is not None else self.supervisor.config
+        return _current_ma(getattr(config, "calibration_current", 0) or 0)
 
     def _apply_current_ceiling(self, session) -> None:
         """Push the live ceiling to the motors.
@@ -1083,6 +1098,10 @@ class HandService:
         """
         with self._state_lock:
             ma = self._max_current
+        if ma is None:
+            ma = _current_ma(session.hand.config.max_current)
+        if ma is None:
+            raise ServiceError("motor current limits are not resolved yet", status_code=409)
         try:
             session.hand.set_max_current(ma)
         except Exception:
@@ -1210,6 +1229,8 @@ class HandService:
         # the motors on the new ceiling with the config and our own snapshot
         # still on the old one.
         floor = self.max_current_floor()
+        if floor is None:
+            raise ServiceError("motor current limits are not resolved yet", status_code=409)
         if ma < floor:
             raise ServiceError(
                 f"max current must be at least the calibration current "

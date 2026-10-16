@@ -10,7 +10,7 @@ export function TendonPreparation() {
       <path d="M415 175 V207 M485 175 V207 M420 195 H480" stroke="currentColor" fill="none" markerStart="url(#measure-arrow)" markerEnd="url(#measure-arrow)"/>
       <text x="450" y="235" textAnchor="middle">10 mm ±5 mm between the two stoppers</text>
     </svg>
-    <div className="assembly-anatomy-terms"><p><strong>10 lengths in total</strong><br/>2 per finger, including the thumb: one for DP and one for PP.</p><p><strong>At each anchor</strong><br/>1 Ashley stopper + 1 ordinary single knot on top, tied around the stopper.</p></div>
+
   </section>
 }
 export function KnotConventions() {

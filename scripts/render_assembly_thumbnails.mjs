@@ -36,7 +36,7 @@ try {
         const geometry=source.geometry;geometry.computeBoundingBox();const extent=geometry.boundingBox.getSize(new THREE.Vector3()),center=geometry.boundingBox.getCenter(new THREE.Vector3());
         const skin=part.category==='Skins',metal=part.category==='Standard components';
         const boardColors=part.label==='OH control board'&&!!geometry.getAttribute('color');
-        const material=new THREE.MeshStandardMaterial({color:boardColors?'#ffffff':skin?(key.startsWith('base')?'#e9eded':'#161b20'):metal?'#b5bcc3':part.category==='Tendons'?'#318b94':/OH control board/.test(part.label)?'#171c1b':/board|PCB/.test(part.label)?'#246e5c':'#29333b',vertexColors:boardColors,roughness:skin?.76:metal?.3:.48,metalness:metal?.55:0});
+        const material=new THREE.MeshStandardMaterial({color:boardColors?'#ffffff':skin?(key.startsWith('base')?'#e9eded':'#161b20'):metal?'#b5bcc3':part.category==='Tendons'?'#318b94':/OH control board/.test(part.label)?'#171c1b':/board|PCB/.test(part.label)?'#171c1b':'#29333b',vertexColors:boardColors,roughness:skin?.76:metal?.3:.48,metalness:metal?.55:0});
         const mesh=new THREE.Mesh(geometry,material),group=new THREE.Group();mesh.position.copy(center).negate();group.add(mesh);group.rotation.set(.4,-.65,.08);scene.add(group);
         const bounds=new THREE.Box3().setFromObject(group),size=bounds.getSize(new THREE.Vector3());group.scale.setScalar(1.55/Math.max(size.y,size.x/1.24));const framed=new THREE.Box3().setFromObject(group);group.position.sub(framed.getCenter(new THREE.Vector3()));
         renderer.render(scene,camera);const data=renderer.domElement.toDataURL('image/png');scene.remove(group);material.dispose();return data.split(',')[1];

@@ -4,7 +4,7 @@ import { OrbitControls } from '@react-three/drei'
 import { loadBundle, finishMaterial, type Bundle } from './cadAssets'
 import * as THREE from 'three'
 import type { Build } from './buildContent'
-import { AREAS, areaSupplyNote, areaSupplyQuantity, supplies, partQuantityLabel, supplyQuantity, supplementalParts, groupStandardParts, type Area, type Part, type Supply } from './assemblyParts'
+import { areaSupplyNote, areaSupplyQuantity, supplies, partQuantityLabel, supplyQuantity, supplementalParts, groupStandardParts, type Area, type Part, type Supply } from './assemblyParts'
 
 type Item={part:Part;area:string;nodes:string[]}
 type Region={area:Area;x:number;y:number;width:number;height:number}
@@ -17,23 +17,35 @@ function itemsFor(bundle:Bundle):Item[] {
 }
 const itemKey=(item:Item)=>`${item.area}:${item.part.id}`
 const isHardware=(part:Part)=>['Standard components','Tendons'].includes(part.category)
-function layoutFor(width:number,items:Item[],assembled:boolean):Layout {
-  const narrow=width<700, height=narrow?(assembled?430:1450):Math.min(600,Math.max(300,window.innerHeight-480)), factor=narrow?1:height/830
-  const regions:Region[]=AREAS.map((area,i)=>narrow?{area,x:12,y:i*286+12,width:width-24,height:274}:i<2?{area,x:i===0?12:width*.32,y:12,width:i===0?width*.32-24:width*.68-12,height:348}:{area,x:12+(i-2)*(width-24)/3,y:374,width:(width-24)/3-12,height:436})
-  if(!narrow)regions.forEach(region=>{region.y*=factor;region.height*=factor})
+function layoutFor(width:number,items:Item[]):Layout {
+  const uiScale=Math.min(1,width/1000),height=width*.68,padding=10*uiScale,gap=10*uiScale,available=width-padding*2
+  const topHeight=height*.46-gap,lowerY=padding+topHeight+gap,lowerHeight=height-lowerY-padding
+  const regions:Region[]=[
+    {area:'Thumb',x:padding,y:padding,width:available*.3-gap/2,height:topHeight},
+    {area:'Fingers',x:padding+available*.3+gap/2,y:padding,width:available*.7-gap/2,height:topHeight},
+    {area:'Carpals',x:padding,y:lowerY,width:available*.25-gap,height:lowerHeight},
+    {area:'Wrist',x:padding+available*.25,y:lowerY,width:available*.25-gap,height:lowerHeight},
+    {area:'Tower',x:padding+available*.5,y:lowerY,width:available*.5,height:lowerHeight},
+  ]
   const targets=new Map<string,Target>()
   for(const region of regions){
-    const parts=items.filter(i=>i.area===region.area&&!isHardware(i.part))
-    const columns=region.area==='Fingers'?(narrow?5:6):region.area==='Tower'?4:3, rows=Math.ceil(parts.length/columns)
-    const cell=region.width/columns, row=(region.height-105)/Math.max(rows,1)
-    parts.forEach((item,i)=>targets.set(itemKey(item),{x:region.x+(i%columns+.5)*cell,y:region.y+34+(Math.floor(i/columns)+.5)*row,size:Math.min(cell*.7,Math.max(12,row-28),86),labelWidth:cell-12}))
-    items.filter(i=>i.area===region.area&&isHardware(i.part)).forEach(item=>targets.set(itemKey(item),{x:region.x+region.width*(item.part.category==='Tendons'?.5:.2),y:region.y+region.height-30,size:0,labelWidth:0}))
+    const parts=items.filter(item=>item.area===region.area&&!isHardware(item.part))
+    const header=46*uiScale,footer=82*uiScale,labelHeight=28*uiScale,innerHeight=region.height-header-footer
+    let columns=1,best=-Infinity
+    for(let n=1;n<=Math.max(1,parts.length);n++){
+      const rows=Math.ceil(parts.length/n),size=Math.min(region.width/n-14*uiScale,innerHeight/rows-labelHeight-8*uiScale)
+      if(size>best){best=size;columns=n}
+    }
+    const cell=region.width/columns,row=innerHeight/Math.max(1,Math.ceil(parts.length/columns)),size=Math.max(4,Math.min(76*uiScale,best))
+    parts.forEach((item,i)=>targets.set(itemKey(item),{x:region.x+(i%columns+.5)*cell,y:region.y+header+Math.floor(i/columns)*row+(row-labelHeight)/2,size,labelWidth:cell-8*uiScale}))
+    items.filter(item=>item.area===region.area&&isHardware(item.part)).forEach(item=>targets.set(itemKey(item),{x:region.x+region.width/2,y:region.y+region.height-footer/2,size:0,labelWidth:0}))
   }
+
   return {width,height,regions,targets}
 }
-function Model({bundle,build,items,layout,amount,onPart}:{bundle:Bundle;build:Build;items:Item[];layout:Layout;amount:number;onPart:(i:Item)=>void}) {
+function Model({bundle,build,items,layout,amount,onPart,onSettled}:{bundle:Bundle;build:Build;items:Item[];layout:Layout;amount:number;onPart:(i:Item)=>void;onSettled:(ready:boolean)=>void}) {
   const invalidate=useThree(s=>s.invalidate),camera=useThree(s=>s.camera) as THREE.OrthographicCamera
-  const animated=useRef(amount)
+  const animated=useRef(amount),settled=useRef(false)
   const assembled=amount===0
   const pieces=useMemo(()=>{
     const byNode=new Map<string,Item>();items.forEach(i=>i.nodes.forEach(n=>byNode.set(n,i)))
@@ -59,17 +71,19 @@ function Model({bundle,build,items,layout,amount,onPart}:{bundle:Bundle;build:Bu
   },[bundle,build,items,layout.width,layout.height])
   useEffect(()=>()=>pieces.forEach(p=>(p.mesh.material as THREE.Material).dispose()),[pieces])
   useEffect(()=>{camera.position.set(0,0,1400);camera.lookAt(0,0,0);camera.zoom=1;camera.updateProjectionMatrix();invalidate()},[assembled,layout.height,camera,invalidate])
-  useEffect(()=>invalidate(),[amount,layout,invalidate])
-  useFrame((_,delta)=>{
+  useLayoutEffect(()=>{settled.current=false;onSettled(false);invalidate()},[amount,layout,invalidate,onSettled])
+  useFrame(({size},delta)=>{
     const t=window.matchMedia('(prefers-reduced-motion: reduce)').matches?amount:THREE.MathUtils.damp(animated.current,amount,7,delta);animated.current=t
     for(const p of pieces){
       const target=layout.targets.get(itemKey(p.item)),material=p.mesh.material as THREE.MeshStandardMaterial
       const hardware=isHardware(p.item.part),end=target??{x:layout.width/2,y:layout.height/2,size:0}
-      p.mesh.position.copy(p.origin).add(new THREE.Vector3(0,layout.width<700?layout.height/2-215:0,0)).lerp(new THREE.Vector3(end.x-layout.width/2,layout.height/2-end.y,0),t)
+      p.mesh.position.copy(p.origin).add(new THREE.Vector3(0,0,0)).lerp(new THREE.Vector3(end.x-layout.width/2,layout.height/2-end.y,0),t)
       p.mesh.quaternion.copy(p.rotation).slerp(new THREE.Quaternion().setFromEuler(new THREE.Euler(.55,-.65,.08)),t)
       p.mesh.scale.setScalar(THREE.MathUtils.lerp(p.scale,end.size/Math.max(p.size,.01),t))
       material.opacity=hardware||!p.first?1-t:1;material.transparent=material.opacity<.999;material.depthWrite=material.opacity>.8;p.mesh.visible=material.opacity>.015
     }
+    const ready=amount===1&&Math.abs(t-amount)<.001&&Math.abs(size.width-layout.width)<1&&Math.abs(size.height-layout.height)<1
+    if(ready!==settled.current){settled.current=ready;onSettled(ready)}
     if(Math.abs(t-amount)>.001)invalidate()
   })
   return <>{pieces.map((p,i)=><primitive key={i} object={p.mesh} onClick={(e:{stopPropagation:()=>void})=>{e.stopPropagation();onPart(p.item)}}/>)}<OrbitControls enabled={amount===0} enablePan={false} minZoom={.7} maxZoom={2.4}/></>
@@ -82,13 +96,12 @@ export function PartsExplorer({build}:{build:Build}) {
   const key=`${build.version}-${build.side}-${build.motor}`
   const [loaded,setLoaded]=useState<{key:string;bundle:Bundle}|null>(null),[failed,setFailed]=useState(false),[amount,setAmount]=useState(0),[width,setWidth]=useState(1000)
   const [detail,setDetail]=useState<{title:string;items:Item[];supplies:Supply[];area?:Area}|null>(null),[query,setQuery]=useState('')
-  const [retry,setRetry]=useState(0)
+  const [retry,setRetry]=useState(0),[settled,setSettled]=useState(false)
   const hasArchive=(build.version==='base'||build.version==='touch')&&build.motor==='dynamixel'
   const stage=useRef<HTMLDivElement>(null),dialog=useRef<HTMLDialogElement>(null)
   const bundle=loaded?.key===key?loaded.bundle:null
   const items=useMemo(()=>bundle?itemsFor(bundle):[],[bundle]),stock=useMemo(()=>supplies(build),[build])
-  const assembled=amount===0
-  const layout=useMemo(()=>layoutFor(width,items,assembled),[width,items,assembled])
+  const layout=useMemo(()=>layoutFor(width,items),[width,items])
   useEffect(()=>{let active=true;setFailed(false);setAmount(0);setDetail(null);dialog.current?.close();loadBundle(key).then(bundle=>{if(active)setLoaded({key,bundle})}).catch(()=>{if(active)setFailed(true)});return()=>{active=false}},[key,retry])
   useEffect(()=>{if(!stage.current)return;const observer=new ResizeObserver(([entry])=>setWidth(entry.contentRect.width));observer.observe(stage.current);return()=>observer.disconnect()},[])
   useLayoutEffect(()=>{if(detail&&!dialog.current?.open)dialog.current?.showModal()},[detail])
@@ -98,7 +111,7 @@ export function PartsExplorer({build}:{build:Build}) {
       items:items.filter(i=>i.area===area&&i.part.category!=='Tendons'&&(!kind||(kind==='standard'&&i.part.category==='Standard components'))),
       supplies:stock.filter(s=>s.areas.includes(area)&&(!kind||(kind==='standard'?!!s.partLabel:s.kind===kind)))})
   }
-  const opacity=Math.max(0,(amount-.55)/.45)
+  const opacity=amount===1&&settled?1:0
   const bom=groupStandardParts(bundle?.inventory.parts??[]).filter(p=>p.category!=='Tendons')
   const rows=[...bom.map(p=>({id:p.id,label:p.label,quantity:partQuantityLabel(p,stock),category:p.category,areas:[...new Set([...Object.keys(p.areas),...supplementalParts(p,stock).flatMap(s=>s.areas)])].join(', '),note:supplementalParts(p,stock).map(s=>s.note).join(' '),part:p,supply:null as Supply|null})),...stock.filter(s=>!bom.some(p=>p.label===s.partLabel)).map(s=>({id:s.id,label:s.label,quantity:supplyQuantity(s),category:s.kind==='equipment'?'Tools & supplies':s.kind==='hardware'?'Other components':'Cables & consumables',areas:s.areas.join(', '),note:s.note,part:null,supply:s}))]
   // The control board is required even when absent from an individual assembly export.
@@ -108,11 +121,11 @@ export function PartsExplorer({build}:{build:Build}) {
   return <section className="assembly-parts-explorer" aria-label="Explore your hand and parts">
     <div ref={stage} className="assembly-area-stage">
       <div className="assembly-cad-toolbar"><div><span className="assembly-eyebrow">YOUR HAND · ASSEMBLY BY ASSEMBLY</span><p>{amount===0?'Drag to turn. Move the slider to explore inside.':'Select standard components, tendons or PTFE to see the quantities for each area.'}</p></div></div>
-      {!bundle?<div className="assembly-cad-placeholder" role="status">{failed?(hasArchive?<div className="assembly-model-recovery"><h3>The 3D model could not load</h3><p>The UI normally unpacks this model automatically when it starts. If the model files have not been extracted, restart the UI or run this from your <code>orca_ui</code> checkout:</p><code className="assembly-recovery-command">uv run python -m orca_ui.assembly_assets</code><p>The archive for your selection is <code>orca_ui/models/assembly/{key}.zip</code>. You can also unzip its <code>assembly.glb</code> into <code>orca_ui/webui/assembly/parts/{key}/</code>. For frontend development, extract it into <code>frontend/public/assembly/parts/{key}/</code> too.</p><button type="button" className="assembly-secondary" onClick={()=>setRetry(n=>n+1)}>Retry model</button></div>:'The complete assembly for this configuration is not available yet.'):'Loading the detailed assembly…'}</div>:<div className="assembly-area-scroll" style={{height:width<700&&amount===0?430:undefined}}><div className="assembly-area-canvas" style={{height:layout.height}}>
-        <ModelBoundary key={key}><Canvas orthographic frameloop="demand" dpr={[1,2]} camera={{position:[0,0,1400],zoom:1,near:.1,far:5000}} gl={{alpha:true,antialias:true}} aria-label={`${build.version} ${build.side} hand assembly`}><ambientLight intensity={1.2}/><hemisphereLight args={['#f5f9ff','#6d7e88',1.5]}/><directionalLight position={[300,450,850]} intensity={3}/><directionalLight position={[-400,120,-500]} intensity={2}/><Model bundle={bundle} build={build} items={items} layout={layout} amount={amount} onPart={item=>setDetail({title:item.part.label,items:[item],supplies:[]})}/></Canvas></ModelBoundary>
-        <div className="assembly-area-overlays" style={{opacity,pointerEvents:amount>.7?'auto':'none'}} aria-hidden={amount<=.7}>
-          {layout.regions.map(region=><section key={region.area} className="assembly-area-outline" style={{left:region.x,top:region.y,width:region.width,height:region.height}}><button className="assembly-area-title" tabIndex={amount>.7?0:-1} onClick={()=>inspect(region.area)}>{region.area}<span>↗</span></button><div className="assembly-area-icons"><button tabIndex={amount>.7?0:-1} onClick={()=>inspect(region.area,'standard')} aria-label={`${region.area} standard components`}><SupplyIcon kind="hardware"/><span>Standard components</span></button>{(['cord','tube','cable'] as const).filter(kind=>stock.some(s=>s.kind===kind&&s.areas.includes(region.area))).map(kind=><button key={kind} tabIndex={amount>.7?0:-1} onClick={()=>inspect(region.area,kind)} aria-label={`${region.area} ${kind==='cord'?'tendons':kind==='tube'?'PTFE':'cables'}`}><SupplyIcon kind={kind}/><span>{kind==='cord'?'Tendons':kind==='tube'?'PTFE':'Cables'}</span></button>)}</div></section>)}
-          {items.filter(i=>!isHardware(i.part)).map(item=>{const point=layout.targets.get(itemKey(item));return point&&<button tabIndex={amount>.7?0:-1} className="assembly-area-part-label" title={item.part.label} key={itemKey(item)} style={{left:point.x-point.labelWidth/2,top:point.y+point.size/2+3,width:point.labelWidth}} onClick={()=>setDetail({title:item.part.label,items:[item],supplies:[]})}>{item.part.label}{item.nodes.length>1&&<strong> ×{item.nodes.length}</strong>}</button>})}
+      {!bundle?<div className="assembly-cad-placeholder" role="status">{failed?(hasArchive?<div className="assembly-model-recovery"><h3>The 3D model could not load</h3><p>The UI normally unpacks this model automatically when it starts. If the model files have not been extracted, restart the UI or run this from your <code>orca_ui</code> checkout:</p><code className="assembly-recovery-command">uv run python -m orca_ui.assembly_assets</code><p>The archive for your selection is <code>orca_ui/models/assembly/{key}.zip</code>. You can also unzip its <code>assembly.glb</code> into <code>orca_ui/webui/assembly/parts/{key}/</code>. For frontend development, extract it into <code>frontend/public/assembly/parts/{key}/</code> too.</p><button type="button" className="assembly-secondary" onClick={()=>setRetry(n=>n+1)}>Retry model</button></div>:'The complete assembly for this configuration is not available yet.'):'Loading the detailed assembly…'}</div>:<div className="assembly-area-scroll"><div className="assembly-area-canvas" style={{height:layout.height,'--explorer-scale':Math.min(1,width/1000)} as React.CSSProperties}>
+        <ModelBoundary key={key}><Canvas orthographic frameloop="demand" dpr={[1,2]} camera={{position:[0,0,1400],zoom:1,near:.1,far:5000}} gl={{alpha:true,antialias:true}} aria-label={`${build.version} ${build.side} hand assembly`}><ambientLight intensity={1.2}/><hemisphereLight args={['#f5f9ff','#6d7e88',1.5]}/><directionalLight position={[300,450,850]} intensity={3}/><directionalLight position={[-400,120,-500]} intensity={2}/><Model bundle={bundle} build={build} items={items} layout={layout} amount={amount} onSettled={setSettled} onPart={item=>setDetail({title:item.part.label,items:[item],supplies:[]})}/></Canvas></ModelBoundary>
+        <div className="assembly-area-overlays" inert={!opacity} style={{opacity,pointerEvents:opacity?'auto':'none'}} aria-hidden={!opacity}>
+          {layout.regions.map(region=><section key={region.area} className="assembly-area-outline" style={{left:region.x,top:region.y,width:region.width,height:region.height}}><button className="assembly-area-title" tabIndex={opacity?0:-1} onClick={()=>inspect(region.area)}>{region.area}<span>↗</span></button><div className="assembly-area-icons"><button tabIndex={opacity?0:-1} onClick={()=>inspect(region.area,'standard')} aria-label={`${region.area} standard components`}><SupplyIcon kind="hardware"/><span>Hardware</span></button>{(['cord','tube','cable'] as const).filter(kind=>stock.some(s=>s.kind===kind&&s.areas.includes(region.area))).map(kind=><button key={kind} tabIndex={opacity?0:-1} onClick={()=>inspect(region.area,kind)} aria-label={`${region.area} ${kind==='cord'?'tendons':kind==='tube'?'PTFE':'cables'}`}><SupplyIcon kind={kind}/><span>{kind==='cord'?'Tendons':kind==='tube'?'PTFE':'Cables'}</span></button>)}</div></section>)}
+          {items.filter(i=>!isHardware(i.part)).map(item=>{const point=layout.targets.get(itemKey(item));return point&&<button tabIndex={opacity?0:-1} className="assembly-area-part-label" title={item.part.label} key={itemKey(item)} style={{left:point.x-point.labelWidth/2,top:point.y+point.size/2+3*Math.min(1,width/1000),width:point.labelWidth}} onClick={()=>setDetail({title:item.part.label,items:[item],supplies:[]})}>{item.part.label}{item.nodes.length>1&&<strong> ×{item.nodes.length}</strong>}</button>})}
         </div>
       </div></div>}
       <label className="assembly-area-slider"><span>Assembled</span><input aria-label="Explode assembly" type="range" min="0" max="100" value={Math.round(amount*100)} disabled={!bundle} onChange={e=>setAmount(Number(e.target.value)/100)}/><span>Exploded</span><output>{Math.round(amount*100)}%</output></label>

@@ -157,13 +157,13 @@ export interface JointGains {
 
 export interface ControlState {
   torque_enabled: boolean
-  max_current: number
+  max_current: number | null
   // config.yaml's ceiling — what the Motor Control "default" button
   // restores. Unchanged by set_max_current (mirrors config_gains).
-  config_max_current: number
+  config_max_current: number | null
   // Lowest ceiling orca_core accepts (the hand's calibration current); a
   // write below it is a 400, so the control stops here.
-  max_current_floor: number
+  max_current_floor: number | null
   // Speed cap for a lone joint jump (typed angle, slider grab), deg/s.
   // Streams — replay, teleop, a slider drag — pace themselves and are not
   // capped, so playback speed scales time rather than range.

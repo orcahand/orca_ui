@@ -13,7 +13,7 @@ export function routingDiagram(step:string,side:'left'|'right',version:'base'|'t
  const entry=views[`${root}/route-${step}-entry`],exit=views[`${root}/route-${step}-exit`]
  if(!entry||!exit)return original
  const picture=(face:'entry'|'exit',data:typeof entry):RoutingImage=>({src:`./assembly/renders/${root}/route-${step}-${face}.webp`,width:data.width,height:data.height,markerRadius:24,reference:face==='entry'?original.entryImage:original.exitImage})
- return {...original,image:picture('entry',entry),entryImage:picture('entry',entry),exitImage:picture('exit',exit),orientation:`${side==='left'?'Left':'Right'} ${version==='touch'?'Touch':'Base'} hand. Orient the part to match each view, then select a tendon to locate its entry and exit.${['p59','p62'].includes(step)?' These six tendons share the slot between the two guide pins. Keep this order; the two TP anchor ends are additional.':step==='p64'?' The index finger seat is shown; repeat the same six identities for middle, ring and pinky.':''}`,routes:original.routes.map((r,i)=>({...r,entry:entry.points[i] as [number,number],exit:exit.points[i] as [number,number]}))}
+ return {...original,image:picture('entry',entry),entryImage:picture('entry',entry),exitImage:picture('exit',exit),orientation:['p59','p62'].includes(step)?'Keep these six tendons in order between the guide pins. The two TP anchor ends are separate.':'Select a tendon to locate its entry and exit.',routes:original.routes.map((r,i)=>({...r,entry:entry.points[i] as [number,number],exit:exit.points[i] as [number,number]}))}
 }
 function referenceDiagram(step:string,side:'left'|'right'):RoutingDiagram|null {
  if(['p42','p54'].includes(step)){

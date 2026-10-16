@@ -19,7 +19,29 @@ This project uses [uv](https://docs.astral.sh/uv/).
 uv sync
 ```
 
-That installs the released `orca_core` from PyPI.
+That installs the pinned `orca_core 0.6.0` release from PyPI. A separate
+`orca_core` checkout is not required.
+
+### Assembly guide branch
+
+From an existing `orca_ui` clone:
+
+```bash
+git fetch origin
+git switch feature/assembly-feedback-touch
+git pull --ff-only
+uv run orca-ui --mock --host 127.0.0.1 --port 5005
+```
+
+Open <http://localhost:5005>, then **Setup → Open assembly guide**.
+`uv run` installs the locked dependencies automatically. Python 3.10 or newer
+and `uv` are required; Node, a frontend build, and a separate core repository
+are not. The built UI, illustrations, videos and model ZIP archives are included.
+The first launch extracts the four assembly models and can take longer.
+
+`--mock` runs without hardware, so this guide can run alongside a calibration
+UI on a different port. To connect a real hand, omit `--mock` and first
+disconnect that hand from any other UI instance.
 
 Working on the console itself, or on `orca_core` alongside it? See
 **[DEVELOPMENT.md](DEVELOPMENT.md)** — `./dev` points the console at your own

@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import {illustratedJointRange,rangeAngle} from './illustratedJointRange'
 import {ASSEMBLY_MOTIONS} from './assemblyMotions'
 import {assemblyStrands} from './assemblyStrands'
 import {spoolWinding} from './spoolWinding'
@@ -127,7 +128,8 @@ export function assemblyScene(bundle:Bundle,build:Build,step:string){
   const pivot=bearings[0].center.clone().add(bearings[1].center).multiplyScalar(.5),axis=bearings[1].center.clone().sub(bearings[0].center).normalize()
   const [finger,segment]=name.split(' '),names=['DP','PP','AP','TP'].slice(0,['DP','PP','AP','TP'].indexOf(segment)+1).map(s=>`${finger} ${s}`)
   const moving=[...included].filter(p=>name==='Wrist'?(spec.moving.includes(p.part.label)||p.part.label==='Bearing · 8 × 13 × 4'):names.includes(p.part.label)||names.includes(p.owner??pinOwners.get(p)??''))
-  return {pivot,axis,moving}
+  const joint=name==='Wrist'?'wrist':`${finger.toLowerCase()}_${segment==='TP'?'cmc':segment==='AP'?'abd':segment==='PP'?'mcp':finger==='Thumb'?'dip':'pip'}`
+  return {pivot,axis,moving,range:illustratedJointRange(build,joint,axis)}
  })
  const selected=[...included],strands=special?null:assemblyStrands(build,step,selected)
  if(strands?.count)group.add(strands.group)
@@ -162,7 +164,7 @@ export function assemblyScene(bundle:Bundle,build:Build,step:string){
    fade(p,step==='p126'&&p.part.label.startsWith('Bearing')?1:cover?(channels?(position<.18?.65:.35):1):.26)
   }
   if(inspection)for(const joint of inspections){
-   const angle=inspection==='rotation'?Math.sin(checkPhase*Math.PI*2)*.55:0,shift=inspection==='axial'?Math.sin(checkPhase*Math.PI*2)*.65:0
+   const angle=inspection==='rotation'?rangeAngle(joint.range,(1-Math.cos(checkPhase*Math.PI*2))/2):0,shift=inspection==='axial'?Math.sin(checkPhase*Math.PI*2)*.65:0
    const rotation=new THREE.Quaternion().setFromAxisAngle(joint.axis,angle),offset=joint.pivot.clone().sub(joint.pivot.clone().applyQuaternion(rotation)).addScaledVector(joint.axis,shift)
    for(const piece of joint.moving){piece.object.quaternion.copy(rotation);piece.object.position.copy(offset)}
   }

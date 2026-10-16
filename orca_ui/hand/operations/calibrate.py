@@ -76,6 +76,7 @@ def validate_calibrate_params(service, params: dict) -> dict:
     if not session.caps.motors:
         raise ServiceError("no motor bus — calibration needs motors",
                            status_code=409)
+    config = session.hand.config
     # None = auto: run the joint-sensor (encoder anchor) pass only when a
     # selected encoder-backed joint has no anchor yet — i.e. the first time.
     sensors = params.get("calibrate_joint_sensors")

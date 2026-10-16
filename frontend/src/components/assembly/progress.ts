@@ -11,7 +11,7 @@ export type Progress = {
   views: Record<string, string>
   build: Build
 }
-export const EMPTY_PROGRESS: Progress = { current: STEPS[0].id, done: [], tendons: [], checks: [], views: {'guide:revision':'assembly-v5','guide:feedback':'oct15-v1'}, build: { side: 'right', motor: 'dynamixel', version: 'base', audience: 'internal' } }
+export const EMPTY_PROGRESS: Progress = { current: STEPS[0].id, done: [], tendons: [], checks: [], views: {'guide:revision':'assembly-v5','guide:feedback':'oct15-v1','guide:layout':'oct16-v1'}, build: { side: 'right', motor: 'dynamixel', version: 'base', audience: 'internal' } }
 export function readProgress(): Progress {
   try {
     return validateProgress(JSON.parse(localStorage.getItem(PROGRESS_KEY) ?? 'null'))
@@ -37,6 +37,8 @@ export function validateProgress(data: unknown): Progress {
       progress.checks=progress.checks.filter(key=>!changed.some(id=>key.startsWith(`${id}:`)))
     }
     progress.views['guide:feedback']='oct15-v1'
+    if(parsed?.views?.['guide:layout']!=='oct16-v1')progress.done=progress.done.filter(id=>!['prepare-pp','p33'].includes(id))
+    progress.views['guide:layout']='oct16-v1'
     if (!progress.checks.includes('p1:0') || !progress.checks.includes('p1:1')) progress.done = progress.done.filter(id => id !== 'p1')
     // Preserve a finger's completed six-tendon check when loading earlier progress.
     FINGER_CHECKS.forEach((_,i)=>{if(Array.from({length:6},(_,j)=>`p45:movement:${i*6+j}`).every(key=>progress.checks.includes(key))&&!progress.checks.includes(`p45:finger:${i}`))progress.checks.push(`p45:finger:${i}`)})
@@ -80,5 +82,5 @@ export function changeBuildProgress(progress: Progress, value: Partial<Build>): 
   return {...progress,build:{...progress.build,...value},done:progress.done.filter(id=>!affected.includes(id)),
     checks:progress.checks.filter(key=>!affected.some(id=>key.startsWith(`${id}:`))),
     tendons:side||version?[]:progress.tendons,
-    views:side||version?{'guide:revision':'assembly-v5','guide:feedback':'oct15-v1','flashing:method':flashingMethod(progress)}:progress.views}
+    views:side||version?{'guide:revision':'assembly-v5','guide:feedback':'oct15-v1','guide:layout':'oct16-v1','flashing:method':flashingMethod(progress)}:progress.views}
 }
