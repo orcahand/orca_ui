@@ -13,6 +13,7 @@ open-loop pacing: nothing else waits for the hand.
 
 from __future__ import annotations
 
+import logging
 import math
 import time
 
@@ -22,6 +23,8 @@ from orca_ui.hand.operations import hand_ops
 from orca_ui.hand.operations.base import OpContext, Operation
 from orca_ui.hand.states import ControlSource
 from orca_ui.library import CONTINUOUS, MOTOR_WAYPOINTS, WAYPOINTS, LibraryError
+
+logger = logging.getLogger(__name__)
 
 SPEEDS = (0.5, 1.0, 2.0)
 WAYPOINT_SPEED_DEG_S = 60.0   # cruise speed for synthesized waypoint segments
@@ -631,10 +634,20 @@ RUN_IN_MAX_S = 1800
 # Multiples of the cruise speed; one pass takes about 15 s at x1.
 RUN_IN_SPEEDS = (1.0, 2.0, 3.0, 4.0)
 RUN_IN_DEFAULT_SPEED = 3.0
+# The first pass always runs at x1, whatever speed was chosen: a tendon that
+# was routed wrong or a finger that collides shows up in the first seconds,
+# and at cruise speed there is time to hit stop before anything breaks.
+RUN_IN_WARMUP_SPEED = 1.0
+RUN_IN_MAX_CURRENT_CEILING_MA = 2000
 
 
 class RunInOperation(Operation):
-    """Loop the full-range run-in sequence for a fixed time after calibration."""
+    """Loop the full-range run-in sequence for a fixed time after calibration.
+
+    The first pass is slow (RUN_IN_WARMUP_SPEED), the rest run at the chosen
+    speed. ``max_current_ma`` caps the motors for the run and the previous
+    ceiling is put back afterwards, stopped or not.
+    """
 
     kind = "run_in"
     control_source = ControlSource.OPERATION
@@ -654,7 +667,22 @@ class RunInOperation(Operation):
         speed = float(params.get("speed", RUN_IN_DEFAULT_SPEED))
         if speed not in RUN_IN_SPEEDS:
             raise ServiceError(f"speed must be one of {list(RUN_IN_SPEEDS)}")
-        return {"duration_s": duration_s, "speed": speed}
+        clean = {"duration_s": duration_s, "speed": speed,
+                 "max_current_ma": None}
+        cap = params.get("max_current_ma")
+        if cap is not None:
+            try:
+                cap = int(cap)
+            except (TypeError, ValueError):
+                raise ServiceError("max_current_ma must be a whole number of mA")
+            floor = service.max_current_floor()
+            if cap < max(floor, 1) or cap > RUN_IN_MAX_CURRENT_CEILING_MA:
+                low = floor if floor else 1
+                raise ServiceError(
+                    f"max_current_ma must be {low}..{RUN_IN_MAX_CURRENT_CEILING_MA} mA"
+                    + (" (the floor is the calibration current)" if floor else ""))
+            clean["max_current_ma"] = cap
+        return clean
 
     def run(self, ctx: OpContext) -> dict:
         from orca_ui.hand.presets import RUN_IN_SEQUENCE
@@ -666,13 +694,46 @@ class RunInOperation(Operation):
         for fractions in RUN_IN_SEQUENCE + RUN_IN_SEQUENCE[:1]:
             pose = hand_ops.pose_from_fractions(hand, fractions)
             cycle.append([pose.get(j) for j in joint_ids])
-        # Faster frames rather than a faster feed: the command rate stays at WAYPOINT_RATE_HZ.
         speed = self.params.get("speed", RUN_IN_DEFAULT_SPEED)
-        frames, rate_hz, _holds = _interpolate(cycle, speed=speed)
-        cycles = max(1, math.ceil(
-            self.params["duration_s"] * rate_hz / len(frames)))
-        ctx.log(f"run-in at ×{speed:g}: one pass {len(frames) / rate_hz:.1f}s")
-        return play_frames(
-            ctx, name=f"run-in ×{speed:g}", joint_ids=joint_ids,
-            frames=frames * cycles, rate_hz=rate_hz, speed=1.0, loop=False,
-        )
+        frames, rate_hz = run_in_frames(cycle, self.params["duration_s"], speed)
+        warm_s = len(_interpolate(cycle, speed=RUN_IN_WARMUP_SPEED)[0]) / rate_hz
+        if speed != RUN_IN_WARMUP_SPEED:
+            ctx.log(f"run-in: first pass at ×{RUN_IN_WARMUP_SPEED:g} ({warm_s:.0f}s), "
+                    f"then ×{speed:g}")
+        else:
+            ctx.log(f"run-in at ×{speed:g}: one pass {warm_s:.1f}s")
+
+        cap = self.params.get("max_current_ma")
+        previous = service.control_state().get("max_current") if cap is not None else None
+        if cap is not None:
+            service.set_max_current(cap)
+            ctx.log(f"motor current capped at {cap} mA for the run"
+                    + (f" (was {previous} mA)" if previous is not None else ""))
+        try:
+            return play_frames(
+                ctx, name=f"run-in ×{speed:g}", joint_ids=joint_ids,
+                frames=frames, rate_hz=rate_hz, speed=1.0, loop=False,
+            )
+        finally:
+            if cap is not None and previous is not None and previous != cap:
+                try:
+                    service.set_max_current(previous)
+                    ctx.log(f"motor current ceiling back at {previous} mA")
+                except Exception:
+                    logger.exception("run-in: restoring the current ceiling failed")
+                    ctx.log(f"could not restore the {previous} mA ceiling - "
+                            "check max current before the next run")
+
+
+def run_in_frames(cycle: list[list[float]], duration_s: float,
+                  speed: float) -> tuple[list[list[float]], float]:
+    """Frames for a run-in of about ``duration_s``: one pass at the warm-up
+    speed, then whole passes at ``speed`` until the time is used up."""
+    warm, rate_hz, _holds = _interpolate(cycle, speed=RUN_IN_WARMUP_SPEED)
+    budget = duration_s * rate_hz
+    if speed == RUN_IN_WARMUP_SPEED:
+        cycles = max(1, math.ceil(budget / len(warm)))
+        return warm * cycles, rate_hz
+    fast, _rate, _holds = _interpolate(cycle, speed=speed)
+    cycles = max(1, math.ceil((budget - len(warm)) / len(fast)))
+    return warm + fast * cycles, rate_hz

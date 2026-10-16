@@ -25,11 +25,15 @@ export function RunInStep({
   const gate = useStartGate('motors')
   const model = useAppStore((s) => s.handInfo?.model_name)
   const torque = useAppStore((s) => s.status?.torque_enabled ?? false)
+  const liveMaxCurrent = useAppStore((s) => s.control?.max_current ?? null)
+  const currentFloor = useAppStore((s) => s.control?.max_current_floor ?? 0)
   const operation = useOperationStore((s) => s.operation)
   const active =
     operation?.kind === 'run_in' && isOperationActive(operation) ? operation : null
   const [minutes, setMinutes] = useState(5)
   const [speed, setSpeed] = useState(3)
+  // Current cap for the run, in mA; empty = leave the hand's ceiling alone.
+  const [capDraft, setCapDraft] = useState('')
   const [doneAt, setDoneAt] = useState<string | null>(null)
   useEffect(() => setDoneAt(readRunInDone(model)), [model])
 
@@ -41,10 +45,16 @@ export function RunInStep({
     setDoneAt(now)
   }, [finishedId, model])
 
+  const cap = capDraft.trim() === '' ? null : parseInt(capDraft, 10)
+  const capValid =
+    cap === null || (Number.isFinite(cap) && cap >= Math.max(currentFloor, 1) && cap <= 2000)
+
   const start = async () => {
     try {
       if (!torque) await api.torqueEnable()
-      await api.operationStart('run_in', { duration_s: minutes * 60, speed })
+      const params: Record<string, unknown> = { duration_s: minutes * 60, speed }
+      if (cap !== null) params.max_current_ma = cap
+      await api.operationStart('run_in', params)
     } catch (error) {
       failToBanner(error)
     }
@@ -52,15 +62,15 @@ export function RunInStep({
 
   const duration = Number(active?.params.duration_s ?? minutes * 60)
   const left = active?.progress != null ? Math.ceil((1 - active.progress) * duration) : null
-  const blocked = gate.blocked || !calibrated
+  const blocked = gate.blocked || !calibrated || !capValid
 
   return (
     <FlowStep
       n={3}
       title="Run-in"
       state={active ? 'running' : state}
-      chip={doneAt ? shortDate(doneAt) : `${minutes} min · ×${speed}`}
-      info="Moves every joint through its full range in a collision-free loop. Keep the hand free."
+      chip={doneAt ? shortDate(doneAt) : `${minutes} min · ×${speed}${cap !== null ? ` · ${cap} mA` : ''}`}
+      info="Moves every joint through its full range in a collision-free loop. The first pass is slow (×1) so a collision can be stopped in time. Keep the hand free."
       settings={
         <>
           <div className="flow-row">
@@ -74,7 +84,7 @@ export function RunInStep({
               </button>
             ))}
           </div>
-          <div className="flow-row" title="Speed of the motion; one pass takes about 15 s at ×1">
+          <div className="flow-row" title="Speed after the first pass; one pass takes about 15 s at ×1">
             {SPEEDS.map((s) => (
               <button
                 key={s}
@@ -85,6 +95,31 @@ export function RunInStep({
               </button>
             ))}
           </div>
+          {liveMaxCurrent !== null && (
+            <div
+              className="flow-row"
+              title={
+                'Motor current ceiling for this run only; the previous ceiling is restored afterwards. ' +
+                `Empty keeps the hand's ${liveMaxCurrent} mA.` +
+                (currentFloor > 0 ? ` Lowest accepted: ${currentFloor} mA (the calibration current).` : '')
+              }
+            >
+              <span style={{ color: 'var(--dim)', fontSize: 10 }}>current cap</span>
+              <input
+                type="number"
+                min={Math.max(currentFloor, 1)}
+                max={2000}
+                step={10}
+                placeholder={String(liveMaxCurrent)}
+                value={capDraft}
+                onChange={(e) => setCapDraft(e.target.value)}
+                style={{ width: 70 }}
+              />
+              <span style={{ color: capValid ? 'var(--dim)' : 'var(--danger, #c33)', fontSize: 10 }}>
+                {capValid ? 'mA' : `${Math.max(currentFloor, 1)}–2000 mA`}
+              </span>
+            </div>
+          )}
         </>
       }
     >
