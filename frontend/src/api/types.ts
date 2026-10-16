@@ -155,6 +155,9 @@ export interface JointGains {
 export interface ControlState {
   torque_enabled: boolean
   max_current: number
+  // config.yaml's ceiling, and the lowest one orca_core accepts (0 = unknown).
+  config_max_current: number | null
+  max_current_floor: number
   // The one gain set every loop joint shares, or null when they differ.
   gains: JointGains | null
   // Live gains per loop-controlled joint, read back from the controller.
