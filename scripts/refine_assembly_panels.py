@@ -7,18 +7,23 @@ ROOT=Path(__file__).resolve().parents[1]
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('pdf',type=Path)
 parser.add_argument('--dpi',type=int,default=300,help='Rasterization resolution (default: 300 DPI). Source photo detail remains the limit.')
+parser.add_argument('--output-root',type=Path,default=ROOT,help='Optional staging directory for extracted panels and catalog')
 args=parser.parse_args()
+output=args.output_root
+(output/'frontend/public/assembly/media').mkdir(parents=True,exist_ok=True)
+(output/'frontend/src/components/assembly').mkdir(parents=True,exist_ok=True)
 if args.dpi<=0:parser.error('--dpi must be positive')
 scale=args.dpi/72
 source=pymupdf.open(args.pdf)
-manifest=ROOT/'frontend/src/components/assembly/media-catalog.json'
+manifest=output/'frontend/src/components/assembly/media-catalog.json'
+if not manifest.exists():manifest.write_bytes((ROOT/'frontend/src/components/assembly/media-catalog.json').read_bytes())
 media=json.loads(manifest.read_text())
 for key,entry in media.items():
  n=int(key)
  if n in (84,85): continue # The three numbered routing maps already have separate crops.
  doc=pymupdf.open();doc.insert_pdf(source,from_page=n-1,to_page=n-1);p=doc[0]
  if n==101:
-  p.get_pixmap(matrix=pymupdf.Matrix(scale,scale),clip=pymupdf.Rect(110,92,550,367)).save(ROOT/'frontend/public/assembly/media/board-connectors.png')
+  p.get_pixmap(matrix=pymupdf.Matrix(scale,scale),clip=pymupdf.Rect(110,92,550,367)).save(output/'frontend/public/assembly/media/board-connectors.png')
   entry['panels']=[{'src':'./assembly/media/board-connectors.png','caption':'Complete OH board connector diagram','side':None}]
   continue
  # The badge is a small hand image plus an overlay near the upper-right corner.
@@ -61,7 +66,7 @@ for key,entry in media.items():
  panels=[]
  for j,r in enumerate(rects):
   filename=f'panel-{n:03}-{j+1}.png'
-  p.get_pixmap(matrix=pymupdf.Matrix(scale,scale),clip=r,alpha=False).save(ROOT/'frontend/public/assembly/media'/filename)
+  p.get_pixmap(matrix=pymupdf.Matrix(scale,scale),clip=r,alpha=False).save(output/'frontend/public/assembly/media'/filename)
   panels.append({'src':f'./assembly/media/{filename}','caption':f'Assembly detail {j+1}','side':entry['side']})
  entry['panels']=panels
  print(n,len(panels))

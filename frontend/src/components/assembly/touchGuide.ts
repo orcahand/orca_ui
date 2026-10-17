@@ -45,11 +45,17 @@ export const TOUCH_STEPS:AssemblyStep[]=[
   'Flash the board for your hand side before mounting it. Switch power off.',
   'Seat the board as pictured and secure it gently with two M1.4×6 self-tapping screws.',
  ],'The flashed connector board is correctly oriented and gently secured.','Touch connector board'),
- step('touch-board-connect','Connect the Touch harness',[
+ step('touch-board-connect','Connect the five finger cables',[
   'With power off, match each plug to the correct orientation pictured.',
   'With the white 4-wire connector at the bottom, connect the fingers to the labeled ports. The physical port map is the same for left and right hands.',
-  'Connect the 4-wire cable to the OH board. Move the hand gently and check cable slack and clearance from tendons, joints and cover edges.',
- ],'All five sensor connections, the board cable and routing clearance are checked.','Touch connector board'),
+  'Check that each finger cable reaches its socket without strain and is clear of the tendons and joints.',
+ ],'All five finger cables are correctly oriented, seated and connected to their labeled ports.','Touch connector board'),
+ step('touch-board-link','Connect the Touch board to the OH board',[
+  'Keep board power off. Remove the rear hull cover if it is fitted and support the cover and OH board without pulling on the existing cables.',
+  'Connect the supplied four-wire board cable to the white four-pin socket on the Touch connector board and the four-pin connector-board socket on the OH board. Match the keyed housings shown below; do not force or offset a plug.',
+  'Guide the cable down from the carpals toward the OH board, clear of the wrist belt, tendons and motor spools. At the rear cover, use the upper-right cable exit alongside the motor lead, as shown when fitting the OH board. Leave slack for wrist movement and for lifting the rear cover.',
+  'Gently move the unpowered wrist through its free movement and lift the rear cover slightly. Check that neither connector is pulled, the cable cannot enter a moving part and the cover closes without pinching it.',
+ ],'Both ends of the four-wire board cable are fully seated, with slack and clearance checked.','Touch connector board'),
  step('touch-test','Check the installed Touch sensors',[
   'With the assembled hand connected to the UI, confirm the selected Touch configuration reports all five sensors.',
   'Touch each sensor in turn. Confirm the expected finger responds: thumb 0, index 1, middle 2, ring 3 and pinky 4.',
@@ -67,10 +73,11 @@ export const TOUCH_KITS:Record<string,string[]>={
  'touch-connect':['5 tested, ID-labeled sensors','5 routed connector cables'],
  'touch-mount':['5 connected Paxini sensors','8 screws · M1.4×3','10 screws · M1.4×4','2 screws · M1.4×6','Hand screwdriver'],
  'touch-board-mount':['Flashed Touch connector board','2 self-tapping screws · M1.4×6','Hand screwdriver'],
- 'touch-board-connect':['5 routed sensor cables','Mounted Touch connector board','1 four-wire connector-board cable','OH board'],
+ 'touch-board-connect':['5 routed sensor cables','Mounted Touch connector board'],
+ 'touch-board-link':['Mounted Touch connector board','OH board in its rear cover','1 four-wire connector-board cable'],
  'touch-test':['Completed Touch hand','12 V supply','USB-C data cable','ORCA UI'],
 }
-const photo=(name:string,caption:string,instruction:number):Figure=>({src:`./assembly/touch/${name}.png`,caption,instruction,showCaption:/correct|wrong|paint-|board-map|clove-hitch/.test(name)})
+const photo=(name:string,caption:string,instruction:number):Figure=>({src:`./assembly/touch/${name}.webp`,caption,instruction,showCaption:/correct|wrong|paint-|board-map|clove-hitch/.test(name)})
 export const TOUCH_FIGURES:Record<string,Figure[]>={
  'touch-parts':[photo('parts-sensors','Five Paxini sensors and copper wire',1),photo('parts-cables','Three short and two long cables, connector board and board cable',2)],
  'touch-wrap-short':[],

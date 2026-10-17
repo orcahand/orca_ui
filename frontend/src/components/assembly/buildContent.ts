@@ -1,3 +1,4 @@
+import {resolvedFigure} from './photoResolution'
 import baseInventory from '../../../public/assembly/parts/base-right-dynamixel/inventory.json'
 import leftInventory from '../../../public/assembly/parts/base-left-dynamixel/inventory.json'
 import touchRightInventory from '../../../public/assembly/parts/touch-right-dynamixel/inventory.json'
@@ -30,7 +31,7 @@ export const GLOSSARY = [
 export const KITS: Record<string, string[]> = {
   p1: ['Printed parts & skins', 'Tendon cord', 'PTFE tubing', 'Bearings & pins', 'Screws, nuts & magnets', 'Hex keys / screw bits', 'Ruler & cutters', 'File / sandpaper'],
   p7: ['Ruler', 'Cutters', 'Allen key / screw bit'], p13: ['PTFE · OD 1.5 / ID 0.9 mm', '5 AP parts', 'Carpals', 'Wrist'],
-  p15: ['10 PTFE liners · OD 1.5 / ID 0.9 mm', '5 AP parts', 'Ruler and cutters · cut to channel depth + about 2 mm'], p16: ['32 tubes for carpals', '32 tubes for wrist'],
+  p15: ['10 PTFE liners · OD 1.5 / ID 0.9 mm', '5 AP parts', 'Ruler and cutters · cut to channel depth + about 2 mm'], p16: ['Carpals and wrist frame', '32 PTFE liners for carpals', '32 PTFE liners for wrist'],
   p20: ['Tendon with stopper knot', 'PTFE tube'], p22: ['Iron wire · approx. 0.45 mm'],
   p26: ['Tendon cord · 10 lengths, 2 m each'], p29: ['DP', 'Double-knot tendon', '2 matching joint bearings'],
   p31: ['PP', 'File / sandpaper'], p33: ['Double-knot tendon', '2×8 pin', '2×6 pin'],
@@ -44,8 +45,8 @@ export const KITS: Record<string, string[]> = {
   p93: ['2 fans', '2 M3 nuts', '3 M4 nuts', '2 fan screws · M3×12 in current CAD (earlier guide: M3×14; verify supplied kit)', '180 mm 3-pin cable'],
   p99: ['M2 nut per spool', '3 screws · M2×4 per spool', 'Bottom spools', 'Ratchets'],
   p101: ['OH board', '12 V power supply', 'USB-C data cable'],
-  p105: ['12 V supply', 'USB-C data cable', 'J-Link', 'Tag-Connect probe'], p150: ['12 V supply', 'USB-C data cable', 'J-Link', 'Tag-Connect probe'],
-  p110: ['Connector board', '4-wire board cable', 'J-Link', 'Tag-Connect probe'], p154: ['Connector board', '4-wire board cable', 'J-Link', 'Tag-Connect probe'],
+  p105: ['OH board', '12 V supply', 'USB-C data cable', 'J-Link', 'Tag-Connect probe'], p150: ['OH board', '12 V supply', 'USB-C data cable', 'J-Link', 'Tag-Connect probe'],
+  p110: ['OH board, 12 V supply and USB-C data cable', 'Connector board', '4-wire board cable', 'J-Link', 'Tag-Connect probe'], p154: ['OH board, 12 V supply and USB-C data cable', 'Connector board', '4-wire board cable', 'J-Link', 'Tag-Connect probe'],
   p115: ['16 prepared spool motors', 'Wrist motor', 'Motor-link cables', '4 cable covers'], p122: ['Wrist motor & pulley carrier', '4 screws · M2×8', 'Wrist pulley', 'Pin · 4×10', 'Bearing · 4×8×3', '3 screws · M4×10', '3 M4 nuts · already in tower'],
   p126: ['16 top spools', '16 bearings · 4×8×3', '16 top-spool screws · M2.5×8 in current CAD (earlier guide: M2×8; verify supplied thread)'], p127: ['4 M3 nuts', 'Metal spool holders', 'M3×14 screws'],
   p129: ['8 magnets', 'Superglue', 'Wiping cloth'], p132: ['Hull magnets', 'Superglue'],
@@ -54,7 +55,7 @@ export const KITS: Record<string, string[]> = {
   p145: ['Silicone A & B', 'Thinner', 'Pigment', 'Molds', 'Scale', 'Cups', 'Separate mixing sticks', 'Gloves'],
 }
 export function kit(step:AssemblyStep,build:Build):string[]{
-  if(['p23','p45','p80','p83','p139','p141','motor-check','touch-test'].includes(step.id))return []
+  if(['p23'].includes(step.id))return []
   if(TOUCH_KITS[step.id])return TOUCH_KITS[step.id]
   const pp=build.version==='touch'?'4×8×2 mm':'4×8×3 mm'
   const extra:Record<string,string[]>={
@@ -77,7 +78,7 @@ export function kit(step:AssemblyStep,build:Build):string[]{
     p59:['Assembled thumb DP/PP/AP','Prepared TP','2 pins · Ø2×30 mm'],
     p62:['Thumb assembly','2 thumb TP bearings · 4×8×3 mm'],
     p64:['4 assembled fingers','Carpals with 32 PTFE liners'],p68:['Assembled thumb with 8 tendon ends','Carpals'],
-    p70:['Hand with all 32 tendon ends','Temporary tie for the dorsum group'],
+    p70:['Hand with all 32 tendon ends'],
     p77:['Prepared hand','Wrist with 32 PTFE liners'],p80:['Hand and wrist with routed tendons'],p83:['Hand and wrist with 32 free tendon ends'],
     p98:build.motor==='feetech'?['Tower','FeeTech direct motor cables']:['Tower','12 Dynamixel motor connector PCBs'],
     p112:['OH board','12 V supply','USB-C data cable',build.motor==='feetech'?'FeeTech motors and matching adapter cable':'Dynamixel motors and matching 3-pin cable','Computer with orca_core installed'],
@@ -98,12 +99,13 @@ const CAPTIONS: Record<number, string> = {
 export function figures(step: AssemblyStep, build: Build): Figure[] {
   if(TOUCH_FIGURES[step.id])return TOUCH_FIGURES[step.id].map(f=>({...f,contrast:false}))
   const items=sourceFigures(step,build).filter(f=>!(step.id==='p35'&&f.instruction===3)&&!(step.id==='p16'&&f.src.endsWith('panel-017-3.png'))&&!(step.id==='p37'&&f.src.endsWith('panel-041-1.png'))&&!(['p37','p52'].includes(step.id)&&build.version!=='full'&&/panel-(041|053)-[24]\.png$/.test(f.src)))
-  if(step.id==='p31')return items.map(f=>({...f,contrast:false}))
+  if(step.id==='p31')return items.map(f=>resolvedFigure({...f,contrast:false}))
   const whiteMaterial=['p15','p16','p20','p29','prepare-pp','p33','p35','p37','p46','p49','p52','p54','p56','p62','p75','p77','p89','p123','p126'].includes(step.id)
-  return replaceCadFigures(items.filter(f=>!(step.id==='p150'&&f.src.endsWith('panel-151-1.png'))),build).map(f=>({...f,contrast:f.photo?whiteMaterial:step.id==='p147'&&build.version==='base',...(f.src.endsWith('panel-111-1.png')?{wide:true,showCaption:true,caption:`Example screen · select ${build.side} hand for this build`}:{})}))
+  return replaceCadFigures(items.filter(f=>!(step.id==='p150'&&f.src.endsWith('panel-151-1.png'))),build).map(f=>({...f,contrast:f.photo?whiteMaterial:step.id==='p147'&&build.version==='base',...(f.src.endsWith('panel-111-1.png')?{wide:true,showCaption:true,caption:`Example screen · select ${build.side} hand for this build`}:{})})).map(resolvedFigure)
 }
 function sourceFigures(step: AssemblyStep, build: Build): Figure[] {
   if(['prepare-pp','p33'].includes(step.id))return (MEDIA['34'].panels??[]).filter(f=>step.id==='prepare-pp'?/panel-034-[123]\.png$/.test(f.src):/panel-034-[456]\.png$/.test(f.src)).map(f=>({...f,instruction:step.id==='prepare-pp'?(f.src.endsWith('-3.png')?2:1):(f.src.endsWith('-6.png')?2:1)}))
+  if(step.id==='p123'&&build.motor==='dynamixel')return []
   if(step.id==='p126')return build.motor==='feetech'?[{src:'./assembly/media/panel-126-1.png',caption:'Top spool, bearing and screw · seat the bearing on the bench before installation',instruction:3}]:[]
   if(['p145','p148'].includes(step.id)&&build.version!=='full'){
     const version=build.version
@@ -121,12 +123,12 @@ function sourceFigures(step: AssemblyStep, build: Build): Figure[] {
   if(build.version==='touch'&&step.id==='p110')return [{src:'./assembly/media/panel-110-2.png',caption:'Touch connector board · programming pads are on the reverse side',instruction:2}]
   if(build.version==='touch'&&step.id==='p154')return []
 
-  if (['p1','p6','p23','p26','p80','p83','p115','p42','p54','p59','p64'].includes(step.id)) return []
+  if (['p1','p6','p23','p26','p77','p80','p83','p115','p42','p54','p59','p64'].includes(step.id)) return []
   if (step.id === 'p13') return ['Index AP','Middle AP','Ring AP','Pinky AP','Thumb AP','Carpals','Wrist frame'].map(label=>({src:(build.version==='touch'?(build.side==='left'?touchLeftInventory:touchRightInventory):(build.side==='left'?leftInventory:baseInventory)).parts.find(p=>p.label===(label==='Carpals'&&build.version==='touch'?'Touch carpals':label))!.thumbnail,showCaption:true,caption:label==='Carpals'&&build.version==='touch'?'Touch carpals':label,instruction:2}))
   if (['p45','p46','p68','p73','p135','p139','p129','finishing-pp'].includes(step.id)) return []
   if(build.motor==='dynamixel'&&['p98','p99','p127'].includes(step.id)) return []
-  if (step.id === 'p101') return [{src:baseInventory.parts.find(p=>p.label==='OH control board')!.thumbnail,caption:'OH control board · CAD identification view',instruction:1},{src:'./assembly/media/board-connectors.png',caption:'Complete OH board connector diagram',instruction:1}]
-  if (step.id === 'p18') return [{src:'./assembly/media/panel-019-4.png',caption:'Clean the carpal channel opening before inserting its PTFE liner',instruction:1}]
+  if (step.id === 'p101') return []
+  if (step.id === 'p18') return [{src:'./assembly/media/panel-019-4.png',caption:'Earlier screw-based cleanup example · the correct screw size remains unconfirmed; follow the inspection instructions',instruction:1}]
   if (step.id === 'p142') return [
     {src:'./assembly/media/mount-1.png',caption:'Earlier mounting kit · rod dimensions differ from the current model; confirm your supplied kit',instruction:2},
     {src:'./assembly/media/mount-3.png',caption:'Remove the hull covers; support the rear cover and connected board',instruction:3},
@@ -148,7 +150,16 @@ function sourceFigures(step: AssemblyStep, build: Build): Figure[] {
     p112:[2,3],p115:[1,1],p117:[1,2,2],p119:[1,1,2,3],p122:[4,2,2,2,2,2],p123:[1,1,3,3],p126:[1,1],p127:[1,2],
     p129:[2],p132:[1],p135:[1],p136:[3,1,2,3,4],p139:[1],p150:[2,2],p154:[1,1],
   }
-  return [...step.pages,...(extra[step.id] ?? [])].flatMap<Figure>(p => MEDIA[String(p)] ? (MEDIA[String(p)].panels ?? [{ ...MEDIA[String(p)], caption: CAPTIONS[p] ?? step.title }]) : []).filter(m => !m.side || m.side === build.side || step.id === 'p115').map((figure,i)=>({...figure,instruction:assignments[step.id]?.[i]??Math.min(i+1,instructions(step,build).length),caption:`${step.title}: ${instructions(step,build)[(assignments[step.id]?.[i]??1)-1]??step.title}`})).filter(f=>!(step.id==='p77'&&f.src.endsWith('panel-079-2.png'))).filter(f=>step.id!=='p110'||!f.src.endsWith(build.version==='touch'?'panel-110-1.png':'panel-110-2.png'))
+  return [...step.pages,...(extra[step.id] ?? [])].flatMap<Figure>(page => {
+    const entry=MEDIA[String(page)]
+    if(!entry)return []
+    const panels=entry.panels??[{...entry,caption:CAPTIONS[page]??step.title}]
+    return panels.map(panel=>({...panel,caption:CAPTIONS[page]??step.title}))
+  }).filter(figure=>!figure.side||figure.side===build.side||step.id==='p115')
+    .map((figure,i)=>({...figure,instruction:assignments[step.id]?.[i]??Math.min(i+1,instructions(step,build).length)}))
+    .filter(figure=>!(step.id==='p77'&&figure.src.endsWith('panel-079-2.png')))
+    .filter(figure=>step.id!=='p110'||!figure.src.endsWith(build.version==='touch'?'panel-110-1.png':'panel-110-2.png'))
+
 }
 export function instructions(step: AssemblyStep, build: Build): string[] {
   switch (step.id) {
@@ -157,7 +168,7 @@ export function instructions(step: AssemblyStep, build: Build): string[] {
     case 'p46': return ['Seat the prepared thumb DP and PP tendons and their matching bearings using the same knot-seating technique as the fingers.', 'Fit the Ø2×8 mm middle pin and Ø2×6 mm lower pin, as on the fingers. Route the DP tendons through the PP and join them, then fit the upper Ø2×6 mm pin with the tendons between the pins.', build.version==='touch'?'Slide the thumb PP skin from its base toward the fingertip. Leave DP bare: Touch uses a fingertip sensor instead of DP skin. Fit the sensor after the hand is assembled, just before tensioning. Keep all tendons clear and check free joint movement.':'Slide the thumb PP skin from its base toward the fingertip, and slide the DP skin over the fingertip and down. Keep all tendons clear and check free joint movement.']
     case 'p73': return [step.instructions[0], 'Insert two 3×50 mm pins, mount the toothed carpal pulley and add two 8×13×4 bearings. The pulley teeth engage the wrist belt.']
     case 'p89': return [...step.instructions.slice(0,2), 'Check that the two tendon groups remain in order below the wrist.']
-    case 'p126': return ['On the workbench, support each loose top spool close to its bearing pocket and seat its 4×8×3 mm bearing fully. Do this before mounting the spool; do not drive a bearing into a spool supported by the tower.', 'Thread the opposite tendon from the same joint. Use one Ashley stopper with three turns; only use the Ashley plus two single knots as the short-tendon fallback.', 'Fit the prepared top spool with its bearing already seated and secure it with the matching supplied screw listed in Parts. Check the screw thread before tightening.', 'With power off, gently turn one motor back and forth by hand. Its two tendons should move only the matching joint, in opposite directions.']
+    case 'p126': return ['On the workbench, support each loose top spool close to its bearing pocket and seat its 4×8×3 mm bearing fully. Do this before mounting the spool; do not drive a bearing into a spool supported by the tower.', 'Use the opposing tendon from the same joint for the top spool—the bottom tendon stays in its installed spool. Thread and anchor it as before: three turns, one Ashley stopper and a 5 mm tail tucked back into the channel. Use the two-extra-knot fallback only if the tendon is too short for three turns.', 'Fit the prepared top spool with its bearing already seated and secure it with the matching supplied screw listed in Parts. Check the screw thread before tightening.', 'With power off, gently turn one motor back and forth by hand. Its two tendons should move only the matching joint, in opposite directions.']
     case 'p147': return build.version==='touch'?['Review the rendered Touch skin set for the selected hand. Touch uses sensor modules at the fingertips; do not cast Base DP skins for this build.', 'The supplied guide gives batch masses only for the Base molds. Obtain the material specification and quantities for the Touch mold set before mixing.']:step.instructions
     case 'p145': if(build.version==='touch')return ['Gather the matching Touch PP and carpal molds shown, silicone A and B, compatible thinner and pigment, scale, cups, separate mixing sticks and gloves.', 'Confirm the silicone product, mixing ratios, batch quantities and demolding schedule for these molds before casting. The supplied Base recipe is not a verified Touch recipe.'];return ['Gather silicone A and B, compatible thinner and pigment, matching molds, a scale, cups, separate mixing sticks and gloves. Confirm the silicone product and its demolding schedule before mixing.', 'The Base recipe uses A:B = 1:1 by mass; thinner 5–10% of A; white pigment 2% of A or black pigment 2–3% of A. These quantities do not establish a recipe for Touch skins.']
     case 'p148': if(build.version==='touch')return ['Identify the matching Touch mold halves, cores, clips and funnel shown. Confirm your mold assembly and pouring instructions before starting.', 'Use the silicone manufacturer’s verified mixing and cure instructions for this Touch mold set. The supplied document does not establish Touch batch masses or a demolding schedule.'];return [...step.instructions.slice(0,2), 'The earlier Base recipe gives a 20-minute pot life. Check the working time on your actual product before mixing. Stir gently and keep the A and B utensils separate to avoid contamination.']

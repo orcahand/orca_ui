@@ -1,3 +1,8 @@
+import {TouchBoardConnection} from './TouchBoardConnection'
+import {BoardIdentification} from './BoardIdentification'
+import {SpoolOverview} from './SpoolOverview'
+import {AssemblyNavigation, chapterTitle} from './AssemblyNavigation'
+import {stepTools, buildTools, partsOnly} from './assemblyTools'
 import {RoutingInspection} from './RoutingInspection'
 import { memo, useRef, useState, type ReactNode } from 'react'
 import { type AssemblyStep } from './guide'
@@ -44,7 +49,6 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
   const main = useRef<HTMLElement>(null)
   const method=flashingMethod(progress)
   const STEPS = buildSteps(progress.build,method)
-  const CHAPTERS=[...new Set(STEPS.map(s=>s.chapter))]
   const step = STEPS.find(s => s.id === progress.current) ?? STEPS[0]
   const index = STEPS.indexOf(step)
   const completed = STEPS.filter(s=>progress.done.includes(s.id)).length
@@ -53,11 +57,15 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
   const copy = instructions(step, build)
   const stepFigures = figures(step, build)
   const warning = note(step, build)
+  const tools = stepTools(step)
+  const parts = partsOnly(kit(step,build))
+  const equipment = buildTools(STEPS,build)
   const checklist = step.id === 'p139' ? FINAL_CHECKS : step.id === 'p45' ? FINGER_CHECKS : []
   const checkKey=(i:number)=>step.id==='p45'?`p45:finger:${i}`:`${step.id}:${i}`
   const allChecked = step.id === 'motor-check' ? Array.from({length:17},(_,i)=>`motor-check:${i+1}`).every(k=>progress.checks.includes(k)) : step.id === 'p83' ? progress.tendons.length === 32 : ['p123','p126'].includes(step.id) ? progress.checks.filter(k=>k.startsWith(`${step.id}:tendon:`)).length===32 : checklist.every((_,i) => progress.checks.includes(checkKey(i)))
   const percent = Math.round(completed / STEPS.length * 100)
   function go(id: string) {
+    setQuery('')
     setProgress(p => ({ ...p, current: id }))
     setNavOpen(false)
     main.current?.scrollTo({ top: 0, behavior: 'instant' })
@@ -78,7 +86,7 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
       return {...p,checks,done:step.id==='p45'&&FINGER_CHECKS.every((_,i)=>checks.includes(`p45:finger:${i}`))?[...remaining,step.id]:remaining}
     })
   }
-  const filtered = STEPS.filter(s => `${s.title} ${s.chapter} ${instructions(s,build).join(' ')} ${kit(s,build).join(' ')}`.toLowerCase().includes(query.trim().toLowerCase()))
+  const filtered = STEPS.filter(s => `${s.title} ${s.chapter} ${instructions(s,build).join(' ')} ${kit(s,build).join(' ')} ${stepTools(s).join(' ')}`.toLowerCase().includes(query.trim().toLowerCase()))
   if (!ready) return <div className="assembly-loading"><p>Restoring your build…</p><button className="btn" onClick={onClose}>Close</button></div>
   return <div className="assembly-app">
     <header className="assembly-header">
@@ -95,28 +103,16 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
     <div className={`assembly-layout ${sidebarCollapsed?'is-sidebar-collapsed':''}`}>
       <button className="assembly-mobile-nav" onClick={() => setNavOpen(!navOpen)} aria-expanded={navOpen} aria-controls="assembly-navigation">{navOpen ? 'Close chapters' : `Chapters · ${step.chapter}`} ☰</button>
       <aside className={`assembly-sidebar ${navOpen ? 'is-open' : ''}`} id="assembly-navigation">
-        <div className="assembly-sidebar-intro"><span className="assembly-eyebrow">THE BUILD GUIDE</span><h1>Every part.<br />One hand.</h1><p>ORCA hand · V2.1</p></div>
+        <div className="assembly-sidebar-intro"><span className="assembly-eyebrow">THE BUILD GUIDE</span><h1>Build your hand</h1><p>ORCA hand · V2.1</p></div>
         <div className="assembly-progress"><div className="assembly-row"><span>{completed} / {STEPS.length} steps</span><strong>{percent}%</strong></div><progress value={completed} max={STEPS.length} aria-label="Assembly progress" /></div>
         <label className="assembly-search"><span className="assembly-sr-only">Search assembly instructions</span><input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Find a part or step…" /></label>
-        <nav aria-label="Assembly chapters">
-          {CHAPTERS.map((chapter,n) => {
-            const chapterSteps = filtered.filter(s => s.chapter === chapter)
-            if (!chapterSteps.length) return null
-            const expanded = Boolean(query) || chapter === step.chapter
-            const count = STEPS.filter(s => s.chapter === chapter && progress.done.includes(s.id)).length
-            return <div className="assembly-chapter" key={chapter}>
-              <button className={`assembly-chapter-button ${expanded ? 'active' : ''}`} onClick={() => go(chapterSteps[0].id)}><span>{String(n+1).padStart(2,'0')}</span><span>{chapter}</span><small>{count}/{STEPS.filter(s => s.chapter === chapter).length}</small></button>
-              {expanded && <div className="assembly-step-links">{chapterSteps.map(s => <button key={s.id} className={s.id === step.id ? 'active' : ''} aria-current={s.id === step.id ? 'step' : undefined} onClick={() => go(s.id)}><span aria-label={progress.done.includes(s.id) ? 'Completed' : 'Incomplete'}>{progress.done.includes(s.id) ? '✓' : '·'}</span>{s.title}</button>)}</div>}
-            </div>
-          })}
-          {!filtered.length && <p className="assembly-muted">No matching steps. Try “wrist” or “PTFE”.</p>}
-        </nav>
+        <AssemblyNavigation steps={STEPS} current={step} done={progress.done} query={query} filtered={filtered} build={build} onGo={go}/>
         <div className="assembly-save-status" role="status">{saveStatus}</div>
         {resetting ? <div className="assembly-reset"><p>Clear assembly progress for a new build?</p><button onClick={() => { setProgress(EMPTY_PROGRESS); setResetting(false); main.current?.scrollTo(0,0) }}>Clear progress</button><button onClick={() => setResetting(false)}>Cancel</button></div> : <button className="assembly-text-button" onClick={() => setResetting(true)}>Start a new build</button>}
       </aside>
       <main ref={main} className="assembly-main">
         <button className="assembly-sidebar-chevron" aria-label={sidebarCollapsed?'Expand chapters':'Collapse chapters'} title={sidebarCollapsed?'Expand chapters':'Collapse chapters'} aria-expanded={!sidebarCollapsed} aria-controls="assembly-navigation" onClick={()=>setSidebarCollapsed(!sidebarCollapsed)}>{sidebarCollapsed?'›':'‹'}</button>
-        <div className="assembly-breadcrumb"><span>{step.chapter}</span><span>STEP {String(index+1).padStart(2,'0')} / {STEPS.length}</span></div>
+        <div className="assembly-breadcrumb"><span>{chapterTitle(step)}</span><span>STEP {String(index+1).padStart(2,'0')} / {STEPS.length}</span></div>
         <h2 ref={heading} tabIndex={-1}>{step.title}</h2>
         {step.id!=='p1'&&build.version==='full'&&(ASSEMBLY_MOTIONS[step.id]||['p23','p35','p45','p80','p83','p115','p123','p126'].includes(step.id))&&<p className="assembly-muted">Mechanical reference: Base geometry. Full-specific sensor parts are not represented in this model.</p>}
         {step.id==='p23'&&build.motor==='feetech'&&<p className="assembly-muted">The anatomy reference uses a Dynamixel wrist and tower; use the FeeTech parts for your build.</p>}
@@ -127,8 +123,13 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
           <label><span className="assembly-sr-only">Guide edition</span><select aria-label="Guide edition" value={build.audience} onChange={e=>changeBuild({audience:e.target.value as Build['audience']})}><option value="internal">Internal</option><option value="external">External</option></select></label>
           </div>}
         {build.audience==='internal'&&step.chapter.startsWith('Flashing')&&<section className="assembly-flashing-choice"><h3>Choose one flashing method</h3><p>Both methods prepare the same boards. Complete the selected method; you do not need to flash them twice.</p><div className="assembly-clip-tabs"><button aria-pressed={method==='console'} onClick={()=>chooseFlashing('console')}>ORCA Console</button><button aria-pressed={method==='firmware'} onClick={()=>chooseFlashing('firmware')}>orca_firmware · terminal</button></div></section>}
-        {step.id !== 'p1' && kit(step,build).length>0 && <div className="assembly-kit"><span className="assembly-eyebrow">Parts</span><ul>{kit(step,build).map(item => <li key={item}>{item}</li>)}</ul></div>}
+        {step.id !== 'p1' && <section className="assembly-supplies" aria-label="Parts and tools for this step">
+          {parts.length>0&&<div><h3>Parts</h3><ul>{parts.map(item=><li key={item}>{item}</li>)}</ul></div>}
+          <div><h3>Tools</h3>{tools.length?<ul>{tools.map(item=><li key={item}>{item}</li>)}</ul>:<p>No tools needed · work by hand.</p>}</div>
+        </section>}
         {step.id === 'p1' && <><Suspense fallback={<p>Loading your hand…</p>}><PartsExplorer build={build}/></Suspense>{build.version==='touch'&&<p className="assembly-muted">Complete the hand and tower assembly first, then prepare and install the Touch sensors, cables and connector board before the final checks and tensioning. Touch has no DP skins.</p>}{build.version==='full'&&<p className="assembly-note">Full-specific sensor installation and harness routing still need a verified procedure before closing the hand.</p>}</>}
+        {step.id==='p1'&&<section className="assembly-tool-overview"><span className="assembly-eyebrow">Before you begin</span><h3>Tools for your build</h3><p>Gather these once. Each step lists the tools you will use there.</p><div className="assembly-tool-columns"><div><h4>At the bench</h4><ul>{equipment.assembly.map(item=><li key={item}>{item}</li>)}</ul></div><div><h4>Setup and electronics</h4><ul>{equipment.setup.map(item=><li key={item}>{item}</li>)}</ul><h4>Optional work</h4><ul>{equipment.optional.map(item=><li key={item}>{item}</li>)}</ul></div></div></section>}
+        {step.id==='p123'&&<SpoolOverview build={build}/>}
         {step.id === 'p6' && <><KnotLesson/><StepVideos key="knot-video" step={step} build={build}/></>}
         {step.id === 'p23' && <HandLabels build={build}/>}
         {step.id.startsWith('touch-')&&['touch-ids','touch-test'].includes(step.id)&&<table className="assembly-sensor-ids"><caption>Sensor IDs</caption><thead><tr><th scope="col">Finger</th><th scope="col">ID</th></tr></thead><tbody>{['Thumb','Index','Middle','Ring','Pinky'].map((finger,id)=><tr key={finger}><th scope="row">{finger}</th><td>{id}</td></tr>)}</tbody></table>}
@@ -147,13 +148,15 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
         {i===1&&step.id==='motor-check'&&<MotorCheck build={build} selected={Number(progress.views['motor-check:selected']??1)} onSelect={id=>setProgress(p=>({...p,views:{...p.views,'motor-check:selected':String(id)}}))} checked={Array.from({length:17},(_,i)=>i+1).filter(id=>progress.checks.includes(`motor-check:${id}`))} onCheck={id=>toggleCheck(`motor-check:${id}`)}/>}
         {i===(DETAIL_AT[step.id]??copy.length-1)&&CAD_DETAILS[step.id]&&step.id!=='p46'&&!(build.motor==='feetech'&&CAD_DETAILS[step.id].motorSpecific)&&<CadDetail key={step.id} build={build} step={step.id}/>}
         {i===0&&step.id==='p115'&&<MotorChain build={build}/>}
+        {i===0&&step.id==='p101'&&<BoardIdentification build={build}/>}
         {i===1&&['p37','p49','p56'].includes(step.id)&&<KnotReinforcement count={step.id==='p37'?1:3}/>}
         {i===0&&['touch-wrap-short','touch-wrap-long'].includes(step.id)&&<CloveHitchLesson key={step.id}/>}
         {i===1&&step.id==='touch-wrap-short'&&<TouchCableWrap/>}
+        {i===1&&step.id==='touch-board-link'&&<TouchBoardConnection/>}
         {i===1&&step.id==='touch-mount'&&<TouchScrewGuide build={build}/>}
         {i===1&&step.id === 'p26' && <TendonPreparation/>}
         {i===2&&step.id === 'p59' && <TendonRouting step={step.id} build={build}/>}
-        {i===1&&step.id === 'p77' && <WristRouting build={build}/>}
+        {i===1&&step.id === 'p77' && <WristRouting build={build} routeIndex={Number(progress.views['p77:route']??0)} onRoute={index=>setProgress(p=>({...p,views:{...p.views,'p77:route':String(index)}}))}/>}
         {i===0&&step.id === 'p80' && <RoutingInspection build={build}/>}
         {i===(step.id==='p35'?1:2)&&['p35','p45'].includes(step.id) && <FingerMotion build={build} indexOnly={step.id==='p35'}/>}
 
@@ -185,6 +188,7 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
   </div>
 }
 
+const isModelImage=(src:string)=>/\/(renders|parts|molds)\//.test(src)
 function MediaGallery({ items, saved, onSelect, focused }: { items: Figure[]; focused:number; saved?: string; onSelect: (src: string) => void }) {
   const [selected,setSelected]=useState(Math.max(0,items.findIndex(item=>item.src===saved)))
   const [photo,setPhoto]=useState(false)
@@ -197,11 +201,11 @@ function MediaGallery({ items, saved, onSelect, focused }: { items: Figure[]; fo
   return <section className="assembly-panel-gallery" style={{'--panel-columns':items.length===1?1:Math.min(5,Math.max(2,Math.ceil(items.length/2))) } as React.CSSProperties} aria-label="Assembly photos and diagrams">
     {items.map((item,i)=><figure key={item.src} data-contrast={item.contrast??false} data-wide={item.wide||undefined} className={focused<0?'':(item.instruction??i+1)===focused+1?'is-focused':'is-unfocused'}>
       <div className="assembly-row" style={{justifyContent:'flex-end'}}><button className="assembly-text-button" onClick={()=>enlarge(i)} aria-label={`Enlarge image ${i+1}`}>⤢</button></div>
-      <button className="assembly-image-button" data-image-kind={item.photo?'cad':'photo'} onClick={()=>enlarge(i)} aria-label={`Enlarge detail ${i+1}`}><img src={item.src} alt={item.caption} loading="lazy"/></button>{item.showCaption&&<figcaption className="assembly-panel-caption">{item.caption}</figcaption>}
+      <button className="assembly-image-button" data-image-kind={isModelImage(item.src)?'cad':'photo'} onClick={()=>enlarge(i)} aria-label={`Enlarge detail ${i+1}`}><img src={item.src} alt={item.caption} loading="lazy" onLoad={e=>{if(!isModelImage(item.src))e.currentTarget.style.maxWidth=`min(100%, ${e.currentTarget.naturalWidth}px)`}}/></button><figcaption className="assembly-panel-caption">{item.caption}</figcaption>
     </figure>)}
-    <dialog ref={dialog} className="assembly-lightbox assembly-comparison" data-contrast={photo?false:item.contrast??false} data-image-kind={photo||!item.photo?'photo':'cad'} aria-label="Enlarged assembly image" onKeyDown={e=>{if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();cycle(e.key==='ArrowRight'?1:-1)}}} onCancel={e=>e.stopPropagation()} onClick={e=>{if(e.target===e.currentTarget)dialog.current?.close()}}>
+    <dialog ref={dialog} className="assembly-lightbox assembly-comparison" data-contrast={photo?false:item.contrast??false} data-image-kind={isModelImage(shown.src)?'cad':'photo'} aria-label="Enlarged assembly image" onKeyDown={e=>{if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();cycle(e.key==='ArrowRight'?1:-1)}}} onCancel={e=>e.stopPropagation()} onClick={e=>{if(e.target===e.currentTarget)dialog.current?.close()}}>
       <div className="assembly-row"><span>Instruction {item.instruction??selected+1}</span>{item.photo&&<div className="assembly-clip-tabs" aria-label="Image view"><button aria-pressed={!photo} onClick={()=>setPhoto(false)}>Model view</button><button aria-pressed={photo} onClick={()=>setPhoto(true)}>Assembly photo</button></div>}<button autoFocus onClick={()=>dialog.current?.close()}>Close image ×</button></div>
-      <img src={shown.src} alt={shown.caption}/>
+      <img key={shown.src} src={shown.src} alt={shown.caption} onLoad={e=>{if(!isModelImage(shown.src))e.currentTarget.style.maxWidth=`min(100%, ${e.currentTarget.naturalWidth}px)`}}/><p className="assembly-lightbox-caption">{shown.caption}</p>
       <div className="assembly-row assembly-image-navigation"><button onClick={()=>cycle(-1)} disabled={frames.length<2}>← Previous image</button><span>{frame+1} / {frames.length}{photo?' · Assembly photo':''}</span><button onClick={()=>cycle(1)} disabled={frames.length<2}>Next image →</button></div>
     </dialog>
   </section>

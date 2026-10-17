@@ -1,0 +1,197 @@
+{
+  "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
+  "components": [
+    {
+      "name": "PCB",
+      "path": "/TouchV2_Assembly_Main/Carpals_touch_Right/Conn_board_touch/Board~ZIsp:1",
+      "bounds": [
+        [
+          -23.808786512573,
+          127.508028610339,
+          11.377078063108609
+        ],
+        [
+          -5.544148463297001,
+          145.799666913615,
+          12.97712886321061
+        ]
+      ]
+    },
+    {
+      "name": "R0603~R0603~8gAr:1",
+      "path": "/TouchV2_Assembly_Main/Carpals_touch_Right/Conn_board_touch/R1~R0603~R0603~N9QM/R0603~R0603~8gAr:1",
+      "bounds": [
+        [
+          -11.250478155956,
+          136.336988483043,
+          12.977128862958612
+        ],
+        [
+          -9.630478155955998,
+          137.146988483042,
+          13.427128862957609
+        ]
+      ]
+    },
+    {
+      "name": "R0603~R0603~8gAr (1):1",
+      "path": "/TouchV2_Assembly_Main/Carpals_touch_Right/Conn_board_touch/R2~R0603~R0603~Mbl5/R0603~R0603~8gAr (1):1",
+      "bounds": [
+        [
+          -11.610479430742,
+          138.175991526265,
+          12.977128862958612
+        ],
+        [
+          -10.800479430743,
+          139.795991526265,
+          13.427128862957609
+        ]
+      ]
+    },
+    {
+      "name": "C0603~C0603_L1.6-W0.8-H0.8~JJcv:1",
+      "path": "/TouchV2_Assembly_Main/Carpals_touch_Right/Conn_board_touch/C3~C0603~C0603_L1.6-W0.8-H0.8~5zaL/C0603~C0603_L1.6-W0.8-H0.8~JJcv:1",
+      "bounds": [
+        [
+          -11.240478155956,
+          134.607982890247,
+          12.977128863211611
+        ],
+        [
+          -9.640478155956,
+          135.407982890247,
+          13.77712886321061
+        ]
+      ]
+    },
+    {
+      "name": "C0603~C0603_L1.6-W0.8-H0.8~JJcv (1):1",
+      "path": "/TouchV2_Assembly_Main/Carpals_touch_Right/Conn_board_touch/C4~C0603~C0603_L1.6-W0.8-H0.8~yGcD/C0603~C0603_L1.6-W0.8-H0.8~JJcv (1):1",
+      "bounds": [
+        [
+          -11.240478155956,
+          132.924980604243,
+          12.977128863211611
+        ],
+        [
+          -9.640478155956,
+          133.724980604243,
+          13.77712886321061
+        ]
+      ]
+    },
+    {
+      "name": "TSSOP-20_L6.5-W4.4-P0.65-LS6.4-BL~TSSOP-20_L6.5-W4.4-H1.0-LS6.4-P0.65~YgRo:1",
+      "path": "/TouchV2_Assembly_Main/Carpals_touch_Right/Conn_board_touch/U1~TSSOP-20_L6.5-W4.4-P0.65-LS6.4-BL~TSSOP-20_L6.5-W4.4-H1.0-LS6.4-P0.65~E4nO/TSSOP-20_L6.5-W4.4-P0.65-LS6.4-BL~TSSOP-20_L6.5-W4.4-H1.0-LS6.4-P0.65~YgRo:1",
+      "bounds": [
+        [
+          -19.046494179405002,
+          132.780825630278,
+          12.97715325909061
+        ],
+        [
+          -12.646486516556998,
+          139.275170630277,
+          14.026420239709608
+        ]
+      ]
+    },
+    {
+      "name": "Board cable socket",
+      "path": "/TouchV2_Assembly_Main/Carpals_touch_Right/Conn_board_touch/CN1~CONN-TH_A2001WR-4P~CONN-TH_A2001WR-4P~F9fl/CONN-TH_A2001WR-4P~CONN-TH_A2001WR-4P~Wy6m:1",
+      "bounds": [
+        [
+          -19.980487553975003,
+          124.422973904862,
+          9.47712895857761
+        ],
+        [
+          -9.979487553974998,
+          132.122973904862,
+          17.877128958577607
+        ]
+      ]
+    },
+    {
+      "name": "CONN-SMD_8P-P0.60_DF53-8S-0.6H~CONN-SMD_8P-P0.60_DF53-8S-0.6H~oqoe:1",
+      "path": "/TouchV2_Assembly_Main/Carpals_touch_Right/Conn_board_touch/CON1~CONN-SMD_8P-P0.60_DF53-8S-0.6H~CONN-SMD_8P-P0.60_DF53-8S-0.6H~uLRM/CONN-SMD_8P-P0.60_DF53-8S-0.6H~CONN-SMD_8P-P0.60_DF53-8S-0.6H~oqoe:1",
+      "bounds": [
+        [
+          -23.454491363982996,
+          127.9340016650573,
+          12.977128864992611
+        ],
+        [
+          -21.154491363984,
+          134.53410357029,
+          14.427128864991609
+        ]
+      ]
+    },
+    {
+      "name": "CONN-SMD_8P-P0.60_DF53-8S-0.6H~CONN-SMD_8P-P0.60_DF53-8S-0.6H~oqoe (1):1",
+      "path": "/TouchV2_Assembly_Main/Carpals_touch_Right/Conn_board_touch/CON2~CONN-SMD_8P-P0.60_DF53-8S-0.6H~CONN-SMD_8P-P0.60_DF53-8S-0.6H~BC29/CONN-SMD_8P-P0.60_DF53-8S-0.6H~CONN-SMD_8P-P0.60_DF53-8S-0.6H~oqoe (1):1",
+      "bounds": [
+        [
+          -23.441334137668,
+          135.13615050935528,
+          12.977128864992611
+        ],
+        [
+          -21.141334137668995,
+          141.736252414588,
+          14.427128864991609
+        ]
+      ]
+    },
+    {
+      "name": "CONN-SMD_8P-P0.60_DF53-8S-0.6H~CONN-SMD_8P-P0.60_DF53-8S-0.6H~oqoe (2):1",
+      "path": "/TouchV2_Assembly_Main/Carpals_touch_Right/Conn_board_touch/CON3~CONN-SMD_8P-P0.60_DF53-8S-0.6H~CONN-SMD_8P-P0.60_DF53-8S-0.6H~ZJQh/CONN-SMD_8P-P0.60_DF53-8S-0.6H~CONN-SMD_8P-P0.60_DF53-8S-0.6H~oqoe (2):1",
+      "bounds": [
+        [
+          -18.298106828440705,
+          142.66198847825999,
+          12.977128864992611
+        ],
+        [
+          -11.698004923208,
+          144.961988478259,
+          14.427128864991609
+        ]
+      ]
+    },
+    {
+      "name": "CONN-SMD_8P-P0.60_DF53-8S-0.6H~CONN-SMD_8P-P0.60_DF53-8S-0.6H~oqoe (3):1",
+      "path": "/TouchV2_Assembly_Main/Carpals_touch_Right/Conn_board_touch/CON4~CONN-SMD_8P-P0.60_DF53-8S-0.6H~CONN-SMD_8P-P0.60_DF53-8S-0.6H~QtZN/CONN-SMD_8P-P0.60_DF53-8S-0.6H~CONN-SMD_8P-P0.60_DF53-8S-0.6H~oqoe (3):1",
+      "bounds": [
+        [
+          -8.243482981964998,
+          135.136152278785,
+          12.977128864992611
+        ],
+        [
+          -5.943482981965991,
+          141.7362541840177,
+          14.427128864991609
+        ]
+      ]
+    },
+    {
+      "name": "CONN-SMD_8P-P0.60_DF53-8S-0.6H~CONN-SMD_8P-P0.60_DF53-8S-0.6H~oqoe (4):1",
+      "path": "/TouchV2_Assembly_Main/Carpals_touch_Right/Conn_board_touch/CON5~CONN-SMD_8P-P0.60_DF53-8S-0.6H~CONN-SMD_8P-P0.60_DF53-8S-0.6H~846P/CONN-SMD_8P-P0.60_DF53-8S-0.6H~CONN-SMD_8P-P0.60_DF53-8S-0.6H~oqoe (4):1",
+      "bounds": [
+        [
+          -8.243482981965,
+          127.934003434487,
+          12.977128864992611
+        ],
+        [
+          -5.943482981965991,
+          134.5341053397197,
+          14.427128864991609
+        ]
+      ]
+    }
+  ]
+}

@@ -1,29 +1,77 @@
-import {useRef,useState} from 'react'
-import views from './cad-route-views.json'
+import {useEffect,useLayoutEffect,useMemo,useState} from 'react'
+import {Canvas,useThree} from '@react-three/fiber'
+import {Html} from '@react-three/drei'
+import * as THREE from 'three'
+import {loadBundle,type Bundle} from './cadAssets'
+import {cadPieces,disposePieces,fade} from './cadScene'
+import {conduitData,vectors} from './conduitPaths'
+import {TENDONS} from './guide'
+import {jointName} from './driveMap'
 import type {Build} from './buildContent'
 
-export function WristRouting({build}:{build:Build}){
- const [palm,setPalm]=useState(true),[channel,setChannel]=useState(0),dialog=useRef<HTMLDialogElement>(null)
- const key=`${build.version}-${build.side}-dynamixel/route-p77-groups`
- const cad=(views as Record<string,{width:number;height:number;points:number[][]}>)[key]
- const color=palm?'#188b9a':'#c05d43',width=cad?.width??1470,height=cad?.height??678
- const row=cad?Array.from({length:16},(_,i)=>i+(palm?16:0)).sort((a,b)=>cad.points[a][0]-cad.points[b][0]):[]
- const selected=row[channel],start=cad?cad.points[selected]:[(palm?455:475)+channel*36.2,palm?336:373],end=cad?cad.points[selected+32]:[start[0],palm?530:180]
- const drawing=<svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${palm?'Palm to dorsal':'Dorsal to palmar'} group, channel ${channel+1} of 16`}>
-  <image href={cad?`./assembly/renders/${key}.webp`:'./assembly/media/panel-079-2.png'} width={width} height={height}/>
-  {cad&&<><text x={width/2} y={height*.18} textAnchor="middle" fontSize="34" fill="currentColor">Palm · palmar</text><text x={width/2} y={height*.88} textAnchor="middle" fontSize="34" fill="currentColor">Dorsum · dorsal</text></>}
-  {cad&&row.map(i=><circle key={i} cx={cad.points[i][0]} cy={cad.points[i][1]} r="9" fill={color} opacity=".6"/>)}
-  <path d={`M${start} L${end}`} stroke="#fff" strokeWidth="13"/>
-  <path d={`M${start} L${end}`} stroke={color} strokeWidth="7"/>
-  <path d={`M${end[0]-10},${end[1]+(palm?-15:15)} L${end} L${end[0]+10},${end[1]+(palm?-15:15)}`} stroke={color} strokeWidth="7" fill="none"/>
-  <circle cx={start[0]} cy={start[1]} r="19" fill="none" stroke={color} strokeWidth="5"/>
-  <text x={end[0]} y={end[1]+(palm?44:-28)} textAnchor="middle" fontSize="30" fontWeight="bold" fill={color}>{channel+1}</text>
- </svg>
- return <section className="assembly-wrist-routing"><h3>Two groups · keep the order within each</h3><p>Look at the underside of the carpals, with the palm above and dorsum below as shown. Send the palm-side row toward the dorsal side of the wrist, and the dorsal row toward the palmar side. Within each group, work from left to right without crossing the strands.</p>
-  <div className="assembly-clip-tabs"><button aria-pressed={palm} onClick={()=>{setPalm(true);setChannel(0)}}>Palm tendons → dorsal wrist</button><button aria-pressed={!palm} onClick={()=>{setPalm(false);setChannel(0)}}>Dorsal tendons → palmar wrist</button></div>
-  <button className="assembly-image-button" aria-label="Enlarge carpal routing" onClick={()=>dialog.current?.showModal()}>{drawing}</button>
-  <dialog ref={dialog} className="assembly-lightbox assembly-route-dialog" aria-label="Carpal routing" onCancel={e=>e.stopPropagation()} onClick={e=>{if(e.target===e.currentTarget)dialog.current?.close()}}><div className="assembly-row"><span>Carpal underside · {channel+1} / 16</span><button autoFocus onClick={()=>dialog.current?.close()}>Close routing ×</button></div>{drawing}</dialog>
-  <div className="assembly-row"><button className="assembly-secondary" disabled={channel===0} onClick={()=>setChannel(channel-1)}>← Previous channel</button><span>{channel+1} / 16 · {palm?'palm':'dorsal'} group</span><button className="assembly-secondary" disabled={channel===15} onClick={()=>setChannel(channel+1)}>Next channel →</button></div>
-  <p>The arrow shows the receiving wrist side, not the final curve of the tendon. Numbers count positions within this row. Verify individual tendon names in “Verify all 32 tendon identities” after threading both groups.</p>
+export function wristRoutingOrder(build:Build){
+ const data=conduitData(build)
+ // The two facing views share screen-left = world +X. Keep the measured row mapping.
+ return Array.from({length:32},(_,i)=>i).sort((a,b)=>data.carpals[b].at(-1)![0]-data.carpals[a].at(-1)![0])
+}
+const routeColor=(index:number)=>index<16?'#b55031':'#147d8e'
+const routeName=(index:number)=>{const code=TENDONS[index],direction=code.split('-')[2];return `${jointName(code)} · ${direction==='flex'?'flexion':direction==='ext'?'extension':direction==='p'?'toward pinky':'toward thumb'}`}
+function RoutingFace({bundle,build,face,selected,onSelect,closeUp}:{bundle:Bundle;build:Build;face:'carpals'|'wrist';selected:number;closeUp:boolean;onSelect:(i:number)=>void}){
+ const {camera,size,invalidate}=useThree()
+ const scene=useMemo(()=>{
+  const pieces=cadPieces(bundle,build),group=new THREE.Group()
+  const visible=pieces.filter(p=>face==='carpals'?['Carpals','Touch carpals','Carpal core'].includes(p.part.label):p.part.label==='Wrist frame')
+  visible.forEach(p=>{group.add(p.object);fade(p,1)})
+  const box=new THREE.Box3().setFromObject(group),center=box.getCenter(new THREE.Vector3())
+  const points=conduitData(build)[face].map(p=>vectors(p)[face==='carpals'?p.length-1:0])
+  return {pieces,group,box,center,points}
+ },[bundle,build,face])
+ useLayoutEffect(()=>{
+  const c=camera as THREE.OrthographicCamera,extent=scene.box.getSize(new THREE.Vector3())
+  const target=closeUp?new THREE.Box3().setFromPoints(scene.points).getCenter(new THREE.Vector3()):scene.center
+  c.position.copy(target).add(new THREE.Vector3(0,face==='carpals'?-300:300,0));c.up.set(0,0,face==='carpals'?-1:1);c.lookAt(target)
+  const closeExtent=new THREE.Box3().setFromPoints(scene.points).getSize(new THREE.Vector3())
+  const half=closeUp?Math.max(closeExtent.z/2+12,(closeExtent.x/2+6)*size.height/size.width):Math.max(extent.z/2+10,(extent.x/2+8)*size.height/size.width)
+  c.left=-half*size.width/size.height;c.right=-c.left;c.top=half;c.bottom=-half;c.zoom=1;c.updateProjectionMatrix();invalidate()
+ },[camera,size.width,size.height,scene,face,closeUp,invalidate])
+ useEffect(()=>()=>disposePieces(scene.pieces),[scene])
+ return <><primitive object={scene.group}/>{scene.points.map((point,i)=>{
+  const position=point.clone();position.y+=face==='carpals'?-1:1
+  const active=selected===i
+  return <group key={i} position={position}>
+   <mesh rotation={[Math.PI/2,0,0]} renderOrder={2} onClick={e=>{e.stopPropagation();onSelect(i)}}>
+    <ringGeometry args={[active?.78:.5,active?1.12:.7,48]}/><meshBasicMaterial color={routeColor(i)} transparent opacity={active?1:.45} depthTest={false} depthWrite={false} side={THREE.DoubleSide}/>
+   </mesh>
+   <mesh onClick={e=>{e.stopPropagation();onSelect(i)}}><sphereGeometry args={[1.2,12,12]}/><meshBasicMaterial transparent opacity={0} depthWrite={false}/></mesh>
+   {active&&<Html center position={[0,face==='carpals'?-2:2,face==='carpals'?(i<16?7:-7):(i<16?-7:7)]}><span className="assembly-routing-pin" style={{background:routeColor(i)}}>{i+1}</span></Html>}
+  </group>
+ })}</>
+}
+
+export function WristRouting({build,routeIndex=0,onRoute}:{build:Build;routeIndex?:number;onRoute?:(index:number)=>void}){
+ const [position,setLocalPosition]=useState(Math.max(0,Math.min(31,Number.isFinite(routeIndex)?routeIndex:0))),[closeUp,setCloseUp]=useState(false),[loaded,setLoaded]=useState<{key:string;bundle:Bundle}|null>(null),[failed,setFailed]=useState(false)
+ const setPosition=(next:number)=>{setLocalPosition(next);onRoute?.(next)}
+ const order=useMemo(()=>wristRoutingOrder(build),[build]),selected=order[position],palm=selected>=16
+ const key=`${build.version==='touch'?'touch':'base'}-${build.side}-dynamixel`
+ useEffect(()=>{let live=true;setFailed(false);loadBundle(key).then(bundle=>{if(live)setLoaded({key,bundle})}).catch(()=>{if(live)setFailed(true)});return()=>{live=false}},[key])
+ const onSelect=(index:number)=>setPosition(order.indexOf(index))
+ return <section className="assembly-wrist-routing" data-contrast={false} aria-label="Match carpal exits to wrist entries">
+  <div className="assembly-row"><div><span className="assembly-eyebrow">One tendon at a time</span><h3>Match the two highlighted openings</h3></div><span className="assembly-routing-count">{position+1} / 32</span></div>
+  <p>Both faces are shown looking into their openings. Keep the pictured orientation: left on the carpal view matches left on the wrist view. Work across the adjacent exits, alternating rows as shown.</p>
+  <div className="assembly-clip-tabs"><button aria-pressed={!closeUp} onClick={()=>setCloseUp(false)}>Whole parts</button><button aria-pressed={closeUp} onClick={()=>setCloseUp(true)}>Channel close-up</button></div>
+  <div className="assembly-wrist-pair">
+   {(['carpals','wrist'] as const).map(face=><figure key={face}>
+    <figcaption><strong>{face==='carpals'?'1 · Carpal exit':'2 · Wrist entry'}</strong><span>{face==='carpals'?'Look at the underside':'Look down into the wrist'}</span></figcaption>
+    <div className="assembly-wrist-face"><span className="assembly-wrist-face-label">{face==='carpals'?'Palm · palmar':'Back · dorsal'}</span>
+     {loaded?.key===key?<Canvas orthographic frameloop="demand" dpr={[1,2]} camera={{position:[0,300,0],near:.1,far:1000}}><ambientLight intensity={1.8}/><directionalLight position={[70,face==='carpals'?-150:150,80]} intensity={2.5}/><RoutingFace bundle={loaded.bundle} build={build} face={face} selected={selected} onSelect={onSelect} closeUp={closeUp}/></Canvas>:<p>{failed?'The model could not load. Reopen this step to retry.':'Loading the channel view…'}</p>}
+     <span className="assembly-wrist-face-label bottom">{face==='carpals'?'Back · dorsal':'Palm · palmar'}</span>
+    </div>
+   </figure>)}
+  </div>
+  <div className="assembly-routing-selection" style={{borderColor:routeColor(selected)}}><strong>Tendon {selected+1} · {routeName(selected)}</strong><span>{palm?'Palmar carpal row → dorsal wrist entry':'Dorsal carpal row → palmar wrist entry'}</span></div>
+  <div className="assembly-route-order" aria-label="Left-to-right threading sequence">{order.map((index,n)=><button key={index} aria-label={`Route ${n+1}: tendon ${index+1}, ${TENDONS[index]}`} aria-pressed={n===position} onClick={()=>setPosition(n)} style={{'--route-color':routeColor(index)} as React.CSSProperties}>{n+1}</button>)}</div>
+  <div className="assembly-row"><button className="assembly-secondary" disabled={position===0} onClick={()=>setPosition(position-1)}>← Previous tendon</button><button className="assembly-primary" disabled={position===31} onClick={()=>setPosition(position+1)}>Next tendon →</button></div>
+  <p className="assembly-muted">The sequence numbers below the models are threading order; the label on each opening is its tendon ID. Keep each strand untangled and retain the same order within each row. Verify all 32 identities in the next checks.</p>
+  {(build.version==='full'||build.motor==='feetech')&&<p className="assembly-muted">Reference geometry: {build.version==='touch'?'Touch':'Base'} Dynamixel. The channel layout for {build.version==='full'?'Full': 'FeeTech'} has not been verified against a separate model here.</p>}
  </section>
 }

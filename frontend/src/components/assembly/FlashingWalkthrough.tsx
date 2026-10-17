@@ -1,3 +1,4 @@
+import {photoResolution} from './photoResolution'
 import {useRef,useState} from 'react'
 import type {Build} from './buildContent'
 const phases=[
@@ -24,7 +25,7 @@ export function FlashingWalkthrough({build}:{build:Build}){
   <div className="assembly-clip-tabs">{phases.map((p,i)=><button key={p.title} aria-pressed={i===index} onClick={()=>setIndex(i)}>{i+1} · {p.title}</button>)}</div>
   <h3>{phase.title}</h3><p>{phase.text}</p>
   {index!==3&&<p className="assembly-muted">The screenshots show an example order. Select the order for your {build.side} {build.version==='base'?'Base':build.version==='touch'?'Touch':'Full'} hand with {build.motor==='dynamixel'?'Dynamixel':'FeeTech'} motors.</p>}
-  <div className={`assembly-flash-images ${index===3?'is-photos':'is-screens'}`}>{phase.images.map(id=><figure key={id}><button className="assembly-image-button" aria-label={`Enlarge ${imageNames[id]}`} onClick={()=>{setEnlarged(`./assembly/media/panel-${id}.png`);dialog.current?.showModal()}}><img src={`./assembly/media/panel-${id}.png`} alt={imageNames[id]}/></button><figcaption>{imageNames[id]}</figcaption></figure>)}</div>
+  <div className={`assembly-flash-images ${index===3?'is-photos':'is-screens'}`}>{phase.images.map(id=><figure key={id}><button className="assembly-image-button" aria-label={`Enlarge ${imageNames[id]}`} onClick={()=>{setEnlarged(photoResolution(`./assembly/media/panel-${id}.png`));dialog.current?.showModal()}}><img src={photoResolution(`./assembly/media/panel-${id}.png`)} alt={imageNames[id]}/></button><figcaption>{imageNames[id]}</figcaption></figure>)}</div>
   <div className="assembly-row"><button className="assembly-secondary" disabled={index===0} onClick={()=>setIndex(i=>i-1)}>← Previous</button><span>{index+1} / {phases.length}</span><button className="assembly-primary" disabled={index===phases.length-1} onClick={()=>setIndex(i=>i+1)}>Next →</button></div>
  <dialog ref={dialog} className="assembly-lightbox" aria-label="Flashing detail" onCancel={e=>e.stopPropagation()}><button onClick={()=>dialog.current?.close()}>Close image ×</button>{enlarged&&<img src={enlarged} alt={phase.title}/>}</dialog>
  </section>

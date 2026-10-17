@@ -24,6 +24,7 @@ export type Recipe = {
 }
 const carpals = ['Carpals', 'Touch carpals', 'Carpal core']
 export const CAD_ILLUSTRATIONS: Recipe[] = [
+  {step:'p18',file:'panel-019-4',caption:'Carpal underside · inspect both rows of channel openings for loose print material',instruction:1,parts:carpals,view:[0,-1,.35]},
   {step:'p93',file:'panel-096-3',caption:'Tower cable routing · motor lead through the upper slot, both fan leads through the lower slot',instruction:1,towerWiring:true,motorSpecific:true},
   {step:'p142',file:'mount-1',caption:'Adapter plate and two mounting rods · rods lifted to show their mounting holes',instruction:2,armMount:'adapter',motorSpecific:true},
   {step:'p142',file:'mount-3',caption:'Tower covers · support the rear hull and board without pulling on their cables',instruction:3,armMount:'covers',motorSpecific:true},

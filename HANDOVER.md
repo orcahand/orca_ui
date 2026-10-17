@@ -403,3 +403,111 @@ The standalone `orca-assembly-image-comparison.html` embeds original guide panel
 and current renders for offline review. It also compares against revision `3985b50`.
 It is a review artifact, not a UI dependency. See the feedback document for the
 complete change map and remaining source uncertainties.
+
+### 17 October: wrist routing, spools, Touch board link and navigation
+
+The assembly-only refinement is implemented on `feature/assembly-feedback-touch`,
+from baseline `59a6686`. It does not change hand control, motor limits, firmware,
+configuration, or the Setup tensioning/calibration behavior.
+
+- `AssemblyNavigation.tsx` replaces the flat chapter list with Prepare, Build the
+  hand, Complete the hand and Optional groups. Its keyboard-accessible hand opens
+  the relevant chapter and highlights the selected region. Chapter names use a
+  consistent action structure; stored step IDs remain unchanged. Navigation
+  never completes a step: completion still comes from its checklist.
+- `assemblyTools.ts` explicitly lists tools for each step, including steps done
+  by hand. The opening page collects the tools for the selected build and flashing
+  method, with optional casting/arm equipment separate. Each subsequent step has
+  a compact Parts / Tools strip. Consumables such as glue and copper wire remain
+  with parts; cutters, drivers, marking tools and software equipment appear under
+  tools. Driver bit sizes are not guessed where the supplied screw-head standard
+  is unspecified.
+- `WristRouting.tsx` shows the actual carpal underside and wrist entrance together.
+  It sorts the 32 existing measured carpal outlets from screen-left to screen-right,
+  interleaving the two rows while preserving their existing receiving-channel
+  correspondence. Both views highlight the same tendon ID. Threading sequence
+  numbers are separate from tendon IDs; do not conflate them. The selected sequence
+  position is saved under `views['p77:route']`. Both cameras share screen-left =
+  world +X, but look into opposing faces; keep those orientations together.
+- `SpoolOverview.tsx` explains bottom = nearest the motor and top = farther out on
+  the same shaft, with an exploded CAD slider, selectable groups and a three-stage
+  sequence. The bottom/top instructions separate tying allowance, winding, tucked
+  tail, bearing-first preparation and final paired movement check. FeeTech uses
+  a labeled position diagram rather than a falsely identified Dynamixel motor.
+- `touch-board-link` is a new, separately checked step after the five finger plugs
+  and before sensor testing. `TouchBoardConnection.tsx` shows the actual four-pin
+  sockets on the Touch and OH boards, with selectable close-ups and the cable
+  linking them. The teal cable is a connection schematic, not a measured installed
+  route or wire-color/pinout diagram. The text covers routing, wrist/cover slack
+  and clearance. Existing completion of `touch-board-connect` does not complete
+  this new operation.
+
+The visual language stays warm off-white, charcoal text, muted teal controls,
+compact monospace eyebrows and thin rounded borders. White diagram surfaces are
+used where colored tendons or dark parts remain legible; mint contrast remains
+for white cord, PTFE and pale skins. Touch anatomy and colored-tendon inspection
+views use white. Short captions sit with images, and numbered actions keep their
+media alongside the relevant instruction. No PDF/source link is added to the UI.
+
+Image quality changes recover detail from the original PDFs, rather than enlarging
+previously small PNG crops. `photoResolutionMap.json` resolves 166 original panel
+paths to matching high-resolution WebPs after CAD substitution and source filtering.
+SVG routing coordinates stay in their original coordinate system, with matching
+crop aspect ratios. The map also applies in enlarged comparison/routing views.
+Twenty-one Touch photographs use new WebPs, up to 2200 pixels on their longest edge.
+Photos stay within both their native pixel size and the available display width.
+The original PNGs remain available for authoring/comparison. Native source detail
+still limits genuinely blurry photographs; these exports do not invent detail.
+Four new carpal-cleanup renders show the openings being inspected instead of
+suggesting an unconfirmed screw-based cleaning tool.
+
+The Touch connection diagram uses a separate ~6.6 MiB board-detail GLB with 12
+components from the current right Touch STEP, checked against the inventory's
+source SHA-256. Its board/socket materials are separated for readability. This
+small asset does not replace or modify the complete assembly archives. The same
+physical boards are used as the socket-identification reference for either hand.
+
+Rebuild the authoring assets from the repository root (paths are inputs, not
+runtime dependencies):
+
+```sh
+python scripts/refine_assembly_panels.py '/path/Assembly Instructions.pdf' --dpi 600 --output-root /path/staging
+python scripts/promote_assembly_photos.py /path/staging
+python scripts/import_touch_photos.py '/path/Touch Assembly Instructions.pdf'
+python scripts/build_touch_board_detail.py /path/TouchV2_Assembly_Right.step
+```
+
+The photo scripts require PyMuPDF and Pillow; the STEP exporter requires CadQuery
+and trimesh plus the existing `cad_render_mesh.py` helper. These are authoring
+requirements only; guide users do not need them. The existing illustration renderer
+can regenerate only the new cleanup views by passing `panel-019-4` as its file
+prefix. Run the production frontend build after changing assets or source.
+
+See [the October 17 review record](docs/assembly-oct17-review.md) for validation
+and unresolved mechanical requirements. A browser/data audit is not a physical
+assembly validation. In particular, bottom/top tendon assignments and the corrected
+thumb AP channel order still require authoritative confirmation before the guide
+can be described as fully verified for a first-time builder.
+
+The follow-up image pass adds `BoardIdentification.tsx`: an eight-item selectable
+port map using the unmodified native-resolution OH-board photo. It defaults to
+and labels the selected motor output, supports keyboard selection and enlargement,
+and covers the board link, both motor types, both fan sockets, USB-C, 12 V, switch
+and programming pads. The original PDF image is extracted with
+`scripts/import_control_board_photo.py`; rotation and annotations are code-native
+SVG, with no labels baked into the photo. This replaces the redundant incomplete
+CAD thumbnail plus red-arrow photograph on `p101`.
+
+**Important CAD limit:** the OH-board STEP component set omits the USB-C, power
+jack, power switch and two fan connector bodies. Do not replace the complete port
+identification photo with a render of that incomplete geometry. The three top
+board/motor connectors are present and support the separate Touch cable diagram.
+A complete electronic board model is needed before those remaining physical
+features can be represented accurately in CAD renders.
+
+`cadThumbFinishing.ts` now frames only the TP joint, pins and bearings. It no longer
+uses the distant fingertip or free tendon ends to set the scale of these details;
+measured paths stay unchanged, with clearer static tendon contrast. Regenerate
+`panel-063-1` and `panel-063-2` for all four measured configurations after changing
+this scene. The renderer uses `frameObjects` to fit the actual surfaces rather
+than the projected corners of a large world-axis bounding box.

@@ -4964,7 +4964,7 @@
       "Guide pin 2 · 2 × 30"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 284662
+    "meshes": 250780
   },
   {
     "key": "base-left-dynamixel",
@@ -4975,7 +4975,7 @@
       "Guide pin 2 · 2 × 30"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 283563
+    "meshes": 249619
   },
   {
     "key": "touch-right-dynamixel",
@@ -4986,7 +4986,7 @@
       "Guide pin 2 · 2 × 30"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
-    "meshes": 303956
+    "meshes": 265076
   },
   {
     "key": "touch-left-dynamixel",
@@ -4997,7 +4997,7 @@
       "Guide pin 2 · 2 × 30"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
-    "meshes": 303878
+    "meshes": 264860
   },
   {
     "key": "base-right-dynamixel",
@@ -5008,7 +5008,7 @@
       "Bearing 2 · 4 × 8 × 3"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 288694
+    "meshes": 254812
   },
   {
     "key": "base-left-dynamixel",
@@ -5019,7 +5019,7 @@
       "Bearing 2 · 4 × 8 × 3"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 287595
+    "meshes": 253651
   },
   {
     "key": "touch-right-dynamixel",
@@ -5030,7 +5030,7 @@
       "Joint bearing 2"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
-    "meshes": 307988
+    "meshes": 269108
   },
   {
     "key": "touch-left-dynamixel",
@@ -5041,7 +5041,7 @@
       "Joint bearing 2"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
-    "meshes": 307910
+    "meshes": 268892
   },
   {
     "key": "base-right-dynamixel",
@@ -7426,5 +7426,37 @@
     "labels": [],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 193444
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-019-4",
+    "step": "p18",
+    "labels": [],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 602136
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-019-4",
+    "step": "p18",
+    "labels": [],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 601844
+  },
+  {
+    "key": "touch-right-dynamixel",
+    "file": "panel-019-4",
+    "step": "p18",
+    "labels": [],
+    "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
+    "meshes": 644389
+  },
+  {
+    "key": "touch-left-dynamixel",
+    "file": "panel-019-4",
+    "step": "p18",
+    "labels": [],
+    "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
+    "meshes": 643686
   }
 ]

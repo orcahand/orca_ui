@@ -11,7 +11,7 @@ const AREAS=[
 
 export function RoutingInspection({build}:{build:Build}){
  const [selected,setSelected]=useState(0),[transparent,setTransparent]=useState(true),area=AREAS[selected]
- const model=()=> <PartAssemblyMotion key={area.step} build={build} step={area.step} position={1} tendon={-1} channels={transparent} zoom={1.35}/>
+ const model=()=> <div data-contrast={build.version!=='touch'||area.step==='p89'}><PartAssemblyMotion key={area.step} build={build} step={area.step} position={1} tendon={-1} channels={transparent} zoom={1.35}/></div>
  return <section className="assembly-routing-inspection" aria-label="Inspect tendon routing">
   <div className="assembly-row"><h3>Trace each strand</h3><AssemblyComparison key={area.step} step="p80" build={build} model={model} photoSources={area.photos}/></div>
   <div className="assembly-clip-tabs">{AREAS.map((item,i)=><button key={item.step} aria-pressed={selected===i} onClick={()=>setSelected(i)}>{item.label}</button>)}</div>
