@@ -40,7 +40,7 @@ export const KITS: Record<string, string[]> = {
   p54: ['2 pins · 2×10', '2 matching joint bearings'], p56: ['2 tendons · 75 cm each'],
   p59: ['2 pins · 2×30'], p62: ['2 bearings · 4×8×3 mm'],
   p73: ['Palm skin', '2 pins · 3×50 mm', 'Carpal pulley', '2 bearings · 8×13×4'],
-  p75: ['2 screws · M4×20', '2 M4 washers', '2 M4 square nuts', 'PTFE sleeves · ID 4 / OD 6 mm'],
+  p75: ['2 screws · M4×20', '2 M4 washers', '2 M4 square nuts', 'PTFE sleeves · ID 2.7 / OD 4 mm'],
   p89: ['Belt · GT2 142 mm', 'Assembled hand', 'Prepared wrist frame'],
   p93: ['2 fans', '2 M3 nuts', '3 M4 nuts', '2 fan screws · M3×12 in current CAD (earlier guide: M3×14; verify supplied kit)', '180 mm 3-pin cable'],
   p99: ['M2 nut per spool', '3 screws · M2×4 per spool', 'Bottom spools', 'Ratchets'],
@@ -59,23 +59,31 @@ export function kit(step:AssemblyStep,build:Build):string[]{
   if(TOUCH_KITS[step.id])return TOUCH_KITS[step.id]
   const pp=build.version==='touch'?'4×8×2 mm':'4×8×3 mm'
   const extra:Record<string,string[]>={
-    'prepare-pp':['PP','Prepared double-knot tendon','1 middle pin · Ø2×8 mm','1 lower pin · Ø2×6 mm'],p33:['Prepared PP with tendon and pins','Prepared DP'],
+    'prepare-pp':['PP','Prepared double-knot tendon','1 middle pin · Ø2×8 mm','1 lower pin · Ø2×6 mm'],p33:[build.version==='touch'?'Prepared bare PP with tendon, pins and bearings':'Prepared PP with tendon, pins, skin and bearings','Prepared DP','1 upper pin · Ø2×6 mm'],
     p6:['Practice tendon cord'],p23:['Selected hand model and parts'],
     p18:['Printed carpals','Soft brush for loose print debris'],
     p20:['Tendon with stopper knot','PTFE · OD 1.5 / ID 0.9 mm','Printed part with tight channel'],
     p22:['Reused PTFE tube','Iron wire · approximately Ø0.45 mm'],
     p29:['DP','Prepared double-knot tendon','2 bearings · 4×8×3 mm'],
-    p35:['DP/PP assembly','1 upper pin · Ø2×6 mm'],
-    'finishing-pp':[build.version==='touch'?'Matching PP skin':'Matching DP and PP skins',`2 PP bearings · ${pp}`],
+    p35:['Assembled index finger · six free tendon ends'],p31:['DP','PP','AP'],
+    'pp-ready':['PP with tendon and guide pins',...(build.version==='touch'?[]:['Matching PP skin']),`2 PP bearings · ${pp}`],
+    'finishing-pp':[build.version==='touch'?'Assembled finger with PP skin':'Assembled finger with PP skin and matching DP skin'],
     p37:['AP with two PTFE liners','2 tendons · 75 cm each','Ruler, cutters and small blunt tool for tucking tails'],
     p42:['Prepared DP/PP and AP','2 pins · Ø2×8 mm',`2 AP bearings · ${pp}`],
-    p45:[build.version==='touch'?'Middle, ring and pinky printed parts and matching PP skins':'Middle, ring and pinky printed parts and matching skins','3 prepared DP/PP tendon sets','6 AP tendons · 75 cm each','6 DP bearings · 4×8×3 mm',`6 PP + 6 AP bearings · ${pp}`,'6 pins · Ø2×6 mm','9 pins · Ø2×8 mm'],
-    p46:['Thumb DP and PP','2 prepared double-knot tendons','2 DP bearings · 4×8×3 mm',`2 PP bearings · ${pp}`,'Matching thumb PP skin',...(build.version==='touch'?[]:['Thumb DP skin']),'1 middle pin · Ø2×8 mm','2 lower/upper pins · Ø2×6 mm'],
+    p45:[build.version==='touch'?'Middle, ring and pinky printed parts · leave all skins off':'Middle, ring and pinky printed parts and matching skins','3 prepared DP/PP tendon sets','6 AP tendons · 75 cm each','6 DP bearings · 4×8×3 mm',`6 PP + 6 AP bearings · ${pp}`,'6 pins · Ø2×6 mm','9 pins · Ø2×8 mm'],
+    'thumb-tendons':['1 prepared DP double-knot tendon · 2 m','1 unknotted PP tendon · 2 m from the ten-length set'],
+    'thumb-parts':['Thumb DP','Thumb PP','Thumb AP','Thumb TP'],
+    'thumb-dp':['Thumb DP','Prepared double-knot tendon','2 DP bearings · 4×8×3 mm'],
+    'thumb-pp':['Thumb PP','Unknotted tendon · 2 m','1 middle pin · Ø2×8 mm','1 lower pin · Ø2×6 mm'],
+    'thumb-pp-ready':['Prepared thumb PP',...(build.version==='touch'?[]:['Matching thumb PP skin']),`2 PP bearings · ${pp}`],
+    'thumb-tp-pins':['Thumb TP with prepared anchors','2 pins · Ø2×30 mm'],
+    'thumb-skins':[build.version==='touch'?'Assembled thumb with PP skin':'Assembled thumb with PP skin and matching DP skin'],
+    'thumb-test':['Assembled thumb · eight free tendon ends'],
+    p46:['Prepared thumb DP',build.version==='touch'?'Prepared bare thumb PP with tendon, bearings and two guide pins':'Prepared thumb PP with tendon, skin, bearings and two guide pins','1 upper pin · Ø2×6 mm'],
     p49:['Thumb AP with two PTFE liners','2 tendons · 75 cm each','Ruler and cutters'],
-    p52:['Prepared thumb AP','Cutters','Small blunt tool for tucking tails'],
     p54:['Prepared thumb DP/PP and AP','2 pins · Ø2×10 mm','2 thumb AP bearings · 4×8×3 mm'],
     p56:['Thumb TP','2 tendons · 75 cm each','Ruler and cutters'],
-    p59:['Assembled thumb DP/PP/AP','Prepared TP','2 pins · Ø2×30 mm'],
+    p59:['Assembled thumb DP/PP/AP','Prepared TP with two guide pins and two anchor ends'],
     p62:['Thumb assembly','2 thumb TP bearings · 4×8×3 mm'],
     p64:['4 assembled fingers','Carpals with 32 PTFE liners'],p68:['Assembled thumb with 8 tendon ends','Carpals'],
     p70:['Hand with all 32 tendon ends'],
@@ -98,13 +106,17 @@ const CAPTIONS: Record<number, string> = {
 }
 export function figures(step: AssemblyStep, build: Build): Figure[] {
   if(TOUCH_FIGURES[step.id])return TOUCH_FIGURES[step.id].map(f=>({...f,contrast:false}))
-  const items=sourceFigures(step,build).filter(f=>!(step.id==='p35'&&f.instruction===3)&&!(step.id==='p16'&&f.src.endsWith('panel-017-3.png'))&&!(step.id==='p37'&&f.src.endsWith('panel-041-1.png'))&&!(['p37','p52'].includes(step.id)&&build.version!=='full'&&/panel-(041|053)-[24]\.png$/.test(f.src)))
+  const items=sourceFigures(step,build).filter(f=>!(step.id==='p33'&&f.src.endsWith('panel-034-6.png'))&&!(step.id==='p35'&&f.instruction===3)&&!(step.id==='p16'&&f.src.endsWith('panel-017-3.png'))&&!(step.id==='p37'&&f.src.endsWith('panel-041-1.png'))&&!(['p37','p49'].includes(step.id)&&build.version!=='full'&&/panel-(041|053)-[24]\.png$/.test(f.src)))
+  if(step.id==='touch-skins')return (build.side==='left'?touchLeftInventory:touchRightInventory).parts.filter(p=>p.label.endsWith('PP skin')).map(p=>({src:p.thumbnail,caption:p.label,instruction:2,showCaption:true}))
+  if(step.id==='thumb-dp')return ['feed','seat','tuck'].map((phase,i)=>({src:`./assembly/renders/${build.version==='touch'?'touch':'base'}-${build.side}-dynamixel/thumb-dp-${phase}.webp`,caption:['Feed both ends through the thumb DP housing','Seat the reinforced stoppers','Tuck the connecting loop inside'][i],instruction:i===0?1:2,contrast:true,showCaption:true}))
+  if(step.id.startsWith('thumb-')||['p35','pp-ready'].includes(step.id))return []
   if(step.id==='p31')return items.map(f=>resolvedFigure({...f,contrast:false}))
-  const whiteMaterial=['p15','p16','p20','p29','prepare-pp','p33','p35','p37','p46','p49','p52','p54','p56','p62','p75','p77','p89','p123','p126'].includes(step.id)
-  return replaceCadFigures(items.filter(f=>!(step.id==='p150'&&f.src.endsWith('panel-151-1.png'))),build).map(f=>({...f,contrast:f.photo?whiteMaterial:step.id==='p147'&&build.version==='base',...(f.src.endsWith('panel-111-1.png')?{wide:true,showCaption:true,caption:`Example screen · select ${build.side} hand for this build`}:{})})).map(resolvedFigure)
+  const whiteMaterial=['p29','prepare-pp','p33','p35','p37','p46','p49','p52','p54','p56','p62','p75','p77','p89','p123','p126'].includes(step.id)
+  return replaceCadFigures(items.filter(f=>!(step.id==='p150'&&f.src.endsWith('panel-151-1.png'))),build).map(f=>({...f,contrast:f.photo?whiteMaterial:step.id==='p147'&&build.version==='base',...(f.src.endsWith('panel-111-1.png')?{wide:true,showCaption:true,caption:`Example screen · select ${build.side} hand for this build`}:{})})).map(f=>({...f,instruction:step.id==='p33'&&f.src.includes('panel-036-')?3:f.instruction})).map(resolvedFigure)
 }
 function sourceFigures(step: AssemblyStep, build: Build): Figure[] {
-  if(['prepare-pp','p33'].includes(step.id))return (MEDIA['34'].panels??[]).filter(f=>step.id==='prepare-pp'?/panel-034-[123]\.png$/.test(f.src):/panel-034-[456]\.png$/.test(f.src)).map(f=>({...f,instruction:step.id==='prepare-pp'?(f.src.endsWith('-3.png')?2:1):(f.src.endsWith('-6.png')?2:1)}))
+  if(step.id.startsWith('thumb-')||['p35','pp-ready'].includes(step.id))return []
+  if(['prepare-pp','p33'].includes(step.id))return (MEDIA['34'].panels??[]).filter(f=>step.id==='prepare-pp'?/panel-034-[123]\.png$/.test(f.src):/panel-034-[456]\.png$/.test(f.src)).map(f=>({...f,instruction:step.id==='prepare-pp'?(f.src.endsWith('-3.png')?2:1):(f.src.endsWith('-6.png')?2:1)})).concat(step.id==='p33'?(MEDIA['36'].panels??[]).filter(f=>/panel-036-[12]\.png$/.test(f.src)).map(f=>({...f,instruction:3})):[])
   if(step.id==='p123'&&build.motor==='dynamixel')return []
   if(step.id==='p126')return build.motor==='feetech'?[{src:'./assembly/media/panel-126-1.png',caption:'Top spool, bearing and screw · seat the bearing on the bench before installation',instruction:3}]:[]
   if(['p145','p148'].includes(step.id)&&build.version!=='full'){
@@ -143,7 +155,7 @@ function sourceFigures(step: AssemblyStep, build: Build): Figure[] {
   const assignments:Record<string,number[]> = {
     p10:[1,2],p11:[1],p13:[2,2],p15:[1,2],p16:[1,1,1,1,1],p18:[1,1,2,2],p20:[1,2,2],
     p29:[1,2,3,4],p31:[1,1,2],p33:[1,2,2,3,3,3],p35:[1,2,3,3,3],
-    p37:[1,2,3,3,3,3,3],p40:[1,1,2,2,2],p42:[1,2],p46:[1],p49:[2,2],p52:[1,1,2,3,3],
+    p37:[1,2,3,3,3,3,3],p40:[1,1,2,2,2],p42:[1,2],p46:[1],p49:[2,2,3,3,3,3,3],
     p54:[1,2,2],p56:[1,2],p59:[2,3,3],p62:[1,1,2],p64:[2,2,2],p68:[1,2],p70:[1],
     p73:[1,2,2,2],p75:[3,2,4],p77:[1,2],p80:[2,2,2,2,2,2,1,1],p83:[1,1,1],p89:[1,2,2,3,3,3],
     p93:[2,1,3,1],p98:[1,2],p99:[1],p101:[1,2,3],p105:[1,2,2,2,3,3,3,3,4],p110:[1,3,2,2,4],
@@ -163,9 +175,14 @@ function sourceFigures(step: AssemblyStep, build: Build): Figure[] {
 }
 export function instructions(step: AssemblyStep, build: Build): string[] {
   switch (step.id) {
+    case 'pp-ready': case 'thumb-pp-ready': return build.version==='touch'?['Leave all skins off so the sensor cable channel stays accessible. Fit PP skins in the Touch skins section, after connecting the sensor cables.', 'Press both matching PP bearings into their pockets with your fingers.']:step.instructions
+    case 'p35': return build.version==='touch'?[...step.instructions.slice(0,2),'Check that bearings remain seated and guide pins are flush. Leave all skins off until the sensor cables are connected. Correct any binding before continuing.']:step.instructions
+    case 'thumb-test': return build.version==='touch'?[...step.instructions.slice(0,2),'Check bearing seats and guide pins. Leave all skins off for the sensor cable steps next. Correct any trapped or crossed tendon before continuing.']:step.instructions
+
+    case 'thumb-skins': return [build.version==='touch'?'Fit the PP skin only after the Touch sensor cable is connected and the sensor is mounted.':'Slide the DP skin over the thumb tip and down. Settle the PP skin already fitted during preparation into its final position.', 'Check that the skin edges clear all thumb joints and keep all eight tendon ends free.']
     case 'p15': return ['Insert two PTFE liners into the wide hole pair of each AP.', 'Measure the actual channel depth and cut each liner to leave approximately 1 mm protruding at each end. A 5–8 mm overall length may suit your print; use the protrusion and fit to decide. Repeat for thumb, index, middle, ring and pinky.']
     case 'p18': return ['Inspect the printed carpal exits and gently clear loose debris with a soft brush.', 'The screw-based cleanup method still needs a confirmed screw size. If an opening remains obstructed, confirm the correct cleanup tool before enlarging it; do not force an arbitrary screw into the tendon channel.']
-    case 'p46': return ['Seat the prepared thumb DP and PP tendons and their matching bearings using the same knot-seating technique as the fingers.', 'Fit the Ø2×8 mm middle pin and Ø2×6 mm lower pin, as on the fingers. Route the DP tendons through the PP and join them, then fit the upper Ø2×6 mm pin with the tendons between the pins.', build.version==='touch'?'Slide the thumb PP skin from its base toward the fingertip. Leave DP bare: Touch uses a fingertip sensor instead of DP skin. Fit the sensor after the hand is assembled, just before tensioning. Keep all tendons clear and check free joint movement.':'Slide the thumb PP skin from its base toward the fingertip, and slide the DP skin over the fingertip and down. Keep all tendons clear and check free joint movement.']
+
     case 'p73': return [step.instructions[0], 'Insert two 3×50 mm pins, mount the toothed carpal pulley and add two 8×13×4 bearings. The pulley teeth engage the wrist belt.']
     case 'p89': return [...step.instructions.slice(0,2), 'Check that the two tendon groups remain in order below the wrist.']
     case 'p126': return ['On the workbench, support each loose top spool close to its bearing pocket and seat its 4×8×3 mm bearing fully. Do this before mounting the spool; do not drive a bearing into a spool supported by the tower.', 'Use the opposing tendon from the same joint for the top spool—the bottom tendon stays in its installed spool. Thread and anchor it as before: three turns, one Ashley stopper and a 5 mm tail tucked back into the channel. Use the two-extra-knot fallback only if the tendon is too short for three turns.', 'Fit the prepared top spool with its bearing already seated and secure it with the matching supplied screw listed in Parts. Check the screw thread before tightening.', 'With power off, gently turn one motor back and forth by hand. Its two tendons should move only the matching joint, in opposite directions.']
@@ -176,14 +193,14 @@ export function instructions(step: AssemblyStep, build: Build): string[] {
     case 'p93': return [`Fit the two M3 nuts in the fan-mounting pockets shown. Route ${build.motor==='dynamixel'?'the 180 mm 3-pin motor cable':'the matching FeeTech board-to-motor adapter lead'} through the upper cable slot. Fit both fans and pass their leads through the lower slot.${build.motor==='feetech'?' If your supplied tower has one shared cable opening, pass both cable sets through it.':''}`, 'Secure the fans with the screws listed in Parts, after matching the supplied length to the fan and nut pockets. Keep the wires clear of the fan blades and screw holes; check that the cables cannot be pinched.', step.instructions[2]]
     case 'p6': return ['Identify the long standing part and the short working end. Make a bight, then fold it into two loops.', 'Pass the loop on the standing-part side through the other loop. Feed the working end through the loop you just passed through.', 'Snug the half knot first, keeping the working end inside the remaining loop. Then tighten the working end, followed by the standing part.', 'Check the underside: the stopper should have three distinct lobes. Practice until you can repeat it consistently.']
     case 'p29': return ['Thread both free ends of one prepared double-knot tendon through the DP housing, from the middle toward the outside.', 'Pull the reinforced stoppers against their seats. The two reinforced knots sit inside the housing; the loop between them must also be tucked inside.', 'Tuck the remaining loop fully into the housing with an Allen key or screw bit.', 'Press in two matching joint bearings, one on each side.']
-    case 'p33': return ['Route the DP tendon from the lettered top through the PP top hole. Draw both strands straight and check for crossings, then snap the joint together.', 'Fully seat the bearing. The joint must rotate freely without sideways play. If it binds, reopen it and check for a trapped tendon or rough printed surface.']
-    case 'p68': return [...step.instructions,'With all eight ends slack, check that the seated thumb rotates freely without axial play.']
+    case 'p33': return ['Route the DP tendon from the lettered top through the PP top hole. Draw both strands straight and check for crossings, then snap the joint together.', 'Fully seat the bearing. The joint must rotate freely without sideways play. If it binds, reopen it and check for a trapped tendon or rough printed surface.', 'Add the upper Ø2×6 mm pin. Keep the two DP tendons between the upper and lower pins, and press the pin fully into its seat. Gently pull each DP end to check that it runs freely.']
+    case 'p68': return [step.instructions[0],step.instructions[1]+(build.version==='touch'?' Guide the free sensor cable tail through its carpal cable passage as you seat the thumb. Keep it separate from the tendon channels and accessible for the connector board.':''),'With all eight ends slack, check that the seated thumb rotates freely without axial play.']
     case 'p62': return [step.instructions[0], 'Add two 4×8×3 mm thumb TP bearings.', ...step.instructions.slice(2)]
-    case 'finishing-pp': return [build.version==='touch'?'Slide the I-PP skin from its base toward the fingertip, then seat both 4×8×2 mm PP bearings. Keep the moving joint clear. Leave DP bare: Touch has no DP skin. Fit the fingertip sensor after the hand is assembled, just before tensioning.':'Slide the I-DP skin over the fingertip and down, and the I-PP skin from its base toward the fingertip. Seat both 4×8×3 mm PP bearings and check that the skins clear the moving joint.']
-    case 'p45': return build.version==='touch'?[step.instructions[0], 'Fit only the matching PP skins and repeat the seating, routing and friction checks. Leave the DPs bare until sensor fitting after assembly, just before tensioning.',step.instructions[2]]:step.instructions
+    case 'finishing-pp': return [build.version==='touch'?'Fit the PP skin only after the Touch sensor cable is connected and the sensor is mounted.':'Slide the DP skin over the fingertip and down. Settle the PP skin already fitted during preparation into its final position.', 'Check that skin edges are seated and do not rub or pinch either joint. Keep all six tendon ends free.']
+    case 'p45': return build.version==='touch'?[step.instructions[0], 'Leave all skins off. Repeat the tendon seating, routing and friction checks on the bare fingers. Connect the Touch cables and sensors in the section after the thumb, then fit the PP skins.',step.instructions[2]]:step.instructions
     case 'p42': return [step.instructions[0]+' Channel labels: 1 = PP extension; 2 = PP flexion; 3 = DP flexion; 4 = DP extension.',...step.instructions.slice(1)]
-    case 'p59': return [...step.instructions.slice(0,2),step.instructions[2]+' Labels: 1 = AP toward thumb (away from pinky); 2 = PP extension; 3 = DP extension; 4 = DP flexion; 5 = PP flexion; 6 = AP toward pinky.']
-    case 'p64': return [step.instructions[0],step.instructions[1]+' Labels: 1 = AP toward pinky; 2 = PP extension; 3 = DP extension; 4 = DP flexion; 5 = PP flexion; 6 = AP toward thumb.', 'With the tendons slack, check each seated finger joint for free rotation and axial play.']
+    case 'p59': return [step.instructions[0]+' Labels: 1 = AP toward thumb (away from pinky); 2 = PP extension; 3 = DP extension; 4 = DP flexion; 5 = PP flexion; 6 = AP toward pinky.',step.instructions[1]]
+    case 'p64': return [step.instructions[0],step.instructions[1]+' Labels: 1 = AP toward pinky; 2 = PP extension; 3 = DP extension; 4 = DP flexion; 5 = PP flexion; 6 = AP toward thumb.'+(build.version==='touch'?' Guide each free sensor cable tail through its carpal cable passage as you seat the finger. Keep it separate from the tendon channels and accessible for the connector board.':''), 'With the tendons slack, check each seated finger joint for free rotation and axial play.']
     case 'p54': return ['Confirm the corrected thumb AP channel order before routing DP and PP tendons. The current diagram is awaiting confirmation of the reversed route reported in the feedback.',...step.instructions.slice(1), 'Fully seat the bearings, then check smooth movement through the joint’s full range. Correct trapped tendons or rough surfaces now.']
     case 'p97': return build.motor === 'feetech' ? ['Use short cables between neighboring motors; FeeTech does not use the Dynamixel connector PCBs.', 'Use the long cable across the bottom motors. The thin-to-thick cables connect the board to the first finger motor and the last finger motor to the wrist motor.', 'Switch the board OFF before adding or removing a motor. Align the small connector hole and plug, seat it fully, then power ON to configure.', 'Configure with --motor-type feetech. Never use Dynamixel configuration tools for FeeTech.'] : ['Use the connector PCBs to join neighboring Dynamixel motors, then link the column bottoms with the short 3-pin cables.', 'Use the Dynamixel output on the OH board. The FeeTech output is a different connector.', 'The connector PCBs should already be seated in the tower. Next, prepare the spools and assign IDs one motor at a time.']
     case 'p98': return build.motor === 'feetech' ? ['Skip the connector PCBs: connect neighboring FeeTech motors directly with the short cables.', 'Use the cable-type photos to identify the long and thin-to-thick cables. Keep the board off while connecting.'] : ['Fit a motor connector PCB in each square housing with a round center peg.', 'Repeat for all twelve connector PCB positions shown. Check that every board sits flat.']
@@ -216,7 +233,7 @@ export const FINAL_CHECKS = [
 ]
 export const RELATED: Record<string, {id:string;label:string}[]> = {
   p26:[{id:'p6',label:'Tie an Ashley-Stopper knot'}], p37:[{id:'p6',label:'Knot technique'}],
-  p46:[{id:'p29',label:'DP assembly'},{id:'p31',label:'PP preparation'},{id:'p33',label:'Join DP and PP'},{id:'finishing-pp',label:'Skins and PP bearings'}],
+  p46:[{id:'thumb-dp',label:'Thumb DP preparation'},{id:'thumb-pp',label:'Thumb PP preparation'}],
   p45:[{id:'p26',label:'Repeat the finger assembly'}], p68:[{id:'p59',label:'Thumb tendon order'}],
   p15:[{id:'p20',label:'Help with a tight PTFE channel'}], p16:[{id:'p20',label:'Help with a tight PTFE channel'},{id:'p22',label:'Reusing a blocked tube'}],
   p77:[{id:'p70',label:'Identify the two tendon groups'}], p123:[{id:'p83',label:'Open tendon mapping'}],
@@ -243,24 +260,20 @@ function stepNote(step: AssemblyStep, build: Build) {
   return step.note
 }
 
-const BEARING_SEATING_STEPS = new Set(['p29','p33','finishing-pp','p42','p45','p46','p54','p62','p73','p75','p89','p126'])
-export function note(step: AssemblyStep, build: Build) {
-  const existing=stepNote(step,build)
-  const tip=BEARING_SEATING_STEPS.has(step.id)?'Tip: Bearings can be tight to seat by hand. Start the bearing squarely and support the part close to its bearing pocket. If needed, use gentle taps with a small hammer and a flat-ended tool resting on the outer ring to seat it evenly. Keep the tool off the inner ring and seal; stop and realign if the bearing tilts.':undefined
-  return [existing,tip].filter(Boolean).join(' ')||undefined
-}
+export const note = stepNote
 
 export type FlashingMethod = 'console' | 'firmware'
 export function buildSteps(build: Build, method?: FlashingMethod): AssemblyStep[] {
-  const selected = STEPS.filter(s => !s.id.startsWith('touch-') && !(method==='console'&&['p150','p154'].includes(s.id)) && !(method==='firmware'&&['p105','p110'].includes(s.id)) && !(build.version === 'base' && ['p110','p154'].includes(s.id)) && !(build.audience==='external' && ['p105','p110','p150','p154'].includes(s.id))).map(s => {
+  const selected = STEPS.filter(s => !(build.version==='touch'&&['finishing-pp','thumb-skins'].includes(s.id)) && !s.id.startsWith('touch-') && !(method==='console'&&['p150','p154'].includes(s.id)) && !(method==='firmware'&&['p105','p110'].includes(s.id)) && !(build.version === 'base' && ['p110','p154'].includes(s.id)) && !(build.audience==='external' && ['p105','p110','p150','p154'].includes(s.id))).map(s => {
     if (build.motor === 'feetech' && s.id === 'p98') return {...s,title:'Fit the direct motor cables',check:'The FeeTech cables are correctly oriented and seated.'}
     if (s.id === 'p101' && build.audience==='internal') return {...s,check:'I have identified the power, USB and correct motor connectors.'}
     if (s.id === 'p101' && build.audience==='external') return {...s,check:'I have identified the power, USB and correct motor connectors.'}
-    if (build.version==='touch'&&s.id==='finishing-pp')return {...s,check:'The PP skin and PP bearings are fitted, DP is bare, and the joint moves freely.'}
+    if (build.version==='touch'&&['pp-ready','thumb-pp-ready'].includes(s.id))return {...s,title:'Fit the PP bearings',check:'Both PP bearings are seated; all skins remain off for cable installation.'}
     if (s.id === 'p110') return {...s,title:`Prepare the ${build.version === 'full' ? 'Full' : 'Touch'} connector board`}
     return s
   })
   if(build.version!=='touch')return selected
-  // Complete the mechanical hand and tower before starting the Touch sensor section.
-  return selected.flatMap(s=>s.id==='p139'?[...TOUCH_STEPS,s]:[s])
+  const fingers=TOUCH_STEPS.filter(s=>['Touch sensors','Touch skins'].includes(s.chapter))
+  const electronics=TOUCH_STEPS.filter(s=>!['Touch sensors','Touch skins'].includes(s.chapter))
+  return selected.flatMap(s=>s.id==='thumb-test'?[s,...fingers]:s.id==='p139'?[...electronics,s]:[s])
 }

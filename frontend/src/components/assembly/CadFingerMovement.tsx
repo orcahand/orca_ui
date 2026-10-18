@@ -13,7 +13,7 @@ function Movement({bundle,build,finger,movement,playing,replay,isolated}:{bundle
  const scene=useMemo(()=>{
   const name=finger[0].toUpperCase()+finger.slice(1),code=finger==='pinky'?'P':name[0],segment=movement<2?'DP':movement<4?'PP':'AP'
   const id=motorId(`${code}-${segment}`,build)
-  const scene=motorCheckScene(bundle,build,id,'hand',undefined,{owners:isolated?[`${name} DP`,`${name} PP`]:[`${name} DP`,`${name} PP`,`${name} AP`],bare:isolated,hideSensors:build.version==='touch'})
+  const scene=motorCheckScene(bundle,build,id,'hand',undefined,{owners:isolated?[`${name} DP`,`${name} PP`]:[`${name} DP`,`${name} PP`,`${name} AP`],bare:isolated,hideSensors:build.version==='touch',hideSkins:build.version==='touch'})
   const range=illustratedJointRange(build,testJoint(id,build),scene.axis);fitIllustratedRange(scene,range)
   return {...scene,range}
  },[bundle,build,finger,movement,isolated])

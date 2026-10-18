@@ -1,6 +1,6 @@
 # ORCA assembly guide — handover
 
-Updated: 16 October 2026. Intended for the next Astra/Codex instance and human maintainers.
+Updated: 18 October 2026. Intended for the next Astra/Codex instance and human maintainers.
 
 ## Start here
 
@@ -9,6 +9,147 @@ The assembly guide is implemented in this checkout. Open **Setup → Open assemb
 The goal is a self-contained guide that makes building the hand straightforward without needing to consult the teaching PDF or ask for missing instructions. The current version is substantial and reviewable, but some mechanical specifications and procedures remain unresolved. Do not describe it as a physically validated, independently complete assembly manual yet.
 
 Read this document first, then [the assembly implementation notes](frontend/src/components/assembly/README.md), [DEVELOPMENT.md](DEVELOPMENT.md) and [CLAUDE.md](CLAUDE.md). The assembly README contains detailed historical development notes; some early statements are superseded. In particular, its opening statement that the guide never starts a hand operation predates the explicitly enabled connected-hand test described below.
+
+## Direct editing and fixed hand navigation · 18 October
+
+The hand navigator is a fixed panel above an independently scrolling table of
+contents (`AssemblyNavigation.tsx`). Selecting a hand region expands its chapter
+and reveals the active timeline entry; the same behavior applies when reopening
+the mobile navigation. The hand does not move when the contents are scrolled.
+
+Guide prose now uses `GuideText` fields: step titles, instructions, notes, parts,
+tools, checklists, captions, glossary entries and lesson text. Titles update in
+the timeline and search uses edited step titles/instructions. Operational status,
+errors, control buttons and labels baked into image/3D assets remain outside this
+text editor. Fields grow with the text and have per-field restore controls.
+
+`GuideEditing.tsx` stores drafts separately from build progress in browser
+localStorage (`orca-ui.assembly.editor.v1`). Text edits are scoped to configuration
+and retain the original text alongside the replacement. A changed source does
+not silently inherit an old override. Dynamic lesson cues retain separate edits
+for each original cue. Starting a new build does not delete editorial drafts.
+**These are local review edits, not writes to repository content or changes shared
+with other browsers.** Export edits downloads `orca-assembly-edits.json` with text,
+background overrides and saved colors for a maintainer to apply to source.
+
+The Background colors panel supports page/sidebar/hand/contents shortcuts and
+Pick an area for individual cards and model backgrounds.
+The picker targets the visible image/model surface, not only its outer wrapper.
+Earlier saved wrapper colors also apply to the nested media surfaces. Overrides
+remove background gradients and restore them on undo; more specific nested
+surface choices take precedence. Opening the picker selects Page by default,
+and its controls stay reachable while scrolling to an area. A hue/saturation wheel,
+brightness slider, native picker, hex field, presets and saved swatches apply
+changes immediately. Global surfaces persist across steps; individual card colors
+are scoped by configuration, step and component occurrence. Restore background
+removes an override. Colors change the surfaces behind media; they do not repaint
+pixels inside photographs or materials on the 3D parts. The editor is confined
+to the assembly guide and does not change hardware operations or completion.
+
+Validation: production build and browser checks of fixed navigation and chapter
+reveal on desktop/mobile; title/instruction/checklist editing without checkbox
+activation; wheel, brightness, presets, saved colors, background selection, export,
+reload persistence and per-field undo. No permanent tests added.
+
+## Thumb cable-channel method and Touch skin order · 18 October
+
+This update supersedes the earlier skin timing described below. Touch fingers and
+thumb remain completely bare during mechanical preparation and tests. `buildSteps`
+inserts Touch sensor preparation, routing, connection and fastening immediately
+after `thumb-test`, followed by the new `touch-skins` step. The connector-board
+mount/connect/link steps stay later, once the carpals, flashed board and OH board
+are available. Cable tails remain free until carpal installation. Base skin timing
+is unchanged. The navigation phases are Prepare → Build the fingers → Build the
+hand (carpals, wrist and tower) → Complete the hand.
+
+Thumb preparation now reuses the Ashley lesson, its local video, the tendon
+measurement diagram and single-knot reinforcement lesson. Of the ten 2 m lengths,
+nine are preknotted; the thumb PP length stays unknotted. Its sequence is top entry
+→ cable-channel access → tie outside → return through the same channel → seat
+stoppers and tuck the loop. Existing 10 mm ±5 mm spacing and one reinforcing
+single knot per stopper are retained. `ThumbPpThreading.tsx` pairs the selected
+CAD PP with a three-stage **schematic**, not a measured internal cable-channel
+trajectory. The DP feed/seat/tuck renders use the actual Thumb DP and existing
+thumb tendon route data for all four Base/Touch × left/right configurations.
+Regenerate these `thumb-*` assets through `render_assembly_illustrations.mjs`.
+
+`p49` now includes AP threading, three-knot reinforcement, settling, trimming and
+tucking; `p52` is removed. All five relevant AP illustrations remain at their
+matching instruction. `guide:thumb-cables=oct18-v1` redirects old `p52` positions
+to `p49`, preserves merged completion only if both former steps were checked,
+and clears changed thumb-PP, tendon-preparation and sleeve checks once. Touch
+skin completion does not transfer to the newly placed skin step. Progress remains
+checkbox-driven; navigation alone never completes a step.
+
+PTFE screw sleeves are now ID 2.7 / OD 4 mm in instructions, parts lists, BOM,
+supplemental geometry and belt-clearance calculation. **Open specification issue:**
+the listed/STEP screws are still M4, which conflicts with a 2.7 mm sleeve bore.
+The user supplied the tube dimensions; do not silently change screw sizes or
+claim this interface has been physically validated. The thumb PP cable-channel
+method and later Touch skin fitting also need a physical build check.
+
+Validation: TypeScript and production Vite build; data/order/migration checks
+across 48 configuration/access/flashing combinations; packaged-UI browser review
+of thumb visuals, PP sequence controls, Touch order, mobile layout and saved
+checkboxes. New stills are 1800 × 1400 transparent WebP, with generated production
+copies under `orca_ui/webui`.
+
+## Navigation and PTFE hints · 18 October
+
+The chapter labels are **Your ORCA hand** and **Glossary**. Glossary opens with
+**Hand anatomy**, followed by **Ashley stopper knot**. Existing step IDs and saved
+checks are preserved. The mobile chapter label uses the same display names.
+
+The PTFE tips (`p20`, `p22`) have `hint: true`: indented HINT entries, no step
+number or completion checkbox, and excluded from progress and chapter totals.
+Previous/Next skips hints; the two liner steps also link to them directly.
+Hints remember the originating step and offer Return to assembly.
+Their content remains searchable and the saved current page can still be a hint.
+
+The sidebar now uses small transparent CAD renders (`assembly/navigation`) with
+invisible SVG hit regions, instead of drawn part outlines. Base and Touch have
+separate assets; the left-hand view mirrors the right. Regenerate using
+`scripts/render_navigation_hand.py` with Python Playwright, Chrome and Vite.
+The UI loads only the small images and hit-region JSON, not a GLB for navigation.
+
+AP, carpal and wrist PTFE liner images use white backgrounds and opaque parts.
+The optional tube-pulling illustrations also use solid parts on white. Gallery
+cards with a matching assembly photo have a translucent right-arrow button to
+switch views inline; enlarging opens the currently visible view.
+
+The index-finger chapter uses `AssemblyStep.section`: Preparation (tendons and
+printed parts), DP, PP, AP, then Assembly (join DP/PP, join PP/AP, skins, whole
+finger test). PP skin and bearings are prepared before closing the PP/AP joint;
+the final skin step fits the DP skin where used and seats the existing PP skin.
+`pp-ready` is new. `p35` now tests all six index tendons; its former upper-pin
+instruction and images are part of `p33`. Changed completion meanings (`p31`,
+`p33`, `p35`, `finishing-pp`) are cleared once by `guide:finger-layout` migration;
+unaffected checks remain saved. Navigation still never completes a step.
+The generic bearing-hammer note and hammer/support-block tool entries are removed.
+
+## Thumb structure and reduced visual repetition · 18 October
+
+The thumb chapter now follows the finger chapter: Preparation, DP, PP, AP, TP,
+then Assembly. Two preparation steps identify the existing tendon pair and the
+printed parts. DP/PP preparation, PP skin/bearings and TP pins have dedicated CAD
+views; AP/TP anchor instructions retain their original measurements and knot
+reinforcement. Assembly keeps the hand-side routing, joins the prepared parts,
+seats the skins and ends with an explicit eight-tendon check.
+
+The sidebar thumb target opens `thumb-tendons`. Existing `p46`, `p59` and `p62`
+IDs remain, but their preparation/testing content has moved to dedicated steps;
+`guide:thumb-layout` clears just those three completion marks once. Anchor-step
+checks remain saved. The unresolved AP routing note is retained.
+
+The redundant seated DP/PP still (`panel-034-6`) is excluded from that step's
+image gallery. The numbered phase bar is removed from joint animations; play,
+scrubbing, routing selection and the current explanatory cue remain. Knot lesson
+controls are separate and unchanged.
+
+Validation: production build; all 48 build/access/flashing combinations; all 15
+thumb pages; left/right Base/Touch preparation part counts; browser navigation,
+scrubbing, saved checks and mobile layout. The thumb AP route remains subject to
+the existing physical verification described below.
 
 ## Current review edition
 

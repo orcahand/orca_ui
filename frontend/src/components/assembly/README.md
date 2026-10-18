@@ -428,7 +428,7 @@ Unresolved assembly information:
 - Four additional views cover the two wrist screw sleeves, belt placement, the
   fan nut pockets and fitted fans. Each is rendered from the selected Base/Touch
   assembly and hand side; the tower views retain the photo for FeeTech and Full.
-- PTFE sleeves are supplemental geometry using the guide's 4 mm inner / 6 mm
+- PTFE sleeves are supplemental geometry using the corrected 2.7 mm inner / 4 mm
   outer diameters. Their lengths follow the exposed STEP screw shafts up to the
   square nuts. The faded wrist provides context for these close-ups.
 - Fan fixing positions follow the STEP nuts and screws. The guide specifies

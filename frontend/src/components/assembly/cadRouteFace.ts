@@ -16,7 +16,7 @@ export function cadRouteFace(bundle:Bundle,build:Build,step:string,face:'entry'|
  const label=carpal?(build.version==='touch'?'Touch carpals':'Carpals'):`${finger} AP`
  const piece=all.find(p=>p.part.label===label)!
  group.add(piece.object)
- if(step==='p15')fade(piece,.6)
+ if(step==='p15')fade(piece,1)
  const paths=step==='p64'?['AP-p','PP-ext','DP-ext','DP-flex','PP-flex','AP-t'].map(kind=>{
   const index=TENDONS.indexOf(`I-${kind}`)
   return carpal?vectors(data.carpals[index]):fingerRoute(build,index)

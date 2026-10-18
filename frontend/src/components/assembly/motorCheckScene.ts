@@ -6,7 +6,7 @@ import {jointForMotor,jointName,motorPieces,motorOwner} from './driveMap'
 
 export const MOTOR_CHECK_IDS=Array.from({length:17},(_,i)=>i+1)
 export const motorCheckName=(id:number,build:Build)=>id===1?'Wrist':jointName(jointForMotor(id,build)!)
-export function motorCheckScene(bundle:Bundle,build:Build,id:number,mode:'hand'|'motor',jointColor?:string,scope?:{owners:string[];bare:boolean;hideSensors?:boolean}) {
+export function motorCheckScene(bundle:Bundle,build:Build,id:number,mode:'hand'|'motor',jointColor?:string,scope?:{owners:string[];bare:boolean;hideSensors?:boolean;hideSkins?:boolean}) {
  const pieces=cadPieces(bundle,build),group=new THREE.Group(),motors=motorPieces(pieces),motor=motors.get(id)!
  const joint=jointForMotor(id,build),name=joint?jointName(joint):'Wrist',segment=joint?.split('-')[1]
  const bodies=pieces.filter(p=>/^(Index|Middle|Ring|Pinky|Thumb) (DP|PP|AP|TP)$/.test(p.part.label))
@@ -24,6 +24,7 @@ export function motorCheckScene(bundle:Bundle,build:Build,id:number,mode:'hand'|
  for(const p of pieces){
   const hand=areas(p).some(a=>['Fingers','Thumb','Carpals'].includes(a))
   if(mode==='hand'&&!hand&&!(jointColor&&id===1&&p.part.label==='Wrist frame'))continue
+  if(scope?.hideSkins&&p.part.category==='Skins')continue
   if(scope?.hideSensors&&(p.part.label.includes('touch module')||(p.part.category==='Skins'&&/DP skin|Pinky touch skin/.test(p.part.label))))continue
   if(scope&&(!scope.owners.includes(owner(p)??'')||(scope.bare&&(p.part.category==='Skins'||p.part.label.includes('touch module')||(p.part.label.startsWith('Bearing')&&p.owner?.endsWith(' PP'))))))continue
   if(mode==='motor'&&!(id===1?['Dynamixel XC430 wrist motor','Wrist motor adapter','Wrist pulley','Pin · 4 × 10'].includes(p.part.label):motorOwner(p,motors)===id&&['Dynamixel XC330 motor','Bottom spool','Top spool / tensioner','Ratchet','Spool cover','Spool ORCA insert','M2 × 4 socket screw','M2.5 × 8 socket screw'].includes(p.part.label)))continue

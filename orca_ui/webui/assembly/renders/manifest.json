@@ -4447,14 +4447,15 @@
   {
     "key": "base-right-dynamixel",
     "file": "panel-053-3",
-    "step": "p52",
+    "step": "p49",
     "labels": [
       "Reinforced stopper",
       "Tail · 5 mm"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 167728,
-    "instruction": 2
+    "instruction": 3,
+    "caption": "Pull the settled stopper out, then trim 5 mm after the knot"
   },
   {
     "key": "base-right-dynamixel",
@@ -4567,14 +4568,15 @@
   {
     "key": "base-left-dynamixel",
     "file": "panel-053-3",
-    "step": "p52",
+    "step": "p49",
     "labels": [
       "Reinforced stopper",
       "Tail · 5 mm"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 167053,
-    "instruction": 2
+    "instruction": 3,
+    "caption": "Pull the settled stopper out, then trim 5 mm after the knot"
   },
   {
     "key": "base-left-dynamixel",
@@ -4687,14 +4689,15 @@
   {
     "key": "touch-right-dynamixel",
     "file": "panel-053-3",
-    "step": "p52",
+    "step": "p49",
     "labels": [
       "Reinforced stopper",
       "Tail · 5 mm"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
     "meshes": 161206,
-    "instruction": 2
+    "instruction": 3,
+    "caption": "Pull the settled stopper out, then trim 5 mm after the knot"
   },
   {
     "key": "touch-right-dynamixel",
@@ -4807,14 +4810,15 @@
   {
     "key": "touch-left-dynamixel",
     "file": "panel-053-3",
-    "step": "p52",
+    "step": "p49",
     "labels": [
       "Reinforced stopper",
       "Tail · 5 mm"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 161182,
-    "instruction": 2
+    "instruction": 3,
+    "caption": "Pull the settled stopper out, then trim 5 mm after the knot"
   },
   {
     "key": "touch-left-dynamixel",
@@ -6750,25 +6754,29 @@
   {
     "key": "base-right-dynamixel",
     "file": "panel-053-1",
-    "step": "p52",
+    "step": "p49",
     "labels": [
       "Reinforced stopper",
       "Untrimmed working end"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 160096
+    "meshes": 160096,
+    "caption": "Pull the long tendon firmly to settle the thumb stopper in its housing",
+    "instruction": 3
   },
   {
     "key": "base-right-dynamixel",
     "file": "panel-053-5",
-    "step": "p52",
+    "step": "p49",
     "labels": [
       "Reinforced stopper",
       "Tucked tail",
       "Second stopper"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 254944
+    "meshes": 254944,
+    "caption": "Reseat and tuck the entire tail inside; repeat for the second thumb anchor",
+    "instruction": 3
   },
   {
     "key": "base-right-dynamixel",
@@ -6796,25 +6804,29 @@
   {
     "key": "base-left-dynamixel",
     "file": "panel-053-1",
-    "step": "p52",
+    "step": "p49",
     "labels": [
       "Reinforced stopper",
       "Untrimmed working end"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 159421
+    "meshes": 159421,
+    "caption": "Pull the long tendon firmly to settle the thumb stopper in its housing",
+    "instruction": 3
   },
   {
     "key": "base-left-dynamixel",
     "file": "panel-053-5",
-    "step": "p52",
+    "step": "p49",
     "labels": [
       "Reinforced stopper",
       "Tucked tail",
       "Second stopper"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 254269
+    "meshes": 254269,
+    "caption": "Reseat and tuck the entire tail inside; repeat for the second thumb anchor",
+    "instruction": 3
   },
   {
     "key": "base-left-dynamixel",
@@ -6842,25 +6854,29 @@
   {
     "key": "touch-right-dynamixel",
     "file": "panel-053-1",
-    "step": "p52",
+    "step": "p49",
     "labels": [
       "Reinforced stopper",
       "Untrimmed working end"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
-    "meshes": 153574
+    "meshes": 153574,
+    "caption": "Pull the long tendon firmly to settle the thumb stopper in its housing",
+    "instruction": 3
   },
   {
     "key": "touch-right-dynamixel",
     "file": "panel-053-5",
-    "step": "p52",
+    "step": "p49",
     "labels": [
       "Reinforced stopper",
       "Tucked tail",
       "Second stopper"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
-    "meshes": 248422
+    "meshes": 248422,
+    "caption": "Reseat and tuck the entire tail inside; repeat for the second thumb anchor",
+    "instruction": 3
   },
   {
     "key": "touch-right-dynamixel",
@@ -6888,25 +6904,29 @@
   {
     "key": "touch-left-dynamixel",
     "file": "panel-053-1",
-    "step": "p52",
+    "step": "p49",
     "labels": [
       "Reinforced stopper",
       "Untrimmed working end"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
-    "meshes": 153550
+    "meshes": 153550,
+    "caption": "Pull the long tendon firmly to settle the thumb stopper in its housing",
+    "instruction": 3
   },
   {
     "key": "touch-left-dynamixel",
     "file": "panel-053-5",
-    "step": "p52",
+    "step": "p49",
     "labels": [
       "Reinforced stopper",
       "Tucked tail",
       "Second stopper"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
-    "meshes": 248494
+    "meshes": 248494,
+    "caption": "Reseat and tuck the entire tail inside; repeat for the second thumb anchor",
+    "instruction": 3
   },
   {
     "key": "touch-left-dynamixel",
@@ -7188,7 +7208,7 @@
     "file": "panel-076-3",
     "step": "p75",
     "labels": [
-      "PTFE · 4 mm inside / 6 mm outside",
+      "PTFE · ID 2.7 / OD 4 mm",
       "PTFE sleeve"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
@@ -7221,7 +7241,7 @@
     "file": "panel-076-3",
     "step": "p75",
     "labels": [
-      "PTFE · 4 mm inside / 6 mm outside",
+      "PTFE · ID 2.7 / OD 4 mm",
       "PTFE sleeve"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
@@ -7254,7 +7274,7 @@
     "file": "panel-076-3",
     "step": "p75",
     "labels": [
-      "PTFE · 4 mm inside / 6 mm outside",
+      "PTFE · ID 2.7 / OD 4 mm",
       "PTFE sleeve"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
@@ -7287,7 +7307,7 @@
     "file": "panel-076-3",
     "step": "p75",
     "labels": [
-      "PTFE · 4 mm inside / 6 mm outside",
+      "PTFE · ID 2.7 / OD 4 mm",
       "PTFE sleeve"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
@@ -7458,5 +7478,197 @@
     "labels": [],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 643686
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "thumb-dp-feed",
+    "labels": [
+      "Ashley stopper + single knot",
+      "Knot housing"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 98560,
+    "step": "thumb-dp",
+    "caption": "Thumb DP · feed both free ends through the knot housing",
+    "instruction": 1
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "thumb-dp-seat",
+    "labels": [
+      "Reinforced stoppers",
+      "Connecting loop"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 39952,
+    "step": "thumb-dp",
+    "caption": "Thumb DP · seat the reinforced stoppers and tuck the connecting loop",
+    "instruction": 2
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "thumb-dp-tuck",
+    "labels": [
+      "Knot housing"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 35008,
+    "step": "thumb-dp",
+    "caption": "Thumb DP · keep the loop inside the housing and both ends free",
+    "instruction": 2
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "thumb-pp-part",
+    "labels": [],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 23834,
+    "step": "thumb-pp",
+    "caption": "Thumb PP · keep the cable channel accessible while threading",
+    "instruction": 1
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "thumb-dp-feed",
+    "labels": [
+      "Ashley stopper + single knot",
+      "Knot housing"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 98554,
+    "step": "thumb-dp",
+    "caption": "Thumb DP · feed both free ends through the knot housing",
+    "instruction": 1
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "thumb-dp-seat",
+    "labels": [
+      "Reinforced stoppers",
+      "Connecting loop"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 39946,
+    "step": "thumb-dp",
+    "caption": "Thumb DP · seat the reinforced stoppers and tuck the connecting loop",
+    "instruction": 2
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "thumb-dp-tuck",
+    "labels": [
+      "Knot housing"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 35002,
+    "step": "thumb-dp",
+    "caption": "Thumb DP · keep the loop inside the housing and both ends free",
+    "instruction": 2
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "thumb-pp-part",
+    "labels": [],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 23902,
+    "step": "thumb-pp",
+    "caption": "Thumb PP · keep the cable channel accessible while threading",
+    "instruction": 1
+  },
+  {
+    "key": "touch-right-dynamixel",
+    "file": "thumb-dp-feed",
+    "labels": [
+      "Ashley stopper + single knot",
+      "Knot housing"
+    ],
+    "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
+    "meshes": 102718,
+    "step": "thumb-dp",
+    "caption": "Thumb DP · feed both free ends through the knot housing",
+    "instruction": 1
+  },
+  {
+    "key": "touch-right-dynamixel",
+    "file": "thumb-dp-seat",
+    "labels": [
+      "Reinforced stoppers",
+      "Connecting loop"
+    ],
+    "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
+    "meshes": 44110,
+    "step": "thumb-dp",
+    "caption": "Thumb DP · seat the reinforced stoppers and tuck the connecting loop",
+    "instruction": 2
+  },
+  {
+    "key": "touch-right-dynamixel",
+    "file": "thumb-dp-tuck",
+    "labels": [
+      "Knot housing"
+    ],
+    "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
+    "meshes": 39166,
+    "step": "thumb-dp",
+    "caption": "Thumb DP · keep the loop inside the housing and both ends free",
+    "instruction": 2
+  },
+  {
+    "key": "touch-right-dynamixel",
+    "file": "thumb-pp-part",
+    "labels": [],
+    "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
+    "meshes": 24530,
+    "step": "thumb-pp",
+    "caption": "Thumb PP · keep the cable channel accessible while threading",
+    "instruction": 1
+  },
+  {
+    "key": "touch-left-dynamixel",
+    "file": "thumb-dp-feed",
+    "labels": [
+      "Ashley stopper + single knot",
+      "Knot housing"
+    ],
+    "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
+    "meshes": 102718,
+    "step": "thumb-dp",
+    "caption": "Thumb DP · feed both free ends through the knot housing",
+    "instruction": 1
+  },
+  {
+    "key": "touch-left-dynamixel",
+    "file": "thumb-dp-seat",
+    "labels": [
+      "Reinforced stoppers",
+      "Connecting loop"
+    ],
+    "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
+    "meshes": 44110,
+    "step": "thumb-dp",
+    "caption": "Thumb DP · seat the reinforced stoppers and tuck the connecting loop",
+    "instruction": 2
+  },
+  {
+    "key": "touch-left-dynamixel",
+    "file": "thumb-dp-tuck",
+    "labels": [
+      "Knot housing"
+    ],
+    "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
+    "meshes": 39166,
+    "step": "thumb-dp",
+    "caption": "Thumb DP · keep the loop inside the housing and both ends free",
+    "instruction": 2
+  },
+  {
+    "key": "touch-left-dynamixel",
+    "file": "thumb-pp-part",
+    "labels": [],
+    "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
+    "meshes": 24668,
+    "step": "thumb-pp",
+    "caption": "Thumb PP · keep the cable channel accessible while threading",
+    "instruction": 1
   }
 ]

@@ -1,3 +1,4 @@
+import {GuideText} from './GuideEditing'
 import {useState} from 'react'
 import {PartAssemblyMotion} from './PartAssemblyMotion'
 import {AssemblyComparison} from './AssemblyComparison'
@@ -13,13 +14,13 @@ export function RoutingInspection({build}:{build:Build}){
  const [selected,setSelected]=useState(0),[transparent,setTransparent]=useState(true),area=AREAS[selected]
  const model=()=> <div data-contrast={build.version!=='touch'||area.step==='p89'}><PartAssemblyMotion key={area.step} build={build} step={area.step} position={1} tendon={-1} channels={transparent} zoom={1.35}/></div>
  return <section className="assembly-routing-inspection" aria-label="Inspect tendon routing">
-  <div className="assembly-row"><h3>Trace each strand</h3><AssemblyComparison key={area.step} step="p80" build={build} model={model} photoSources={area.photos}/></div>
+  <div className="assembly-row"><h3><GuideText variant field="prose/RoutingInspection.tsx/0ae6fd5fec" text={"Trace each strand"} label="Section heading"/></h3><AssemblyComparison key={area.step} step="p80" build={build} model={model} photoSources={area.photos}/></div>
   <div className="assembly-clip-tabs">{AREAS.map((item,i)=><button key={item.step} aria-pressed={selected===i} onClick={()=>setSelected(i)}>{item.label}</button>)}</div>
-  <p>{area.text}</p>
+  <p><GuideText variant field="prose/RoutingInspection.tsx/c3ed08cd7e" text={String(area.text)} label="Guide text"/></p>
   <label className="assembly-route-check"><input type="checkbox" checked={transparent} onChange={e=>setTransparent(e.target.checked)}/> See through the parts</label>
   {model()}
-  <p className="assembly-muted">Drag to inspect from another angle; scroll or pinch to zoom. Strands can overlap in a flat view without touching: rotate the model and trace each one. Open the assembly photos to compare actual correct and crossed examples.</p>
-  {selected===2&&build.motor==='feetech'&&<p className="assembly-muted">The wrist reference shows the Dynamixel frame.</p>}
+  <p className="assembly-muted"><GuideText variant field="prose/RoutingInspection.tsx/095f0ab1fa" text={"Drag to inspect from another angle; scroll or pinch to zoom. Strands can overlap in a flat view without touching: rotate the model and trace each one. Open the assembly photos to compare actual correct and crossed examples."} label="Guide text"/></p>
+  {selected===2&&build.motor==='feetech'&&<p className="assembly-muted"><GuideText variant field="prose/RoutingInspection.tsx/d294aa3033" text={"The wrist reference shows the Dynamixel frame."} label="Guide text"/></p>}
   <div className="assembly-crossing-examples" aria-label="Tendon crossing examples">{['Clear path','Single crossing','Double crossing'].map((title,i)=><figure key={title}>
    <svg viewBox="0 0 240 170" role="img" aria-label={title}>
     <g fill="none" strokeLinecap="round" strokeWidth="6">
@@ -27,7 +28,7 @@ export function RoutingInspection({build}:{build:Build}){
      <path d={i===0?'M155 15 V155':i===1?'M155 15 C155 70 85 100 85 155':'M155 15 C155 50 85 40 85 85 S155 110 155 155'} stroke="var(--assembly-image-bg)" strokeWidth="12"/>
      <path d={i===0?'M155 15 V155':i===1?'M155 15 C155 70 85 100 85 155':'M155 15 C155 50 85 40 85 85 S155 110 155 155'} stroke="#fff"/>
     </g>
-   </svg><figcaption><strong>{title}</strong><span>{i===0?'Neighboring strands stay separate.':i===1?'The strands swap positions.':'They cross twice, even though the ends return to the same order.'}</span></figcaption>
+   </svg><figcaption><GuideText variant field="prose/RoutingInspection.tsx/d6c8307625" text={[String(title),String(i===0?'Neighboring strands stay separate.':i===1?'The strands swap positions.':'They cross twice, even though the ends return to the same order.')].join('').trim()} label="Guide text"/></figcaption>
   </figure>)}</div>
  </section>
 }

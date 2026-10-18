@@ -4,7 +4,7 @@ import type {Figure} from './buildContent'
 const step=(id:string,title:string,instructions:string[],check:string,chapter='Touch sensors'):AssemblyStep=>({id,chapter,title,pages:[],instructions,check})
 export const TOUCH_STEPS:AssemblyStep[]=[
  step('touch-parts','Prepare the Touch sensor kit',[
-  'Sort the five sensors: thumb, three middle-size sensors (index, middle and ring), and pinky. Touch has no DP skins; keep the sensors off the fingertips until the hand is assembled, just before tensioning.',
+  'Sort the five sensors: thumb, three middle-size sensors (index, middle and ring), and pinky. The fingers and thumb should be mechanically assembled but still bare. Connect and mount the sensors before fitting any PP skins. Touch uses sensors instead of DP skins.',
   'Lay out the three 130 mm cables, two 280 mm cables, copper wire, connector board and 4-wire board cable.',
   'Sort the M1.4 screws into 3, 4 and 6 mm lengths. The fastening steps show where each length goes.',
  ],'I have the correct sensors, cables, wire and all three screw lengths.'),
@@ -27,20 +27,25 @@ export const TOUCH_STEPS:AssemblyStep[]=[
   'Color the copper wraps with a black permanent marker. Keep ink off the connector contacts.',
   'Check even turns, secure knots and short wire tails.',
  ],'All five wraps are colored and checked.'),
- step('touch-route','Route the Touch cables through the hand',[
-  'With power off, feed cables from the hand base toward the fingertips through the pictured cable passages.',
+ step('touch-route','Route the cables through the fingers',[
+  'With power off and all skins still off, feed each cable from its finger base toward the fingertip through the pictured cable passages. Work on the four fingers and thumb before attaching them to the carpals.',
   'Guide the connectors through gently and seat each copper wrap at its AP.',
-  'Check that each cable reaches both connectors without strain. Choose the cable length to suit the route and leave the sensor end accessible.',
+  'Leave the sensor plug accessible and the connector-board end free at the finger base. Choose the cable length to suit the route; the free tails will pass into the carpals and connect to the board later.',
  ],'All five cables are routed gently, with the wrapped sections at the APs and enough slack to connect.'),
  step('touch-connect','Connect the cables to the Paxini sensors',[
-  'With the mechanical hand assembled and power off, match each sensor and exposed plug contacts to the correct close-up. Connect and fit the sensors now, just before tensioning.',
+  'With the individual fingers and thumb assembled, all skins off and power off, match each sensor and exposed plug contacts to the correct close-up. Connect the fingertip ends now.',
   'Insert the plug squarely and gently. Check its orientation against the correct and reversed examples.',
  ],'Each sensor connector matches the correct orientation and is fully seated.'),
  step('touch-mount','Fasten the Touch sensors',[
-  'After completing the mechanical hand assembly, place each labeled sensor on its matching bare DP, keeping the cable clear of the mounting surfaces. Touch uses this sensor instead of a DP skin; fit it just before tensioning.',
+  'Place each labeled sensor on its matching bare DP, keeping the cable clear of the mounting surfaces. Touch uses this sensor instead of a DP skin. Fit PP skins in the next section, after these connections are made.',
   'Fit the screws shown: fingers use two M1.4×3 at the tip and two M1.4×4 below; the thumb uses two M1.4×4 at the tip and two M1.4×6 below.',
   'Tighten gently with a hand screwdriver. Check that each sensor sits flush and its cable is free.',
  ],'All five sensors are flush, gently secured with the correct screws, and their cables are clear.'),
+ step('touch-skins','Fit the finger and thumb PP skins',[
+  'Check that all five sensor plugs are seated, the sensors are fastened and their cables lie in the cable channels. Keep the free cable tails and tendon ends accessible at each base.',
+  'Fit the matching PP skin to the index, middle, ring, pinky and thumb. Guide it into place without pulling on a connector or trapping a cable. Touch has no DP skins: leave the fingertip sensors exposed.',
+  'Seat the skin edges and gently move every finger and the thumb through their free movement. Check that no skin rubs a joint or pulls a cable. Repeat the six-tendon finger checks and eight-tendon thumb check after fitting the skins.',
+ ],'All five PP skins are seated; cables are free and every finger and thumb moves freely.','Touch skins'),
  step('touch-board-mount','Mount the flashed Touch connector board',[
   'Flash the board for your hand side before mounting it. Switch power off.',
   'Seat the board as pictured and secure it gently with two M1.4×6 self-tapping screws.',
@@ -67,11 +72,12 @@ export const TOUCH_KITS:Record<string,string[]>={
  'touch-parts':['1 thumb + 3 middle-size + 1 pinky Paxini sensors','3 connector cables · 130 mm','2 connector cables · 280 mm','Copper wire · Ø0.2 mm','1 Touch connector board','1 four-wire connector-board cable','8 screws · M1.4×3','10 screws · M1.4×4','4 allocated screws · M1.4×6 (2 thumb + 2 board)','Windows laptop with Paxini software + Paxini adapter','Hand screwdriver, ruler, wire cutters, black marker'],
  'touch-ids':['5 Paxini sensors','Windows laptop with Paxini software','Paxini adapter','Labels or marker'],
  'touch-wrap-short':['3 cables · 130 mm','3 copper wire lengths · about 50 cm each, Ø0.2 mm','Ruler','Wire cutters'],
- 'touch-wrap-long':['2 cables · 280 mm','2 copper wire lengths · about 50 cm each, Ø0.2 mm','Hand for checking cable paths','Ruler','Wire cutters'],
+ 'touch-wrap-long':['2 cables · 280 mm','2 copper wire lengths · about 50 cm each, Ø0.2 mm','Assembled fingers and thumb for checking cable paths','Ruler','Wire cutters'],
  'touch-paint':['5 wrapped cables','Black permanent marker'],
- 'touch-route':['Assembled Touch hand','3 prepared 130 mm + 2 prepared 280 mm cables'],
+ 'touch-route':['Four assembled fingers and thumb · all skins off','3 prepared 130 mm + 2 prepared 280 mm cables'],
  'touch-connect':['5 tested, ID-labeled sensors','5 routed connector cables'],
  'touch-mount':['5 connected Paxini sensors','8 screws · M1.4×3','10 screws · M1.4×4','2 screws · M1.4×6','Hand screwdriver'],
+ 'touch-skins':['Five connected, secured sensors on assembled fingers and thumb','Matching index, middle, ring, pinky and thumb PP skins'],
  'touch-board-mount':['Flashed Touch connector board','2 self-tapping screws · M1.4×6','Hand screwdriver'],
  'touch-board-connect':['5 routed sensor cables','Mounted Touch connector board'],
  'touch-board-link':['Mounted Touch connector board','OH board in its rear cover','1 four-wire connector-board cable'],

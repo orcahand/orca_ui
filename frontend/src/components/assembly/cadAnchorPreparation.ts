@@ -3,6 +3,7 @@ import {cadPieces,cadKey,disposePieces} from './cadScene'
 import {ChannelCurve} from './channelStrands'
 import {anchorStopper} from './anchorStopper'
 import routes from './channelRoutes.json'
+import thumbRoutes from './thumbChannelRoutes.json'
 import frames from './jointFrames.json'
 import ppRoutes from './ppAnchorRoutes.json'
 import type {Bundle} from './cadAssets'
@@ -10,13 +11,13 @@ import type {Build} from './buildContent'
 
 export type AnchorPreparation='dp-feed'|'dp-seat'|'dp-tuck'|'pp-feed'|'pp-tuck'
 
-export function cadAnchorPreparation(bundle:Bundle,build:Build,kind:AnchorPreparation){
+export function cadAnchorPreparation(bundle:Bundle,build:Build,kind:AnchorPreparation,thumb=false){
  const pp=kind.startsWith('pp'),phase=kind.split('-')[1]
- const pieces=cadPieces(bundle,build),part=pieces.find(p=>p.part.label===(pp?'Index PP':'Index DP'))!,group=new THREE.Group(),extra:THREE.Mesh[]=[]
+ const pieces=cadPieces(bundle,build),part=pieces.find(p=>p.part.label===`${thumb?'Thumb':'Index'} ${pp?'PP':'DP'}`)!,group=new THREE.Group(),extra:THREE.Mesh[]=[]
  group.add(part.object)
- const key=cadKey(build),frame=frames[key].Index,x=new THREE.Vector3().fromArray(frame.x),y=new THREE.Vector3().fromArray(frame.y),z=new THREE.Vector3().fromArray(frame.z)
+ const key=cadKey(build),frame=frames[key][thumb?'Thumb':'Index'],x=new THREE.Vector3().fromArray(frame.x),y=new THREE.Vector3().fromArray(frame.y),z=new THREE.Vector3().fromArray(frame.z)
  const opening=pp?new THREE.Vector3().fromArray(ppRoutes[key].opening):y
- const paths=(pp?ppRoutes[key].paths:routes[key].p33.map(p=>p.moving)).map(path=>path.map(v=>new THREE.Vector3().fromArray(v)))
+ const paths=(pp?ppRoutes[key].paths:(thumb?thumbRoutes[key].slice(0,2):routes[key].p33).map(p=>p.moving)).map(path=>path.map(v=>new THREE.Vector3().fromArray(v)))
  const starts=paths.map(p=>p[0]),center=starts[0].clone().lerp(starts[1],.5)
  const labels:{text:string;point:THREE.Vector3}[]=[],stoppers:ReturnType<typeof anchorStopper>[]=[]
  function cord(points:THREE.Vector3[],radius=.14){

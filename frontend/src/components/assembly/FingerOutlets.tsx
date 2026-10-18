@@ -1,3 +1,4 @@
+import {GuideText} from './GuideEditing'
 import {useEffect,useMemo,useState} from 'react'
 import {Canvas,useThree} from '@react-three/fiber'
 import {Html,Line,OrbitControls} from '@react-three/drei'
@@ -39,7 +40,7 @@ export function FingerOutlets({build,finger,movement}:{build:Build;finger:string
  const key=`${build.version==='touch'?'touch':'base'}-${build.side}-dynamixel`
  const [loaded,setLoaded]=useState<{key:string;bundle:Bundle}|null>(null),[failed,setFailed]=useState('')
  useEffect(()=>{let active=true;loadBundle(key).then(bundle=>{if(active)setLoaded({key,bundle})}).catch(()=>{if(active)setFailed(key)});return()=>{active=false}},[key])
- return <figure className="assembly-finger-outlets"><figcaption>{finger[0].toUpperCase()+finger.slice(1)} AP · underside</figcaption><div className="assembly-finger-outlet-canvas" aria-label={`${finger} AP outlet for ${MOVEMENTS[movement][0]}`}>
+ return <figure className="assembly-finger-outlets"><figcaption><GuideText variant field="prose/FingerOutlets.tsx/7da9c8be7e" text={[String(finger[0].toUpperCase()+finger.slice(1))," AP · underside"].join('').trim()} label="Guide text"/></figcaption><div className="assembly-finger-outlet-canvas" aria-label={`${finger} AP outlet for ${MOVEMENTS[movement][0]}`}>
   {loaded?.key===key?<Canvas key={`${key}-${finger}`} orthographic frameloop="demand" camera={{near:.1,far:1000}} dpr={[1,2]}><ambientLight intensity={1.4}/><directionalLight position={[100,300,200]} intensity={2.5}/><directionalLight position={[-100,-200,-200]} intensity={2}/><Outlets bundle={loaded.bundle} build={build} finger={finger} movement={movement}/></Canvas>:<p>{failed===key?'Unable to load the AP view. Reopen this step to retry.':'Loading AP outlets…'}</p>}
- </div><p>Pull <strong>{MOVEMENTS[movement][0]}</strong> from the marked {movement<4?'channel':'side anchor'}. Leave the other five ends slack.</p></figure>
+ </div><p><GuideText variant field="prose/FingerOutlets.tsx/caa9e2c586" text={["Pull ",String(MOVEMENTS[movement][0])," from the marked ",String(movement<4?'channel':'side anchor'),". Leave the other five ends slack."].join('').trim()} label="Guide text"/></p></figure>
 }

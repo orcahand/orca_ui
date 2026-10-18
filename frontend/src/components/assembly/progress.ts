@@ -11,7 +11,7 @@ export type Progress = {
   views: Record<string, string>
   build: Build
 }
-export const EMPTY_PROGRESS: Progress = { current: STEPS[0].id, done: [], tendons: [], checks: [], views: {'guide:revision':'assembly-v5','guide:feedback':'oct15-v1','guide:layout':'oct16-v1'}, build: { side: 'right', motor: 'dynamixel', version: 'base', audience: 'internal' } }
+export const EMPTY_PROGRESS: Progress = { current: STEPS[0].id, done: [], tendons: [], checks: [], views: {'guide:revision':'assembly-v5','guide:feedback':'oct15-v1','guide:layout':'oct16-v1','guide:finger-layout':'parts-first-v1','guide:thumb-layout':'parts-first-v1','guide:thumb-cables':'oct18-v1'}, build: { side: 'right', motor: 'dynamixel', version: 'base', audience: 'internal' } }
 export function readProgress(): Progress {
   try {
     return validateProgress(JSON.parse(localStorage.getItem(PROGRESS_KEY) ?? 'null'))
@@ -40,6 +40,21 @@ export function validateProgress(data: unknown): Progress {
     if(parsed?.views?.['guide:layout']!=='oct16-v1')progress.done=progress.done.filter(id=>!['prepare-pp','p33'].includes(id))
     progress.views['guide:layout']='oct16-v1'
     if (!progress.checks.includes('p1:0') || !progress.checks.includes('p1:1')) progress.done = progress.done.filter(id => id !== 'p1')
+    if(parsed?.views?.['guide:finger-layout']!=='parts-first-v1')progress.done=progress.done.filter(id=>!['p31','p33','p35','finishing-pp'].includes(id))
+    progress.views['guide:finger-layout']='parts-first-v1'
+    if(parsed?.views?.['guide:thumb-layout']!=='parts-first-v1')progress.done=progress.done.filter(id=>!['p46','p59','p62'].includes(id))
+    progress.views['guide:thumb-layout']='parts-first-v1'
+    if(parsed?.views?.['guide:thumb-cables']!=='oct18-v1'){
+      const changed=['thumb-tendons','thumb-pp','p26','p75',...(progress.build.version==='touch'?['pp-ready','thumb-pp-ready','touch-route','touch-connect','touch-mount','touch-skins']:[])]
+      if(!parsed?.done?.includes('p52'))changed.push('p49')
+      progress.done=progress.done.filter(id=>!changed.includes(id))
+      progress.checks=progress.checks.filter(key=>!changed.some(id=>key.startsWith(`${id}:`)))
+    }
+    progress.views['guide:thumb-cables']='oct18-v1'
+    if(progress.build.version==='touch'){
+      if(['finishing-pp','thumb-skins'].includes(progress.current))progress.current='touch-skins'
+      progress.done=progress.done.filter(id=>!['finishing-pp','thumb-skins'].includes(id))
+    }
     // Preserve a finger's completed six-tendon check when loading earlier progress.
     FINGER_CHECKS.forEach((_,i)=>{if(Array.from({length:6},(_,j)=>`p45:movement:${i*6+j}`).every(key=>progress.checks.includes(key))&&!progress.checks.includes(`p45:finger:${i}`))progress.checks.push(`p45:finger:${i}`)})
     progress.checks=progress.checks.filter(key=>!key.startsWith('p45:movement:'))
@@ -56,7 +71,7 @@ function parseProgress(data: Record<string, any>): Progress {
   try {
     if (!data || typeof data !== 'object') return structuredClone(EMPTY_PROGRESS)
     return {
-      current: data.current==='p40'?'p37':data.current==='p97'?'p99':['p117','p119'].includes(data.current) ? 'p115' : STEPS.some(s => s.id === data.current) ? data.current : EMPTY_PROGRESS.current,
+      current: data.current==='p52'?'p49':data.current==='p40'?'p37':data.current==='p97'?'p99':['p117','p119'].includes(data.current) ? 'p115' : STEPS.some(s => s.id === data.current) ? data.current : EMPTY_PROGRESS.current,
       done: Array.isArray(data.done) ? [...new Set<string>(data.done.filter((id: unknown) => STEPS.some(s => s.id === id)))] : [],
       tendons: Array.isArray(data.tendons) ? [...new Set<number>(data.tendons.filter((n: unknown) => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n < 32))] : [],
       checks: Array.isArray(data.checks) ? [...new Set<string>(data.checks.filter((s: unknown) => typeof s === 'string'))] : [],
@@ -82,5 +97,5 @@ export function changeBuildProgress(progress: Progress, value: Partial<Build>): 
   return {...progress,build:{...progress.build,...value},done:progress.done.filter(id=>!affected.includes(id)),
     checks:progress.checks.filter(key=>!affected.some(id=>key.startsWith(`${id}:`))),
     tendons:side||version?[]:progress.tendons,
-    views:side||version?{'guide:revision':'assembly-v5','guide:feedback':'oct15-v1','guide:layout':'oct16-v1','flashing:method':flashingMethod(progress)}:progress.views}
+    views:side||version?{'guide:revision':'assembly-v5','guide:feedback':'oct15-v1','guide:layout':'oct16-v1','guide:finger-layout':'parts-first-v1','guide:thumb-layout':'parts-first-v1','guide:thumb-cables':'oct18-v1','flashing:method':flashingMethod(progress)}:progress.views}
 }

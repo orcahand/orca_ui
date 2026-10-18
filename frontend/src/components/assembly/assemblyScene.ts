@@ -107,12 +107,12 @@ export function assemblyScene(bundle:Bundle,build:Build,step:string){
   }
   if(step==='p89'){
    const wrist=fixed.find(p=>p.part.label==='Wrist frame')!
-   // The hand already has its skins and pins at this stage. Touch DP sensors
-   // are fitted later, so only its PP skins and palm skin belong here.
+   // Touch cables, sensors and PP skins are fitted before the carpals and wrist.
    for(const p of all){
     const skin=p.part.category==='Skins'&&(p.part.label==='Palm skin'||/ (DP|PP) skin$/.test(p.part.label))&&!(build.version==='touch'&&p.part.label.includes('DP skin'))
     const pin=p.part.label.startsWith('Pin ·')&&(spec.moving.includes(p.owner??'')||p.part.label==='Pin · 3 × 50')
-    if(skin||pin)stage(p,direction.clone().multiplyScalar(gap),.25,.78)
+    const sensor=build.version==='touch'&&p.part.label.includes('touch module')
+    if(skin||pin||sensor)stage(p,direction.clone().multiplyScalar(gap),.25,.78)
    }
    matching(['M4 square nut']).forEach(add)
    matching(['M4 washer','M4 × 20 socket screw']).forEach(p=>{

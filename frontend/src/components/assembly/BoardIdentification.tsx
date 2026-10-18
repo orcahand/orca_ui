@@ -1,3 +1,4 @@
+import {GuideText} from './GuideEditing'
 import {useRef,useState} from 'react'
 import type {Build} from './buildContent'
 
@@ -25,14 +26,14 @@ export function BoardIdentification({build}:{build:Build}){
   </g>)}
  </svg>
  return <section className="assembly-board-identification" aria-label="Identify the OH board connections" data-contrast={false}>
-  <div className="assembly-row"><div><span className="assembly-eyebrow">Find each connection</span><h3>The OH control board</h3></div><button className="assembly-text-button" aria-label="Enlarge the board connections" onClick={()=>dialog.current?.showModal()}>⤢</button></div>
+  <div className="assembly-row"><div><span className="assembly-eyebrow">Find each connection</span><h3><GuideText variant field="prose/BoardIdentification.tsx/a3bbf8574b" text={"The OH control board"} label="Section heading"/></h3></div><button className="assembly-text-button" aria-label="Enlarge the board connections" onClick={()=>dialog.current?.showModal()}>⤢</button></div>
   <div className="assembly-board-identification-layout"><div className="assembly-board-photo">{drawing}</div><div>
-   <div className="assembly-board-port-list">{PORTS.map((p,i)=><button key={p.id} aria-pressed={p.id===selected} onClick={()=>setSelected(p.id)}><span>{i+1}</span>{p.name}{p.id===build.motor&&<small>Your motor output</small>}</button>)}</div>
-   <p className="assembly-board-port-description" aria-live="polite"><strong>{port.name}</strong>{port.text}</p>
+   <div className="assembly-board-port-list">{PORTS.map((p,i)=><button key={p.id} aria-pressed={p.id===selected} onClick={()=>setSelected(p.id)}><span>{i+1}</span>{p.name}{p.id===build.motor&&<small><GuideText variant field="prose/BoardIdentification.tsx/3866a08fa3" text={"Your motor output"} label="Guide text"/></small>}</button>)}</div>
+   <p className="assembly-board-port-description" aria-live="polite"><GuideText variant field="prose/BoardIdentification.tsx/f28fd5d23e" text={[String(port.name),String(port.text)].join('').trim()} label="Guide text"/></p>
   </div></div>
   <dialog ref={dialog} className="assembly-lightbox assembly-board-port-dialog" aria-label="OH board connections" onCancel={e=>e.stopPropagation()} onClick={e=>{if(e.target===e.currentTarget)dialog.current?.close()}}>
    <div className="assembly-row"><span>{port.name}</span><button autoFocus onClick={()=>dialog.current?.close()}>Close image ×</button></div>
-   {drawing}<p>{port.text}</p>
+   {drawing}<p><GuideText variant field="prose/BoardIdentification.tsx/c70667fee7" text={String(port.text)} label="Guide text"/></p>
   </dialog>
  </section>
 }

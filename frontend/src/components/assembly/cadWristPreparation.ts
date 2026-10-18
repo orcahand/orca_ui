@@ -60,9 +60,9 @@ export function cadWristPreparation(bundle:Bundle,build:Build,kind:WristPreparat
   fade(wrist,.07)
   for(const screw of screws){
    const nut=nearest(nuts,screw.center),start=screw.bounds.min.x+.15,end=nut.bounds.min.x-.15
-   // The guide specifies ID 4 / OD 6; trim each supplemental sleeve to the exposed shaft.
-   const profile=new THREE.Shape();profile.absarc(0,0,3,0,Math.PI*2,false)
-   const hole=new THREE.Path();hole.absarc(0,0,2,0,Math.PI*2,true);profile.holes.push(hole)
+   // The guide specifies ID 2.7 / OD 4; trim each supplemental sleeve to the exposed shaft.
+   const profile=new THREE.Shape();profile.absarc(0,0,2,0,Math.PI*2,false)
+   const hole=new THREE.Path();hole.absarc(0,0,1.35,0,Math.PI*2,true);profile.holes.push(hole)
    const mesh=new THREE.Mesh(new THREE.ExtrudeGeometry(profile,{depth:end-start,steps:1,bevelEnabled:false,curveSegments:64}),new THREE.MeshStandardMaterial({color:'#e2dcc3',roughness:.58}))
    mesh.rotation.y=Math.PI/2;mesh.position.set(start,screw.center.y,screw.center.z);group.add(mesh);extra.push(mesh)
   }
@@ -76,7 +76,7 @@ export function cadWristPreparation(bundle:Bundle,build:Build,kind:WristPreparat
    direction.set(-1,.15,-.28)
   }else{
    focus=screws[0].bounds.clone().union(screws[1].bounds).expandByScalar(7)
-   labels.push({text:'PTFE · 4 mm inside / 6 mm outside',point:screws[1].center.clone().setX((screws[1].bounds.min.x+nuts[1].bounds.min.x)/2)})
+   labels.push({text:'PTFE · ID 2.7 / OD 4 mm',point:screws[1].center.clone().setX((screws[1].bounds.min.x+nuts[1].bounds.min.x)/2)})
    labels.push({text:'PTFE sleeve',point:screws[0].center.clone().setX(screws[0].bounds.min.x+3)})
    direction.set(-.65,.6,-1)
   }

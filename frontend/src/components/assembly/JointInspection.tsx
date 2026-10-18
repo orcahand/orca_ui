@@ -1,3 +1,4 @@
+import {GuideText} from './GuideEditing'
 import {useEffect,useState} from 'react'
 import {PartAssemblyMotion} from './PartAssemblyMotion'
 import type {Build} from './buildContent'
@@ -14,6 +15,6 @@ export function JointInspection({build,step}:{build:Build;step:string}){
   <div className="assembly-clip-tabs">{(['rotation','axial'] as const).map(value=><button key={value} aria-pressed={mode===value} onClick={()=>{setMode(value);setPosition(0);setReplay(n=>n+1);setPlaying(true)}}>{value==='rotation'?'Check rotation':'Check axial play'}</button>)}</div>
   <PartAssemblyMotion build={build} step={step} position={position} inspection={mode}/>
   <label className="assembly-motion-scrubber"><span>{mode==='rotation'?'Full model range':'Bearing axis'}</span><input type="range" aria-label="Joint check progress" min="0" max="1000" value={Math.round(position*1000)} onChange={e=>{setPlaying(false);setPosition(+e.target.value/1000)}}/></label>
-  <p>{mode==='rotation'?'Support the fixed part and keep the tendons slack. Move gently through the available range.':'Gently push and pull along the bearing axis to check for looseness. The animation exaggerates this motion.'}</p>
+  <p><GuideText variant field="prose/JointInspection.tsx/3632f8ee4a" text={String(mode==='rotation'?'Support the fixed part and keep the tendons slack. Move gently through the available range.':'Gently push and pull along the bearing axis to check for looseness. The animation exaggerates this motion.')} label="Guide text"/></p>
  </section>
 }

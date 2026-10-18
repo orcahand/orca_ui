@@ -24,6 +24,11 @@ export type Recipe = {
 }
 const carpals = ['Carpals', 'Touch carpals', 'Carpal core']
 export const CAD_ILLUSTRATIONS: Recipe[] = [
+  {step:'thumb-dp',file:'thumb-dp-feed',caption:'Thumb DP · feed both free ends through the knot housing',instruction:1,anchorPreparation:'dp-feed',thumbAnchor:true},
+  {step:'thumb-dp',file:'thumb-dp-seat',caption:'Thumb DP · seat the reinforced stoppers and tuck the connecting loop',instruction:2,anchorPreparation:'dp-seat',thumbAnchor:true},
+  {step:'thumb-dp',file:'thumb-dp-tuck',caption:'Thumb DP · keep the loop inside the housing and both ends free',instruction:2,anchorPreparation:'dp-tuck',thumbAnchor:true},
+  {step:'thumb-pp',file:'thumb-pp-part',caption:'Thumb PP · keep the cable channel accessible while threading',instruction:1,parts:['Thumb PP'],view:[.8,-.5,-.35]},
+
   {step:'p18',file:'panel-019-4',caption:'Carpal underside · inspect both rows of channel openings for loose print material',instruction:1,parts:carpals,view:[0,-1,.35]},
   {step:'p93',file:'panel-096-3',caption:'Tower cable routing · motor lead through the upper slot, both fan leads through the lower slot',instruction:1,towerWiring:true,motorSpecific:true},
   {step:'p142',file:'mount-1',caption:'Adapter plate and two mounting rods · rods lifted to show their mounting holes',instruction:2,armMount:'adapter',motorSpecific:true},
@@ -43,9 +48,9 @@ export const CAD_ILLUSTRATIONS: Recipe[] = [
   {step:'p56',file:'panel-058-2',caption:'TP · reinforce each Ashley stopper with three single knots around the stopper itself',instruction:2,tpAnchorPreparation:'reinforce'},
   {step:'p49',file:'panel-051-1',caption:'Thumb AP · thread from outside to inside; pull 20 cm through before tying',instruction:2,apAnchorPreparation:'thread',thumbAnchor:true},
   {step:'p49',file:'panel-051-2',caption:'Thumb AP · reinforce each Ashley stopper with three single knots around it',instruction:2,apAnchorPreparation:'reinforce',thumbAnchor:true},
-  {step:'p52',file:'panel-053-1',caption:'Pull the long tendon firmly to settle the thumb stopper in its housing',instruction:1,apAnchorPreparation:'settle',thumbAnchor:true},
-  {step:'p52',file:'panel-053-3',caption:'Pull the settled stopper out, then trim 5 mm after the knot',instruction:2,apAnchorPreparation:'trim',thumbAnchor:true},
-  {step:'p52',file:'panel-053-5',caption:'Reseat and tuck the entire tail inside; repeat for the second thumb anchor',instruction:3,apAnchorPreparation:'tuck',thumbAnchor:true},
+  {step:'p49',file:'panel-053-1',caption:'Pull the long tendon firmly to settle the thumb stopper in its housing',instruction:3,apAnchorPreparation:'settle',thumbAnchor:true},
+  {step:'p49',file:'panel-053-3',caption:'Pull the settled stopper out, then trim 5 mm after the knot',instruction:3,apAnchorPreparation:'trim',thumbAnchor:true},
+  {step:'p49',file:'panel-053-5',caption:'Reseat and tuck the entire tail inside; repeat for the second thumb anchor',instruction:3,apAnchorPreparation:'tuck',thumbAnchor:true},
   {step:'p37',file:'panel-039-1',caption:'AP · pass the tendon from outside to inside and pull 20 cm through',instruction:1,apAnchorPreparation:'thread'},
   {step:'p37',file:'panel-039-2',caption:'Reinforce the Ashley stopper with one single knot around the stopper itself',instruction:2,apAnchorPreparation:'reinforce'},
   {step:'p37',file:'panel-041-1',caption:'Pull firmly to settle the reinforced stopper in its housing',instruction:3,apAnchorPreparation:'settle'},
@@ -80,7 +85,7 @@ export const CAD_ILLUSTRATIONS: Recipe[] = [
   {step:'p33',file:'panel-034-4',caption:'Keep the DP tendons aligned with the PP channels',instruction:1,scene:'motion',position:0},
   {step:'p33',file:'panel-034-5',caption:'Take up slack while closing the joint',instruction:1,scene:'motion',position:.55},
   {step:'p33',file:'panel-034-6',caption:'DP and PP · bearings fully seated',instruction:2,scene:'motion',position:1},
-  {step:'p46',file:'panel-048-1',caption:'Thumb DP and PP · skins and bearings fitted',instruction:1,scene:'detail',position:0},
+  {step:'thumb-skins',file:'panel-048-1',caption:'Thumb · skins seated',instruction:1,scene:'detail',position:0},
   {step:'p62',file:'panel-063-3',caption:'Thumb · fully seated joint and bearings',instruction:2,scene:'motion',position:1},
   {step:'p68',file:'panel-069-1',caption:'Thumb · align all eight ends before seating',instruction:1,scene:'motion',position:0},
   {step:'p68',file:'panel-069-2',caption:'Thumb · seat the bearings in the carpals',instruction:2,scene:'motion',position:1},

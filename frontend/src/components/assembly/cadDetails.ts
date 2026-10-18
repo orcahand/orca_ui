@@ -4,8 +4,15 @@ import type {Bundle} from './cadAssets'
 import type {Build} from './buildContent'
 export type CadDetail={title:string;fixed:string[];moving:string[];caption:string;motorSpecific?:boolean}
 export const CAD_DETAILS:Record<string,CadDetail>={
- 'finishing-pp':{title:'Fit the skins and PP bearings',fixed:['Index DP','Index PP'],moving:['Index DP skin','Index PP skin','Bearing · 4 × 8 × 3','Bearing · 4 × 8 × 2','Middle / ring / index touch module'],caption:'Slide the DP skin over the fingertip and down. Slide the PP skin from its base upward toward the fingertip. Keep the tendons clear, then seat both PP bearings.'},
- p46:{title:'Fit the thumb skins and PP bearings',fixed:['Thumb DP','Thumb PP'],moving:['Thumb DP skin','Thumb PP skin','Bearing · 4 × 8 × 3','Bearing · 4 × 8 × 2','Thumb touch module'],caption:'Slide the DP skin over the fingertip and down. Slide the PP skin from its base toward the fingertip, then seat the PP bearings.'},
+ 'finishing-pp':{title:'Seat the finger skins',fixed:['Index DP','Index PP','Index AP','Index PP skin'],moving:['Index DP skin'],caption:'The PP skin is already fitted. Seat the DP skin where used, then check clearance at both joints.'},
+ 'pp-ready':{title:'Prepare the PP skin and bearings',fixed:['Index PP'],moving:['Index PP skin','Bearing · 4 × 8 × 3','Bearing · 4 × 8 × 2'],caption:'Slide the PP skin from the open base toward the fingertip, then press both PP bearings into their pockets with your fingers.'},
+ 'thumb-parts':{title:'Thumb parts · DP, PP, AP and TP',fixed:['Thumb DP','Thumb PP','Thumb AP','Thumb TP'],moving:[],caption:'Identify the four thumb segments before preparation.'},
+ 'thumb-dp':{title:'Thumb DP bearings',fixed:['Thumb DP'],moving:['Bearing · 4 × 8 × 3'],caption:'Seat the tendon first, then press a bearing into each side.'},
+ 'thumb-pp':{title:'Thumb PP guide pins',fixed:['Thumb PP'],moving:['Pin · 2 × 8','Pin · 2 × 6'],caption:'Fit the middle and lower guide pins. The upper pin goes in after DP and PP are joined.'},
+ 'thumb-pp-ready':{title:'Prepare the thumb PP skin and bearings',fixed:['Thumb PP'],moving:['Thumb PP skin','Bearing · 4 × 8 × 3','Bearing · 4 × 8 × 2'],caption:'Slide the PP skin on from the base, then seat both PP bearings.'},
+ 'thumb-tp-pins':{title:'Thumb TP guide pins',fixed:['Thumb TP'],moving:['Pin · 2 × 30'],caption:'Press both long pins fully into their shaft slots.'},
+ 'thumb-skins':{title:'Seat the thumb skins',fixed:['Thumb DP','Thumb PP','Thumb AP','Thumb TP','Thumb PP skin'],moving:['Thumb DP skin'],caption:'Seat the DP skin where used; the PP skin is already fitted.'},
+ 'thumb-test':{title:'Inspect the assembled thumb',fixed:['Thumb DP','Thumb PP','Thumb AP','Thumb TP','Thumb PP skin','Thumb DP skin'],moving:[],caption:'Check all eight tendon movements on the physical thumb.'},
  p73:{title:'Finish the carpal assembly',fixed:['Carpals','Touch carpals','Carpal core'],moving:['Palm skin','Pin · 3 × 50','Carpal pulley','Bearing · 8 × 13 × 4'],caption:'Fit the palm skin, two long pins, toothed carpal pulley and two wrist bearings. The carpal pulley is the wrist gear on the hand: its teeth engage the belt; the motor pulley is fitted later.'},
  p98:{title:'Seat the connector PCBs',fixed:['Motor tower'],moving:['Motor connector PCB'],caption:'Twelve connector PCBs bridge the sixteen motor positions. Inspect their orientation before seating the motors.',motorSpecific:true},
  p127:{title:'Secure the four spool holders',fixed:['Motor tower'],moving:['Metal spool holder','M3 × 14 socket screw','M3 hex nut'],caption:'Fit the four nuts in the inside-bottom tower slots, slide in the four holders, then secure their screws.',motorSpecific:true},
@@ -14,17 +21,23 @@ export const CAD_DETAILS:Record<string,CadDetail>={
 }
 export function cadDetailSpec(build:Build,step:string):CadDetail {
  const spec=CAD_DETAILS[step]
- if(build.version!=='touch'||!['finishing-pp','p46'].includes(step))return spec
- return {...spec,title:step==='p46'?'Fit the thumb PP skin and bearings':'Fit the PP skin and bearings',
-  moving:spec.moving.filter(label=>!label.includes('touch module')&&!label.includes('DP skin')),
-  caption:'Fit the PP skin and bearings. Leave DP bare; fit the Touch sensor after assembly, just before tensioning.'}
+ if(build.version!=='touch')return spec
+ if(['pp-ready','thumb-pp-ready'].includes(step))return {...spec,title:'Fit the PP bearings',moving:spec.moving.filter(label=>!label.includes('skin')),caption:'Press both PP bearings into their pockets. Leave all skins off until the cables are connected.'}
+ if(step==='thumb-test')return {...spec,fixed:spec.fixed.filter(label=>!label.includes('skin'))}
+ return spec
 }
 export function cadDetailScene(bundle:Bundle,build:Build,step:string){
- const skinStep=['finishing-pp','p46'].includes(step),finger=step==='p46'?'Thumb':'Index'
+ const skinStep=['pp-ready','finishing-pp','thumb-pp-ready','thumb-skins'].includes(step),finger=step.startsWith('thumb-')?'Thumb':'Index'
  const spec=cadDetailSpec(build,step),pieces=cadPieces(bundle,build),group=new THREE.Group()
- const fixed=pieces.filter(p=>spec.fixed.includes(p.part.label)||(skinStep&&p.part.label.startsWith('Bearing')&&p.owner===`${finger} DP`)),center=new THREE.Box3();fixed.forEach(p=>center.union(p.bounds));const anchor=center.isEmpty()?new THREE.Vector3():center.getCenter(new THREE.Vector3())
+ const fixed=pieces.filter(p=>spec.fixed.includes(p.part.label)||(skinStep&&!['pp-ready','thumb-pp-ready'].includes(step)&&p.part.label.startsWith('Bearing')&&(p.owner===`${finger} DP`||['finishing-pp','thumb-skins'].includes(step)&&[`${finger} PP`,`${finger} AP`].includes(p.owner??'')))),center=new THREE.Box3();fixed.forEach(p=>center.union(p.bounds));const anchor=center.isEmpty()?new THREE.Vector3():center.getCenter(new THREE.Vector3())
  const screws=pieces.filter(p=>p.part.label==='M3 × 14 socket screw')
- const moving=pieces.filter(p=>spec.moving.includes(p.part.label)).filter(p=>!skinStep||(p.part.label.startsWith('Bearing')?p.owner===`${finger} PP`:p.part.label.includes('touch module')&&step==='finishing-pp'?nearest(pieces.filter(b=>/^(Index|Middle|Ring) DP$/.test(b.part.label)),p.center)?.part.label==='Index DP':true)).filter(p=>step!=='p127'||p.part.label!=='M3 hex nut'||screws.some(s=>s.center.distanceTo(p.center)<25))
+ const thumbDp=pieces.find(p=>p.part.label==='Thumb DP')!
+ const thumbTp=pieces.find(p=>p.part.label==='Thumb TP')!
+ const thumbPp=pieces.find(p=>p.part.label==='Thumb PP')!
+ const inPp=(p:CadPiece)=>thumbPp.bounds.clone().expandByScalar(1).containsPoint(p.center)
+ const lowerPin=pieces.filter(p=>p.part.label==='Pin · 2 × 6'&&inPp(p)).sort((a,b)=>b.center.distanceToSquared(thumbDp.center)-a.center.distanceToSquared(thumbDp.center))[0]
+ const detailPart=(p:CadPiece)=>step==='thumb-dp'?p.owner==='Thumb DP':step==='thumb-pp'?(inPp(p)&&(p.part.label==='Pin · 2 × 8'||p===lowerPin)):step==='thumb-tp-pins'?thumbTp.bounds.clone().expandByScalar(1).containsPoint(p.center):true
+ const moving=pieces.filter(p=>spec.moving.includes(p.part.label)&&detailPart(p)).filter(p=>!skinStep||(p.part.label.startsWith('Bearing')?p.owner===`${finger} PP`:p.part.label.includes('touch module')&&step==='finishing-pp'?nearest(pieces.filter(b=>/^(Index|Middle|Ring) DP$/.test(b.part.label)),p.center)?.part.label==='Index DP':true)).filter(p=>step!=='p127'||p.part.label!=='M3 hex nut'||screws.some(s=>s.center.distanceTo(p.center)<25))
  const selected=step==='p139'?pieces.filter(p=>p.part.category!=='Tendons'&&!p.part.label.includes('(optional)')&&!(build.version==='touch'&&p.part.category==='Skins'&&/DP skin|Pinky touch skin/.test(p.part.label))):[...fixed,...moving]
  const offsets=new Map<CadPiece,THREE.Vector3>()
  for(const p of selected){group.add(p.object);if(!moving.includes(p))continue

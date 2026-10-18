@@ -7,7 +7,7 @@ import type {Build} from './buildContent'
 
 export function tubePullScene(bundle:Bundle,build:Build,phase:0|1|2){
  const pieces=cadPieces(bundle,build),ap=pieces.find(p=>p.part.label==='Index AP')!,group=new THREE.Group(),extra:THREE.Mesh[]=[]
- if(phase>0){group.add(ap.object);fade(ap,.38)}
+ if(phase>0){group.add(ap.object);fade(ap,1)}
  const path=vectors(conduitData(build).ap.Index['PP-flex']),start=path[0],end=path.at(-1)!,axis=start.clone().sub(end).normalize()
  const tube=phase===2?[start.clone().addScaledVector(axis,1),...path,end.clone().addScaledVector(axis,-1)]:[start.clone().addScaledVector(axis,15),start.clone().addScaledVector(axis,6)]
  const tendon=phase===2?[tube[0].clone().addScaledVector(axis,2),...path,end.clone().addScaledVector(axis,-20)]:phase===0?[tube[0].clone().addScaledVector(axis,4),tube.at(-1)!.clone().addScaledVector(axis,-3)]:[tube[0].clone().addScaledVector(axis,2),...tube,...path,end.clone().addScaledVector(axis,-20)]

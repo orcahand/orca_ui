@@ -1,7 +1,8 @@
 import * as THREE from 'three'
 import { assemblyScene } from './assemblyScene'
 import { cadDetailScene } from './cadDetails'
-import { cadPieces, disposePieces, nearest } from './cadScene'
+import frames from './jointFrames.json'
+import { cadKey, cadPieces, disposePieces, nearest } from './cadScene'
 import { ChannelCurve } from './channelStrands'
 import conduits from './conduitRoutes.json'
 import type { Bundle } from './cadAssets'
@@ -24,6 +25,11 @@ import type { Recipe } from './cadIllustrations'
 
 // These scenes are used by the offline renderer, not mounted by the walkthrough.
 export function illustrationScene(bundle:Bundle,build:Build,recipe:Recipe){
+  if(recipe.file==='thumb-pp-part'){
+    const pieces=cadPieces(bundle,build),group=new THREE.Group(),frame=frames[cadKey(build)].Thumb
+    group.add(pieces.find(p=>p.part.label==='Thumb PP')!.object)
+    return {group,labels:[],direction:new THREE.Vector3().fromArray(frame.y).negate().addScaledVector(new THREE.Vector3().fromArray(frame.x),.4),up:new THREE.Vector3().fromArray(frame.z),dispose:()=>disposePieces(pieces)}
+  }
   if(recipe.towerWiring)return cadTowerWiring(bundle,build)
   if(recipe.armMount)return cadArmMount(bundle,build,recipe.armMount)
   if(recipe.spoolPreparation)return cadSpoolPreparation(bundle,build,recipe.spoolPreparation)
@@ -31,7 +37,7 @@ export function illustrationScene(bundle:Bundle,build:Build,recipe:Recipe){
   if(recipe.thumbFinishing)return cadThumbFinishing(bundle,build,recipe.thumbFinishing)
   if(recipe.tpAnchorPreparation)return cadTpAnchorPreparation(bundle,build,recipe.tpAnchorPreparation)
   if(recipe.apAnchorPreparation)return cadApAnchorPreparation(bundle,build,recipe.apAnchorPreparation,recipe.thumbAnchor)
-  if(recipe.anchorPreparation)return cadAnchorPreparation(bundle,build,recipe.anchorPreparation)
+  if(recipe.anchorPreparation)return cadAnchorPreparation(bundle,build,recipe.anchorPreparation,recipe.thumbAnchor)
   if(recipe.wristPreparation)return cadWristPreparation(bundle,build,recipe.wristPreparation)
   if(recipe.jointPreparation)return cadJointPreparation(bundle,build,recipe.jointPreparation)
   if(recipe.routingReference)return cadRoutingReference(bundle,build,recipe.routingReference)

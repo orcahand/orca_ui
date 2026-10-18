@@ -1,3 +1,4 @@
+import {GuideText} from './GuideEditing'
 import { useEffect, useState } from 'react'
 export function TendonPreparation() {
   return <section className="assembly-tendon-preparation" aria-label="Double-knot tendon measurements">
@@ -14,14 +15,14 @@ export function TendonPreparation() {
   </section>
 }
 export function KnotConventions() {
-  return <section className="assembly-knot-conventions"><h3>Anchor knots throughout the build</h3><dl><div><dt>Thumb ABD / AP and CMC / TP</dt><dd>1 Ashley stopper + 3 single knots on top.</dd></div><div><dt>All other joint anchors</dt><dd>1 Ashley stopper + 1 single knot on top.</dd></div><div><dt>Spools</dt><dd>1 Ashley stopper with 3 tendon turns. If a tendon is too short for 3 turns, use Ashley + 2 single knots on top as the fallback.</dd></div></dl><p>Tie each extra single knot around the Ashley stopper, not beside it. The reinforcement belongs to the anchor, not to the free section of tendon.</p></section>
+  return <section className="assembly-knot-conventions"><h3><GuideText variant field="prose/TendonPreparation.tsx/7c108b0a4e" text={"Anchor knots throughout the build"} label="Section heading"/></h3><dl><div><dt><GuideText variant field="prose/TendonPreparation.tsx/847d2cf995" text={"Thumb ABD / AP and CMC / TP"} label="Guide text"/></dt><dd><GuideText variant field="prose/TendonPreparation.tsx/2da9eec00f" text={"1 Ashley stopper + 3 single knots on top."} label="Guide text"/></dd></div><div><dt><GuideText variant field="prose/TendonPreparation.tsx/ff2073dc10" text={"All other joint anchors"} label="Guide text"/></dt><dd><GuideText variant field="prose/TendonPreparation.tsx/fa3342ff98" text={"1 Ashley stopper + 1 single knot on top."} label="Guide text"/></dd></div><div><dt><GuideText variant field="prose/TendonPreparation.tsx/d7f982a936" text={"Spools"} label="Guide text"/></dt><dd><GuideText variant field="prose/TendonPreparation.tsx/39492e36fa" text={"1 Ashley stopper with 3 tendon turns. If a tendon is too short for 3 turns, use Ashley + 2 single knots on top as the fallback."} label="Guide text"/></dd></div></dl><p><GuideText variant field="prose/TendonPreparation.tsx/c0833fce82" text={"Tie each extra single knot around the Ashley stopper, not beside it. The reinforcement belongs to the anchor, not to the free section of tendon."} label="Guide text"/></p></section>
 }
 export function KnotReinforcement({count}:{count:1|3}) {
   const [phase,setPhase]=useState(0),[playing,setPlaying]=useState(false)
   const labels=['Set the Ashley stopper','Tie a single knot on top','Pull the single knot tight']
   useEffect(()=>{if(!playing)return;const timer=setTimeout(()=>{if(phase===2)setPlaying(false);else setPhase(phase+1)},2200);return()=>clearTimeout(timer)},[phase,playing])
   return <section className="assembly-knot-reinforcement" aria-label={`One Ashley stopper plus ${count} single knots on top`}>
-    <div className="assembly-row"><h3>Reinforce the tightened stopper</h3><button className="assembly-secondary" onClick={()=>{if(phase===2)setPhase(0);setPlaying(!playing)}}>{playing?'Pause knot':'Play knot'}</button></div>
+    <div className="assembly-row"><h3><GuideText variant field="prose/TendonPreparation.tsx/0f9e48f185" text={"Reinforce the tightened stopper"} label="Section heading"/></h3><button className="assembly-secondary" onClick={()=>{if(phase===2)setPhase(0);setPlaying(!playing)}}>{playing?'Pause knot':'Play knot'}</button></div>
     <div className="assembly-motion-phases">{labels.map((label,i)=><button key={label} aria-pressed={phase===i} onClick={()=>{setPhase(i);setPlaying(false)}}><span>{i+1}</span>{label}</button>)}</div>
     <svg viewBox="0 0 700 290" role="img" aria-label={labels[phase]}>
       <defs><linearGradient id="ashley-rope"><stop stopColor="#24636e"/><stop offset=".45" stopColor="#73b5bc"/><stop offset="1" stopColor="#23626d"/></linearGradient><linearGradient id="single-rope"><stop stopColor="#8b541e"/><stop offset=".45" stopColor="#ebbd7a"/><stop offset="1" stopColor="#8b541e"/></linearGradient></defs>
@@ -42,6 +43,6 @@ export function KnotReinforcement({count}:{count:1|3}) {
       {phase>0&&<text x="440" y="51" fontSize="16" fill="currentColor">Single overhand knot</text>}
       <text x="350" y="278" textAnchor="middle" fontSize="14" fill="currentColor">{phase===0?'Pull the Ashley firmly before adding reinforcement.':phase===1?'Tie the ordinary single knot around the stopper, on top.':'Pull snug against the Ashley to make one compact anchor.'}</text>
     </svg>
-    {count===3&&<p>Repeat the single-knot step twice more: <strong>three single knots in total</strong> on top of the same Ashley stopper.</p>}
+    {count===3&&<p><GuideText variant field="prose/TendonPreparation.tsx/a292ed22a0" text={["Repeat the single-knot step twice more: ","three single knots in total"," on top of the same Ashley stopper."].join('').trim()} label="Guide text"/></p>}
   </section>
 }
