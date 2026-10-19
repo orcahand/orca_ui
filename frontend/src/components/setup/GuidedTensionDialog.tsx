@@ -640,7 +640,7 @@ const CURRENT_FIELDS = [
   { key: 'hold_ap', label: 'Hold · APs', step: 'range', min: 20, max: 500, unit: 'mA', inc: 10 },
   { key: 'hold_mcp', label: 'Hold · MCPs', step: 'range', min: 20, max: 500, unit: 'mA', inc: 10 },
   { key: 'hold_pip', label: 'Hold · PIPs', step: 'range', min: 20, max: 500, unit: 'mA', inc: 10 },
-  { key: 'tension_current', label: 'Tensioning', step: 'tension', min: 50, max: 1200, unit: 'mA', inc: 10 },
+  { key: 'tension_current', label: 'Tensioning', step: 'tension', min: 50, max: 1500, unit: 'mA', inc: 10 },
   { key: 'tension_offset_deg', label: 'Turn CCW', step: null, min: 0, max: 45, unit: '°', inc: 5 },
 ] as const
 
