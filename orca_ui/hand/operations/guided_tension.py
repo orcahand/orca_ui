@@ -34,7 +34,7 @@ PUBLISH_PERIOD_S = 0.1
 HOLD_BOUNDS_MA = (20.0, 500.0)
 # Run settings: currents in mA, and how far the motors turn counterclockwise while tensioning in degrees.
 CURRENT_BOUNDS_MA = {"hold_ap": HOLD_BOUNDS_MA, "hold_mcp": HOLD_BOUNDS_MA,
-                     "hold_pip": HOLD_BOUNDS_MA, "tension_current": (50.0, 1000.0),
+                     "hold_pip": HOLD_BOUNDS_MA, "tension_current": (50.0, 1200.0),
                      "tension_offset_deg": (0.0, 45.0)}
 # Range-check holds per joint group and the tensioning hold, in mA. The Feetech values match
 # the Dynamixel output torque (Feetech draws ~275 mA before producing any).
