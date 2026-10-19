@@ -10,7 +10,7 @@ const CHAPTER_NAMES:Record<string,string> = {
   'Tower':'Build the tower','Electronics':'Prepare the control board',
   'Flashing · ORCA Console':'Flash the boards','Flashing · orca_firmware':'Flash the boards',
   'Motors':'Install the motors','Spooling':'Wind the tendons','Hull':'Fit the covers',
-  'Touch skins':'Fit the finger skins','Touch sensors':'Install Touch sensors','Touch connector board':'Connect the Touch board',
+  'Touch skins':'Fit the finger skins','Touch sensors':'Fit Touch sensors and skins','Touch connector board':'Connect the Touch board',
   'Finish':'Check and commission','Appendix · arm mounting':'Mount to a robot arm','Appendix · silicone':'Make silicone skins',
 }
 export const chapterKey=(step:AssemblyStep)=>step.id==='p45'?'Other fingers':step.chapter
@@ -27,19 +27,27 @@ const REGIONS=[
   {id:'tower',label:'Tower and motors',step:'p93'},
 ]
 
-export function AssemblyNavigation({steps,current,done,query,filtered,build,onGo,beforeContents,title}:{title:(step:AssemblyStep)=>string;beforeContents?:ReactNode;steps:AssemblyStep[];current:AssemblyStep;done:string[];query:string;filtered:AssemblyStep[];build:Build;onGo:(id:string)=>void}) {
+export function AssemblyNavigation({steps,current,done,query,filtered,build,onGo,beforeContents,title}:{title:(step:AssemblyStep)=>string;beforeContents?:ReactNode;steps:AssemblyStep[];current:AssemblyStep;done:string[];query:string;filtered:AssemblyStep[];build:Build;onGo:(id:string,preserveMenu?:boolean)=>void}) {
   const maskId=useId(),contents=useRef<HTMLElement>(null)
+  const menuSelection=useRef<{id:string;top:number;restore:boolean}|null>(null)
   const [jump,setJump]=useState(0)
   const active=chapterKey(current),[open,setOpen]=useState(active),[picked,setPicked]=useState('')
   useLayoutEffect(()=>{
     const nav=contents.current;if(!nav)return
+    const selection=menuSelection.current?.id===current.id?menuSelection.current:null
+    if(!selection)menuSelection.current=null
     const reveal=()=>{
+      if(selection){
+        if(selection.restore&&nav.clientHeight){nav.scrollTop=selection.top;selection.restore=false}
+        return
+      }
       const target=nav.querySelector<HTMLElement>('[aria-current=step]');if(!target||!nav.clientHeight)return
       const box=nav.getBoundingClientRect(),row=target.getBoundingClientRect()
       const chapter=target.closest('.assembly-chapter')?.querySelector('.assembly-chapter-button')?.getBoundingClientRect()
       const top=chapter&&row.bottom-chapter.top<nav.clientHeight*.7?chapter.top:row.top
       if(top<box.top+12||row.bottom>box.bottom-12)nav.scrollTo({top:nav.scrollTop+top-box.top-12,behavior:'instant'})
     }
+    reveal()
     const frame=requestAnimationFrame(reveal),observer=new ResizeObserver(reveal);observer.observe(nav)
     return()=>{cancelAnimationFrame(frame);observer.disconnect()}
   },[current.id,jump,query,open])
@@ -47,7 +55,8 @@ export function AssemblyNavigation({steps,current,done,query,filtered,build,onGo
   const chapters=[...new Set(steps.map(chapterKey))]
   const region=regionFor(current)
   const pickedActive=REGIONS.find(r=>r.id===picked)?.step===current.id?picked:''
-  const select=(id:string,step:string)=>{const target=steps.find(s=>s.id===step);if(target)setOpen(chapterKey(target));onGo(step);setPicked(id);setJump(n=>n+1)}
+  const select=(id:string,step:string)=>{menuSelection.current=null;const target=steps.find(s=>s.id===step);if(target)setOpen(chapterKey(target));onGo(step);setPicked(id);setJump(n=>n+1)}
+  const selectStep=(id:string)=>{menuSelection.current={id,top:contents.current?.scrollTop??0,restore:true};setPicked('');setJump(n=>n+1);onGo(id,true)}
   let previousPhase=''
   return <div className="assembly-navigation-layers">
     <div className="assembly-hand-navigation">
@@ -66,7 +75,7 @@ export function AssemblyNavigation({steps,current,done,query,filtered,build,onGo
           })}
         </g>
       </svg>
-      <p aria-live="polite">{pickedActive?REGIONS.find(r=>r.id===pickedActive)?.label:region==='fingers'?'Middle · ring · pinky':REGIONS.find(r=>r.id===region)?.label??'Select a finger, palm, wrist or tower'}</p>
+      <p aria-live="polite">{pickedActive?REGIONS.find(r=>r.id===pickedActive)?.label:region==='fingers'?'Middle, ring and pinky':REGIONS.find(r=>r.id===region)?.label??'Select a finger, palm, wrist or tower'}</p>
     </div>
     <nav ref={contents} className="assembly-contents-scroll" aria-label="Assembly chapters">
       {beforeContents}
@@ -76,14 +85,14 @@ export function AssemblyNavigation({steps,current,done,query,filtered,build,onGo
         const expanded=Boolean(query.trim())||open===chapter
         const required=all.filter(s=>!s.hint)
         const count=required.filter(s=>done.includes(s.id)).length
-        const phase=chapter.startsWith('Appendix')?'Optional':n<3?'Prepare':['Fingers','Other fingers','Thumb','Touch sensors','Touch skins'].includes(chapter)?'Build the fingers':['Carpals','Wrist & routing','Tower'].includes(chapter)?'Build the hand':'Complete the hand'
+        const phase=chapter.startsWith('Appendix')?'Optional':n<3?'Prepare':['Fingers','Other fingers','Thumb'].includes(chapter)?'Build the fingers':['Carpals','Wrist & routing','Tower'].includes(chapter)?'Build the hand':'Complete the hand'
         const showPhase=phase!==previousPhase;previousPhase=phase
         return <div className="assembly-chapter" key={chapter}>
           {showPhase&&<p className="assembly-nav-phase">{phase}</p>}
-          <button className={`assembly-chapter-button ${chapter===active?'active':''}`} aria-expanded={expanded} aria-controls={`chapter-${n}`} onClick={()=>setOpen(expanded?'':chapter)}>
+          <button className={`assembly-chapter-button ${chapter===active?'active':''}`} aria-expanded={expanded} aria-controls={`chapter-${n}`} onClick={()=>{menuSelection.current={id:current.id,top:contents.current?.scrollTop??0,restore:false};setOpen(expanded?'':chapter)}}>
             <span className={count===required.length?'is-complete':''}>{count===required.length?'✓':String(n+1).padStart(2,'0')}</span><span>{CHAPTER_NAMES[chapter]??chapter}</span><small>{count}/{required.length} <span aria-hidden="true">{expanded?'−':'+'}</span></small>
           </button>
-          {expanded&&<div className="assembly-step-links" id={`chapter-${n}`}>{matches.map((s,i)=><Fragment key={s.id}>{s.section&&s.section!==matches[i-1]?.section&&<h4 className="assembly-step-section">{s.section}</h4>}<button className={`${s.id===current.id?'active':''} ${s.hint?'assembly-hint-link':''}`} aria-current={s.id===current.id?'step':undefined} onClick={()=>{setPicked('');onGo(s.id)}}><span aria-label={s.hint?'Optional hint':done.includes(s.id)?'Completed':'Incomplete'}>{s.hint?'HINT':done.includes(s.id)?'✓':String((s.section?required.filter(item=>item.section===s.section):required).indexOf(s)+1).padStart(2,'0')}</span><span>{title(s)}</span></button></Fragment>)}</div>}
+          {expanded&&<div className="assembly-step-links" id={`chapter-${n}`}>{matches.map((s,i)=><Fragment key={s.id}>{s.section&&s.section!==matches[i-1]?.section&&<h4 className="assembly-step-section">{s.section}</h4>}<button className={`${s.id===current.id?'active':''} ${s.hint?'assembly-hint-link':''}`} aria-current={s.id===current.id?'step':undefined} onClick={()=>selectStep(s.id)}><span aria-label={s.hint?'Optional hint':done.includes(s.id)?'Completed':'Incomplete'}>{s.hint?'HINT':done.includes(s.id)?'✓':String((s.section?required.filter(item=>item.section===s.section):required).indexOf(s)+1).padStart(2,'0')}</span><span>{title(s)}</span></button></Fragment>)}</div>}
         </div>
       })}
       {!filtered.length&&<p className="assembly-muted">No matching steps. Try “wrist” or “PTFE”.</p>}

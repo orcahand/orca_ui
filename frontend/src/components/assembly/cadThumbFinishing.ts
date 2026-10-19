@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import {guideLabel} from './guideLabel'
 import {cadKey,cadPieces,disposePieces,fade} from './cadScene'
 import {thumbTpStrands} from './thumbTpStrands'
 import frames from './thumbTpFrames.json'
@@ -20,7 +21,7 @@ export function cadThumbFinishing(bundle:Bundle,build:Build,kind:'pins'|'bearing
  // Keep the measured routes intact; only the camera's focus changes.
  strands.group.traverse(n=>{if(n instanceof THREE.Mesh)(n.material as THREE.MeshBasicMaterial).opacity=.85})
  const frameObjects=[tp.object,...pins.map(p=>p.object),...(kind==='bearings'?bearings.map(p=>p.object):[])]
- const labels=kind==='pins'?pins.map((p,i)=>({text:`Guide pin ${i+1} · 2 × 30`,point:p.center.clone()})):
-  bearings.map((p,i)=>({text:build.version==='touch'?`Joint bearing ${i+1}`:p.part.label.replace('Bearing',`Bearing ${i+1}`),point:p.center.clone()}))
+ const labels=kind==='pins'?pins.map((p,i)=>({text:`Guide pin ${i+1} (2 × 30)`,point:p.center.clone()})):
+  bearings.map((p,i)=>({text:build.version==='touch'?`Joint bearing ${i+1}`:guideLabel(p.part.label.replace('Bearing',`Bearing ${i+1}`)),point:p.center.clone()}))
  return {group,labels,frameObjects,direction:axes[kind==='pins'?1:0].clone().multiplyScalar(kind==='pins'?1:-1).addScaledVector(axes[2],kind==='pins'?1.2:.3).normalize(),up:axes[2],dispose:()=>{disposePieces(pieces);strands.dispose()}}
 }

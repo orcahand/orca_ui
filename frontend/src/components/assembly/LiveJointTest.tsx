@@ -63,7 +63,7 @@ export function LiveJointTest({build,id}:{build:Build;id:number}){
   {!status?.capabilities?.motors&&<button className="assembly-secondary" disabled={!ws||busy} onClick={async()=>{setBusy(true);setError('');try{await api.reconnect()}catch(e){report(e)}finally{if(mounted.current)setBusy(false)}}}>Connect hand</button>}
   {!unavailable&&!armed&&<p>Support the hand and clear its travel. Enable the test to hold its current position.</p>}
   <label className="assembly-motion-scrubber"><span>−10°</span><input aria-label="Move connected joint" type="range" min="-10" max="10" step="0.1" disabled={!armed||!!unavailable} value={offset} onChange={e=>slide(+e.target.value)}/><span>+10°</span></label>
-  <p>{offset>0?'+':''}{offset.toFixed(1)}° from the starting position{position!==null?` · ${joint?.encoder_backed?'Measured':control?.effective_pose_source==='target'?'Commanded':'Motor estimate'} ${position.toFixed(1)}°`:''}</p>
+  <p>{offset>0?'+':''}{offset.toFixed(1)}° from the starting position{position!==null?` (${joint?.encoder_backed?'Measured':control?.effective_pose_source==='target'?'Commanded':'Motor estimate'} ${position.toFixed(1)}°)`:''}</p>
   {armed&&<p>Move gently in both directions and check the physical joint. Travel is limited to its calibrated range.</p>}
   {error&&<p role="alert">{error}</p>}
  </section>

@@ -7,7 +7,7 @@ export function TendonPreparation() {
       <path d="M60 145 H840" stroke="#2b818a" strokeWidth="4"/>
       {[415,485].map(x=><g key={x} transform={`translate(${x} 145)`}><path d="M-9 2 C-19 -17 13 -20 9 -1 C-6 21 -20 3 9 -2 C22 -12 8 -27 -7 -11" fill="none" stroke="#2b818a" strokeWidth="5"/><path d="M-9 -13 Q0 -27 10 -12" stroke="#ac783e" strokeWidth="4" fill="none"/></g>)}
       <path d="M60 75 V100 M840 75 V100 M65 85 H835" fill="none" stroke="currentColor" markerStart="url(#measure-arrow)" markerEnd="url(#measure-arrow)"/>
-      <text x="450" y="62" textAnchor="middle">2 m total · near the midpoint</text>
+      <text x="450" y="62" textAnchor="middle">2 m total (near the midpoint)</text>
       <path d="M415 175 V207 M485 175 V207 M420 195 H480" stroke="currentColor" fill="none" markerStart="url(#measure-arrow)" markerEnd="url(#measure-arrow)"/>
       <text x="450" y="235" textAnchor="middle">10 mm ±5 mm between the two stoppers</text>
     </svg>

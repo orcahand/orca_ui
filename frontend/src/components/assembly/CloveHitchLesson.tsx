@@ -24,7 +24,7 @@ export function CloveHitchLesson(){
  },[frame,playing])
  const select=(i:number)=>{setPlaying(false);setFrame(i)}
  return <section className="assembly-knot assembly-clove-hitch" aria-label="Clove hitch visual lesson">
-  <div className="assembly-row"><div><span className="assembly-eyebrow">ONE KNOT · FRAME BY FRAME</span><h3><GuideText variant field="prose/CloveHitchLesson.tsx/49b23163f0" text={"Tie the clove hitch"} label="Section heading"/></h3></div><span>{frame+1} / {stages.length}</span></div>
+  <div className="assembly-row"><div><span className="assembly-eyebrow">ONE KNOT (FRAME BY FRAME)</span><h3><GuideText variant field="prose/CloveHitchLesson.tsx/49b23163f0" text={"Tie the clove hitch"} label="Section heading"/></h3></div><span>{frame+1} / {stages.length}</span></div>
   <div className="assembly-knot-layout"><HitchFrame frame={frame}/><div>
    <span className="assembly-eyebrow">{frame===4?'CHECK THE FINISHED HITCH':'YOUR NEXT MOVEMENT'}</span>
    <p aria-live={playing?'off':'polite'}><GuideText variant field="prose/CloveHitchLesson.tsx/72ac0b75d8" text={String(stages[frame].cue)} label="Guide text"/></p>

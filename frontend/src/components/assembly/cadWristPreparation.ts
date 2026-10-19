@@ -21,7 +21,7 @@ export function cadWristPreparation(bundle:Bundle,build:Build,kind:WristPreparat
    nut.object.position.copy(inward).multiplyScalar(12);group.add(nut.object)
    const from=nut.center.clone().add(nut.object.position)
    group.add(new THREE.ArrowHelper(inward.clone().negate(),from.clone().addScaledVector(inward,-2),8,0x298a92,2,1))
-   labels.push({text:`M4 nut ${i+1} · from inside`,point:from})
+   labels.push({text:`M4 nut ${i+1} (from inside)`,point:from})
    focus.union(nut.bounds)
   }
   focus.expandByScalar(15)
@@ -37,7 +37,7 @@ export function cadWristPreparation(bundle:Bundle,build:Build,kind:WristPreparat
    const from=nut.center.clone().add(nut.object.position)
    const arrow=new THREE.ArrowHelper(new THREE.Vector3(1,0,0),from.clone().add(new THREE.Vector3(2,0,0)),8,0x298a92,2,1)
    group.add(arrow)
-   labels.push({text:`Square nut ${i+1} · insert from inside`,point:from})
+   labels.push({text:`Square nut ${i+1} (insert from inside)`,point:from})
   }
   focus=wrist.bounds.clone()
   direction.set(-1,.6,-.7)
@@ -72,11 +72,11 @@ export function cadWristPreparation(bundle:Bundle,build:Build,kind:WristPreparat
    const pulley=matching(['Carpal pulley'])[0],belt=matching(['GT2 belt · 142 mm'])[0]
    focus=belt.bounds.clone().union(pulley.bounds).union(screws[0].bounds).union(screws[1].bounds).expandByScalar(5)
    labels.push({text:'Wrist belt',point:center.clone().setX(belt.center.x)})
-   labels.push({text:'Carpal pulley · hand side',point:pulley.center.clone()})
+   labels.push({text:'Carpal pulley (hand side)',point:pulley.center.clone()})
    direction.set(-1,.15,-.28)
   }else{
    focus=screws[0].bounds.clone().union(screws[1].bounds).expandByScalar(7)
-   labels.push({text:'PTFE · ID 2.7 / OD 4 mm',point:screws[1].center.clone().setX((screws[1].bounds.min.x+nuts[1].bounds.min.x)/2)})
+   labels.push({text:'PTFE (ID 2.7 / OD 4 mm)',point:screws[1].center.clone().setX((screws[1].bounds.min.x+nuts[1].bounds.min.x)/2)})
    labels.push({text:'PTFE sleeve',point:screws[0].center.clone().setX(screws[0].bounds.min.x+3)})
    direction.set(-.65,.6,-1)
   }

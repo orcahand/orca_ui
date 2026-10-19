@@ -31,5 +31,5 @@ export function cadRouteFace(bundle:Bundle,build:Build,step:string,face:'entry'|
  direction.addScaledVector(new THREE.Vector3(0,0,1),.12).normalize()
  const focus=carpal?new THREE.Box3().setFromPoints(routePoints).expandByScalar(9):undefined
  const names=step==='p64'?['AP toward pinky','PP ext','DP ext','DP flex','PP flex','AP toward thumb']:kinds.map(k=>k.replace('-',' '))
- return {group,labels:step==='p15'?[{text:'PTFE · Ø1.5 / Ø0.9 mm',point:routePoints[0]},{text:'Liner end · 1 mm',point:routePoints[1]}]:[] as {text:string;point:THREE.Vector3}[],direction,focus,routePoints,names,dispose:()=>{disposePieces(all);extra.forEach(m=>{m.geometry.dispose();(m.material as THREE.Material).dispose()})}}
+ return {group,labels:step==='p15'?[{text:'PTFE (Ø1.5 / Ø0.9 mm)',point:routePoints[0]},{text:'Liner end (1 mm)',point:routePoints[1]}]:[] as {text:string;point:THREE.Vector3}[],direction,focus,routePoints,names,dispose:()=>{disposePieces(all);extra.forEach(m=>{m.geometry.dispose();(m.material as THREE.Material).dispose()})}}
 }

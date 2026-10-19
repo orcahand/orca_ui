@@ -5,7 +5,7 @@
     "step": "p49",
     "labels": [
       "Tendon",
-      "Working end · 20 cm"
+      "Working end (20 cm)"
     ],
     "meshes": 85744,
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
@@ -16,7 +16,7 @@
     "step": "p37",
     "labels": [
       "Tendon",
-      "Working end · 20 cm"
+      "Working end (20 cm)"
     ],
     "meshes": 59694,
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
@@ -58,7 +58,7 @@
     "file": "panel-032-3",
     "step": "p31",
     "labels": [
-      "Smooth underside · preserve the curved profile"
+      "PP underside"
     ],
     "meshes": 25430,
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
@@ -402,8 +402,8 @@
     "file": "panel-015-1",
     "step": "p15",
     "labels": [
-      "PTFE · Ø1.5 / Ø0.9 mm",
-      "Liner end · 1 mm"
+      "PTFE (Ø1.5 / Ø0.9 mm)",
+      "Liner end (1 mm)"
     ],
     "meshes": 55854,
     "points": [
@@ -439,8 +439,8 @@
     "file": "panel-015-2",
     "step": "p15",
     "labels": [
-      "PTFE · Ø1.5 / Ø0.9 mm",
-      "Liner end · 1 mm"
+      "PTFE (Ø1.5 / Ø0.9 mm)",
+      "Liner end (1 mm)"
     ],
     "meshes": 55854,
     "points": [
@@ -668,8 +668,8 @@
     "file": "panel-091-1",
     "step": "p122",
     "labels": [
-      "Pin · 4 × 10",
-      "Bearing · 4 × 8 × 3"
+      "Pin (4 × 10)",
+      "Bearing (4 × 8 × 3)"
     ],
     "meshes": 96336,
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
@@ -709,7 +709,7 @@
     "step": "p49",
     "labels": [
       "Tendon",
-      "Working end · 20 cm"
+      "Working end (20 cm)"
     ],
     "meshes": 85069,
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
@@ -720,7 +720,7 @@
     "step": "p37",
     "labels": [
       "Tendon",
-      "Working end · 20 cm"
+      "Working end (20 cm)"
     ],
     "meshes": 59964,
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
@@ -762,7 +762,7 @@
     "file": "panel-032-3",
     "step": "p31",
     "labels": [
-      "Smooth underside · preserve the curved profile"
+      "PP underside"
     ],
     "meshes": 25410,
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
@@ -1106,8 +1106,8 @@
     "file": "panel-015-1",
     "step": "p15",
     "labels": [
-      "PTFE · Ø1.5 / Ø0.9 mm",
-      "Liner end · 1 mm"
+      "PTFE (Ø1.5 / Ø0.9 mm)",
+      "Liner end (1 mm)"
     ],
     "meshes": 56124,
     "points": [
@@ -1143,8 +1143,8 @@
     "file": "panel-015-2",
     "step": "p15",
     "labels": [
-      "PTFE · Ø1.5 / Ø0.9 mm",
-      "Liner end · 1 mm"
+      "PTFE (Ø1.5 / Ø0.9 mm)",
+      "Liner end (1 mm)"
     ],
     "meshes": 56124,
     "points": [
@@ -1372,8 +1372,8 @@
     "file": "panel-091-1",
     "step": "p122",
     "labels": [
-      "Pin · 4 × 10",
-      "Bearing · 4 × 8 × 3"
+      "Pin (4 × 10)",
+      "Bearing (4 × 8 × 3)"
     ],
     "meshes": 96336,
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
@@ -1413,7 +1413,7 @@
     "step": "p49",
     "labels": [
       "Tendon",
-      "Working end · 20 cm"
+      "Working end (20 cm)"
     ],
     "meshes": 79222,
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
@@ -1424,7 +1424,7 @@
     "step": "p37",
     "labels": [
       "Tendon",
-      "Working end · 20 cm"
+      "Working end (20 cm)"
     ],
     "meshes": 60480,
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
@@ -1466,7 +1466,7 @@
     "file": "panel-032-3",
     "step": "p31",
     "labels": [
-      "Smooth underside · preserve the curved profile"
+      "PP underside"
     ],
     "meshes": 27164,
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
@@ -1810,8 +1810,8 @@
     "file": "panel-015-1",
     "step": "p15",
     "labels": [
-      "PTFE · Ø1.5 / Ø0.9 mm",
-      "Liner end · 1 mm"
+      "PTFE (Ø1.5 / Ø0.9 mm)",
+      "Liner end (1 mm)"
     ],
     "meshes": 56640,
     "points": [
@@ -1847,8 +1847,8 @@
     "file": "panel-015-2",
     "step": "p15",
     "labels": [
-      "PTFE · Ø1.5 / Ø0.9 mm",
-      "Liner end · 1 mm"
+      "PTFE (Ø1.5 / Ø0.9 mm)",
+      "Liner end (1 mm)"
     ],
     "meshes": 56640,
     "points": [
@@ -2076,8 +2076,8 @@
     "file": "panel-091-1",
     "step": "p122",
     "labels": [
-      "Pin · 4 × 10",
-      "Bearing · 4 × 8 × 3"
+      "Pin (4 × 10)",
+      "Bearing (4 × 8 × 3)"
     ],
     "meshes": 96336,
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
@@ -2117,7 +2117,7 @@
     "step": "p49",
     "labels": [
       "Tendon",
-      "Working end · 20 cm"
+      "Working end (20 cm)"
     ],
     "meshes": 79198,
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
@@ -2128,7 +2128,7 @@
     "step": "p37",
     "labels": [
       "Tendon",
-      "Working end · 20 cm"
+      "Working end (20 cm)"
     ],
     "meshes": 60640,
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
@@ -2170,7 +2170,7 @@
     "file": "panel-032-3",
     "step": "p31",
     "labels": [
-      "Smooth underside · preserve the curved profile"
+      "PP underside"
     ],
     "meshes": 27142,
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
@@ -2514,8 +2514,8 @@
     "file": "panel-015-1",
     "step": "p15",
     "labels": [
-      "PTFE · Ø1.5 / Ø0.9 mm",
-      "Liner end · 1 mm"
+      "PTFE (Ø1.5 / Ø0.9 mm)",
+      "Liner end (1 mm)"
     ],
     "meshes": 56800,
     "points": [
@@ -2551,8 +2551,8 @@
     "file": "panel-015-2",
     "step": "p15",
     "labels": [
-      "PTFE · Ø1.5 / Ø0.9 mm",
-      "Liner end · 1 mm"
+      "PTFE (Ø1.5 / Ø0.9 mm)",
+      "Liner end (1 mm)"
     ],
     "meshes": 56800,
     "points": [
@@ -2780,8 +2780,8 @@
     "file": "panel-091-1",
     "step": "p122",
     "labels": [
-      "Pin · 4 × 10",
-      "Bearing · 4 × 8 × 3"
+      "Pin (4 × 10)",
+      "Bearing (4 × 8 × 3)"
     ],
     "meshes": 96336,
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
@@ -2821,7 +2821,7 @@
     "step": "p89",
     "labels": [
       "Wrist belt",
-      "Carpal pulley · hand side"
+      "Carpal pulley (hand side)"
     ],
     "meshes": 493847,
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
@@ -2831,7 +2831,7 @@
     "file": "panel-030-4",
     "step": "p29",
     "labels": [
-      "Bearing · 4 × 8 × 3"
+      "Bearing (4 × 8 × 3)"
     ],
     "meshes": 19633,
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
@@ -2841,10 +2841,9 @@
     "file": "panel-034-3",
     "step": "prepare-pp",
     "labels": [
-      "Pin · 2 × 8",
-      "Pin · 2 × 6"
+      "Pin (2 × 8)"
     ],
-    "meshes": 25564,
+    "meshes": 24730,
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
   },
   {
@@ -2853,7 +2852,7 @@
     "step": "p89",
     "labels": [
       "Wrist belt",
-      "Carpal pulley · hand side"
+      "Carpal pulley (hand side)"
     ],
     "meshes": 493847,
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
@@ -2863,7 +2862,7 @@
     "file": "panel-030-4",
     "step": "p29",
     "labels": [
-      "Bearing · 4 × 8 × 3"
+      "Bearing (4 × 8 × 3)"
     ],
     "meshes": 19593,
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
@@ -2873,10 +2872,9 @@
     "file": "panel-034-3",
     "step": "prepare-pp",
     "labels": [
-      "Pin · 2 × 8",
-      "Pin · 2 × 6"
+      "Pin (2 × 8)"
     ],
-    "meshes": 25546,
+    "meshes": 24710,
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
   },
   {
@@ -2885,7 +2883,7 @@
     "step": "p89",
     "labels": [
       "Wrist belt",
-      "Carpal pulley · hand side"
+      "Carpal pulley (hand side)"
     ],
     "meshes": 493847,
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
@@ -2895,7 +2893,7 @@
     "file": "panel-030-4",
     "step": "p29",
     "labels": [
-      "Bearing · 4 × 8 × 3"
+      "Bearing (4 × 8 × 3)"
     ],
     "meshes": 29952,
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
@@ -2905,10 +2903,9 @@
     "file": "panel-034-3",
     "step": "prepare-pp",
     "labels": [
-      "Pin · 2 × 8",
-      "Pin · 2 × 6"
+      "Pin (2 × 8)"
     ],
-    "meshes": 27300,
+    "meshes": 26464,
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f"
   },
   {
@@ -2917,7 +2914,7 @@
     "step": "p89",
     "labels": [
       "Wrist belt",
-      "Carpal pulley · hand side"
+      "Carpal pulley (hand side)"
     ],
     "meshes": 493847,
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
@@ -2927,7 +2924,7 @@
     "file": "panel-030-4",
     "step": "p29",
     "labels": [
-      "Bearing · 4 × 8 × 3"
+      "Bearing (4 × 8 × 3)"
     ],
     "meshes": 29850,
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
@@ -2937,10 +2934,9 @@
     "file": "panel-034-3",
     "step": "prepare-pp",
     "labels": [
-      "Pin · 2 × 8",
-      "Pin · 2 × 6"
+      "Pin (2 × 8)"
     ],
-    "meshes": 27278,
+    "meshes": 26442,
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
   },
   {
@@ -3140,20 +3136,20 @@
     "meshes": 52694,
     "points": [
       [
-        940.3283905905075,
-        1112.4755810409536
+        934.5068947595846,
+        1103.8142223343505
       ],
       [
-        952.5988392742718,
-        1122.6562135540587
+        945.5703810596233,
+        1113.4269475625715
       ],
       [
-        1118.4945359457267,
-        1309.6279195418663
+        1092.131917538013,
+        1289.985627820175
       ],
       [
-        1127.6260674528744,
-        1320.8896026213772
+        1116.9312746395103,
+        1321.097236232354
       ]
     ],
     "names": [
@@ -3172,20 +3168,20 @@
     "meshes": 52674,
     "points": [
       [
-        885.7902273737907,
-        1103.6687602618013
+        866.0525974224264,
+        1103.8680754730217
       ],
       [
-        891.5468391246109,
-        1093.7082126388889
+        873.4063563794737,
+        1093.3779318556105
       ],
       [
-        717.9305530041769,
-        1321.1633683287537
+        672.1779267332062,
+        1321.1695101385887
       ],
       [
-        726.6712953956878,
-        1312.212965048325
+        699.3713299409281,
+        1295.79410836675
       ]
     ],
     "names": [
@@ -3204,20 +3200,20 @@
     "meshes": 54428,
     "points": [
       [
-        992.791892987807,
-        1114.6914574457087
+        973.6044463091132,
+        1103.858659731116
       ],
       [
-        1008.4208223761792,
-        1120.085828696574
+        987.8138545894714,
+        1109.3911636446742
       ],
       [
-        1187.6333766152848,
-        1313.1992977423401
+        1142.3707278473628,
+        1298.7020410413547
       ],
       [
-        1197.4808474539998,
-        1321.0992696570568
+        1168.3736988033245,
+        1321.3207391800547
       ]
     ],
     "names": [
@@ -3236,20 +3232,20 @@
     "meshes": 54406,
     "points": [
       [
-        873.1171040739229,
-        1112.6430892765327
+        863.1186314778064,
+        1109.0968290699561
       ],
       [
-        876.1263070409312,
-        1100.3867588335515
+        867.5597454972219,
+        1095.9364668575524
       ],
       [
-        692.6348347638354,
-        1320.9174403858124
+        661.0767525398911,
+        1320.8411367403232
       ],
       [
-        701.852467273243,
-        1310.7667465339332
+        688.9582390536507,
+        1291.7649392441701
       ]
     ],
     "names": [
@@ -4416,7 +4412,7 @@
     "file": "panel-058-1",
     "step": "p56",
     "labels": [
-      "Working end · 20 cm",
+      "Working end (20 cm)",
       "TP anchor housing"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
@@ -4450,7 +4446,7 @@
     "step": "p49",
     "labels": [
       "Reinforced stopper",
-      "Tail · 5 mm"
+      "Tail (5 mm)"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 167728,
@@ -4474,7 +4470,7 @@
     "step": "p37",
     "labels": [
       "Reinforced stopper",
-      "Tail · 5 mm"
+      "Tail (5 mm)"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 94830
@@ -4537,7 +4533,7 @@
     "file": "panel-058-1",
     "step": "p56",
     "labels": [
-      "Working end · 20 cm",
+      "Working end (20 cm)",
       "TP anchor housing"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
@@ -4571,7 +4567,7 @@
     "step": "p49",
     "labels": [
       "Reinforced stopper",
-      "Tail · 5 mm"
+      "Tail (5 mm)"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 167053,
@@ -4595,7 +4591,7 @@
     "step": "p37",
     "labels": [
       "Reinforced stopper",
-      "Tail · 5 mm"
+      "Tail (5 mm)"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 95100
@@ -4658,7 +4654,7 @@
     "file": "panel-058-1",
     "step": "p56",
     "labels": [
-      "Working end · 20 cm",
+      "Working end (20 cm)",
       "TP anchor housing"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
@@ -4692,7 +4688,7 @@
     "step": "p49",
     "labels": [
       "Reinforced stopper",
-      "Tail · 5 mm"
+      "Tail (5 mm)"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
     "meshes": 161206,
@@ -4716,7 +4712,7 @@
     "step": "p37",
     "labels": [
       "Reinforced stopper",
-      "Tail · 5 mm"
+      "Tail (5 mm)"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
     "meshes": 95616
@@ -4779,7 +4775,7 @@
     "file": "panel-058-1",
     "step": "p56",
     "labels": [
-      "Working end · 20 cm",
+      "Working end (20 cm)",
       "TP anchor housing"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
@@ -4813,7 +4809,7 @@
     "step": "p49",
     "labels": [
       "Reinforced stopper",
-      "Tail · 5 mm"
+      "Tail (5 mm)"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 161182,
@@ -4837,7 +4833,7 @@
     "step": "p37",
     "labels": [
       "Reinforced stopper",
-      "Tail · 5 mm"
+      "Tail (5 mm)"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 95776
@@ -4964,8 +4960,8 @@
     "file": "panel-063-1",
     "step": "p62",
     "labels": [
-      "Guide pin 1 · 2 × 30",
-      "Guide pin 2 · 2 × 30"
+      "Guide pin 1 (2 × 30)",
+      "Guide pin 2 (2 × 30)"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 250780
@@ -4975,8 +4971,8 @@
     "file": "panel-063-1",
     "step": "p62",
     "labels": [
-      "Guide pin 1 · 2 × 30",
-      "Guide pin 2 · 2 × 30"
+      "Guide pin 1 (2 × 30)",
+      "Guide pin 2 (2 × 30)"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 249619
@@ -4986,8 +4982,8 @@
     "file": "panel-063-1",
     "step": "p62",
     "labels": [
-      "Guide pin 1 · 2 × 30",
-      "Guide pin 2 · 2 × 30"
+      "Guide pin 1 (2 × 30)",
+      "Guide pin 2 (2 × 30)"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
     "meshes": 265076
@@ -4997,8 +4993,8 @@
     "file": "panel-063-1",
     "step": "p62",
     "labels": [
-      "Guide pin 1 · 2 × 30",
-      "Guide pin 2 · 2 × 30"
+      "Guide pin 1 (2 × 30)",
+      "Guide pin 2 (2 × 30)"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 264860
@@ -5008,8 +5004,8 @@
     "file": "panel-063-2",
     "step": "p62",
     "labels": [
-      "Bearing 1 · 4 × 8 × 3",
-      "Bearing 2 · 4 × 8 × 3"
+      "Bearing 1 (4 × 8 × 3)",
+      "Bearing 2 (4 × 8 × 3)"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 254812
@@ -5019,8 +5015,8 @@
     "file": "panel-063-2",
     "step": "p62",
     "labels": [
-      "Bearing 1 · 4 × 8 × 3",
-      "Bearing 2 · 4 × 8 × 3"
+      "Bearing 1 (4 × 8 × 3)",
+      "Bearing 2 (4 × 8 × 3)"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 253651
@@ -5052,8 +5048,8 @@
     "file": "panel-072-1",
     "step": "p70",
     "labels": [
-      "Dorsal row · 16 tendons",
-      "Palmar row · 16 tendons"
+      "Dorsal row (16 tendons)",
+      "Palmar row (16 tendons)"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 613400,
@@ -5389,8 +5385,8 @@
     "file": "panel-072-1",
     "step": "p70",
     "labels": [
-      "Dorsal row · 16 tendons",
-      "Palmar row · 16 tendons"
+      "Dorsal row (16 tendons)",
+      "Palmar row (16 tendons)"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 613108,
@@ -5726,8 +5722,8 @@
     "file": "panel-072-1",
     "step": "p70",
     "labels": [
-      "Dorsal row · 16 tendons",
-      "Palmar row · 16 tendons"
+      "Dorsal row (16 tendons)",
+      "Palmar row (16 tendons)"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
     "meshes": 655653,
@@ -6063,8 +6059,8 @@
     "file": "panel-072-1",
     "step": "p70",
     "labels": [
-      "Dorsal row · 16 tendons",
-      "Palmar row · 16 tendons"
+      "Dorsal row (16 tendons)",
+      "Palmar row (16 tendons)"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 654950,
@@ -6621,7 +6617,7 @@
     "step": "p142",
     "labels": [
       "Adapter plate",
-      "Mounting rods · ×2"
+      "Mounting rods (×2)"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 7754
@@ -6643,7 +6639,7 @@
     "step": "p142",
     "labels": [
       "Adapter plate",
-      "Mounting rods · ×2"
+      "Mounting rods (×2)"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 7754
@@ -6665,7 +6661,7 @@
     "step": "p142",
     "labels": [
       "Adapter plate",
-      "Mounting rods · ×2"
+      "Mounting rods (×2)"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
     "meshes": 7754
@@ -6687,7 +6683,7 @@
     "step": "p142",
     "labels": [
       "Adapter plate",
-      "Mounting rods · ×2"
+      "Mounting rods (×2)"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 7754
@@ -6709,7 +6705,7 @@
     "step": "p142",
     "labels": [
       "Adapter plate",
-      "Mounting rods · ×2",
+      "Mounting rods (×2)",
       "Motor tower"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
@@ -6721,7 +6717,7 @@
     "step": "p142",
     "labels": [
       "Adapter plate",
-      "Mounting rods · ×2",
+      "Mounting rods (×2)",
       "Motor tower"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
@@ -6733,7 +6729,7 @@
     "step": "p142",
     "labels": [
       "Adapter plate",
-      "Mounting rods · ×2",
+      "Mounting rods (×2)",
       "Motor tower"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
@@ -6745,7 +6741,7 @@
     "step": "p142",
     "labels": [
       "Adapter plate",
-      "Mounting rods · ×2",
+      "Mounting rods (×2)",
       "Motor tower"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
@@ -6956,8 +6952,8 @@
     "file": "panel-096-3",
     "step": "p93",
     "labels": [
-      "Motor lead · upper slot",
-      "Fan leads · lower slot"
+      "Motor lead (upper slot)",
+      "Fan leads (lower slot)"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 106864
@@ -6967,8 +6963,8 @@
     "file": "panel-096-3",
     "step": "p93",
     "labels": [
-      "Motor lead · upper slot",
-      "Fan leads · lower slot"
+      "Motor lead (upper slot)",
+      "Fan leads (lower slot)"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 106864
@@ -6978,8 +6974,8 @@
     "file": "panel-096-3",
     "step": "p93",
     "labels": [
-      "Motor lead · upper slot",
-      "Fan leads · lower slot"
+      "Motor lead (upper slot)",
+      "Fan leads (lower slot)"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
     "meshes": 106864
@@ -6989,8 +6985,8 @@
     "file": "panel-096-3",
     "step": "p93",
     "labels": [
-      "Motor lead · upper slot",
-      "Fan leads · lower slot"
+      "Motor lead (upper slot)",
+      "Fan leads (lower slot)"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 106864
@@ -7208,7 +7204,7 @@
     "file": "panel-076-3",
     "step": "p75",
     "labels": [
-      "PTFE · ID 2.7 / OD 4 mm",
+      "PTFE (ID 2.7 / OD 4 mm)",
       "PTFE sleeve"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
@@ -7230,8 +7226,8 @@
     "file": "panel-076-2",
     "step": "p75",
     "labels": [
-      "Square nut 1 · insert from inside",
-      "Square nut 2 · insert from inside"
+      "Square nut 1 (insert from inside)",
+      "Square nut 2 (insert from inside)"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 456555
@@ -7241,7 +7237,7 @@
     "file": "panel-076-3",
     "step": "p75",
     "labels": [
-      "PTFE · ID 2.7 / OD 4 mm",
+      "PTFE (ID 2.7 / OD 4 mm)",
       "PTFE sleeve"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
@@ -7263,8 +7259,8 @@
     "file": "panel-076-2",
     "step": "p75",
     "labels": [
-      "Square nut 1 · insert from inside",
-      "Square nut 2 · insert from inside"
+      "Square nut 1 (insert from inside)",
+      "Square nut 2 (insert from inside)"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 456555
@@ -7274,7 +7270,7 @@
     "file": "panel-076-3",
     "step": "p75",
     "labels": [
-      "PTFE · ID 2.7 / OD 4 mm",
+      "PTFE (ID 2.7 / OD 4 mm)",
       "PTFE sleeve"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
@@ -7296,8 +7292,8 @@
     "file": "panel-076-2",
     "step": "p75",
     "labels": [
-      "Square nut 1 · insert from inside",
-      "Square nut 2 · insert from inside"
+      "Square nut 1 (insert from inside)",
+      "Square nut 2 (insert from inside)"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
     "meshes": 456555
@@ -7307,7 +7303,7 @@
     "file": "panel-076-3",
     "step": "p75",
     "labels": [
-      "PTFE · ID 2.7 / OD 4 mm",
+      "PTFE (ID 2.7 / OD 4 mm)",
       "PTFE sleeve"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
@@ -7329,8 +7325,8 @@
     "file": "panel-076-2",
     "step": "p75",
     "labels": [
-      "Square nut 1 · insert from inside",
-      "Square nut 2 · insert from inside"
+      "Square nut 1 (insert from inside)",
+      "Square nut 2 (insert from inside)"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 456555
@@ -7340,9 +7336,9 @@
     "file": "panel-096-2",
     "step": "p93",
     "labels": [
-      "M4 nut 1 · from inside",
-      "M4 nut 2 · from inside",
-      "M4 nut 3 · from inside"
+      "M4 nut 1 (from inside)",
+      "M4 nut 2 (from inside)",
+      "M4 nut 3 (from inside)"
     ],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 37542
@@ -7352,9 +7348,9 @@
     "file": "panel-096-2",
     "step": "p93",
     "labels": [
-      "M4 nut 1 · from inside",
-      "M4 nut 2 · from inside",
-      "M4 nut 3 · from inside"
+      "M4 nut 1 (from inside)",
+      "M4 nut 2 (from inside)",
+      "M4 nut 3 (from inside)"
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 37542
@@ -7364,9 +7360,9 @@
     "file": "panel-096-2",
     "step": "p93",
     "labels": [
-      "M4 nut 1 · from inside",
-      "M4 nut 2 · from inside",
-      "M4 nut 3 · from inside"
+      "M4 nut 1 (from inside)",
+      "M4 nut 2 (from inside)",
+      "M4 nut 3 (from inside)"
     ],
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
     "meshes": 37542
@@ -7376,9 +7372,9 @@
     "file": "panel-096-2",
     "step": "p93",
     "labels": [
-      "M4 nut 1 · from inside",
-      "M4 nut 2 · from inside",
-      "M4 nut 3 · from inside"
+      "M4 nut 1 (from inside)",
+      "M4 nut 2 (from inside)",
+      "M4 nut 3 (from inside)"
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 37542
@@ -7489,7 +7485,7 @@
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 98560,
     "step": "thumb-dp",
-    "caption": "Thumb DP · feed both free ends through the knot housing",
+    "caption": "Thumb DP (feed both free ends through the knot housing)",
     "instruction": 1
   },
   {
@@ -7502,7 +7498,7 @@
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 39952,
     "step": "thumb-dp",
-    "caption": "Thumb DP · seat the reinforced stoppers and tuck the connecting loop",
+    "caption": "Thumb DP (seat the reinforced stoppers and tuck the connecting loop)",
     "instruction": 2
   },
   {
@@ -7514,7 +7510,7 @@
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 35008,
     "step": "thumb-dp",
-    "caption": "Thumb DP · keep the loop inside the housing and both ends free",
+    "caption": "Thumb DP (keep the loop inside the housing and both ends free)",
     "instruction": 2
   },
   {
@@ -7524,7 +7520,7 @@
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 23834,
     "step": "thumb-pp",
-    "caption": "Thumb PP · keep the cable channel accessible while threading",
+    "caption": "Thumb PP (keep the cable channel accessible while threading)",
     "instruction": 1
   },
   {
@@ -7537,7 +7533,7 @@
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 98554,
     "step": "thumb-dp",
-    "caption": "Thumb DP · feed both free ends through the knot housing",
+    "caption": "Thumb DP (feed both free ends through the knot housing)",
     "instruction": 1
   },
   {
@@ -7550,7 +7546,7 @@
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 39946,
     "step": "thumb-dp",
-    "caption": "Thumb DP · seat the reinforced stoppers and tuck the connecting loop",
+    "caption": "Thumb DP (seat the reinforced stoppers and tuck the connecting loop)",
     "instruction": 2
   },
   {
@@ -7562,7 +7558,7 @@
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 35002,
     "step": "thumb-dp",
-    "caption": "Thumb DP · keep the loop inside the housing and both ends free",
+    "caption": "Thumb DP (keep the loop inside the housing and both ends free)",
     "instruction": 2
   },
   {
@@ -7572,7 +7568,7 @@
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 23902,
     "step": "thumb-pp",
-    "caption": "Thumb PP · keep the cable channel accessible while threading",
+    "caption": "Thumb PP (keep the cable channel accessible while threading)",
     "instruction": 1
   },
   {
@@ -7585,7 +7581,7 @@
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
     "meshes": 102718,
     "step": "thumb-dp",
-    "caption": "Thumb DP · feed both free ends through the knot housing",
+    "caption": "Thumb DP (feed both free ends through the knot housing)",
     "instruction": 1
   },
   {
@@ -7598,7 +7594,7 @@
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
     "meshes": 44110,
     "step": "thumb-dp",
-    "caption": "Thumb DP · seat the reinforced stoppers and tuck the connecting loop",
+    "caption": "Thumb DP (seat the reinforced stoppers and tuck the connecting loop)",
     "instruction": 2
   },
   {
@@ -7610,7 +7606,7 @@
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
     "meshes": 39166,
     "step": "thumb-dp",
-    "caption": "Thumb DP · keep the loop inside the housing and both ends free",
+    "caption": "Thumb DP (keep the loop inside the housing and both ends free)",
     "instruction": 2
   },
   {
@@ -7620,7 +7616,7 @@
     "sourceSha256": "9d4db6a6af9598ba11fac8778fa69eabc8924f6d2c8d4df1c7112f9154d6814f",
     "meshes": 24530,
     "step": "thumb-pp",
-    "caption": "Thumb PP · keep the cable channel accessible while threading",
+    "caption": "Thumb PP (keep the cable channel accessible while threading)",
     "instruction": 1
   },
   {
@@ -7633,7 +7629,7 @@
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 102718,
     "step": "thumb-dp",
-    "caption": "Thumb DP · feed both free ends through the knot housing",
+    "caption": "Thumb DP (feed both free ends through the knot housing)",
     "instruction": 1
   },
   {
@@ -7646,7 +7642,7 @@
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 44110,
     "step": "thumb-dp",
-    "caption": "Thumb DP · seat the reinforced stoppers and tuck the connecting loop",
+    "caption": "Thumb DP (seat the reinforced stoppers and tuck the connecting loop)",
     "instruction": 2
   },
   {
@@ -7658,7 +7654,7 @@
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 39166,
     "step": "thumb-dp",
-    "caption": "Thumb DP · keep the loop inside the housing and both ends free",
+    "caption": "Thumb DP (keep the loop inside the housing and both ends free)",
     "instruction": 2
   },
   {
@@ -7668,7 +7664,7 @@
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 24668,
     "step": "thumb-pp",
-    "caption": "Thumb PP · keep the cable channel accessible while threading",
+    "caption": "Thumb PP (keep the cable channel accessible while threading)",
     "instruction": 1
   }
 ]

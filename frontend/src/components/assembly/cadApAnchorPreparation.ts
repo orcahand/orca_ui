@@ -42,7 +42,7 @@ export function cadApAnchorPreparation(bundle:Bundle,build:Build,phase:ApAnchorP
   if(phase==='thread')line([seat,seat.clone().addScaledVector(up,20)])
   else{line([seat,knotEntry]);line([knotExit,knotExit.clone().addScaledVector(up,8)]);group.add(stopper.group)}
   labels.push({text:phase==='thread'?'Tendon':thumb?'Ashley stopper + 3 single knots':'Ashley stopper + single knot',point:phase==='thread'?entrance:knot})
-  labels.push({text:phase==='thread'?'Working end · 20 cm':'Knot housing',point:phase==='thread'?seat.clone().addScaledVector(up,18):seat})
+  labels.push({text:phase==='thread'?'Working end (20 cm)':'Knot housing',point:phase==='thread'?seat.clone().addScaledVector(up,18):seat})
  }else if(phase==='trim'){
   const from=knotExit,end=from.clone().addScaledVector(up,5)
   line([seat,knotEntry]);line([from,end]);group.add(stopper.group)
@@ -50,7 +50,7 @@ export function cadApAnchorPreparation(bundle:Bundle,build:Build,phase:ApAnchorP
   line([from.clone().add(offset),end.clone().add(offset)],.045,'#b16d23')
   for(const p of [from,end])line([p.clone().add(offset).addScaledVector(front,-.5),p.clone().add(offset).addScaledVector(front,.5)],.045,'#b16d23')
   labels.push({text:'Reinforced stopper',point:knot})
-  labels.push({text:'Tail · 5 mm',point:from.clone().lerp(end,.5).add(offset)})
+  labels.push({text:'Tail (5 mm)',point:from.clone().lerp(end,.5).add(offset)})
  }
  if(seated){
   fade(part,.22)

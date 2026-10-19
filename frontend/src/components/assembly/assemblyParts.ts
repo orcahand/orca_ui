@@ -33,7 +33,7 @@ export function partQuantityLabel(part:Part,stock:Supply[],area?:string){
   const suffix=optional.length?optional.some(s=>!Number.isFinite(Number(s.quantity)))?' + optional kit (confirm count)':` + ${optional.reduce((n,s)=>n+Number(s.quantity),0)} optional`:''
   return `${partQuantity(part,stock,area)}${suffix}`
 }
-export const supplyQuantity=(s:Supply)=>`${s.quantity}${s.optional?' · optional':''}`
+export const supplyQuantity=(s:Supply)=>`${s.quantity}${s.optional?' (optional)':''}`
 export function supplies(build:Build):Supply[] {
   const touchInventory=build.side==='left'?touchLeft:touchRight
   const touchScrews:Supply[]=build.version==='touch'?[
@@ -47,12 +47,13 @@ export function supplies(build:Build):Supply[] {
   }):[]
   const list:Supply[] = [
     ...touchScrews,
+    ...(build.version==='touch'?[{id:'carpal-cover-screws',label:'M1.4 × 6 self-tapping screw',quantity:'4',areas:['Carpals'] as Area[],kind:'hardware' as const,note:'Four screws secure the carpal cover after the Touch connector board is connected.'}]:[]),
     {id:`carpal-cover-${build.side}`,label:'Carpal cover',quantity:'1',areas:['Carpals'],kind:'hardware',note:'Separate printed carpal cover; omitted from the complete CAD assembly export.',image:`./assembly/supplies/carpal-cover-${build.side}.svg`,files:[{label:'STL',src:`./assembly/supplies/carpal-cover-${build.side}.stl`}]},
     {id:'cord',label:'Tendon cord',quantity:'29 m + spare',areas:['Thumb','Fingers','Carpals','Wrist','Tower'],kind:'cord',note:'Ten 2 m lengths and twelve 75 cm lengths. These form 32 routed tendon ends; the same ends continue through carpals, wrist and tower.'},
-    {id:'ptfe',label:'PTFE channel liner · OD 1.5 / ID 0.9 mm',quantity:'74 cut pieces',areas:['Thumb','Fingers','Carpals','Wrist'],kind:'tube',note:'2 thumb AP liners + 8 finger AP liners + 32 carpal liners + 32 wrist liners. Cut and trim during preparation.'},
-    {id:'sleeves',label:'PTFE screw sleeve · OD 4 / ID 2.7 mm',quantity:'2 cut pieces',areas:['Wrist'],kind:'tube',note:'Sleeves over the two wrist screw threads. Trim to fit at the wrist preparation step.'},
+    {id:'ptfe',label:'PTFE channel liner (OD 1.5 / ID 0.9 mm)',quantity:'74 cut pieces',areas:['Thumb','Fingers','Carpals','Wrist'],kind:'tube',note:'2 thumb AP liners + 8 finger AP liners + 32 carpal liners + 32 wrist liners. Cut and trim during preparation.'},
+    {id:'sleeves',label:'PTFE screw sleeve (OD 4 / ID 2.7 mm)',quantity:'2 cut pieces',areas:['Wrist'],kind:'tube',note:'Sleeves over the two wrist screw threads. Trim to fit at the wrist preparation step.'},
     ...(build.motor==='dynamixel'?[
-      {id:'motor-long',label:'3-pin board-to-motor cable · 180 mm',quantity:'1',areas:['Tower'] as Area[],kind:'cable' as const,note:'From the OH board through the upper tower slot.'},
+      {id:'motor-long',label:'3-pin board-to-motor cable (180 mm)',quantity:'1',areas:['Tower'] as Area[],kind:'cable' as const,note:'From the OH board through the upper tower slot.'},
       {id:'motor-links',label:'3-pin column-link cables',quantity:'3',areas:['Tower'] as Area[],kind:'cable' as const,note:'Two bottom links (14 → 13 and 6 → 5) and one top link (10 → 9). The bottom links use 30–50 mm cables; match the top link to the routed assembly.'},
       {id:'wrist-lead',label:'3-pin wrist motor cable',quantity:'1',areas:['Tower','Wrist'] as Area[],kind:'cable' as const,note:'From the last spool motor to the wrist motor. Check the required length against your routed assembly.'},
     ]:[{id:'feetech-harness',label:'FeeTech motor cable harness',quantity:'1 matching set',areas:['Tower','Wrist'] as Area[],kind:'cable' as const,note:'Short neighbor links, long bottom links and the two thin-to-thick adapter leads shown in the motor wiring steps.'}]),
@@ -64,13 +65,13 @@ export function supplies(build:Build):Supply[] {
     {id:'board-cover-screw',label:'M2 × 8 socket screw',partLabel:'M2 × 8 socket screw',quantity:'1',areas:['Tower'],kind:'hardware',note:'Includes 1 screw for the OH board cable cover.',image:'./assembly/parts/base-right-dynamixel/d1b7310480.png'},
     {id:'arm-flange-screws',label:'M6 × 8 low-profile mounting screw',partLabel:'M6 × 8 low-profile mounting screw',quantity:'4',optional:true,areas:['Tower'],kind:'hardware',note:'Only for the optional arm adapter. Match the screw head to the supplied plate and arm flange.',image:'./assembly/supplies/mount-screw.svg'},
     {id:'arm-hand-screws',label:'M3 × 14 socket screw',partLabel:'M3 × 14 socket screw',quantity:'unconfirmed',optional:true,areas:['Tower'],kind:'hardware',note:'Optional arm mounting needs additional M3×14 screws. The written instructions say 3 and the older illustration shows 4; confirm the supplied kit before purchasing or fitting them.',image:'./assembly/parts/base-right-dynamixel/f1efd004fd.png'},
-    {id:'fan-leads',label:'Fan leads',quantity:'2 · with fans',areas:['Tower'],kind:'cable',note:'Included with the two fans; route through the lower tower slot.'},
+    {id:'fan-leads',label:'Fan leads',quantity:'2 (with fans)',areas:['Tower'],kind:'cable',note:'Included with the two fans; route through the lower tower slot.'},
     ...(build.version!=='base'?[
       {id:'board-lead',label:'4-wire connector-board cable',quantity:'1',areas:['Carpals','Wrist','Tower'] as Area[],kind:'cable' as const,note:'Connects the OH board and the selected version’s connector board.'},
       ...(build.version==='touch'?[
-        {id:'touch-short',label:'Touch sensor cable · 130 mm',quantity:'3',areas:['Thumb','Fingers','Carpals'] as Area[],kind:'cable' as const,note:'Three short cables. Finger allocation needs confirmation; the cable-wrapping step shows the short-cable dimensions.'},
-        {id:'touch-long',label:'Touch sensor cable · 280 mm',quantity:'2',areas:['Thumb','Fingers','Carpals'] as Area[],kind:'cable' as const,note:'Two long cables. Confirm the finger allocation and wrap position before fixing the copper wrap.'},
-        {id:'touch-wire',label:'Copper wrapping wire · Ø0.2 mm',quantity:'2.5 m + spare',areas:['Thumb','Fingers'] as Area[],kind:'cord' as const,note:'Approximately 50 cm per cable, five cables. Secure each end with a clove hitch.'},
+        {id:'touch-short',label:'Touch sensor cable (130 mm)',quantity:'3',areas:['Fingers','Carpals'] as Area[],kind:'cable' as const,note:'One cable each for index, middle and pinky. The cable-wrapping step shows the short-cable dimensions.'},
+        {id:'touch-long',label:'Touch sensor cable (280 mm)',quantity:'2',areas:['Thumb','Fingers','Carpals'] as Area[],kind:'cable' as const,note:'One cable each for thumb and ring. Trial-route each cable to position the copper wrap at its AP.'},
+        {id:'touch-wire',label:'Copper wrapping wire (Ø0.2 mm)',quantity:'2.5 m + spare',areas:['Thumb','Fingers'] as Area[],kind:'cord' as const,note:'Approximately 50 cm per cable, five cables. Secure each end with a clove hitch.'},
       ]:[{id:'sensor-harness',label:'Full finger harness',quantity:'1 matching set',areas:['Thumb','Fingers','Carpals'] as Area[],kind:'cable' as const,note:'Use the harness supplied for the selected hand side and version; check connector lengths against the kit.'}]),
     ]:[]),
     {id:'power',label:'12 V power supply',quantity:'1',areas:['Tower'],kind:'equipment',note:'Power connection to the OH board.'},
@@ -89,7 +90,7 @@ export function supplies(build:Build):Supply[] {
 }
 export function areaSupplyQuantity(s:Supply,area:Area) {
   if(s.id==='ptfe')return `${area==='Thumb'?2:area==='Fingers'?10:32} liners`
-  if(s.id==='cord')return area==='Thumb'?'8 ends · 7 m cut stock':area==='Fingers'?'32 ends · 29 m cut stock':'32 passing ends'
+  if(s.id==='cord')return area==='Thumb'?'8 ends (7 m cut stock)':area==='Fingers'?'32 ends (29 m cut stock)':'32 passing ends'
   return supplyQuantity(s)
 }
 

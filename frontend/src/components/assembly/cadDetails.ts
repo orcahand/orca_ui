@@ -3,10 +3,16 @@ import {cadPieces,disposePieces,fade,framed,nearest,type CadPiece} from './cadSc
 import type {Bundle} from './cadAssets'
 import type {Build} from './buildContent'
 export type CadDetail={title:string;fixed:string[];moving:string[];caption:string;motorSpecific?:boolean}
+export const THUMB_PARTS=[
+ {label:'Thumb DP',short:'DP',name:'Distal phalanx',color:'#2879cf'},
+ {label:'Thumb PP',short:'PP',name:'Proximal phalanx',color:'#d77818'},
+ {label:'Thumb AP',short:'AP',name:'Abduction phalanx',color:'#9853cb'},
+ {label:'Thumb TP',short:'TP',name:'Thumb phalanx',color:'#168b79'},
+]
 export const CAD_DETAILS:Record<string,CadDetail>={
  'finishing-pp':{title:'Seat the finger skins',fixed:['Index DP','Index PP','Index AP','Index PP skin'],moving:['Index DP skin'],caption:'The PP skin is already fitted. Seat the DP skin where used, then check clearance at both joints.'},
  'pp-ready':{title:'Prepare the PP skin and bearings',fixed:['Index PP'],moving:['Index PP skin','Bearing · 4 × 8 × 3','Bearing · 4 × 8 × 2'],caption:'Slide the PP skin from the open base toward the fingertip, then press both PP bearings into their pockets with your fingers.'},
- 'thumb-parts':{title:'Thumb parts · DP, PP, AP and TP',fixed:['Thumb DP','Thumb PP','Thumb AP','Thumb TP'],moving:[],caption:'Identify the four thumb segments before preparation.'},
+ 'thumb-parts':{title:'Thumb parts (DP, PP, AP and TP)',fixed:['Thumb DP','Thumb PP','Thumb AP','Thumb TP'],moving:[],caption:'Identify the four thumb segments before preparation.'},
  'thumb-dp':{title:'Thumb DP bearings',fixed:['Thumb DP'],moving:['Bearing · 4 × 8 × 3'],caption:'Seat the tendon first, then press a bearing into each side.'},
  'thumb-pp':{title:'Thumb PP guide pins',fixed:['Thumb PP'],moving:['Pin · 2 × 8','Pin · 2 × 6'],caption:'Fit the middle and lower guide pins. The upper pin goes in after DP and PP are joined.'},
  'thumb-pp-ready':{title:'Prepare the thumb PP skin and bearings',fixed:['Thumb PP'],moving:['Thumb PP skin','Bearing · 4 × 8 × 3','Bearing · 4 × 8 × 2'],caption:'Slide the PP skin on from the base, then seat both PP bearings.'},
@@ -22,7 +28,7 @@ export const CAD_DETAILS:Record<string,CadDetail>={
 export function cadDetailSpec(build:Build,step:string):CadDetail {
  const spec=CAD_DETAILS[step]
  if(build.version!=='touch')return spec
- if(['pp-ready','thumb-pp-ready'].includes(step))return {...spec,title:'Fit the PP bearings',moving:spec.moving.filter(label=>!label.includes('skin')),caption:'Press both PP bearings into their pockets. Leave all skins off until the cables are connected.'}
+ if(['pp-ready','thumb-pp-ready'].includes(step))return {...spec,title:'Fit the PP bearings',moving:spec.moving.filter(label=>!label.includes('skin')),caption:'Press both PP bearings into their pockets.'}
  if(step==='thumb-test')return {...spec,fixed:spec.fixed.filter(label=>!label.includes('skin'))}
  return spec
 }
@@ -63,6 +69,6 @@ export function cadDetailScene(bundle:Bundle,build:Build,step:string){
  const view=framed(group,build,340,530)
  const labels=[...new Set(moving.map(p=>p.part.label))]
  return {view,parts:selected.map(p=>p.part.label),labels,counts:labels.map(label=>moving.filter(p=>p.part.label===label).length),update:(amount:number,highlight:string)=>{
-  for(const p of selected){p.object.position.copy(offsets.get(p)??new THREE.Vector3()).multiplyScalar(amount);fade(p,highlight?(p.part.label===highlight?1:.18):1)}
+  for(const p of selected){p.object.position.copy(offsets.get(p)??new THREE.Vector3()).multiplyScalar(amount);fade(p,highlight?(p.part.label===highlight?1:.18):1,step==='thumb-parts'?THUMB_PARTS.find(part=>part.label===p.part.label)?.color:undefined)}
  },dispose:()=>disposePieces(pieces)}
 }

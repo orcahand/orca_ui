@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import {guideLabel} from './guideLabel'
 import { assemblyScene } from './assemblyScene'
 import { cadDetailScene } from './cadDetails'
 import frames from './jointFrames.json'
@@ -96,7 +97,7 @@ export function illustrationScene(bundle:Bundle,build:Build,recipe:Recipe){
   }
   const labels=(recipe.labelParts??[]).flatMap(label=>{
     const p=selected.find(p=>p.part.label===label)
-    return p?[{text:label,point:p.center.clone().add(p.object.position)}]:[]
+    return p?[{text:guideLabel(label),point:p.center.clone().add(p.object.position)}]:[]
   })
   return {group,labels,direction:new THREE.Vector3(...(recipe.view??[.6,.4,-1])),dispose:()=>{disposePieces(pieces);extra.forEach(p=>{p.geometry.dispose();(p.material as THREE.Material).dispose()})}}
 }

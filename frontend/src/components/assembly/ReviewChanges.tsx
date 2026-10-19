@@ -39,23 +39,26 @@ const CHANGES:Record<string,Changes>={
  p148:{images:'Adds the matching mold backs, clips and funnel renders.',content:'The 20-minute pot-life claim is identified as a value from the earlier recipe that must be checked against the actual product.'},
 }
 const TOUCH:Record<string,Changes>={
- 'touch-parts':{content:'Adds the five sensor sizes, three short/two long cables, copper wire and screw sizes from the Touch instructions.',unresolved:'The opening Touch kit list says six M1.4×6 screws. The installation diagrams allocate four (two thumb, two board), plus eight M1.4×3 and ten M1.4×4. The remaining two M1.4×6 have no specified destination. Left/right CAD screw counts also differ: the BOM adds only missing sensor screws by area and retains other CAD hardware. The CAD’s two carpal M1.4×8 screws conflict with the new board instruction’s M1.4×6 and need reconciliation.'},
+ 'touch-parts':{content:'Lists the five sensor sizes, three short/two long cables, copper wire and screws. The M1.4×6 total is eight: two thumb screws, two self-tapping board screws and four self-tapping carpal-cover screws.'},
  'touch-ids':{content:'Adds one-at-a-time sensor ID assignment and response checks using the Windows Paxini tool and adapter.'},
- 'touch-wrap-short':{content:'Adds 0.2 mm wire, approximately 50 cm per cable, clove-hitch ends, 1 mm turn spacing, pictured short-cable dimensions and tails under 2 mm.'},
- 'touch-wrap-long':{content:'Adds the two 280 mm cables with the same wrapping technique.',unresolved:'The long-cable wrap offset/length and the allocation of short/long cables to fingers are absent from the supplied document. Do not copy short-cable dimensions.'},
+ 'touch-wrap-short':{content:'Adds 0.2 mm wire, approximately 50 cm per cable, clove-hitch ends, a maximum 1 mm gap between turns, pictured short-cable dimensions and tails under 2 mm.'},
+ 'touch-wrap-long':{content:'Adds the two 280 mm cables for thumb and ring with the same wrapping technique.',unresolved:'The long-cable wrap offset/length is absent from the supplied document. Trial-route each cable to position its wrap at the AP.'},
  'touch-paint':{content:'Adds black marker coloring of the copper wraps.'},
- 'touch-route':{content:'Adds gentle bottom-to-top routing with the wraps at the APs.',unresolved:'The finger allocation of 130 mm and 280 mm cables needs confirmation.'},
+ 'touch-route':{content:'Adds a cable-length overview: thumb and ring use 280 mm; index, middle and pinky use 130 mm. Route gently from the hand base, with the wraps at the APs.'},
  'touch-connect':{content:'Adds correct versus reversed sensor connector orientation; contact faces, not wire colors alone, determine orientation.'},
  'touch-mount':{content:'Adds the finger and thumb screw maps, hand tightening and flush sensor seating.'},
  'touch-board-mount':{content:'Adds two M1.4×6 self-tapping screws and mounting only after flashing, while the back pads are still accessible.'},
  'touch-board-connect':{content:'Adds correct versus reversed plugs, physical PCB port assignments and cable-clearance checks. The physical board map is not mirrored for a left hand.'},
+ 'touch-board-cable':{structure:'Cable preparation immediately precedes connecting the Touch board to the OH board.',content:'Remove the heat-shrink tubing at both ends carefully, keeping the cable strands and insulation intact. Inspect both ends before connecting.',images:'Two original-resolution user photos show the complete cable and a connector close-up before and after removal.'},
+ 'touch-board-link':{images:'Adds two original-resolution user images showing the cable route past the wrist and toward the OH board with the rear cover open.'},
+ 'touch-carpal-cover':{structure:'Closes the Touch connector-board chapter after the board cable is connected.',content:'Seat the matching cover and secure it with four self-tapping M1.4×6 screws. Check cable clearance and wrist movement.',images:'Interactive cover-fitting view with a slider and four screws aligned to the cover mounting holes.'},
  'touch-test':{structure:'Placed after the assembled electronics and before final inspection.',content:'Adds an installed response check for all five finger IDs.'},
 }
 export function ReviewChanges({step,build}:{step:AssemblyStep;build:Build}){
  const touch=TOUCH[step.id],changes=touch??CHANGES[step.id]??{}
  const guided=!['p1','p23'].includes(step.id)
  return <aside className="assembly-review-notes" aria-label="Changes in this review version">
-  <details open><summary>Review notes · changes on this step</summary><dl>
+  <details open><summary>Review notes (changes on this step)</summary><dl>
    <div><dt>Structure</dt><dd>{changes.structure??(guided?'All numbered instructions remain visible together. Associated images, models and commands follow the instruction that uses them. Supplementary video follows the checklist and navigation.':'The existing interactive layout is retained.')}</dd></div>
    <div><dt>Content</dt><dd>{changes.content??(touch?'New Touch installation instructions.':'Assembly meaning and completion checks are retained. Parts and tools are grouped at the top where specified.')}</dd></div>
    <div><dt>Images</dt><dd>{changes.images??(touch?(step.id==='touch-ids'||step.id==='touch-test'?'Finger IDs are presented as a text table; no new hardware image is invented.':'Relevant images are extracted from the supplied Touch instructions and placed beside their instruction.'):'Existing images and interactive models are retained; each static image follows its matching instruction.')}</dd></div>

@@ -208,5 +208,21 @@
       681,
       344
     ]
+  },
+  "board-cable-preparation": {
+    "file": "20261019_110547.jpg",
+    "description": "User-supplied cable preparation photo. Original JPEG preserved without resizing or recompression."
+  },
+  "board-cable-end": {
+    "file": "20261019_110559.jpg",
+    "description": "User-supplied cable preparation photo. Original JPEG preserved without resizing or recompression."
+  },
+  "board-cable-routing-wrist": {
+    "file": "Screenshot 2026-10-19 at 11.49.36.png",
+    "description": "User-supplied Touch connector-board to OH-board cable routing image. Original file preserved without resizing or recompression."
+  },
+  "board-cable-routing-overview": {
+    "file": "20261019_112614 (1).jpg",
+    "description": "User-supplied Touch connector-board to OH-board cable routing image. Original file preserved without resizing or recompression."
   }
 }

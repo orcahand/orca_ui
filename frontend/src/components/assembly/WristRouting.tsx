@@ -16,7 +16,7 @@ export function wristRoutingOrder(build:Build){
  return Array.from({length:32},(_,i)=>i).sort((a,b)=>data.carpals[b].at(-1)![0]-data.carpals[a].at(-1)![0])
 }
 const routeColor=(index:number)=>index<16?'#b55031':'#147d8e'
-const routeName=(index:number)=>{const code=TENDONS[index],direction=code.split('-')[2];return `${jointName(code)} · ${direction==='flex'?'flexion':direction==='ext'?'extension':direction==='p'?'toward pinky':'toward thumb'}`}
+const routeName=(index:number)=>{const code=TENDONS[index],direction=code.split('-')[2];return `${jointName(code)} (${direction==='flex'?'flexion':direction==='ext'?'extension':direction==='p'?'toward pinky':'toward thumb'})`}
 function RoutingFace({bundle,build,face,selected,onSelect,closeUp}:{bundle:Bundle;build:Build;face:'carpals'|'wrist';selected:number;closeUp:boolean;onSelect:(i:number)=>void}){
  const {camera,size,invalidate}=useThree()
  const scene=useMemo(()=>{
@@ -62,14 +62,14 @@ export function WristRouting({build,routeIndex=0,onRoute}:{build:Build;routeInde
   <div className="assembly-clip-tabs"><button aria-pressed={!closeUp} onClick={()=>setCloseUp(false)}>Whole parts</button><button aria-pressed={closeUp} onClick={()=>setCloseUp(true)}>Channel close-up</button></div>
   <div className="assembly-wrist-pair">
    {(['carpals','wrist'] as const).map(face=><figure key={face}>
-    <figcaption><GuideText variant field="prose/WristRouting.tsx/7c7a411178" text={[String(face==='carpals'?'1 · Carpal exit':'2 · Wrist entry'),String(face==='carpals'?'Look at the underside':'Look down into the wrist')].join('').trim()} label="Guide text"/></figcaption>
-    <div className="assembly-wrist-face"><span className="assembly-wrist-face-label">{face==='carpals'?'Palm · palmar':'Back · dorsal'}</span>
+    <figcaption><GuideText variant field="prose/WristRouting.tsx/7c7a411178" text={[String(face==='carpals'?'1. Carpal exit. ':'2. Wrist entry. '),String(face==='carpals'?'Look at the underside':'Look down into the wrist')].join('').trim()} label="Guide text"/></figcaption>
+    <div className="assembly-wrist-face"><span className="assembly-wrist-face-label">{face==='carpals'?'Palm (palmar)':'Back (dorsal)'}</span>
      {loaded?.key===key?<Canvas orthographic frameloop="demand" dpr={[1,2]} camera={{position:[0,300,0],near:.1,far:1000}}><ambientLight intensity={1.8}/><directionalLight position={[70,face==='carpals'?-150:150,80]} intensity={2.5}/><RoutingFace bundle={loaded.bundle} build={build} face={face} selected={selected} onSelect={onSelect} closeUp={closeUp}/></Canvas>:<p>{failed?'The model could not load. Reopen this step to retry.':'Loading the channel view…'}</p>}
-     <span className="assembly-wrist-face-label bottom">{face==='carpals'?'Back · dorsal':'Palm · palmar'}</span>
+     <span className="assembly-wrist-face-label bottom">{face==='carpals'?'Back (dorsal)':'Palm (palmar)'}</span>
     </div>
    </figure>)}
   </div>
-  <div className="assembly-routing-selection" style={{borderColor:routeColor(selected)}}><strong>Tendon {selected+1} · {routeName(selected)}</strong><span>{palm?'Palmar carpal row → dorsal wrist entry':'Dorsal carpal row → palmar wrist entry'}</span></div>
+  <div className="assembly-routing-selection" style={{borderColor:routeColor(selected)}}><strong>Tendon {selected+1} ({routeName(selected)})</strong><span>{palm?'Palmar carpal row → dorsal wrist entry':'Dorsal carpal row → palmar wrist entry'}</span></div>
   <div className="assembly-route-order" aria-label="Left-to-right threading sequence">{order.map((index,n)=><button key={index} aria-label={`Route ${n+1}: tendon ${index+1}, ${TENDONS[index]}`} aria-pressed={n===position} onClick={()=>setPosition(n)} style={{'--route-color':routeColor(index)} as React.CSSProperties}>{n+1}</button>)}</div>
   <div className="assembly-row"><button className="assembly-secondary" disabled={position===0} onClick={()=>setPosition(position-1)}>← Previous tendon</button><button className="assembly-primary" disabled={position===31} onClick={()=>setPosition(position+1)}>Next tendon →</button></div>
   <p className="assembly-muted"><GuideText variant field="prose/WristRouting.tsx/335aaadf9d" text={"The sequence numbers below the models are threading order; the label on each opening is its tendon ID. Keep each strand untangled and retain the same order within each row. Verify all 32 identities in the next checks."} label="Guide text"/></p>

@@ -44,6 +44,6 @@ export function HandModel({build,selected,face}:{build:Build;selected:string;fac
   useEffect(()=>{let live=true;setFailed(false);loadBundle(key).then(bundle=>{if(live)setLoaded({side:key,bundle})}).catch(()=>{if(live)setFailed(true)});return()=>{live=false}},[key])
   return <div className="assembly-hand-label-render" aria-label={`${version} ${side} hand, ${face} view; ${selected} highlighted`}>
     {loaded?.side===key?<Canvas key={`${key}-${face}`} orthographic frameloop="demand" dpr={[1,2]} camera={{position:[0,0,1000],zoom:1,near:.1,far:4000}}><ambientLight intensity={1.5}/><hemisphereLight intensity={1.8}/><directionalLight position={[250,400,600]} intensity={3}/><directionalLight position={[-300,0,-600]} intensity={2}/><Render bundle={loaded.bundle} build={build} selected={selected} face={face}/><OrbitControls enablePan={false} minZoom={.7} maxZoom={2}/></Canvas>:<p>{failed?'The hand render could not load. Reopen this step to retry.':'Loading the hand…'}</p>}
-    <span className="assembly-render-direction">Distal · toward fingertips ↑</span>
+    <span className="assembly-render-direction">Distal (toward fingertips) ↑</span>
   </div>
 }

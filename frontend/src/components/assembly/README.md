@@ -43,6 +43,16 @@ and populated PCBs as units. It removes coincident repeated motor subassemblies
 before counting fasteners and spools. Finer tessellation and exported vertex normals
 support the high-DPI viewer. Touch uses black structural parts and skins.
 
+The thumb-parts identification view uses consistent DP, PP, AP and TP colors for
+every build. Its legend includes the full phalanx names; selecting a label fades
+the other segments, and selecting it again restores all four. The legend is also
+available in the enlarged viewer. Other assembly views retain their material colors.
+
+The Touch connector-board cable preparation step immediately precedes the board
+connection step. It covers careful removal of the heat-shrink tubing at both ends
+and inspection of the cable strands and insulation. The two October 19 user photos
+are preserved as original JPEGs in `public/assembly/touch/board-cable-*.jpg`.
+
 `scripts/refine_assembly_boards.py` restores the OH board's individual component
 colors from each current STEP while keeping its single inventory identity and
 assembly placement. The PCB is black; the modeled connectors retain their light
@@ -60,6 +70,20 @@ those solids remain visible in the assembled hand.
 Carpal covers are supplemental parts because the complete exports omit them.
 Their left/right STL downloads and mesh-derived SVG previews come from the
 Touch `02_Carpals/Coav-L.stl` and `Coav-R.stl` hardware sources.
+The final Touch connector-board step mounts the cover after connecting the boards,
+using four self-tapping M1.4×6 screws. `CarpalCover.tsx` and `carpalCoverScene.ts`
+provide a slider that seats the cover before inserting the screws. The four screw
+axes and head seats match each cover STL's 1.4 mm through-holes. The cover is blue
+in this illustration to distinguish it from the carpal body.
+
+This fitting view uses the separate printable carpal bodies because the complete
+assembly meshes contain overlapping cover-shaped surfaces. Rebuild the two body
+GLBs with `python scripts/build_carpal_cover_reference.py /path/to/touch/02_Carpals`
+(NumPy required). `public/assembly/details/carpal-cover-sources.json` records source
+hashes. Triangle positions are preserved, with indexed vertices and smooth normals.
+The STL-to-assembly rotation is −90° about X, with translation
+`(-14.75, 141.8, 1.8770780631086)` for right and
+`(-12.9, 141.8, 1.8770780631086)` for left (millimetres).
 Supplemental cheese-head screws use a screw illustration rather than the cable fallback.
 Standard hardware collapses into one kit icon in each area. Area-title dialogs include the complete kit. “Standard components” shows only
 fasteners, bearings and pins; Tendons/PTFE/Cables each show only that section’s stock.
@@ -264,7 +288,7 @@ Content review findings (for the next media revision):
   instruction. The top-spool CAD screw is M2.5×8, versus written M2×8. These size
   discrepancies require hardware-owner confirmation; no silent substitution was made.
 
-## Clarity review · October 10
+## Clarity review (October 10)
 
 - Fundamentals contains the Ashley lesson and hand terminology. Routing, bearing
   seating and friction checks appear at the joints where builders use them.
@@ -300,7 +324,7 @@ Unresolved assembly information:
 - Silicone notes do not identify the material product or demolding time, and their
   skin quantities describe Base. The appendix now states these limits explicitly.
 
-## Motor verification and CAD visual review · October 11
+## Motor verification and CAD visual review (October 11)
 
 - Finish includes a saved 17-motor mechanical check. Each motor has a synchronized
   output/spool and joint preview, a scrubber, and its own physical-check checkbox.
@@ -334,7 +358,7 @@ Unresolved assembly information:
   mobile steps, completion/persistence/configuration invalidation, and playback.
 
 
-## Still-image review · October 11
+## Still-image review (October 11)
 
 - Twenty-four mechanical gallery panels now use 1800 × 1400 transparent WebP
   renders for each supplied Base/Touch and left/right STEP assembly (96 assets).
@@ -371,7 +395,7 @@ Unresolved assembly information:
   saved place, explicit completion and uninterrupted video playback pass. All 96
   packaged render assets match the generated source files.
 
-## STEP refresh · October 12
+## STEP refresh (October 12)
 
 - Touch assets now come from `orca_v2/touch/TouchV2_Assembly_Right.step.zip` and
   `TouchV2_Assembly_Left.step.zip`. Each generated inventory records the extracted
@@ -739,27 +763,51 @@ Unresolved assembly information:
   photographs; the Dynamixel-only tower render is not shown for those builds.
   The three M4 nut picture is linked to the final instruction in this step.
 
-## Touch DP flexion through PP
+## DP tendon pair through PP
 
-- The Join DP and PP viewer uses the Touch PP's internal flexion passage. Its
-  depth changes near the entrance; the previous constant-depth route went around
-  the outside of the body. Both Touch hand sides now follow the measured passage.
-- `scripts/repair_assembly_touch_pp_routes.py` recreates the route from the Base
-  path in joint coordinates, adjusts its depth against the actual Touch mesh,
-  and plans the short entrance bend around both seated DP and PP surfaces.
-  It requires NumPy and writes a staging JSON via `--output`.
-- Dense samples of the 0.16 mm checking envelope clear DP, PP and the installed
-  pins; the viewer's cord radius is 0.14 mm. The Base and extension paths retain
-  their existing coordinates. These are illustration checks against CAD meshes.
+- In Join DP and PP, the yellow Index DP flexion tendon follows the purple DP
+  extension passage inside PP for both Base and Touch, on either hand side.
+  The two cords remain separate. The DP anchor paths and free-end positions
+  are preserved; the entrance bend passes through the seated joint's free space.
+- `scripts/repair_assembly_dp_pp_pair.py --output /tmp/routes.json` recreates the
+  paired route and checks a 0.15 mm sampled envelope against DP, PP and the guide
+  pins (the rendered cord radius is 0.14 mm). It requires NumPy and supersedes
+  `repair_assembly_touch_pp_routes.py`.
+- Regenerate `panel-034-[456]`, `panel-036-[12]` and `route-p35-pair` after copying
+  the checked staging data to `channelRoutes.json`, so still renderings and the
+  interactive animation show the same paths.
 
 ## Touch sensor fitting order
 
-- Touch DPs have no skins. Early finger/thumb assembly fits PP skins and
-  bearings only; the fitting and movement viewers leave fingertip sensors off.
-- The complete Touch section follows hand, tower and hull assembly: sensor kit
-  preparation, IDs, cable preparation/routing, sensor fitting, connector-board
-  mounting and harness connection, then sensor testing. Board flashing remains
-  with the electronics steps after Tower.
-- Review the completed hand after sensor installation, then continue to
-  tensioning in Setup.
-  Stable step IDs preserve saved progress while navigation follows this order.
+- Assemble and check the fingers and thumb with all skins off.
+- Complete the carpals, wrist and tower chapters with the finger and thumb
+  skins off. Immediately after the last Tower step, prepare and route the Touch
+  sensor cables, fit the PP skins with the fingertip plugs disconnected and
+  accessible, then connect and fasten the sensors. Touch DPs use sensors
+  instead of skins; the earlier wrist viewer leaves them and PP skins off.
+- Routing, skin fitting, connection and fastening share one navigation chapter
+  so the sidebar follows the same sequence as Next/Back. Step IDs stay stable.
+- Connector-board mounting, harness connection and sensor testing remain in the
+  later electronics section before final review and tensioning.
+
+## Sandbox bullet lists
+
+- Clicking a sidebar step preserves the menu scroll position and search query.
+  Next/Previous and hand-map jumps reveal the destination step automatically.
+
+- Never use middle-dot separators in user-facing guide content. Use parentheses
+  for dimensions and short details, e.g. `2 pins (Ø2×8 mm)`, or start a new
+  sentence for explanations. This applies to captions, controls, headings and
+  labels baked into renderings as well as parts lists. CAD lookup names retain
+  their original spelling; the parts explorer formats them for display and CSV.
+  Punctuation-only source changes preserve existing sandbox text and list edits.
+- Parts, tools and the opening equipment lists support inserting and removing
+  bullets. New items receive stable IDs so removing a bullet does not move its
+  text edits onto another item. Reset list restores the original structure and
+  retains edits to original bullet text.
+- Text, list structure and colors autosave to browser localStorage under
+  `orca-ui.assembly.editor.v1`. Existing text drafts remain compatible. Lists
+  share the text configuration scope (version, side, motor and audience), and
+  structural overrides apply only while their source list matches.
+- Export edits includes list structures and their text edits in the JSON file.
+  Browser drafts do not change repository content or sync between browsers.

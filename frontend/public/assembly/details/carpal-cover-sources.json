@@ -1,0 +1,18 @@
+{
+  "right": {
+    "source": "Carpals-R-Touch.stl",
+    "sha256": "e4038ddb13dc3bf02c4447bc0746d82e3403f01d7e962406c9d216f0f500496e",
+    "triangles": 283984,
+    "vertices": 141914,
+    "cover": "carpal-cover-right.stl",
+    "coverSource": "Coav-R.stl"
+  },
+  "left": {
+    "source": "Carpals-L-Touch.stl",
+    "sha256": "fcf427bb0ed54d2399700df75a1d4dfcc0030089315b50dba182719a11362aac",
+    "triangles": 282750,
+    "vertices": 141293,
+    "cover": "carpal-cover-left.stl",
+    "coverSource": "Coav-L.stl"
+  }
+}

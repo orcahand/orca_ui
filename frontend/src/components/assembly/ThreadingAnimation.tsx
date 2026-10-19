@@ -35,10 +35,10 @@ export function ThreadingAnimation({kind,build,step}:{kind:AnimationKind;build:B
     {['p33','p46','p68'].includes(step)&&<div className="assembly-tendon-legend" aria-label="Tendon color legend">{legend.map(([color,label],i)=>step==='p68'?<button key={label} aria-pressed={tendon===i} onClick={()=>setTendon(i)}><i style={{background:color}}/>{label}</button>:<span key={label}><i style={{background:color}}/>{label}</span>)}</div>}
     {step==='p68'&&<p className="assembly-muted"><GuideText variant field="prose/ThreadingAnimation.tsx/7644b7e4fd" text={"Select a named tendon to highlight its path. The two white rings mark its TP exit and carpal entrance. Rotate the model to look into the seat; keep the other seven ends in their own channels."} label="Guide text"/></p>}
     <AssemblyComparison step={step} build={build} model={()=><PartAssemblyMotion build={build} step={step} position={position} tendon={tendon} channels={channels}/>}/>
-    {step==='p99'&&<p className="assembly-parts-legend"><GuideText variant field="prose/ThreadingAnimation.tsx/fc6c288913" text={"Per motor: bottom spool ×1 · M2 nut ×1 · M2×4 screws ×3 · ratchet ×1. Prepare sixteen sets."} label="Guide text"/></p>}
-    {step==='p122'&&<p className="assembly-parts-legend"><GuideText variant field="prose/ThreadingAnimation.tsx/e5d98f13b3" text={"Carrier · M2×8 screws ×4 · wrist pulley · 4×10 pin · 4×8×3 bearing · M4 nuts ×3 · M4×10 screws ×3."} label="Guide text"/></p>}
+    {step==='p99'&&<p className="assembly-parts-legend"><GuideText variant field="prose/ThreadingAnimation.tsx/fc6c288913" text={"Per motor: one bottom spool, one M2 nut, three M2×4 screws and one ratchet. Prepare sixteen sets."} label="Guide text"/></p>}
+    {step==='p122'&&<p className="assembly-parts-legend"><GuideText variant field="prose/ThreadingAnimation.tsx/e5d98f13b3" text={"Use the carrier, four M2×8 screws, wrist pulley, 4×10 pin, 4×8×3 bearing, three M4 nuts and three M4×10 screws."} label="Guide text"/></p>}
     <label className="assembly-motion-scrubber"><span>Replay any movement</span><input aria-label="Animation progress" type="range" min="0" max="1000" value={Math.round(position*1000)} onChange={e=>{setPlaying(false);setPosition(Number(e.target.value)/1000)}}/></label>
     <p className="assembly-motion-cue" aria-live={playing?'off':'polite'}><><strong>{phase+1}.</strong> {lesson.cues[phase]}</></p>
-    <small className="assembly-muted"><GuideText variant field="prose/ThreadingAnimation.tsx/71e62c5963" text={"Drag to rotate · scroll or pinch to zoom."} label="Guide text"/></small>
+    <small className="assembly-muted"><GuideText variant field="prose/ThreadingAnimation.tsx/71e62c5963" text={"Drag to rotate. Scroll or pinch to zoom."} label="Guide text"/></small>
   </section>
 }

@@ -39,7 +39,7 @@ export function AssemblyCard() {
   return <>
     <section className="assembly-launch">
       <div className="assembly-launch-icon" aria-hidden="true">◈</div>
-      <div className="assembly-launch-copy"><span className="assembly-launch-kicker">BUILD · V2.1</span><h2>Assembly instructions</h2><p>Build one step at a time with photos, videos and guided checks. Your place is saved whenever you leave.</p></div>
+      <div className="assembly-launch-copy"><span className="assembly-launch-kicker">BUILD (V2.1)</span><h2>Assembly instructions</h2><p>Build one step at a time with photos, videos and guided checks. Your place is saved whenever you leave.</p></div>
       <button type="button" ref={launcher} className="btn btn-info" onClick={() => setOpen(true)}>Open assembly guide</button>
     </section>
     {open && <AssemblyPopup onClose={close} />}

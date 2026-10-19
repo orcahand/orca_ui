@@ -2,13 +2,13 @@ import type {Build} from './buildContent'
 import type {AssemblyStep} from './guide'
 
 const TOOLS = {
-  measure: 'Ruler or tape measure · millimetres',
-  cut: 'Sharp scissors or flush cutters · tendon and PTFE',
+  measure: 'Ruler or tape measure',
+  cut: 'Sharp scissors or flush cutters',
   driver: 'Hand screwdriver / hex keys with bits matching the supplied screws',
-  tuck: 'Small blunt tool · tuck knots and tails without piercing the cord',
+  tuck: 'Small blunt tool (tuck knots and tails without piercing the cord)',
   finish: 'Small file or fine sandpaper',
-  brush: 'Soft brush · remove loose print debris',
-  cloth: 'Wiping cloth · remove excess glue',
+  brush: 'Soft brush (remove loose print debris)',
+  cloth: 'Wiping cloth (remove excess glue)',
   computer: 'Computer with ORCA UI and orca_core installed',
   flash: 'J-Link programmer and matching Tag-Connect probe',
   console: 'Computer with ORCA Console and Bench Helper',
@@ -17,7 +17,7 @@ const TOOLS = {
   labels: 'Removable labels and a pen',
   wire: 'Fine wire cutters',
   marker: 'Black permanent marker',
-  scale: 'Digital scale · weigh silicone components separately',
+  scale: 'Digital scale (weigh silicone components separately)',
   mixing: 'Separate cups and mixing sticks for A and B',
   gloves: 'Gloves suitable for the silicone materials',
 } as const
@@ -47,7 +47,7 @@ export const STEP_TOOLS:Record<string,Tool[]> = {
   'touch-ids':['paxini','labels'],'touch-wrap-short':['measure','wire'],
   'touch-wrap-long':['measure','wire'],'touch-paint':['marker'],
   'touch-skins':[],'touch-route':[],'touch-connect':[],'touch-mount':['driver'],
-  'touch-board-mount':['driver'],'touch-board-connect':[],'touch-board-link':[],'touch-test':['computer'],
+  'touch-board-mount':['driver'],'touch-board-connect':[],'touch-board-cable':['cut'],'touch-board-link':[],'touch-carpal-cover':['driver'],'touch-test':['computer'],
 }
 
 export function stepTools(step:AssemblyStep):string[] {

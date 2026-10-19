@@ -26,7 +26,7 @@ export function cadRoutingReference(bundle:Bundle,build:Build,kind:'wrist-groups
     mesh.position.copy(point);mesh.renderOrder=5
     group.add(mesh);extra.push(mesh)
    }
-   for(const [start,text] of [[0,'Dorsal row · 16 tendons'],[16,'Palmar row · 16 tendons']] as const){
+   for(const [start,text] of [[0,'Dorsal row (16 tendons)'],[16,'Palmar row (16 tendons)']] as const){
     const point=starts[start+8].clone()
     labels.push({text,point})
    }

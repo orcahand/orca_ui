@@ -11,19 +11,19 @@ const phases=[
  {title:'Confirm success',text:'Wait for the flashed-and-linked confirmation. If the process fails, inspect the output and connections before retrying.',images:['109-1']},
 ]
 const imageNames:Record<string,string>={
- '105-1':'Flashing page · select the order for this hand',
- '106-1':'Not ready · Bench Helper is unreachable',
- '106-2':'Ready · Bench Helper is connected',
+ '105-1':'Flashing page (select the order for this hand)',
+ '106-1':'Not ready (Bench Helper is unreachable)',
+ '106-2':'Ready (Bench Helper is connected)',
  '107-1':'Selected order, Flash button and output controls',
  '108-1':'OH board power, USB and programming connections',
  '108-2':'Hold the Tag-Connect on the programming pads',
  '108-4':'Prompt to lift the Tag-Connect off the pads',
- '109-1':'Success · flashed and linked',
+ '109-1':'Success (flashed and linked)',
 }
 export function FlashingWalkthrough({build}:{build:Build}){
  const [index,setIndex]=useState(0),[enlarged,setEnlarged]=useState(''),dialog=useRef<HTMLDialogElement>(null),phase=phases[index]
  return <section className="assembly-flashing-walkthrough" aria-label="ORCA Console flashing sequence">
-  <div className="assembly-clip-tabs">{phases.map((p,i)=><button key={p.title} aria-pressed={i===index} onClick={()=>setIndex(i)}>{i+1} · {p.title}</button>)}</div>
+  <div className="assembly-clip-tabs">{phases.map((p,i)=><button key={p.title} aria-pressed={i===index} onClick={()=>setIndex(i)}>{i+1}. {p.title}</button>)}</div>
   <h3><GuideText variant field="prose/FlashingWalkthrough.tsx/3f058a24f4" text={String(phase.title)} label="Section heading"/></h3><p><GuideText variant field="prose/FlashingWalkthrough.tsx/26df6ce60a" text={String(phase.text)} label="Guide text"/></p>
   {index!==3&&<p className="assembly-muted"><GuideText variant field="prose/FlashingWalkthrough.tsx/684386f05e" text={["The screenshots show an example order. Select the order for your ",String(build.side)," ",String(build.version==='base'?'Base':build.version==='touch'?'Touch':'Full')," hand with ",String(build.motor==='dynamixel'?'Dynamixel':'FeeTech')," motors."].join('').trim()} label="Guide text"/></p>}
   <div className={`assembly-flash-images ${index===3?'is-photos':'is-screens'}`}>{phase.images.map(id=><figure key={id}><button className="assembly-image-button" aria-label={`Enlarge ${imageNames[id]}`} onClick={()=>{setEnlarged(photoResolution(`./assembly/media/panel-${id}.png`));dialog.current?.showModal()}}><img src={photoResolution(`./assembly/media/panel-${id}.png`)} alt={imageNames[id]}/></button><figcaption><GuideText variant field="prose/FlashingWalkthrough.tsx/7c174448ee" text={String(imageNames[id])} label="Guide text"/></figcaption></figure>)}</div>

@@ -32,7 +32,7 @@ export function cadArmMount(bundle:Bundle,build:Build,stage:'adapter'|'covers'|'
   if(stage==='covers'){
     covers.forEach(p=>label(p.part.label==='Rear hull cover'?'Rear hull + board':'Hull cover',p))
   }else{
-    label('Adapter plate',plate);label('Mounting rods · ×2',rods[0])
+    label('Adapter plate',plate);label('Mounting rods (×2)',rods[0])
     if(stage==='alignment')label('Motor tower',tower)
   }
   return {group,labels,direction:new THREE.Vector3(1,.7,1),...(stage==='alignment'?{focus:new THREE.Box3().setFromObject(group)}:{}),dispose:()=>disposePieces(pieces)}

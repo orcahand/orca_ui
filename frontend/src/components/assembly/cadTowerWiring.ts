@@ -19,8 +19,8 @@ export function cadTowerWiring(bundle:Bundle,build:Build){
   wire([[x,i===0?20:-19,26.5],[x,y,27],[x,y,31],[x,y-3,37],[x,y-18,42]],color)
  }
  const labels=[
-  {text:'Motor lead · upper slot',point:new THREE.Vector3(-48.7,32,33)},
-  {text:'Fan leads · lower slot',point:new THREE.Vector3(-47.3,0,31)},
+  {text:'Motor lead (upper slot)',point:new THREE.Vector3(-48.7,32,33)},
+  {text:'Fan leads (lower slot)',point:new THREE.Vector3(-47.3,0,31)},
  ]
  return {group,labels,direction:new THREE.Vector3(-1,.2,1),dispose:()=>{disposePieces(pieces);wires.forEach(w=>{w.geometry.dispose();(w.material as THREE.Material).dispose()})}}
 }

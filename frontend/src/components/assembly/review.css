@@ -183,8 +183,14 @@
 .assembly-app .assembly-guided-instructions .assembly-panel-gallery figure:only-child .assembly-image-button[data-image-kind=photo] { background:transparent; }
 
 .assembly-board-link { border:1px solid var(--panel-border); border-radius:12px; padding:24px; margin:22px 0; }
+.assembly-carpal-cover { border:1px solid var(--panel-border); border-radius:12px; padding:24px; margin:22px 0; }
+.assembly-carpal-cover h3 { margin:0 0 10px; }
+.assembly-carpal-cover-canvas { height:480px; overflow:hidden; border-radius:10px; }
+@media(max-width:600px) { .assembly-carpal-cover { padding:16px; }.assembly-carpal-cover-canvas { height:360px; } }
 .assembly-board-link h3 { font-size:25px; font-weight:500; letter-spacing:-.03em; margin:8px 0 22px; }
-.assembly-board-link-layout { display:grid; grid-template-columns:1fr 1fr; gap:28px; align-items:center; }
+.assembly-board-link-layout { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:28px; align-items:center; }
+.assembly-board-link-key { min-width:0; }
+.assembly-board-link-key>button>div,.assembly-board-cable-key>div { flex:1; min-width:0; }
 .assembly-board-link-canvas { height:560px; min-width:0; background:white; border-radius:10px; }
 .assembly-board-link-key>button { display:flex; align-items:flex-start; gap:14px; width:100%; text-align:left; border:1px solid var(--panel-border); background:transparent; border-radius:9px; padding:18px; color:var(--text); }
 .assembly-board-link-key>button[aria-pressed=true] { border-color:var(--accent); background:rgb(var(--accent-rgb) / .05); }
@@ -249,7 +255,7 @@
 .assembly-dialog .assembly-sidebar { display:flex; flex-direction:column; min-height:0; overflow:hidden; }
 .assembly-navigation-layers { display:flex; flex-direction:column; flex:1; min-height:0; }
 .assembly-hand-navigation { flex:none; position:relative; z-index:2; background:var(--bg); margin:0 0 12px; }
-.assembly-contents-scroll { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; padding-right:5px; }
+.assembly-contents-scroll { flex:1; min-height:0; overflow-y:auto; overflow-anchor:none; overscroll-behavior:contain; scrollbar-width:thin; padding-right:5px; }
 .assembly-sidebar .assembly-save-status,.assembly-sidebar>.assembly-text-button,.assembly-sidebar>.assembly-reset { flex:none; }
 @media(max-width:900px) {
  .assembly-dialog .assembly-sidebar { display:none; }
@@ -264,6 +270,12 @@
 .assembly-edit-field:has(.assembly-edit-undo) textarea { padding-right:32px; }
 .assembly-app .assembly-edit-undo { position:absolute; right:5px; top:6px; padding:2px 4px; color:var(--accent); font-size:16px; background:var(--bg); border:0; }
 .assembly-guided-text>.assembly-edit-field { flex:1; }
+.assembly-edit-list-row { display:flex; align-items:flex-start; gap:6px; }
+.assembly-edit-list-row>.assembly-edit-field { flex:1; }
+.assembly-list-item-actions { display:flex; gap:3px; padding-top:3px; }
+.assembly-app .assembly-list-item-actions button { min-width:28px; min-height:28px; padding:2px 6px; border:1px solid var(--panel-border); border-radius:5px; background:transparent; color:var(--accent); font-size:18px; line-height:1; }
+.assembly-list-actions { display:flex; gap:14px; margin-top:8px; }
+.assembly-app .assembly-list-actions button { font-size:12px; }
 .assembly-check label>span,.assembly-work-checklist label>span { flex:1; min-width:0; }
 .assembly-main>h2 .assembly-edit-field textarea { padding:5px 9px; }
 .assembly-panel-gallery .assembly-panel-caption:has(.assembly-edit-field) { display:block; }

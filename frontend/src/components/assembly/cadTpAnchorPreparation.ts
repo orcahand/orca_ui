@@ -21,7 +21,7 @@ export function cadTpAnchorPreparation(bundle:Bundle,build:Build,phase:'thread'|
   cord(points)
   if(phase==='thread'){
    cord([seat,seat.clone().addScaledVector(up,20)])
-   if(i===0)labels.push({text:'Working end · 20 cm',point:seat.clone().addScaledVector(up,17)})
+   if(i===0)labels.push({text:'Working end (20 cm)',point:seat.clone().addScaledVector(up,17)})
   }else{
    const stopper=anchorStopper(.7,3),position=seat.clone().addScaledVector(up,10),rotation=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1),up)
    stopper.group.position.copy(position);stopper.group.quaternion.copy(rotation);group.add(stopper.group);stoppers.push(stopper)
