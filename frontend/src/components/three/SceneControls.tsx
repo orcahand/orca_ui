@@ -129,6 +129,16 @@ export function SceneControls() {
               taxel forces
             </label>
           )}
+          {showForces && (
+            <label className="toggle-label" title="each taxel's outward surface normal: the axis its pressure (fz) acts along">
+              <input
+                type="checkbox"
+                checked={scene.taxelNormals}
+                onChange={(e) => setScene({ taxelNormals: e.target.checked })}
+              />
+              taxel normals
+            </label>
+          )}
           {showGlow && (
             <label className="toggle-label" title="joint rings colored by tracking error">
               <input
