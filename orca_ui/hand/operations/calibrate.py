@@ -55,6 +55,23 @@ def apply_calibration_current(hand, current: float | None, ctx: OpContext) -> No
     ctx.log(f"calibrating at {current} mA")
 
 
+def _drive_current_lines(measured: dict) -> list[str]:
+    """The mean current each joint drew onto its stops, as log lines.
+
+    Informational: a joint well above its siblings is the signature of an
+    over-tensioned tendon.
+    """
+    if not measured:
+        return []
+    lines = ["mean current onto the hardstops (mA) — flex / extend:"]
+    for joint, per_direction in measured.items():
+        flex, extend = per_direction.get("flex"), per_direction.get("extend")
+        lines.append(f"  {joint}: "
+                     f"{'--' if flex is None else format(flex, '.0f')} / "
+                     f"{'--' if extend is None else format(extend, '.0f')}")
+    return lines
+
+
 # The v2.1 travel check: how calibration answered a joint whose motor travel
 # fell short of (or beyond) its baseline.
 _TRAVEL_NOTE = {
@@ -132,6 +149,8 @@ def run_calibrate(hand, encoder_client, ctx: OpContext,
                 ctx.log("travel: motor-shaft travel between the hardstops in degrees, against the "
                         "hand's joint_motor_travel baseline; mA: the current the joint was driven "
                         "onto its hardstops with")
+            for line in _drive_current_lines(event.get("drive_current_ma") or {}):
+                ctx.log(line)
         elif kind == "calibration_aborted":
             ctx.log("calibration aborted — completed steps are persisted")
         elif kind == "joints_skipped":
