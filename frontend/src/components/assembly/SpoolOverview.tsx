@@ -44,7 +44,7 @@ export function SpoolOverview({build}:{build:Build}){
  const key=`${build.version==='touch'?'touch':'base'}-${build.side}-dynamixel`
  useEffect(()=>{if(build.motor!=='dynamixel')return;let live=true;setFailed(false);loadBundle(key).then(bundle=>{if(live)setLoaded({key,bundle})}).catch(()=>{if(live)setFailed(true)});return()=>{live=false}},[key,build.motor])
  return <section className="assembly-spool-overview" data-contrast={false} aria-label="Understand the two spools">
-  <span className="assembly-eyebrow">Before you wind</span><h3><GuideText variant field="prose/SpoolOverview.tsx/5385dc6d9b" text={"One motor. Two opposing tendons."} label="Section heading"/></h3>
+  
   <p><GuideText variant field="prose/SpoolOverview.tsx/d7d838c390" text={["Bottom"," means closest to the motor. ","Top"," means farther out along the same shaft. These names describe the two spools on each motor, not its position in the tower."].join('').trim()} label="Guide text"/></p>
   <div className="assembly-spool-overview-layout">
    <div className="assembly-spool-overview-model">

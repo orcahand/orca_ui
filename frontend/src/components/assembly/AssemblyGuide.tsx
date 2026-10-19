@@ -1,5 +1,6 @@
 import {GuideBackgroundEditor} from './GuideBackgroundEditor'
 import {GuideText,GuideEditingContext,useGuideEditing} from './GuideEditing'
+import {ViewToggle} from './AssemblyComparison'
 import {TouchBoardConnection} from './TouchBoardConnection'
 import {BoardIdentification} from './BoardIdentification'
 import {SpoolOverview} from './SpoolOverview'
@@ -98,7 +99,7 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
   if (!ready) return <div className="assembly-loading"><p><GuideText variant field="prose/AssemblyGuide.tsx/f764a6be18" text={"Restoring your build…"} label="Guide text"/></p><button className="btn" onClick={onClose}>Close</button></div>
   return <GuideEditingContext.Provider value={editing}><div className="assembly-app">
     <header className="assembly-header">
-      <div className="assembly-brand">◈ ORCA <span>ASSEMBLY WORKSPACE</span></div>
+      <div className="assembly-brand"><i className="assembly-logo" role="img" aria-label="ORCA"/><span>ASSEMBLY WORKSPACE</span></div>
       <div className="assembly-header-actions">
         {safetyControl}
 
@@ -112,8 +113,7 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
       <button className="assembly-mobile-nav" onClick={() => setNavOpen(!navOpen)} aria-expanded={navOpen} aria-controls="assembly-navigation">{navOpen ? 'Close chapters' : `Chapters · ${chapterTitle(step)}`} ☰</button>
       <aside className={`assembly-sidebar ${navOpen ? 'is-open' : ''}`} id="assembly-navigation">
         <AssemblyNavigation steps={STEPS} current={step} done={progress.done} title={s=>editing.read(`${s.id}/title`,s.title)} query={query} filtered={filtered} build={build} onGo={go} beforeContents={<>
-        <div className="assembly-sidebar-intro"><span className="assembly-eyebrow">THE BUILD GUIDE</span><h1><GuideText variant field="prose/AssemblyGuide.tsx/490747982e" text={"Build your hand"} label="Section heading"/></h1><p><GuideText variant field="prose/AssemblyGuide.tsx/4055f42241" text={"ORCA hand · V2.1"} label="Guide text"/></p></div>
-        <div className="assembly-progress"><div className="assembly-row"><span>{completed} / {required.length} steps</span><strong>{percent}%</strong></div><progress value={completed} max={required.length} aria-label="Assembly progress" /></div>
+                <div className="assembly-progress"><div className="assembly-row"><span>{completed} / {required.length} steps</span><strong>{percent}%</strong></div><progress value={completed} max={required.length} aria-label="Assembly progress" /></div>
         <label className="assembly-search"><span className="assembly-sr-only">Search assembly instructions</span><input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Find a part or step…" /></label>
         </>}/>
         <div className="assembly-save-status" role="status">{saveStatus}</div>
@@ -122,7 +122,7 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
       <main ref={main} className="assembly-main">
         <button className="assembly-sidebar-chevron" aria-label={sidebarCollapsed?'Expand chapters':'Collapse chapters'} title={sidebarCollapsed?'Expand chapters':'Collapse chapters'} aria-expanded={!sidebarCollapsed} aria-controls="assembly-navigation" onClick={()=>setSidebarCollapsed(!sidebarCollapsed)}>{sidebarCollapsed?'›':'‹'}</button>
         <GuideBackgroundEditor step={step.id}/>
-        <div className="assembly-breadcrumb"><span>{chapterTitle(step)}{step.section?` · ${step.section}`:''}</span><span>{step.hint?'HINT · OPTIONAL':`STEP ${String(required.indexOf(step)+1).padStart(2,'0')} / ${required.length}`}</span></div>
+        <div className="assembly-breadcrumb"><span>{step.id!=='p1'&&<>{chapterTitle(step)}{step.section?` · ${step.section}`:''}</>}</span><span>{step.hint?'HINT · OPTIONAL':`STEP ${String(required.indexOf(step)+1).padStart(2,'0')} / ${required.length}`}</span></div>
         <h2 ref={heading} tabIndex={-1}><GuideText field={`${step.id}/title`} text={step.title} label="Step title"/></h2>
         {step.id!=='p1'&&build.version==='full'&&(ASSEMBLY_MOTIONS[step.id]||['p23','p35','p45','p80','p83','p115','p123','p126'].includes(step.id))&&<p className="assembly-muted"><GuideText variant field="prose/AssemblyGuide.tsx/4f3cffcb55" text={"Mechanical reference: Base geometry. Full-specific sensor parts are not represented in this model."} label="Guide text"/></p>}
         {step.id==='p23'&&build.motor==='feetech'&&<p className="assembly-muted"><GuideText variant field="prose/AssemblyGuide.tsx/94c60d5ecc" text={"The anatomy reference uses a Dynamixel wrist and tower; use the FeeTech parts for your build."} label="Guide text"/></p>}
@@ -132,13 +132,13 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
           <label><span className="assembly-sr-only">Version</span><select aria-label="Version" value={build.version} onChange={e=>changeBuild({version:e.target.value as Build['version']})}><option value="base">Base</option><option value="touch">Touch</option><option value="full">Full</option></select></label>
           <label><span className="assembly-sr-only">Guide edition</span><select aria-label="Guide edition" value={build.audience} onChange={e=>changeBuild({audience:e.target.value as Build['audience']})}><option value="internal">Internal</option><option value="external">External</option></select></label>
           </div>}
-        {build.audience==='internal'&&step.chapter.startsWith('Flashing')&&<section className="assembly-flashing-choice"><h3><GuideText variant field="prose/AssemblyGuide.tsx/1c73a2d7fd" text={"Choose one flashing method"} label="Section heading"/></h3><p><GuideText variant field="prose/AssemblyGuide.tsx/29758ff53a" text={"Both methods prepare the same boards. Complete the selected method; you do not need to flash them twice."} label="Guide text"/></p><div className="assembly-clip-tabs"><button aria-pressed={method==='console'} onClick={()=>chooseFlashing('console')}>ORCA Console</button><button aria-pressed={method==='firmware'} onClick={()=>chooseFlashing('firmware')}>orca_firmware · terminal</button></div></section>}
+        {build.audience==='internal'&&step.chapter.startsWith('Flashing')&&<section className="assembly-flashing-choice"><h3><GuideText variant field="prose/AssemblyGuide.tsx/1c73a2d7fd" text={"Choose one flashing method"} label="Section heading"/></h3><div className="assembly-clip-tabs"><button aria-pressed={method==='console'} onClick={()=>chooseFlashing('console')}>ORCA Console</button><button aria-pressed={method==='firmware'} onClick={()=>chooseFlashing('firmware')}>orca_firmware · terminal</button></div></section>}
         {step.id !== 'p1' && <section className="assembly-supplies" aria-label="Parts and tools for this step">
           {parts.length>0&&<div><h3><GuideText variant field="prose/AssemblyGuide.tsx/87dd8f7d3d" text={"Parts"} label="Section heading"/></h3><ul>{parts.map((item,i)=><li key={i}><GuideText field={`${step.id}/part/${i}`} text={item} label={`Part ${i+1}`}/></li>)}</ul></div>}
-          <div><h3><GuideText variant field="prose/AssemblyGuide.tsx/0ee7030893" text={"Tools"} label="Section heading"/></h3>{tools.length?<ul>{tools.map((item,i)=><li key={i}><GuideText field={`${step.id}/tool/${i}`} text={item} label={`Tool ${i+1}`}/></li>)}</ul>:<p><GuideText variant field="prose/AssemblyGuide.tsx/6bdd114bad" text={"No tools needed · work by hand."} label="Guide text"/></p>}</div>
+          {tools.length>0&&<div><h3><GuideText variant field="prose/AssemblyGuide.tsx/0ee7030893" text={"Tools"} label="Section heading"/></h3><ul>{tools.map((item,i)=><li key={i}><GuideText field={`${step.id}/tool/${i}`} text={item} label={`Tool ${i+1}`}/></li>)}</ul></div>}
         </section>}
         {step.id === 'p1' && <><Suspense fallback={<p>{"Loading your hand…"}</p>}><PartsExplorer build={build}/></Suspense>{build.version==='touch'&&<p className="assembly-muted"><GuideText variant field="prose/AssemblyGuide.tsx/750d98ce89" text={"Build the fingers and thumb with all skins off. Connect and mount their Touch sensors next, then fit the PP skins before building the hand and tower. Connect the sensor cable tails to the connector board later. Touch uses sensors instead of DP skins."} label="Guide text"/></p>}{build.version==='full'&&<p className="assembly-note"><GuideText variant field="prose/AssemblyGuide.tsx/d6745dd89a" text={"Full-specific sensor installation and harness routing still need a verified procedure before closing the hand."} label="Guide text"/></p>}</>}
-        {step.id==='p1'&&<section className="assembly-tool-overview"><span className="assembly-eyebrow">Before you begin</span><h3><GuideText variant field="prose/AssemblyGuide.tsx/f7fe31ffad" text={"Tools for your build"} label="Section heading"/></h3><p><GuideText variant field="prose/AssemblyGuide.tsx/295ddb622c" text={"Gather these once. Each step lists the tools you will use there."} label="Guide text"/></p><div className="assembly-tool-columns"><div><h4><GuideText variant field="prose/AssemblyGuide.tsx/5e36900b3e" text={"At the bench"} label="Section heading"/></h4><ul>{equipment.assembly.map((item,i)=><li key={i}><GuideText field={`equipment/assembly/${i}`} text={item} label={`Tool ${i+1}`}/></li>)}</ul></div><div><h4><GuideText variant field="prose/AssemblyGuide.tsx/fb93ba8114" text={"Setup and electronics"} label="Section heading"/></h4><ul>{equipment.setup.map((item,i)=><li key={i}><GuideText field={`equipment/setup/${i}`} text={item} label={`Tool ${i+1}`}/></li>)}</ul><h4><GuideText variant field="prose/AssemblyGuide.tsx/05c992dd81" text={"Optional work"} label="Section heading"/></h4><ul>{equipment.optional.map((item,i)=><li key={i}><GuideText field={`equipment/optional/${i}`} text={item} label={`Tool ${i+1}`}/></li>)}</ul></div></div></section>}
+        {step.id==='p1'&&<section className="assembly-tool-overview"><h3><GuideText variant field="prose/AssemblyGuide.tsx/f7fe31ffad" text={"Tools"} label="Section heading"/></h3><div className="assembly-tool-columns"><div><h4><GuideText variant field="prose/AssemblyGuide.tsx/5e36900b3e" text={"At the bench"} label="Section heading"/></h4><ul>{equipment.assembly.map((item,i)=><li key={i}><GuideText field={`equipment/assembly/${i}`} text={item} label={`Tool ${i+1}`}/></li>)}</ul></div><div><h4><GuideText variant field="prose/AssemblyGuide.tsx/fb93ba8114" text={"Setup and electronics"} label="Section heading"/></h4><ul>{equipment.setup.map((item,i)=><li key={i}><GuideText field={`equipment/setup/${i}`} text={item} label={`Tool ${i+1}`}/></li>)}</ul><h4><GuideText variant field="prose/AssemblyGuide.tsx/05c992dd81" text={"Optional work"} label="Section heading"/></h4><ul>{equipment.optional.map((item,i)=><li key={i}><GuideText field={`equipment/optional/${i}`} text={item} label={`Tool ${i+1}`}/></li>)}</ul></div></div></section>}
         {step.id==='p123'&&<SpoolOverview build={build}/>}
         {step.id === 'p6' && <><KnotLesson/><StepVideos key="knot-video" step={step} build={build}/></>}
         {step.id === 'p23' && <HandLabels build={build}/>}
@@ -186,12 +186,12 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
 
         {step.id!=='p139'&&checklist.length > 0 && <section className="assembly-work-checklist"><h3><GuideText variant field="prose/AssemblyGuide.tsx/3d29c4c3a3" text={String(step.id === 'p139' ? 'Final assembly checklist' : 'Finger movement checklist')} label="Section heading"/></h3>{checklist.map((label,i) => <label key={label}><input type="checkbox" checked={progress.checks.includes(checkKey(i))} onChange={() => toggleCheck(checkKey(i))} /><span><GuideText field={`${step.id}/check/${i}`} text={label} label={`Checklist item ${i+1}`}/></span></label>)}</section>}
 
-        {['p15','p16'].includes(step.id)&&<aside className="assembly-hint-help" aria-label="Optional PTFE hints"><span className="assembly-eyebrow">Hints · only if needed</span>{STEPS.filter(s=>s.hint).map(s=><button key={s.id} onClick={()=>go(s.id)}>{s.title} ↗</button>)}</aside>}
+        {['p15','p16'].includes(step.id)&&<aside className="assembly-hint-help" aria-label="Optional PTFE hints"><span className="assembly-eyebrow">Hints</span>{STEPS.filter(s=>s.hint).map(s=><button key={s.id} onClick={()=>go(s.id)}>{s.title} ↗</button>)}</aside>}
         {step.id === 'p1' ? <section className="assembly-check assembly-intro-checks" aria-label="Build preparation"><h3><GuideText variant field="prose/AssemblyGuide.tsx/432e027c3c" text={"Checklist"} label="Section heading"/></h3>{['I have selected the correct configuration for this build.', 'I have confirmed that I have all the necessary parts.'].map((text,i)=><label key={text}><input type="checkbox" checked={progress.checks.includes(`p1:${i}`)} onChange={()=>setProgress(p=>{
           const key=`p1:${i}`;const checks=p.checks.includes(key)?p.checks.filter(k=>k!==key):[...p.checks,key]
           return {...p,checks,done:checks.includes('p1:0')&&checks.includes('p1:1')?[...new Set([...p.done,'p1'])]:p.done.filter(id=>id!=='p1')}
-        })}/><span><GuideText field={`p1/check/${i}`} text={text} label={`Checklist item ${i+1}`}/></span></label>)}</section> : step.id !== 'p45' && !step.hint && <section className="assembly-check"><h3><GuideText variant field="prose/AssemblyGuide.tsx/432e027c3c" text={"Checklist"} label="Section heading"/></h3><label><input type="checkbox" checked={done} disabled={!done && !allChecked} onChange={toggleDone} /><span><GuideText field={`${step.id}/check`} text={step.check} label="Step completion checklist"/>{!allChecked && <small><GuideText variant field="prose/AssemblyGuide.tsx/ab19e30877" text={"Finish the checks above to mark this step complete."} label="Guide text"/></small>}</span></label></section>}
-        {completed === required.length && <div className="assembly-finished" role="status"><h3><GuideText variant field="prose/AssemblyGuide.tsx/22db4828c1" text={"Build checklist complete."} label="Section heading"/></h3><p><GuideText variant field="prose/AssemblyGuide.tsx/579680331c" text={"Your assembly and joint checks are saved."} label="Guide text"/></p></div>}
+        })}/><span><GuideText field={`p1/check/${i}`} text={text} label={`Checklist item ${i+1}`}/></span></label>)}</section> : step.id !== 'p45' && !step.hint && <section className="assembly-check"><h3><GuideText variant field="prose/AssemblyGuide.tsx/432e027c3c" text={"Checklist"} label="Section heading"/></h3><label><input type="checkbox" checked={done} disabled={!done && !allChecked} onChange={toggleDone} /><span><GuideText field={`${step.id}/check`} text={step.check} label="Step completion checklist"/></span></label></section>}
+        {completed === required.length && <div className="assembly-finished" role="status"><h3><GuideText variant field="prose/AssemblyGuide.tsx/22db4828c1" text={"Build checklist complete."} label="Section heading"/></h3></div>}
         {SHOW_ASSEMBLY_REVIEW_NOTES&&reviewNotes&&<ReviewChanges key={step.id} step={step} build={build}/>}
         <footer className="assembly-footer"><button className="assembly-secondary" disabled={!previous} onClick={() => previous && go(previous.id)}>← Previous</button><span>{step.hint?`Return to: ${editing.read(`${resume.id}/title`,resume.title)}`:next ? `Up next: ${editing.read(`${next.id}/title`,next.title)}` : 'End of the guide'}</span><button className="assembly-primary" disabled={!step.hint&&!next} onClick={() => step.hint?go(resume.id):next&&go(next.id)}>{step.hint?'Return to assembly →':'Next step →'}</button></footer>
         {build.motor === 'feetech' && ['p97','p98','p115'].includes(step.id) && <FeeTechVideos key={`ft-${step.id}`} />}
@@ -217,16 +217,15 @@ function MediaGallery({ items, saved, onSelect, focused }: { items: Figure[]; fo
     {items.map((item,i)=>{
       const isPhoto=Boolean(inlinePhotos[item.src]&&item.photo),view=isPhoto?item.photo!:item
       return <figure key={item.src} data-contrast={isPhoto?false:item.contrast??false} data-wide={item.wide||undefined} className={focused<0?'':(item.instruction??i+1)===focused+1?'is-focused':'is-unfocused'}>
-        <div className="assembly-row" style={{justifyContent:'flex-end'}}><button className="assembly-text-button" onClick={()=>enlarge(i)} aria-label={`Enlarge image ${i+1}`}>⤢</button></div>
+        <div className="assembly-row" style={{justifyContent:item.photo?'space-between':'flex-end'}}>{item.photo&&<ViewToggle photo={isPhoto} onChange={photo=>setInlinePhotos(p=>({...p,[item.src]:photo}))}/>}<button className="assembly-text-button" onClick={()=>enlarge(i)} aria-label={`Enlarge image ${i+1}`}>⤢</button></div>
         <div className="assembly-image-frame">
           <button className="assembly-image-button" data-image-kind={isModelImage(view.src)?'cad':'photo'} onClick={()=>enlarge(i)} aria-label={`Enlarge detail ${i+1}`}><img key={view.src} src={view.src} alt={view.caption} loading="lazy" onLoad={e=>{if(!isModelImage(view.src))e.currentTarget.style.maxWidth=`min(100%, ${e.currentTarget.naturalWidth}px)`}}/></button>
-          {item.photo&&<button className="assembly-photo-toggle" aria-label={isPhoto?'Show model render':'Show assembly photo'} title={isPhoto?'Show model render':'Show assembly photo'} onClick={()=>setInlinePhotos(p=>({...p,[item.src]:!isPhoto}))}><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg></button>}
-        </div><figcaption className="assembly-panel-caption"><GuideText field={`caption/${view.src}`} text={view.caption} label="Image caption"/>{isPhoto&&<span> · Assembly photo</span>}</figcaption>
+        </div>{item.showCaption&&<figcaption className="assembly-panel-caption"><GuideText field={`caption/${view.src}`} text={view.caption} label="Image caption"/></figcaption>}
       </figure>
     })}
     <dialog ref={dialog} className="assembly-lightbox assembly-comparison" data-contrast={photo?false:item.contrast??false} data-image-kind={isModelImage(shown.src)?'cad':'photo'} aria-label="Enlarged assembly image" onKeyDown={e=>{if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();cycle(e.key==='ArrowRight'?1:-1)}}} onCancel={e=>e.stopPropagation()} onClick={e=>{if(e.target===e.currentTarget)dialog.current?.close()}}>
-      <div className="assembly-row"><span>Instruction {item.instruction??selected+1}</span>{item.photo&&<div className="assembly-clip-tabs" aria-label="Image view"><button aria-pressed={!photo} onClick={()=>setPhoto(false)}>Model view</button><button aria-pressed={photo} onClick={()=>setPhoto(true)}>Assembly photo</button></div>}<button autoFocus onClick={()=>dialog.current?.close()}>Close image ×</button></div>
-      <img key={shown.src} src={shown.src} alt={shown.caption} onLoad={e=>{if(!isModelImage(shown.src))e.currentTarget.style.maxWidth=`min(100%, ${e.currentTarget.naturalWidth}px)`}}/><p className="assembly-lightbox-caption"><GuideText field={`caption/${shown.src}`} text={shown.caption} label="Image caption"/></p>
+      <div className="assembly-row"><span>Instruction {item.instruction??selected+1}</span>{item.photo&&<ViewToggle photo={photo} onChange={setPhoto}/>}<button autoFocus onClick={()=>dialog.current?.close()}>Close image ×</button></div>
+      <img key={shown.src} src={shown.src} alt={shown.caption} onLoad={e=>{if(!isModelImage(shown.src))e.currentTarget.style.maxWidth=`min(100%, ${e.currentTarget.naturalWidth}px)`}}/>{item.showCaption&&<p className="assembly-lightbox-caption"><GuideText field={`caption/${shown.src}`} text={shown.caption} label="Image caption"/></p>}
       <div className="assembly-row assembly-image-navigation"><button onClick={()=>cycle(-1)} disabled={frames.length<2}>← Previous image</button><span>{frame+1} / {frames.length}{photo?' · Assembly photo':''}</span><button onClick={()=>cycle(1)} disabled={frames.length<2}>Next image →</button></div>
     </dialog>
   </section>
@@ -235,16 +234,16 @@ function Command({ command }: { command: string }) {
   const [copied,setCopied] = useState(false)
   return <div className="assembly-command"><pre>{command}</pre><button className="assembly-text-button" onClick={async () => {try {await navigator.clipboard.writeText(command);setCopied(true)} catch {setCopied(false)}}}>{copied ? 'Copied ✓' : 'Copy command'}</button></div>
 }
-const StepVideos = memo(function StepVideos({ step, build }: { step: AssemblyStep; build: Build }) {
+const StepVideos = memo(function StepVideos({ step }: { step: AssemblyStep; build: Build }) {
   const clips = (step.id==='finishing-pp'?[]:step.id==='p37'?['p37','p40']:step.id==='prepare-pp'?['p33']:[step.id]).flatMap(id=>(localClips as Record<string,{src:string;poster:string;title:string;duration:number}[]>)[id] ?? []).filter((_,i)=>step.id==='prepare-pp'?i===0:step.id==='p33'?i===1:true)
   const [active,setActive] = useState(0)
   if (!clips.length) return null
   const clip = clips[active]
   return <section className="assembly-video-section assembly-local-video">
-    <div className="assembly-row"><div><span className="assembly-eyebrow">FOLLOW ALONG · THIS STEP</span><h3><GuideText variant field="prose/AssemblyGuide.tsx/ad33033d38" text={String(clip.title)} label="Section heading"/></h3></div><span className="assembly-muted">{Math.floor(clip.duration/60)}:{String(clip.duration%60).padStart(2,'0')}</span></div>
+    <div className="assembly-row"><div><h3><GuideText variant field="prose/AssemblyGuide.tsx/ad33033d38" text={String(clip.title)} label="Section heading"/></h3></div><span className="assembly-muted">{Math.floor(clip.duration/60)}:{String(clip.duration%60).padStart(2,'0')}</span></div>
     {clips.length>1 && <div className="assembly-clip-tabs">{clips.map((c,i)=><button key={c.src} aria-pressed={active===i} onClick={()=>setActive(i)}>{c.title}</button>)}</div>}
     <video key={clip.src} controls playsInline preload="auto" poster={clip.poster} aria-label={clip.title} src={clip.src}/>
-    <p className="assembly-muted"><GuideText variant field="prose/AssemblyGuide.tsx/2975e3dabf" text={["This clip shows an older model of the hand. Use it for the handling technique; follow the instructions and diagrams for your selected ",String(build.side)," ",String(build.version)," hand."].join('').trim()} label="Guide text"/></p>
+    <p className="assembly-muted"><GuideText variant field="prose/AssemblyGuide.tsx/2975e3dabf" text={"Older hand model shown."} label="Guide text"/></p>
   </section>
 }, (a,b)=>a.step.id===b.step.id&&a.build.side===b.build.side&&a.build.version===b.build.version)
 
@@ -252,9 +251,9 @@ function FeeTechVideos() {
   const [active, setActive] = useState(0)
   const clips = ['Cable connections', 'Installed motor wiring', 'Connector orientation']
   return <section className="assembly-video-section assembly-local-video">
-    <span className="assembly-eyebrow">FEETECH · CLOSE-UP VIDEOS</span><h3><GuideText variant field="prose/AssemblyGuide.tsx/ba78c9ec98" text={String(clips[active])} label="Section heading"/></h3>
+    <h3><GuideText variant field="prose/AssemblyGuide.tsx/ba78c9ec98" text={String(clips[active])} label="Section heading"/></h3>
     <div className="assembly-clip-tabs">{clips.map((label,i) => <button key={label} aria-pressed={active === i} onClick={() => setActive(i)}>{label}</button>)}</div>
     <video key={active} controls playsInline preload="auto" poster={`./assembly/media/feetech-video-${active+1}-poster.jpg`} aria-label={clips[active]} src={`./assembly/media/feetech-video-${active+1}.mp4`} />
-    <p className="assembly-muted"><GuideText variant field="prose/AssemblyGuide.tsx/7bb5dde277" text={"This clip shows an older model of the hand. Power the board off before connecting or disconnecting a FeeTech motor."} label="Guide text"/></p>
+    <p className="assembly-muted"><GuideText variant field="prose/AssemblyGuide.tsx/7bb5dde277" text={"Power the board off before connecting or disconnecting a FeeTech motor."} label="Guide text"/></p>
   </section>
 }

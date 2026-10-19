@@ -14,12 +14,11 @@ export function RoutingInspection({build}:{build:Build}){
  const [selected,setSelected]=useState(0),[transparent,setTransparent]=useState(true),area=AREAS[selected]
  const model=()=> <div data-contrast={build.version!=='touch'||area.step==='p89'}><PartAssemblyMotion key={area.step} build={build} step={area.step} position={1} tendon={-1} channels={transparent} zoom={1.35}/></div>
  return <section className="assembly-routing-inspection" aria-label="Inspect tendon routing">
-  <div className="assembly-row"><h3><GuideText variant field="prose/RoutingInspection.tsx/0ae6fd5fec" text={"Trace each strand"} label="Section heading"/></h3><AssemblyComparison key={area.step} step="p80" build={build} model={model} photoSources={area.photos}/></div>
   <div className="assembly-clip-tabs">{AREAS.map((item,i)=><button key={item.step} aria-pressed={selected===i} onClick={()=>setSelected(i)}>{item.label}</button>)}</div>
   <p><GuideText variant field="prose/RoutingInspection.tsx/c3ed08cd7e" text={String(area.text)} label="Guide text"/></p>
   <label className="assembly-route-check"><input type="checkbox" checked={transparent} onChange={e=>setTransparent(e.target.checked)}/> See through the parts</label>
-  {model()}
-  <p className="assembly-muted"><GuideText variant field="prose/RoutingInspection.tsx/095f0ab1fa" text={"Drag to inspect from another angle; scroll or pinch to zoom. Strands can overlap in a flat view without touching: rotate the model and trace each one. Open the assembly photos to compare actual correct and crossed examples."} label="Guide text"/></p>
+  <AssemblyComparison key={area.step} step="p80" build={build} model={model} photoSources={area.photos}>{model()}</AssemblyComparison>
+  
   {selected===2&&build.motor==='feetech'&&<p className="assembly-muted"><GuideText variant field="prose/RoutingInspection.tsx/d294aa3033" text={"The wrist reference shows the Dynamixel frame."} label="Guide text"/></p>}
   <div className="assembly-crossing-examples" aria-label="Tendon crossing examples">{['Clear path','Single crossing','Double crossing'].map((title,i)=><figure key={title}>
    <svg viewBox="0 0 240 170" role="img" aria-label={title}>

@@ -57,8 +57,8 @@ export function WristRouting({build,routeIndex=0,onRoute}:{build:Build;routeInde
  useEffect(()=>{let live=true;setFailed(false);loadBundle(key).then(bundle=>{if(live)setLoaded({key,bundle})}).catch(()=>{if(live)setFailed(true)});return()=>{live=false}},[key])
  const onSelect=(index:number)=>setPosition(order.indexOf(index))
  return <section className="assembly-wrist-routing" data-contrast={false} aria-label="Match carpal exits to wrist entries">
-  <div className="assembly-row"><div><span className="assembly-eyebrow">One tendon at a time</span><h3><GuideText variant field="prose/WristRouting.tsx/fcbc8478fb" text={"Match the two highlighted openings"} label="Section heading"/></h3></div><span className="assembly-routing-count">{position+1} / 32</span></div>
-  <p><GuideText variant field="prose/WristRouting.tsx/4883077353" text={"Both faces are shown looking into their openings. Keep the pictured orientation: left on the carpal view matches left on the wrist view. Work across the adjacent exits, alternating rows as shown."} label="Guide text"/></p>
+  <div className="assembly-row"><div></div><span className="assembly-routing-count">{position+1} / 32</span></div>
+  <p><GuideText variant field="prose/WristRouting.tsx/4883077353" text={"Keep the pictured orientation: left on the carpal view matches left on the wrist view. Work across the adjacent exits, alternating rows as shown."} label="Guide text"/></p>
   <div className="assembly-clip-tabs"><button aria-pressed={!closeUp} onClick={()=>setCloseUp(false)}>Whole parts</button><button aria-pressed={closeUp} onClick={()=>setCloseUp(true)}>Channel close-up</button></div>
   <div className="assembly-wrist-pair">
    {(['carpals','wrist'] as const).map(face=><figure key={face}>
@@ -72,7 +72,7 @@ export function WristRouting({build,routeIndex=0,onRoute}:{build:Build;routeInde
   <div className="assembly-routing-selection" style={{borderColor:routeColor(selected)}}><strong>Tendon {selected+1} · {routeName(selected)}</strong><span>{palm?'Palmar carpal row → dorsal wrist entry':'Dorsal carpal row → palmar wrist entry'}</span></div>
   <div className="assembly-route-order" aria-label="Left-to-right threading sequence">{order.map((index,n)=><button key={index} aria-label={`Route ${n+1}: tendon ${index+1}, ${TENDONS[index]}`} aria-pressed={n===position} onClick={()=>setPosition(n)} style={{'--route-color':routeColor(index)} as React.CSSProperties}>{n+1}</button>)}</div>
   <div className="assembly-row"><button className="assembly-secondary" disabled={position===0} onClick={()=>setPosition(position-1)}>← Previous tendon</button><button className="assembly-primary" disabled={position===31} onClick={()=>setPosition(position+1)}>Next tendon →</button></div>
-  <p className="assembly-muted"><GuideText variant field="prose/WristRouting.tsx/335aaadf9d" text={"The sequence numbers below the models are threading order; the label on each opening is its tendon ID. Keep each strand untangled and retain the same order within each row. Verify all 32 identities in the next checks."} label="Guide text"/></p>
+  <p className="assembly-muted"><GuideText variant field="prose/WristRouting.tsx/335aaadf9d" text={"Keep each strand untangled and retain the same order within each row."} label="Guide text"/></p>
   {(build.version==='full'||build.motor==='feetech')&&<p className="assembly-muted"><GuideText variant field="prose/WristRouting.tsx/62646550a1" text={["Reference geometry: ",String(build.version==='touch'?'Touch':'Base')," Dynamixel. The channel layout for ",String(build.version==='full'?'Full': 'FeeTech')," has not been verified against a separate model here."].join('').trim()} label="Guide text"/></p>}
  </section>
 }

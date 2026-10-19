@@ -11,9 +11,9 @@ const phases=[
 export function ThumbPpThreading({build}:{build:Build}){
  const [phase,setPhase]=useState(0),id=useId().replace(/:/g,''),title=phases[phase]
  return <section className="assembly-thumb-threading" aria-label="Thumb PP cable-channel threading">
-  <div className="assembly-row"><h3><GuideText variant field="prose/ThumbPpThreading.tsx/e1d96d51a6" text={"Thread first, tie through the cable channel"} label="Section heading"/></h3><span>{phase+1} / 3</span></div>
+  <div className="assembly-row"><span>{phase+1} / 3</span></div>
   <div className="assembly-thumb-threading-views">
-   <figure><img src={`./assembly/renders/${build.version==='touch'?'touch':'base'}-${build.side}-dynamixel/thumb-pp-part.webp`} alt={`${build.side} ${build.version} thumb PP without its skin`}/><figcaption><GuideText variant field="prose/ThumbPpThreading.tsx/dec792b85b" text={"Your thumb PP · keep the cable channel accessible"} label="Guide text"/></figcaption></figure>
+   <figure><img src={`./assembly/renders/${build.version==='touch'?'touch':'base'}-${build.side}-dynamixel/thumb-pp-part.webp`} alt={`${build.side} ${build.version} thumb PP without its skin`}/><figcaption><GuideText variant field="prose/ThumbPpThreading.tsx/dec792b85b" text={"Keep the cable channel accessible"} label="Guide text"/></figcaption></figure>
    <svg viewBox="0 0 620 470" role="img" aria-label={`${title[0]}. ${title[1]} Simplified sequence diagram, not a measured channel route.`}>
     <defs><marker id={id} markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="m0 0 6 3.5-6 3.5" fill="none" stroke="#287881" strokeWidth="1.5"/></marker></defs>
     <path d="M180 100 Q180 75 205 75 H290 Q315 75 315 100 V173 H287 V228 H315 V348 Q315 372 290 372 H205 Q180 372 180 348 Z" fill="#28343e"/>
@@ -28,6 +28,6 @@ export function ThumbPpThreading({build}:{build:Build}){
    </svg>
   </div>
   <p aria-live="polite"><GuideText variant field="prose/ThumbPpThreading.tsx/72a29cc7d8" text={[String(title[0]),"."," ",String(title[1])].join('').trim()} label="Guide text"/></p>
-  <div className="assembly-row"><small className="assembly-muted"><GuideText variant field="prose/ThumbPpThreading.tsx/8b46f203dd" text={"The diagram shows the sequence; use the cable channel on your part."} label="Guide text"/></small><div><button className="assembly-secondary" disabled={phase===0} onClick={()=>setPhase(phase-1)} aria-label="Previous threading phase">←</button><button className="assembly-secondary" disabled={phase===2} onClick={()=>setPhase(phase+1)} aria-label="Next threading phase">→</button></div></div>
+  <div className="assembly-row"><span/><div><button className="assembly-secondary" disabled={phase===0} onClick={()=>setPhase(phase-1)} aria-label="Previous threading phase">←</button><button className="assembly-secondary" disabled={phase===2} onClick={()=>setPhase(phase+1)} aria-label="Next threading phase">→</button></div></div>
  </section>
 }

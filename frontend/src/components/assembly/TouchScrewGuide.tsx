@@ -26,7 +26,7 @@ export function TouchScrewGuide({build}:{build:Build}){
  const key=`touch-${build.side}-dynamixel`,tip=finger==='Thumb'?4:3,lower=finger==='Thumb'?6:4
  useEffect(()=>{let active=true;setFailed(false);loadBundle(key).then(bundle=>{if(active)setLoaded({key,bundle})}).catch(()=>{if(active)setFailed(true)});return()=>{active=false}},[key])
  return <section className="assembly-touch-screws" aria-label="Touch sensor screw positions">
-  <div className="assembly-row"><div><span className="assembly-eyebrow">TOUCH SENSOR · FOUR SCREWS PER FINGER</span><h3><GuideText variant field="prose/TouchScrewGuide.tsx/6acd7473d9" text={"Match the screw to its hole"} label="Section heading"/></h3></div><span>{build.side==='left'?'Left':'Right'} hand</span></div>
+  <div className="assembly-row"><div></div><span>{build.side==='left'?'Left':'Right'} hand</span></div>
   <div className="assembly-clip-tabs assembly-touch-fingers" aria-label="Choose finger">{TOUCH_FINGERS.map(name=><button key={name} aria-pressed={finger===name} onClick={()=>{setFinger(name);setLength(0)}}>{name}</button>)}</div>
   <div className="assembly-screw-key" aria-label="Highlight screw length">
    <button aria-pressed={length===0} onClick={()=>setLength(0)}>All four screws</button>
@@ -40,7 +40,6 @@ export function TouchScrewGuide({build}:{build:Build}){
   </div>
   <div className="assembly-screw-controls"><label><input type="checkbox" checked={seeThrough} onChange={e=>setSeeThrough(e.target.checked)}/> See screw shafts through the parts</label><label className="assembly-motion-scrubber"><span>Separate screws</span><input aria-label="Separate sensor screws" type="range" min="0" max="100" value={exploded*100} onChange={e=>setExploded(Number(e.target.value)/100)}/></label></div>
   <p aria-live="polite"><GuideText variant field="prose/TouchScrewGuide.tsx/7f8f34db31" text={[String(finger),": ","two M1.4×",String(tip)," at the tip"," and ","two M1.4×",String(lower)," in the lower holes",". Tighten gently with a hand screwdriver."].join('').trim()} label="Guide text"/></p>
-  <p className="assembly-muted"><GuideText variant field="prose/TouchScrewGuide.tsx/f5023f320d" text={"Click a screw or its length to highlight the matching pair. Drag to rotate; scroll or pinch to zoom. Colors match the reference diagrams. Screw shapes are simplified; their lengths and mounting positions are shown."} label="Guide text"/></p>
   <details className="assembly-screw-reference" open={failed}><summary>Original screw diagrams</summary><div>{['fingers','thumb'].map(kind=><figure key={kind}><img src={`./assembly/touch/screws-${kind}.png`} alt={kind==='thumb'?'Thumb: blue M1.4×4 screws at the tip, orange M1.4×6 below':'Fingers: green M1.4×3 screws at the tips, blue M1.4×4 below'}/><figcaption><GuideText variant field="prose/TouchScrewGuide.tsx/dc5e3893bd" text={[String(kind==='thumb'?'Thumb':'Index, middle, ring and pinky')," · reference orientation"].join('').trim()} label="Guide text"/></figcaption></figure>)}</div></details>
  </section>
 }

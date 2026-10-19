@@ -26,7 +26,7 @@ export function BoardIdentification({build}:{build:Build}){
   </g>)}
  </svg>
  return <section className="assembly-board-identification" aria-label="Identify the OH board connections" data-contrast={false}>
-  <div className="assembly-row"><div><span className="assembly-eyebrow">Find each connection</span><h3><GuideText variant field="prose/BoardIdentification.tsx/a3bbf8574b" text={"The OH control board"} label="Section heading"/></h3></div><button className="assembly-text-button" aria-label="Enlarge the board connections" onClick={()=>dialog.current?.showModal()}>⤢</button></div>
+  <div className="assembly-row"><div><h3><GuideText variant field="prose/BoardIdentification.tsx/a3bbf8574b" text={"The OH control board"} label="Section heading"/></h3></div><button className="assembly-text-button" aria-label="Enlarge the board connections" onClick={()=>dialog.current?.showModal()}>⤢</button></div>
   <div className="assembly-board-identification-layout"><div className="assembly-board-photo">{drawing}</div><div>
    <div className="assembly-board-port-list">{PORTS.map((p,i)=><button key={p.id} aria-pressed={p.id===selected} onClick={()=>setSelected(p.id)}><span>{i+1}</span>{p.name}{p.id===build.motor&&<small><GuideText variant field="prose/BoardIdentification.tsx/3866a08fa3" text={"Your motor output"} label="Guide text"/></small>}</button>)}</div>
    <p className="assembly-board-port-description" aria-live="polite"><GuideText variant field="prose/BoardIdentification.tsx/f28fd5d23e" text={[String(port.name),String(port.text)].join('').trim()} label="Guide text"/></p>

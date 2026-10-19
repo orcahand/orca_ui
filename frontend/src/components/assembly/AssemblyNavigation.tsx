@@ -66,7 +66,7 @@ export function AssemblyNavigation({steps,current,done,query,filtered,build,onGo
           })}
         </g>
       </svg>
-      <p aria-live="polite">{pickedActive?REGIONS.find(r=>r.id===pickedActive)?.label:region==='fingers'?'Middle · ring · pinky':REGIONS.find(r=>r.id===region)?.label??'Select a finger, palm, wrist or tower'}</p>
+      <p aria-live="polite">{pickedActive?REGIONS.find(r=>r.id===pickedActive)?.label:region==='fingers'?'Middle · ring · pinky':REGIONS.find(r=>r.id===region)?.label}</p>
     </div>
     <nav ref={contents} className="assembly-contents-scroll" aria-label="Assembly chapters">
       {beforeContents}
@@ -86,7 +86,7 @@ export function AssemblyNavigation({steps,current,done,query,filtered,build,onGo
           {expanded&&<div className="assembly-step-links" id={`chapter-${n}`}>{matches.map((s,i)=><Fragment key={s.id}>{s.section&&s.section!==matches[i-1]?.section&&<h4 className="assembly-step-section">{s.section}</h4>}<button className={`${s.id===current.id?'active':''} ${s.hint?'assembly-hint-link':''}`} aria-current={s.id===current.id?'step':undefined} onClick={()=>{setPicked('');onGo(s.id)}}><span aria-label={s.hint?'Optional hint':done.includes(s.id)?'Completed':'Incomplete'}>{s.hint?'HINT':done.includes(s.id)?'✓':String((s.section?required.filter(item=>item.section===s.section):required).indexOf(s)+1).padStart(2,'0')}</span><span>{title(s)}</span></button></Fragment>)}</div>}
         </div>
       })}
-      {!filtered.length&&<p className="assembly-muted">No matching steps. Try “wrist” or “PTFE”.</p>}
+      {!filtered.length&&<p className="assembly-muted">No matching steps.</p>}
     </nav>
   </div>
 }

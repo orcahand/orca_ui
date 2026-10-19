@@ -24,11 +24,10 @@ export function CloveHitchLesson(){
  },[frame,playing])
  const select=(i:number)=>{setPlaying(false);setFrame(i)}
  return <section className="assembly-knot assembly-clove-hitch" aria-label="Clove hitch visual lesson">
-  <div className="assembly-row"><div><span className="assembly-eyebrow">ONE KNOT · FRAME BY FRAME</span><h3><GuideText variant field="prose/CloveHitchLesson.tsx/49b23163f0" text={"Tie the clove hitch"} label="Section heading"/></h3></div><span>{frame+1} / {stages.length}</span></div>
+  <div className="assembly-row"><div></div><span>{frame+1} / {stages.length}</span></div>
   <div className="assembly-knot-layout"><HitchFrame frame={frame}/><div>
-   <span className="assembly-eyebrow">{frame===4?'CHECK THE FINISHED HITCH':'YOUR NEXT MOVEMENT'}</span>
    <p aria-live={playing?'off':'polite'}><GuideText variant field="prose/CloveHitchLesson.tsx/72ac0b75d8" text={String(stages[frame].cue)} label="Guide text"/></p>
-   <p className="assembly-muted"><GuideText variant field="prose/CloveHitchLesson.tsx/e44613a76a" text={"The blue bar represents the cable; the white cord represents the copper wire. Working end = the end you move around the cable."} label="Guide text"/></p>
+   <p className="assembly-muted"><GuideText variant field="prose/CloveHitchLesson.tsx/e44613a76a" text={"Working end = the end you move around the cable."} label="Guide text"/></p>
    <div className="assembly-media-controls"><button disabled={frame===0} onClick={()=>select(frame-1)}>← Back</button><button onClick={()=>{if(frame===4)setFrame(0);setPlaying(!playing)}}>{playing?'Pause':'Play sequence'}</button><button disabled={frame===4} onClick={()=>select(frame+1)}>Next →</button></div>
   </div></div>
   <div className="assembly-knot-frames">{stages.map((stage,i)=><button key={i} aria-label={`Clove hitch stage ${i+1}`} title={stage.cue} aria-pressed={frame===i} onClick={()=>select(i)}><HitchFrame frame={i} thumbnail/><span>{i+1}</span></button>)}</div>

@@ -25,7 +25,7 @@ export function TouchCableWrap(){
  },[playing])
  useEffect(()=>{if(progress>=1)setPlaying(false)},[progress])
  return <section className="assembly-cable-wrap" aria-label="130 mm cable wrapping model">
-  <div className="assembly-row"><div><span className="assembly-eyebrow">130 MM CABLE · COPPER WRAP</span><h3><GuideText variant field="prose/TouchCableWrap.tsx/95fdd98b19" text={"Position and wind the wrap"} label="Section heading"/></h3></div><button className="assembly-secondary" onClick={()=>{if(progress>=1)setProgress(0);setPlaying(!playing)}}>{playing?'Pause wrapping':'Play wrapping'}</button></div>
+  <div className="assembly-row"><div></div><button className="assembly-secondary" onClick={()=>{if(progress>=1)setProgress(0);setPlaying(!playing)}}>{playing?'Pause wrapping':'Play wrapping'}</button></div>
   <div className="assembly-clip-tabs"><button aria-pressed={!close} onClick={()=>setClose(false)}>Whole cable</button><button aria-pressed={close} onClick={()=>setClose(true)}>Wrap close-up</button></div>
   <div className="assembly-cable-model" role="img" aria-label="Rotatable 130 millimetre cable with a 30 millimetre copper wrap and 70 millimetres from the wrap end to the right connector">
    <Canvas orthographic frameloop="demand" camera={{position:[0,0,180],near:.1,far:1000}} dpr={[1,2]}>
@@ -41,8 +41,7 @@ export function TouchCableWrap(){
   <p className="assembly-cable-mobile-measurements"><GuideText variant field="prose/TouchCableWrap.tsx/3ea451630e" text={["Wrap: ","≈30 mm","\n","To right connector: ","≈70 mm (±5 mm)"].join('').trim()} label="Guide text"/></p>
   <label className="assembly-motion-scrubber"><span>Wrapping progress</span><input aria-label="Cable wrapping progress" type="range" min="0" max="100" value={Math.round(progress*100)} onChange={e=>{setPlaying(false);setProgress(Number(e.target.value)/100)}}/></label>
   <p><GuideText variant field="prose/TouchCableWrap.tsx/4c5f9149cf" text={["Keep about ","1 mm between turns",". Secure both ends with the clove hitch shown above, then trim the wire tails below 2 mm."].join('').trim()} label="Guide text"/></p>
-  <p className="assembly-muted"><GuideText variant field="prose/TouchCableWrap.tsx/2f40b22279" text={"Drag to rotate. The model follows the photographed wrap position; connector shapes are simplified. Use the close-up to inspect the spacing."} label="Guide text"/></p>
   <button className="assembly-text-button" aria-expanded={reference} onClick={()=>setReference(!reference)}>{reference?'Hide reference photo':'Show reference photo'}</button>
-  {reference&&<figure className="assembly-cable-reference"><img src="./assembly/touch/wrap-short.png" alt="Original cable photo with a 3 cm copper wrap and 7 cm from its end to the right connector"/><figcaption><GuideText variant field="prose/TouchCableWrap.tsx/5aeb56ea7e" text={"Reference photo · match the connector orientation shown."} label="Guide text"/></figcaption></figure>}
+  {reference&&<figure className="assembly-cable-reference"><img src="./assembly/touch/wrap-short.png" alt="Original cable photo with a 3 cm copper wrap and 7 cm from its end to the right connector"/><figcaption><GuideText variant field="prose/TouchCableWrap.tsx/5aeb56ea7e" text={"Match the connector orientation shown."} label="Guide text"/></figcaption></figure>}
  </section>
 }

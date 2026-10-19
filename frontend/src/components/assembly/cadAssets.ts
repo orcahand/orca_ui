@@ -17,5 +17,5 @@ export function loadBundle(key:string) {
 export function finishMaterial(part:Part,build:Build,geometry?:THREE.BufferGeometry) {
   const skin=part.category==='Skins',metal=part.category==='Standard components'||part.label==='Metal spool holder',tendon=part.category==='Tendons'
   const boardColors=part.label==='OH control board'&&!!geometry?.getAttribute('color')
-  return new THREE.MeshStandardMaterial({color:boardColors?'#ffffff':skin?(build.version==='base'?'#e9eded':'#161b20'):metal?'#b5bcc3':tendon?'#f5f6f2':/OH control board/.test(part.label)?'#171c1b':/board|PCB/.test(part.label)?'#171c1b':'#29333b',vertexColors:boardColors,roughness:skin?.76:metal?.3:.48,metalness:metal?.55:0})
+  return new THREE.MeshStandardMaterial({color:boardColors?'#ffffff':skin?(build.version==='base'?(part.label==='Palm skin'?'#29333b':'#e9eded'):'#161b20'):metal?'#b5bcc3':tendon?'#f5f6f2':/OH control board/.test(part.label)?'#171c1b':/board|PCB/.test(part.label)?'#171c1b':'#29333b',vertexColors:boardColors,roughness:skin?.76:metal?.3:.48,metalness:metal?.55:0})
 }

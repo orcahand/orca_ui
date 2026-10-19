@@ -40,7 +40,7 @@ export function TouchBoardConnection(){
  const build=useMemo<Build>(()=>({version:'touch',side:'right',motor:'dynamixel',audience:'external'}),[])
  useEffect(()=>{let live=true;Promise.all([loadBundle('touch-right-dynamixel'),new GLTFLoader().loadAsync('./assembly/details/touch-connector-board.glb')]).then(([bundle,gltf])=>{if(live)setLoaded({bundle,board:gltf.scene})}).catch(()=>{if(live)setFailed(true)});return()=>{live=false}},[])
  return <section className="assembly-board-link" data-contrast={false} aria-label="Touch connector board to OH board cable">
-  <span className="assembly-eyebrow">The link between the two boards</span><h3><GuideText variant field="prose/TouchBoardConnection.tsx/3cb708a195" text={"One cable, two four-pin sockets"} label="Section heading"/></h3>
+  
   <div className="assembly-clip-tabs"><button aria-pressed={selected===-1} onClick={()=>setSelected(-1)}>Both boards</button><button aria-pressed={selected===0} onClick={()=>setSelected(0)}>A · Touch socket</button><button aria-pressed={selected===1} onClick={()=>setSelected(1)}>B · OH socket</button></div>
   <div className="assembly-board-link-layout"><div className="assembly-board-link-canvas">
    {loaded?<Canvas orthographic frameloop="demand" camera={{position:[0,0,1000],near:.1,far:3000}} dpr={[1,2]}><ambientLight intensity={1.8}/><directionalLight position={[-120,170,300]} intensity={3}/><BoardDiagram {...loaded} build={build} selected={selected}/><OrbitControls key={selected} enablePan={false} minZoom={.8} maxZoom={2.5}/></Canvas>:<p>{failed?'The connection diagram could not load. Reopen this step to retry.':'Loading the board connection…'}</p>}
@@ -48,7 +48,6 @@ export function TouchBoardConnection(){
    <button aria-pressed={selected===0} onClick={()=>setSelected(0)}><span>A</span><div><strong>Touch connector board</strong><p><GuideText variant field="prose/TouchBoardConnection.tsx/7f22c38bff" text={"Use the white four-pin socket below the five finger connectors. The finger cables use the smaller sockets around the board."} label="Guide text"/></p></div></button>
    <div className="assembly-board-cable-key"><i/><div><strong>Four-wire board cable</strong><p><GuideText variant field="prose/TouchBoardConnection.tsx/0e780ebc00" text={"Connect the supplied complete cable. Align each plug’s keyed housing with its socket and push on the plug, not the wires."} label="Guide text"/></p></div></div>
    <button aria-pressed={selected===1} onClick={()=>setSelected(1)}><span>B</span><div><strong>OH control board</strong><p><GuideText variant field="prose/TouchBoardConnection.tsx/0362008087" text={"Use the four-pin connector-board socket labeled “Sensing”, next to the motor connectors. Match all four positions; the motor outputs have three."} label="Guide text"/></p></div></button>
-   <p className="assembly-muted"><GuideText variant field="prose/TouchBoardConnection.tsx/44ab068853" text={"Boards shown outside the hand to make the connection clear. The colored cable marks the connection, not its installed shape or wire colors. Drag to inspect the keyed sockets."} label="Guide text"/></p>
   </div></div>
  </section>
 }

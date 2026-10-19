@@ -70,7 +70,7 @@ export function GuideBackgroundEditor({step}:{step:string}){
  const name=selected.split('::')[2],label=NAMES[name]??name?.replace('assembly-','').replaceAll('-',' ')
  function toggle(){if(!open&&!selected){const main=root()?.querySelector<HTMLElement>('.assembly-main');if(main)select(main)}setOpen(!open);setPicking(false)}
  return <div ref={panel} className={`assembly-editor-controls ${open?'is-color-open':''}`}>
-  <div className="assembly-row"><span role="status">{editing.error||'Text and colors save in this browser.'}</span><div><button className="assembly-text-button" aria-expanded={open} onClick={toggle}>Background colors</button><button className="assembly-text-button" onClick={editing.exportEdits}>Export edits</button></div></div>
+  <div className="assembly-row"><span role="status">{editing.error}</span><div><button className="assembly-text-button" aria-expanded={open} onClick={toggle}>Background colors</button><button className="assembly-text-button" onClick={editing.exportEdits}>Export edits</button></div></div>
   {open&&picking&&<div className="assembly-color-pick-message" role="status">Click the picture, model or panel background to edit.<button className="assembly-text-button" onClick={()=>setPicking(false)}>Cancel selection</button></div>}
   {open&&!picking&&<div className="assembly-color-panel">
    <div className="assembly-row"><strong>{label?`Editing: ${label}`:'Choose a background'}</strong><button className="assembly-secondary" aria-pressed={picking} onClick={()=>setPicking(!picking)}>{picking?'Cancel selection':'Pick an area'}</button></div>
