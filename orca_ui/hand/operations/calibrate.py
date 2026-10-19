@@ -52,23 +52,37 @@ def apply_calibration_current(hand, current: float | None, ctx: OpContext) -> No
     groups = {family: table for family, table in config.calibration_current_v21_dict.items()
               if family != str(config.motor_type)}
     object.__setattr__(config, "calibration_current_v21_dict", groups)
-    ctx.log(f"calibrating at {current} mA")
+    ctx.log("driving the hardstops at each motor's full available current; "
+            f"wrist at {current} mA")
 
 
-def _drive_current_lines(measured: dict) -> list[str]:
+def _drive_current_cell(now, before) -> str:
+    """One direction's mean current, with its change since the previous run."""
+    if now is None:
+        return "--"
+    if before in (None, 0):
+        return f"{now:.0f}"
+    delta = now - before
+    return f"{now:.0f} ({delta:+.0f}, {100 * delta / before:+.0f}%)"
+
+
+def _drive_current_lines(measured: dict, previous: dict | None = None) -> list[str]:
     """The mean current each joint drew onto its stops, as log lines.
 
-    Informational: a joint well above its siblings is the signature of an
-    over-tensioned tendon.
+    Informational: a joint well above its siblings, or one that has climbed
+    since the last run, is the signature of an over-tensioned tendon.
     """
     if not measured:
         return []
-    lines = ["mean current onto the hardstops (mA) — flex / extend:"]
+    previous = previous or {}
+    lines = ["mean current onto the hardstops, flex / extend (mA, change "
+             "since the previous run):"]
     for joint, per_direction in measured.items():
-        flex, extend = per_direction.get("flex"), per_direction.get("extend")
-        lines.append(f"  {joint}: "
-                     f"{'--' if flex is None else format(flex, '.0f')} / "
-                     f"{'--' if extend is None else format(extend, '.0f')}")
+        was = previous.get(joint, {})
+        lines.append(
+            f"  {joint}: "
+            f"{_drive_current_cell(per_direction.get('flex'), was.get('flex'))}"
+            f" / {_drive_current_cell(per_direction.get('extend'), was.get('extend'))}")
     return lines
 
 
@@ -149,7 +163,9 @@ def run_calibrate(hand, encoder_client, ctx: OpContext,
                 ctx.log("travel: motor-shaft travel between the hardstops in degrees, against the "
                         "hand's joint_motor_travel baseline; mA: the current the joint was driven "
                         "onto its hardstops with")
-            for line in _drive_current_lines(event.get("drive_current_ma") or {}):
+            for line in _drive_current_lines(
+                    event.get("drive_current_ma") or {},
+                    event.get("drive_current_previous_ma") or {}):
                 ctx.log(line)
         elif kind == "calibration_aborted":
             ctx.log("calibration aborted — completed steps are persisted")
