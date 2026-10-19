@@ -34,20 +34,22 @@ PUBLISH_PERIOD_S = 0.1
 HOLD_BOUNDS_MA = (20.0, 500.0)
 # Run settings: currents in mA, and how far the motors turn counterclockwise while tensioning in degrees.
 CURRENT_BOUNDS_MA = {"hold_ap": HOLD_BOUNDS_MA, "hold_mcp": HOLD_BOUNDS_MA,
-                     "hold_pip": HOLD_BOUNDS_MA, "tension_current": (50.0, 1000.0),
+                     "hold_pip": HOLD_BOUNDS_MA,
                      "tension_offset_deg": (0.0, 45.0)}
-# Range-check holds per joint group and the tensioning hold, in mA. The Feetech values match
-# the Dynamixel output torque (Feetech draws ~275 mA before producing any).
+# Range-check holds per joint group, in mA. The Feetech values match the Dynamixel
+# output torque (Feetech draws ~275 mA before producing any). The ratcheting hold
+# is not here: orca_core runs it at each motor's own goal-current ceiling, because a
+# position loop at its goal draws nothing and the ceiling is the whole budget it has
+# to refuse being turned with.
 DEFAULT_CURRENTS_MA = {
-    "dynamixel": {"hold_ap": 200.0, "hold_mcp": 140.0, "hold_pip": 100.0, "tension_current": 400.0},
-    "feetech": {"hold_ap": 380.0, "hold_mcp": 320.0, "hold_pip": 280.0, "tension_current": 580.0},
+    "dynamixel": {"hold_ap": 200.0, "hold_mcp": 140.0, "hold_pip": 100.0},
+    "feetech": {"hold_ap": 380.0, "hold_mcp": 320.0, "hold_pip": 280.0},
 }
 
 
 # Input values "current:<key>=<mA>" change a current mid-run instead of answering a prompt.
 CURRENT_INPUT = "current:"
-LIVE_STEP = {"hold_ap": "range", "hold_mcp": "range", "hold_pip": "range",
-             "tension_current": "tension"}
+LIVE_STEP = {"hold_ap": "range", "hold_mcp": "range", "hold_pip": "range"}
 # Input values "pass:<group>=<fraction>" change a group's pass threshold mid-run.
 PASS_INPUT = "pass:"
 PASS_GROUPS = ("ap", "mcp", "pip")
@@ -291,10 +293,7 @@ class _LiveCurrents(Operation):
             presenter.log(f"{key.replace('_', ' ')} set to {current:.0f}{_unit(key)}")
             hand = self._hand
             if hand is not None and presenter.step == LIVE_STEP.get(key):
-                if key == "tension_current":
-                    hand_ops.set_max_current(hand, current)
-                else:
-                    hand_ops.set_joint_currents(hand, self.hold_for)
+                hand_ops.set_joint_currents(hand, self.hold_for)
         return True
 
 
@@ -318,7 +317,6 @@ class GuidedTensionOperation(_LiveCurrents):
                 progress_callback=presenter.progress,
                 should_stop=ctx.stop_event.is_set,
                 hold_current=self.hold_for,
-                tension_current=lambda: self.currents["tension_current"],
                 tension_offset_deg=lambda: self.currents["tension_offset_deg"],
                 pass_fraction=self.pass_fraction,
                 hand_key=supervisor.hand_id,
@@ -478,8 +476,7 @@ class SimulatedGuidedTensionOperation(_LiveCurrents):
                 while True:
                     presenter.progress({"event": "pulled", "total_deg": pulled})
                     answer = presenter.prompt({"action": "tension", "options": ["Done", "Pull more"]
-                                               + goto(), "round": round_no,
-                                               "tension_current": self.currents["tension_current"]})
+                                               + goto(), "round": round_no})
                     if answer != "Pull more":
                         break
                     pulled += EXTRA_DEG
