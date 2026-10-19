@@ -257,20 +257,12 @@ export interface HandInfo {
   last_tension?: LastTension | null
   // Unfinished guided tensioning saved for this hand: best score per joint.
   tension_progress?: TensionProgress | null
-  // The connected hand's calibration current and its motors' ceiling (mA).
-  calibration_current?: {
-    default: number
-    // v2.1 hands whose model sets a current per joint group; null otherwise.
-    groups: Record<'abd' | 'mcp' | 'pip', number> | null
-    max: number | null
-  } | null
   // Guided tensioning currents (mA) for this hand's motor family.
   guided_tension_defaults?: {
     motor_type: string | null
     hold_ap: number
     hold_mcp: number
     hold_pip: number
-    tension_current: number
   }
 }
 
@@ -817,7 +809,6 @@ export interface GuidedTensionExtra {
   hold_ap?: number
   hold_mcp?: number
   hold_pip?: number
-  tension_current?: number
   tension_offset_deg?: number
   pulled_deg?: number
   pass_fractions?: Record<'ap' | 'mcp' | 'pip', number>

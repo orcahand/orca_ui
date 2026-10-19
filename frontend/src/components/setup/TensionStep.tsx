@@ -244,7 +244,6 @@ interface GuidedCurrents {
   hold_ap: number
   hold_mcp: number
   hold_pip: number
-  tension_current: number
 }
 
 const overridesKey = (family: string) => `orca.guidedTension.currents.v3.${family}`
@@ -253,7 +252,6 @@ const DEFAULT_CURRENTS: GuidedCurrents = {
   hold_ap: 200,
   hold_mcp: 180,
   hold_pip: 140,
-  tension_current: 400,
 }
 // Bounds mirror CURRENT_BOUNDS_MA in orca_ui/hand/operations/guided_tension.py.
 const CURRENT_FIELDS: {
@@ -266,7 +264,6 @@ const CURRENT_FIELDS: {
   { key: 'hold_ap', label: 'hold AP', hint: 'range check · abductions + thumb cmc', min: 20, max: 500 },
   { key: 'hold_mcp', label: 'hold MCP', hint: 'range check · MCPs', min: 20, max: 500 },
   { key: 'hold_pip', label: 'hold PIP', hint: 'range check · PIPs + thumb dip', min: 20, max: 500 },
-  { key: 'tension_current', label: 'tension', hint: 'held while you ratchet', min: 50, max: 1000 },
 ]
 
 function pickCurrents(defaults?: Partial<GuidedCurrents> | null): GuidedCurrents {

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from orca_ui.hand.operations import hand_ops
 from orca_ui.hand.operations.base import OpContext, Operation
-from orca_ui.hand.operations.calibrate import run_calibrate
+from orca_ui.hand.operations.calibrate import apply_calibration_current, run_calibrate
 from orca_ui.hand.operations.tension import run_tension, validate_tension_params
 
 MAX_ROUNDS = 5
@@ -62,6 +62,7 @@ class WizardOperation(Operation):
                 supervisor.config, ctx.stop_event,
                 motor_port=lease.presence.motor_port if lease.presence else None)
             self._hand = hand
+            apply_calibration_current(hand, ctx.service.max_current, ctx)
             try:
                 encoder_client, encoder_link = hand_ops.open_encoder_client(
                     supervisor.config, lease.presence)

@@ -463,8 +463,8 @@ function StepContent({
             <p className="setup-copy">
               Hulls off. The finger motors have slowly turned{' '}
               {extra.pulled_deg ?? extra.tension_offset_deg}° counterclockwise and are holding
-              with {extra.tension_current} mA of current, the rotation should have placed some
-              tension on all tendons attached to the bottom spools.
+              where they came to rest, at each motor's full available current, so the rotation
+              should have placed some tension on all tendons attached to the bottom spools.
             </p>
             <p className="setup-copy">
               If any bottom spool tendons still feel loose, press "{PULL_MORE}" ({EXTRA_DEG}° more).
@@ -640,7 +640,6 @@ const CURRENT_FIELDS = [
   { key: 'hold_ap', label: 'Hold · APs', step: 'range', min: 20, max: 500, unit: 'mA', inc: 10 },
   { key: 'hold_mcp', label: 'Hold · MCPs', step: 'range', min: 20, max: 500, unit: 'mA', inc: 10 },
   { key: 'hold_pip', label: 'Hold · PIPs', step: 'range', min: 20, max: 500, unit: 'mA', inc: 10 },
-  { key: 'tension_current', label: 'Tensioning', step: 'tension', min: 50, max: 1500, unit: 'mA', inc: 10 },
   { key: 'tension_offset_deg', label: 'Turn CCW', step: null, min: 0, max: 45, unit: '°', inc: 5 },
 ] as const
 
