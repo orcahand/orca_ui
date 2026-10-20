@@ -283,6 +283,9 @@ class TelemetryService:
         # Which motors answered the last error sweep. None until the first
         # one: "we have not asked" is not the same as "nothing answered".
         self._motor_answering: "dict[int, bool] | None" = None
+        # Core's per-motor fault records, refreshed each fault poll.
+        self._fault_records: dict = {}
+        self._last_fault_poll = 0.0
         self._last_hw_error_sweep = 0.0
 
     def start(self) -> None:
@@ -406,6 +409,7 @@ class TelemetryService:
 
         if session.caps.motors:
             self._sweep_hardware_errors(session)
+            self._drive_fault_policy(session)
             if not session.caps.feedback_loop:
                 if self._motor_telemetry_is_due():
                     now = time.monotonic()
@@ -685,6 +689,37 @@ class TelemetryService:
         self._hw_errors = found
         self._hw_error_info = classified
 
+    def _drive_fault_policy(self, session) -> None:
+        """Let orca_core act on what the motors are reporting.
+
+        The console is a subscriber here, not the decision-maker: core owns
+        what a fault means and performs the recovery, and this only chooses
+        the moment and reports the outcome. Skipped while the hand is being
+        driven - a reboot takes the bus for the best part of a second, and
+        mid-motion is the worst time to lose it.
+        """
+        hand = getattr(session, "hand", None)
+        poll = getattr(hand, "poll_faults", None)
+        if poll is None or self._hand_is_driven():
+            return
+        now = time.monotonic()
+        if now - self._last_fault_poll < HW_ERROR_SWEEP_S:
+            return
+        self._last_fault_poll = now
+        try:
+            actions = poll()
+        except Exception:
+            logger.debug("fault poll failed", exc_info=True)
+            return
+        for action in actions:
+            if action.prominent:
+                message = f"motor {action.motor_id} {action.reason}"
+                logger.warning(message)
+                # orca_ui installs no printing handler, and a motor being
+                # recovered or abandoned has to reach the operator.
+                print(f"\033[93mWarning: {message}\033[0m")
+        self._fault_records = getattr(hand, "fault_records", {}) or {}
+
     @staticmethod
     def _drain_alerts(client) -> dict:
         """Motors whose status packets carried the Alert bit since last asked.
@@ -729,6 +764,7 @@ class TelemetryService:
                 self._hw_error_info = {}
                 self._hw_errors_warned = set()
                 self._motor_answering = None
+                self._fault_records = {}
         bus = self._bus_errors.snapshot()
         tracking = self._tracking.snapshot()
         config = getattr(getattr(self._service, "supervisor", None),
@@ -753,6 +789,16 @@ class TelemetryService:
             # Classified: which kind of latch, and what to do about it. The
             # dashboard needs this to tell a power latch from a hot motor.
             entry["hw_error"] = self._hw_error_info.get(mid)
+            # What core's fault policy has done about this motor so far.
+            record = self._fault_records.get(mid)
+            entry["recovery"] = None if record is None else {
+                "load_reboots": record.reboots,
+                "thermal_recoveries": record.thermal_recoveries,
+                "cooling": record.cooling,
+                "given_up": record.given_up,
+                "thermal_given_up": record.thermal_given_up,
+                "faults": len(record.events),
+            }
             motors[mid] = entry
         self._hub.publish(T.MOTORS_FAULTS,
                           {"motors": motors, "bus": bus["bus"]})
