@@ -700,7 +700,15 @@ class TelemetryService:
         """
         hand = getattr(session, "hand", None)
         poll = getattr(hand, "poll_faults", None)
-        if poll is None or self._hand_is_driven():
+        if poll is None:
+            return
+        # Deferred while the hand is driven, but not indefinitely: a motor
+        # overheats under exactly the sustained load that keeps the hand
+        # driven, so a long replay or teleop session must not be able to hide
+        # it. Same trade the health read already makes. A motor that faulted
+        # has stopped itself, so recovering it mid-run costs bus time, not
+        # motion.
+        if self._hand_is_driven() and not self._telemetry_is_stale():
             return
         now = time.monotonic()
         if now - self._last_fault_poll < HW_ERROR_SWEEP_S:
