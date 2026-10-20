@@ -40,6 +40,9 @@ logger = logging.getLogger(__name__)
 # transaction where the motor family can read the register from every motor at
 # once, one read per motor otherwise.
 HW_ERROR_SWEEP_S = 10.0
+# While a motor is being held off to cool, the hold has to be re-asserted
+# faster than the hardware brings it back.
+FAULT_HOLD_POLL_S = 1.0
 
 # Bare motor mode reads position and current this often. There is no control
 # loop to starve and no tendon whose timing matters — the point of a bench is
@@ -286,6 +289,9 @@ class TelemetryService:
         # Core's per-motor fault records, refreshed each fault poll.
         self._fault_records: dict = {}
         self._last_fault_poll = 0.0
+        # Per-motor shutdown threshold from the motors themselves; None until
+        # read, {} when the family cannot report it.
+        self._shutdown_temps: "dict[int, float] | None" = None
         self._last_hw_error_sweep = 0.0
 
     def start(self) -> None:
@@ -552,11 +558,26 @@ class TelemetryService:
         """temps/currents plus the family's rated max operating temperature
         (same source as scripts/stress_test.py's monitor)."""
         payload = dict(self._motor_health)
-        max_temp = getattr(getattr(session, "hand", None), "motor_client",
-                           None)
-        max_temp = getattr(max_temp, "max_operating_temp_c", None)
+        client = getattr(getattr(session, "hand", None), "motor_client", None)
+        max_temp = getattr(client, "max_operating_temp_c", None)
         if max_temp is not None:
             payload["max_temp_c"] = float(max_temp)
+        # The rated figure above is a datasheet number; what actually turns a
+        # motor off is its own Temperature Limit register, which hands do not
+        # all ship alike. EEPROM, so read once per session.
+        # The bench path builds this service without __init__, so read
+        # through getattr rather than assuming the attribute exists.
+        if getattr(self, "_shutdown_temps", None) is None and client is not None:
+            read = getattr(client, "read_temperature_limits", None)
+            try:
+                self._shutdown_temps = {} if read is None else {
+                    int(mid): value for mid, value in (read() or {}).items()
+                    if value is not None}
+            except Exception:
+                logger.debug("temperature limits unreadable", exc_info=True)
+                self._shutdown_temps = {}
+        if getattr(self, "_shutdown_temps", None):
+            payload["shutdown_temps"] = dict(self._shutdown_temps)
         return payload
 
     def _publish_motor_state(self, session) -> None:
@@ -711,7 +732,15 @@ class TelemetryService:
         if self._hand_is_driven() and not self._telemetry_is_stale():
             return
         now = time.monotonic()
-        if now - self._last_fault_poll < HW_ERROR_SWEEP_S:
+        # A cooling motor re-energizes itself about a second after dropping
+        # below its limit, so re-asserting the hold every sweep interval
+        # leaves it running most of the time and it never cools. Poll fast
+        # while anything is being held off, and pay the bus for it.
+        cooling = any(getattr(record, "cooling", False)
+                      for record in (getattr(self, "_fault_records", None)
+                                     or {}).values())
+        interval = FAULT_HOLD_POLL_S if cooling else HW_ERROR_SWEEP_S
+        if now - self._last_fault_poll < interval:
             return
         self._last_fault_poll = now
         config = None
@@ -777,6 +806,7 @@ class TelemetryService:
                 self._hw_errors_warned = set()
                 self._motor_answering = None
                 self._fault_records = {}
+                self._shutdown_temps = None
         bus = self._bus_errors.snapshot()
         tracking = self._tracking.snapshot()
         config = getattr(getattr(self._service, "supervisor", None),

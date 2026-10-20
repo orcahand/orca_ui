@@ -878,6 +878,11 @@ export interface GuidedTensionExtra {
   excluded?: { joint: string; motor: number; reason: string }[]
 }
 
+// Per-motor shutdown threshold read from the motors (Temperature Limit).
+// Distinct from the family's rated operating temperature: the rating is a
+// datasheet figure, this is what actually turns the motor off.
+export type ShutdownTemps = Record<string, number>
+
 export interface FaultBudgets {
   // Reboots of one motor before its repetition is called out prominently.
   report_after_reboots: number

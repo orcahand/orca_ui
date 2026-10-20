@@ -238,6 +238,9 @@ function dispatch(message: ServerMessage): void {
         latest.motors.positions
       latest.motors.maxTempC =
         (data.max_temp_c as number | undefined) ?? latest.motors.maxTempC
+      latest.motors.shutdownTemps =
+        (data.shutdown_temps as Record<string, number> | undefined) ??
+        latest.motors.shutdownTemps
       markDirty()
       break
     case TOPICS.motorsFaults: {

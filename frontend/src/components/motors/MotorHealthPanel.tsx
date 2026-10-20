@@ -197,6 +197,9 @@ export function MotorHealthPanel() {
   }, [joints])
 
   const [maxTemp, setMaxTemp] = useState<number>(DEFAULT_MAX_TEMP_C)
+  // What actually turns a motor off, read from the motors. null until the
+  // first telemetry payload carries it.
+  const [shutdownTemp, setShutdownTemp] = useState<number | null>(null)
   const budgets = useAppStore((state) => state.control?.fault_budgets ?? null)
   const [bus, setBus] = useState<MotorsFaults['bus'] | null>(null)
   useStreamFrame((frames) => {
@@ -213,6 +216,13 @@ export function MotorHealthPanel() {
     }
     const rated = frames.motors.maxTempC
     if (rated !== null && rated !== maxTemp) setMaxTemp(rated)
+    const shutdown = frames.motors.shutdownTemps
+    if (shutdown && Object.keys(shutdown).length) {
+      const lowest = Math.min(...Object.values(shutdown))
+      if (Number.isFinite(lowest) && lowest !== shutdownTemp) {
+        setShutdownTemp(lowest)
+      }
+    }
   })
 
   // Per-motor issues, derived once: the table above the grid renders them,
@@ -228,13 +238,13 @@ export function MotorHealthPanel() {
           temp: row.temp,
           current: row.current,
           faults: row.faults,
-          maxTemp,
+          maxTemp: shutdownTemp ?? maxTemp,
           maxCurrent,
         }),
       )
     }
     return map
-  }, [rows, jointOfMotor, maxTemp, maxCurrent])
+  }, [rows, jointOfMotor, maxTemp, shutdownTemp, maxCurrent])
 
   const allIssues = useMemo(
     () => sortIssues([...issuesByMotor.values()].flat()),
@@ -265,7 +275,15 @@ export function MotorHealthPanel() {
         <>
         <MotorIssues issues={allIssues} />
         <div style={{ fontSize: 10, color: 'var(--dimmer)', marginBottom: 4 }}>
-          max operating temp: {maxTemp.toFixed(0)}°C
+          rated operating temp: {maxTemp.toFixed(0)}°C
+          {shutdownTemp !== null && (
+            <>
+              {' · '}
+              <span title="the motors' own Temperature Limit register — what actually de-energizes them. A motor runs past the rated figure above without stopping.">
+                shuts off at {shutdownTemp.toFixed(0)}°C
+              </span>
+            </>
+          )}
         </div>
         <table className="motor-table">
           <thead>
@@ -322,12 +340,13 @@ export function MotorHealthPanel() {
                 ) : (
                   row.id
                 )
-              const pct = tempPct(row.temp, maxTemp)
+              const limit = shutdownTemp ?? maxTemp
+              const pct = tempPct(row.temp, limit)
               return (
                 <tr key={row.id}>
                   <td>{idCell}</td>
                   <td className="motor-joint">{joint ?? '--'}</td>
-                  <td className={tempClass(row.temp, maxTemp)}>
+                  <td className={tempClass(row.temp, limit)}>
                     {row.temp === null ? '--' : row.temp.toFixed(1)}
                   </td>
                   <td
