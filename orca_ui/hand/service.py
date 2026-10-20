@@ -372,6 +372,9 @@ class HandService:
                 "active_sensors": list(tactile_config.active_sensors),
                 "num_taxels": dict(tactile_config.num_taxels),
             }
+        fingertips = session.fingertip_identities() if session else None
+        if fingertips is not None:
+            info["fingertips"] = fingertips
         return info
 
     def models(self) -> dict:

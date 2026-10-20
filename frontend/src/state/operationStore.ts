@@ -23,7 +23,12 @@ const OPERATION_LABELS: Record<string, string> = {
   wizard: 'full setup',
   guided_tension: 'guided tensioning',
   run_in: 'run-in',
+  number_fingertip: 'fingertip numbering',
 }
+
+// Operations that show their progress, prompts and errors inside their own
+// panel, so the transport bar and the global error banner leave them alone.
+export const SELF_REPORTING_KINDS = new Set(['number_fingertip'])
 
 export function operationLabel(kind: string): string {
   return OPERATION_LABELS[kind] ?? kind
@@ -57,9 +62,11 @@ export const useOperationStore = create<OperationStoreState>((set, get) => ({
     // both terminals land in the Motors tab event log.
     const label = operationLabel(snapshot.kind)
     if (snapshot.state === 'error') {
-      useAppStore
-        .getState()
-        .setError(`${label} failed: ${snapshot.error ?? 'unknown error'}`)
+      if (!SELF_REPORTING_KINDS.has(snapshot.kind)) {
+        useAppStore
+          .getState()
+          .setError(`${label} failed: ${snapshot.error ?? 'unknown error'}`)
+      }
       useEventLogStore
         .getState()
         .pushEvent(

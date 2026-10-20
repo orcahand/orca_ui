@@ -61,6 +61,9 @@ def build_operation_manager(service, settings, publish_topic) -> OperationManage
         RunInOperation,
     )
     from orca_ui.hand.operations.record import RecordOperation
+    from orca_ui.hand.operations.fingertips import NumberFingertipOperation
+    # Mock mode runs it against orca_core's simulated connector board.
+    manager.register(NumberFingertipOperation)
     manager.register(ReplayOperation)
     manager.register(DemoOperation)
     manager.register(RunInOperation)
