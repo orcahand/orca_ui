@@ -101,12 +101,13 @@ class HandSession:
 
     def fingertip_identities(self) -> dict | None:
         """Which fingertip model sits in each slot, and the mismatches; read
-        once per session (None when the board firmware doesn't report it)."""
+        once per session; a failed read is retried on the next call (None when
+        the board firmware doesn't report it)."""
         if not self._fingertips_read and self.tactile_client is not None:
-            self._fingertips_read = True
             from orca_ui.hand.operations import hand_ops
             try:
                 self._fingertips = hand_ops.fingertip_identities(self.tactile_client)
+                self._fingertips_read = True
             except Exception:
                 logger.warning("could not read fingertip identities", exc_info=True)
         return self._fingertips

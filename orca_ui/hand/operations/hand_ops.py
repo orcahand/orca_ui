@@ -12,6 +12,8 @@ import threading
 import time
 from typing import Callable
 
+from orca_ui.hand.operations.events import OperationStopped
+
 logger = logging.getLogger(__name__)
 
 # Mirrors orca_core/scripts/calibrate.py (scripts aren't importable from the
@@ -390,15 +392,15 @@ _simulated_fingertip_bus: dict = {}
 
 def open_tactile_link(presence, finger_to_sensor_id: dict | None = None,
                       mock: bool = False, retry_s: float = 0.0,
-                      stop_event: threading.Event | None = None):
+                      stop_event: threading.Event | None = None, probe=None):
     """(client, link) on the hand's tactile port for fingertip numbering.
 
-    ``retry_s`` keeps re-discovering the port, for reopening after the
-    operator power-cycles the hand. In mock mode a simulated board with one
-    fresh fingertip (module 2) stands in; it persists across calls.
+    ``retry_s`` keeps re-discovering and reopening the port, for after the
+    operator power-cycles the hand. ``probe`` returns the sensing ports
+    (the supervisor's pinned-board probe); without it discovery is global.
+    In mock mode a simulated board with one fresh fingertip (module 2)
+    stands in; it persists across calls.
     """
-    from orca_core.hardware.tactile_client import TactileClient
-
     if mock:
         from orca_core.hardware.mock_hand_serial_link import MockHandSerialLink
         from orca_core.hardware.sensing.tactile_mock import (
@@ -420,12 +422,30 @@ def open_tactile_link(presence, finger_to_sensor_id: dict | None = None,
 
         deadline = time.monotonic() + retry_s
         sensing = getattr(presence, "sensing", None)
-        while not getattr(sensing, "tactile", None):
-            if time.monotonic() >= deadline or (stop_event and stop_event.is_set()):
+        while True:
+            if stop_event is not None and stop_event.is_set():
+                raise OperationStopped()
+            if not getattr(sensing, "tactile", None):
+                sensing = probe() if probe else discover_sensing_ports()
+            error = None
+            if getattr(sensing, "tactile", None):
+                link = HandSerialLink(port=sensing.tactile, baudrate=sensing.tactile_baudrate)
+                try:
+                    return _connect_tactile(link, finger_to_sensor_id)
+                except Exception as e:
+                    error = e
+                    sensing = None
+            if time.monotonic() >= deadline:
+                if error is not None:
+                    raise RuntimeError(f"could not open the tactile sensor port: {error}") from error
                 raise RuntimeError("no tactile sensor port found — is the hand plugged in and powered?")
             time.sleep(0.5)
-            sensing = discover_sensing_ports()
-        link = HandSerialLink(port=sensing.tactile, baudrate=sensing.tactile_baudrate)
+    return _connect_tactile(link, finger_to_sensor_id)
+
+
+def _connect_tactile(link, finger_to_sensor_id):
+    from orca_core.hardware.tactile_client import TactileClient
+
     link.connect()
     try:
         client = TactileClient(link, finger_to_sensor_id=finger_to_sensor_id)

@@ -7,19 +7,27 @@ import { useState } from 'react'
 import { api } from '../../api/rest'
 import type { Finger, FingertipExtra, FoundFingertip } from '../../api/types'
 import { FINGERS } from '../../api/types'
+import { useAppStore } from '../../state/appStore'
 import { isOperationActive, useOperationStore } from '../../state/operationStore'
 import { FlowRunning } from './FlowStep'
 import { failToBanner } from './setupUtils'
 
 const KIND = 'number_fingertip'
 const SPARE = 5
-const TARGETS: [number, Finger | 'spare'][] = [...FINGERS.map((f, i): [number, Finger] => [i, f]), [SPARE, 'spare']]
+type Target = [number, Finger | 'spare']
 
-const fitsText = (tip: FoundFingertip) => tip.fits.map((m) => `${m} ${FINGERS[m]}`).join(', ')
+// Module per finger from the hand config, as the backend resolves it.
+const targetsFor = (mapping: Partial<Record<Finger, number>> | undefined): Target[] => [
+  ...FINGERS.map((f, i): Target => [mapping?.[f] ?? i, f]),
+  [SPARE, 'spare'],
+]
+const fitsText = (tip: FoundFingertip, targets: Target[]) =>
+  tip.fits.map((m) => `${m} ${targets.find(([n]) => n === m)?.[1] ?? '?'}`).join(', ')
 const misfit = (tip: FoundFingertip) => tip.part !== null && tip.module !== SPARE && !tip.fits.includes(tip.module)
 
 export function FingertipNumbering() {
   const operation = useOperationStore((s) => s.operation)
+  const targets = targetsFor(useAppStore((s) => s.handInfo?.finger_to_sensor_id))
   const [source, setSource] = useState<number | null>(null)
   const [target, setTarget] = useState<number | null>(null)
   const mine = operation?.kind === KIND ? operation : null
@@ -37,7 +45,7 @@ export function FingertipNumbering() {
   const read = () => api.operationStart(KIND, { mode: 'detect' }).catch(failToBanner)
   const set = () =>
     api
-      .operationStart(KIND, { mode: 'number', finger: to === SPARE ? 'spare' : FINGERS[to!], current_module: from })
+      .operationStart(KIND, { mode: 'number', finger: targets.find(([m]) => m === to)![1], current_module: from })
       .catch(failToBanner)
   const awaiting = active?.state === 'awaiting_input' ? active.awaiting : null
 
@@ -53,7 +61,7 @@ export function FingertipNumbering() {
               key={tip.module}
               className={`finger-chip${tip.module === from ? ' has-selection' : ''}`}
               disabled={active !== null}
-              title={tip.part ? `${tip.part}, fits ${fitsText(tip) || 'no finger'}` : undefined}
+              title={tip.part ? `${tip.part}, fits ${fitsText(tip, targets) || 'no finger'}` : undefined}
               onClick={() => setSource(tip.module)}
             >
               {tip.module} {tip.finger}
@@ -64,7 +72,7 @@ export function FingertipNumbering() {
       )}
       <div className="flow-row">
         <span className="fingertip-label">New number</span>
-        {TARGETS.map(([m, label]) => (
+        {targets.map(([m, label]) => (
           <button
             key={m}
             className={`finger-chip${m === to ? ' has-selection' : ''}`}
@@ -115,18 +123,24 @@ export function FingertipNumbering() {
           </button>
         </div>
       )}
-      {extra && <FingertipResult extra={extra} from={from} collision={collision} error={mine?.error ?? null} />}
+      {extra ? (
+        <FingertipResult extra={extra} targets={targets} from={from} collision={collision} error={mine?.error ?? null} />
+      ) : (
+        mine?.error && <span className="flow-info warn">⚠ {mine.error}</span>
+      )}
     </div>
   )
 }
 
 function FingertipResult({
   extra,
+  targets,
   from,
   collision,
   error,
 }: {
   extra: FingertipExtra
+  targets: Target[]
   from: number | null
   collision: boolean
   error: string | null
@@ -149,7 +163,7 @@ function FingertipResult({
       {tip && (
         <span>
           Module {tip.module} ({tip.finger}){tip.part ? ` · ${tip.part}` : ''}
-          {tip.fits.length > 0 ? ` · fits ${fitsText(tip)}` : ''}
+          {tip.fits.length > 0 ? ` · fits ${fitsText(tip, targets)}` : ''}
         </span>
       )}
       {extra.verified === true && <span>Set to {extra.target_module} ✓</span>}

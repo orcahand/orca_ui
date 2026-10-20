@@ -40,8 +40,11 @@ def finger_modules(service) -> dict[str, int]:
 
 
 def validate_fingertip_params(service, params: dict) -> dict:
+    from orca_ui.hand.models import describe
     from orca_ui.hand.service import ServiceError
 
+    if not describe(service.supervisor.config.config_path)[1]:
+        raise ServiceError("this hand model has no tactile fingertips", status_code=409)
     numbering = hand_ops.fingertip_numbering()
     mode = params.get("mode", "detect")
     if mode not in ("detect", "number"):
@@ -82,35 +85,30 @@ class NumberFingertipOperation(Operation):
             "targeted": False,
             "verified": None,
         }
-        # Scan and confirm without taking the hand offline; only the write and
-        # the power cycle hold the maintenance lease.
-        client, link = self._connected_link(ctx, mock)
-        scan = current = None
-        try:
-            if client is not None:
-                scan = self._scan(ctx, numbering, client, extra, names)
-                if self.params["mode"] == "detect":
-                    return dict(extra)
-                current = self._confirm(ctx, scan, extra, names)
-                if current is None:
-                    return dict(extra)
-        finally:
-            if link is not None:
-                hand_ops.close_tactile_link(client, link)
-
+        # Scan and confirm over the live link when there is one, so the hand
+        # stays connected; the write and the power cycle hold the lease.
         supervisor = ctx.service.supervisor
-        ctx.set_phase("acquiring", detail="taking the sensor port into maintenance")
-        lease = supervisor.enter_maintenance(self.kind)
-        client = link = None
+        probe = None if mock else (lambda: getattr(supervisor._probe_hardware(), "sensing", None))
+        client, link = self._connected_link(ctx, mock)
+        lease = None
         try:
-            client, link = hand_ops.open_tactile_link(lease.presence, mock=mock)
-            if scan is None:
-                scan = self._scan(ctx, numbering, client, extra, names)
-                if self.params["mode"] == "detect":
-                    return dict(extra)
-                current = self._confirm(ctx, scan, extra, names)
-                if current is None:
-                    return dict(extra)
+            if client is None:
+                lease = self._enter(ctx, supervisor)
+                client, link = hand_ops.open_tactile_link(
+                    lease.presence, mock=mock, stop_event=ctx.stop_event, probe=probe)
+            scan = self._scan(ctx, numbering, client, extra, names)
+            if self.params["mode"] == "detect":
+                return dict(extra)
+            current = self._confirm(ctx, scan, extra, names)
+            if current is None:
+                return dict(extra)
+            if lease is None:
+                if link is not None:
+                    hand_ops.close_tactile_link(client, link)
+                client = link = None
+                lease = self._enter(ctx, supervisor)
+                client, link = hand_ops.open_tactile_link(
+                    lease.presence, mock=mock, stop_event=ctx.stop_event, probe=probe)
 
             ctx.set_phase("numbering", detail=f"module {current} → {target}")
             done = numbering.set_fingertip_module(client, target, current=current)
@@ -131,7 +129,7 @@ class NumberFingertipOperation(Operation):
 
             ctx.set_phase("verifying", detail="looking for the fingertip at its new number")
             client, link = hand_ops.open_tactile_link(
-                None, mock=mock, retry_s=REOPEN_RETRY_S, stop_event=ctx.stop_event)
+                None, mock=mock, retry_s=REOPEN_RETRY_S, stop_event=ctx.stop_event, probe=probe)
             scan = self._scan(ctx, numbering, client, extra, names)
             extra["verified"] = target in scan.modules and current not in scan.modules
             ctx.set_extra(extra)
@@ -142,8 +140,14 @@ class NumberFingertipOperation(Operation):
             ctx.log(f"verified: the fingertip that was module {current} is now module {target}")
             return dict(extra)
         finally:
-            hand_ops.close_tactile_link(client, link)
-            supervisor.exit_maintenance()
+            if link is not None:
+                hand_ops.close_tactile_link(client, link)
+            if lease is not None:
+                supervisor.exit_maintenance()
+
+    def _enter(self, ctx: OpContext, supervisor):
+        ctx.set_phase("acquiring", detail="taking the sensor port into maintenance")
+        return supervisor.enter_maintenance(self.kind)
 
     @staticmethod
     def _connected_link(ctx: OpContext, mock: bool):

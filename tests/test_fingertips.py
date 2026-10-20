@@ -84,6 +84,16 @@ def test_numbering_needs_confirmation_a_free_number_and_verifies_after_power_cyc
     assert bus.numbering.pending == {}
     assert client.get("/api/status").json()["state"] == "connected"
 
+    # A write that never lands is a failure, not a success.
+    assert client.post("/api/operation/number_fingertip/start", json=start).status_code == 200
+    _awaiting(client)
+    client.post("/api/operation/input", json={"value": "Set"})
+    _awaiting(client)
+    bus.numbering.pending.clear()
+    client.post("/api/operation/input", json={"value": "Power-cycled"})
+    lost = _finished(client)
+    assert lost["state"] == "error" and lost["extra"]["verified"] is False
+
     assert client.post("/api/operation/number_fingertip/start", json=start).status_code == 200
     _awaiting(client)
     client.post("/api/operation/input", json={"value": "Set"})
@@ -93,3 +103,4 @@ def test_numbering_needs_confirmation_a_free_number_and_verifies_after_power_cyc
     assert done["state"] == "done", done
     assert done["extra"]["verified"] is True
     assert _modules(done) == [0, 1]
+

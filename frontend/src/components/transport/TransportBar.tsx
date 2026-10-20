@@ -8,11 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../../api/rest'
 import type { OperationSnapshot } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
-import {
-  operationLabel,
-  SELF_REPORTING_KINDS,
-  useOperationStore,
-} from '../../state/operationStore'
+import { operationLabel, useOperationStore } from '../../state/operationStore'
 import { TeleopBar } from './TeleopBar'
 
 const DONE_LINGER_MS = 3000
@@ -66,7 +62,7 @@ function OperationBar() {
     return () => window.clearTimeout(timer)
   }, [runId, state])
 
-  if (!operation || SELF_REPORTING_KINDS.has(operation.kind)) return null
+  if (!operation) return null
   if (operation.state === 'done' && expiredRun === operation.run_id) return null
   if (operation.state === 'error' && dismissedRun === operation.run_id) {
     return null
