@@ -336,16 +336,21 @@ export interface FingertipIdentities {
   mismatches: Partial<Record<Finger, [expected: string, found: string]>>
 }
 
+export interface FoundFingertip {
+  module: number
+  finger: Finger | 'spare' | null // the slot this module number feeds
+  part: string | null // fingertip model, when the board read it
+  fits: number[] // modules whose finger takes this model
+}
+
 export interface FingertipExtra {
-  finger: Finger | null // the chosen target; null for a plain read
+  finger: Finger | 'spare' | null // the chosen target; null for a plain read
   target_module: number | null
-  expected_part: string | null
+  current_module: number | null // the fingertip being renumbered
   result: string | null // scan result: scan_ok | no_sensor | multiple | bus_error
-  found_modules: number[]
-  found_finger: Finger | null // finger the single found module belongs to
-  fits: [number, Finger][] // [module, finger] pairs taking the found model
-  identity: string
-  part: string | null
+  found: FoundFingertip[]
+  garbled_modules: number[] // numbers two fingertips seem to share
+  targeted: boolean // the board can renumber one of several fingertips
   verified: boolean | null
 }
 

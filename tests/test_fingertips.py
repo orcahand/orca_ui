@@ -1,7 +1,8 @@
 """number_fingertip operation: renumbering a fingertip is persistent, so it
-writes only after an explicit confirmation and reports success only once the
-fingertip answers at its new number after a power cycle. Runs over the real
-manager + mock stack with orca_core's simulated connector board."""
+writes only after an explicit confirmation, never onto a number another
+fingertip has, and reports success only once the fingertip answers at its new
+number after a power cycle. Runs over the real manager + mock stack with
+orca_core's simulated connector board."""
 
 import time
 
@@ -48,20 +49,39 @@ def _finished(client):
     return _operation(client)
 
 
-def test_numbering_needs_confirmation_and_verifies_after_power_cycle(client):
+def _modules(op):
+    return [tip["module"] for tip in op["extra"]["found"]]
+
+
+def test_numbering_needs_confirmation_a_free_number_and_verifies_after_power_cycle(client):
+    from orca_core.hardware.sensing.tactile_mock import TactileMockState
+
+    bus = TactileMockState(connected_fingers=[])
+    bus.numbering.modules = [1, 2]
+    bus.numbering.parts = {1: "PXSR-CMDDP18B", 2: "PXSR-CMDDP18A"}
+    hand_ops._simulated_fingertip_bus["state"] = bus
+
     read = {"params": {"mode": "detect"}}
     assert client.post("/api/operation/number_fingertip/start", json=read).status_code == 200
     seen = _finished(client)["extra"]
-    assert (seen["found_modules"], seen["found_finger"], seen["fits"]) == ([2], "middle", [[0, "thumb"]])
+    assert seen["found"] == [
+        {"module": 1, "finger": "index", "part": "PXSR-CMDDP18B", "fits": [1, 2, 3]},
+        {"module": 2, "finger": "middle", "part": "PXSR-CMDDP18A", "fits": [0]},
+    ]
     assert client.get("/api/status").json()["state"] == "connected"
 
-    start = {"params": {"finger": "thumb", "mode": "number"}}
+    taken = {"params": {"finger": "index", "current_module": 2, "mode": "number"}}
+    assert client.post("/api/operation/number_fingertip/start", json=taken).status_code == 200
+    refused = _finished(client)
+    assert refused["state"] == "error" and "taken" in refused["error"]
+    assert bus.numbering.pending == {}
 
+    start = {"params": {"finger": "thumb", "current_module": 2, "mode": "number"}}
     assert client.post("/api/operation/number_fingertip/start", json=start).status_code == 200
-    assert "module 2 to module 0" in _awaiting(client)["prompt"]
+    assert "module 2 (middle) to module 0 (thumb)" in _awaiting(client)["prompt"]
     client.post("/api/operation/input", json={"value": "Cancel"})
     assert _finished(client)["state"] == "done"
-    assert hand_ops._simulated_fingertip_bus["state"].numbering.pending == {}
+    assert bus.numbering.pending == {}
     assert client.get("/api/status").json()["state"] == "connected"
 
     assert client.post("/api/operation/number_fingertip/start", json=start).status_code == 200
@@ -72,4 +92,4 @@ def test_numbering_needs_confirmation_and_verifies_after_power_cycle(client):
     done = _finished(client)
     assert done["state"] == "done", done
     assert done["extra"]["verified"] is True
-    assert done["extra"]["found_modules"] == [0]
+    assert _modules(done) == [0, 1]
