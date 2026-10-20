@@ -155,9 +155,6 @@ export interface JointGains {
 export interface ControlState {
   torque_enabled: boolean
   max_current: number
-  // config.yaml's ceiling, and the lowest one orca_core accepts (0 = unknown).
-  config_max_current: number | null
-  max_current_floor: number
   // The one gain set every loop joint shares, or null when they differ.
   gains: JointGains | null
   // Live gains per loop-controlled joint, read back from the controller.
@@ -260,20 +257,12 @@ export interface HandInfo {
   last_tension?: LastTension | null
   // Unfinished guided tensioning saved for this hand: best score per joint.
   tension_progress?: TensionProgress | null
-  // The connected hand's calibration current and its motors' ceiling (mA).
-  calibration_current?: {
-    default: number
-    // v2.1 hands whose model sets a current per joint group; null otherwise.
-    groups: Record<'abd' | 'mcp' | 'pip', number> | null
-    max: number | null
-  } | null
   // Guided tensioning currents (mA) for this hand's motor family.
   guided_tension_defaults?: {
     motor_type: string | null
     hold_ap: number
     hold_mcp: number
     hold_pip: number
-    tension_current: number
   }
 }
 
@@ -820,7 +809,6 @@ export interface GuidedTensionExtra {
   hold_ap?: number
   hold_mcp?: number
   hold_pip?: number
-  tension_current?: number
   tension_offset_deg?: number
   pulled_deg?: number
   pass_fractions?: Record<'ap' | 'mcp' | 'pip', number>

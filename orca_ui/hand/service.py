@@ -293,7 +293,6 @@ class HandService:
 
     def hand_info(self) -> dict:
         from orca_ui.hand.operations import hand_ops
-        from orca_ui.hand.operations.calibrate import calibration_current_info
 
         config = self.supervisor.config
         encoder_backed = set(_encoder_sensed_joints(config))
@@ -363,7 +362,6 @@ class HandService:
             "last_tension": hand_ops.last_tension(config),
             "tension_progress": self._tension_progress(config),
             "guided_tension_defaults": self._guided_tension_defaults(),
-            "calibration_current": calibration_current_info(self),
         }
         mapping = getattr(config, "finger_to_sensor_id", None)
         if mapping:
@@ -597,8 +595,6 @@ class HandService:
                 # config.yaml's ceiling — what the panel's "default" button
                 # returns to (mirrors config_gains below).
                 "config_max_current": self._config_max_current,
-                # Lowest ceiling orca_core accepts (see max_current_floor).
-                "max_current_floor": self.max_current_floor(),
                 # The one gain set every loop joint shares, or null when the
                 # joints are tuned individually.
                 "gains": _uniform_gains(joint_gains),
@@ -1111,17 +1107,12 @@ class HandService:
                                  if joint not in controlled],
         }
 
-    def max_current_floor(self) -> int:
-        """Lowest ceiling orca_core will accept: its config validation refuses
-        a max_current below the calibration current (calibration would then
-        stall against its own limit). Published so the UI's control can stop
-        at the floor instead of learning about it from a failed write.
-
-        0 while the calibration current is still the motor family's
-        ``default`` — no floor is known until a session names the family.
-        """
-        return _current_or_none(
-            getattr(self.supervisor.config, "calibration_current", 0)) or 0
+    @property
+    def max_current(self) -> int | None:
+        """The ceiling the console is set to, or None before a session has
+        resolved the motor family's own default."""
+        with self._state_lock:
+            return self._max_current
 
     def _apply_current_ceiling(self, session) -> None:
         """Push the live ceiling to the motors.
@@ -1352,11 +1343,20 @@ class HandService:
 
         session = self._require_motors()
         ma = int(ma)
-        # Validate before the hardware write: orca_core refuses a ceiling
-        # below the calibration current, and a rejected value must not leave
+        # Calibration drives onto the hardstops at the ceiling set here, for
+        # every joint: the packaged configs ship the two values equal, so a
+        # separate calibration current only ever constrained this control.
+        hand_config = session.hand.config
+        fields = {"max_current": ma, "calibration_current": ma}
+        if hand_config.wrist_calibration_current == hand_config.calibration_current:
+            fields["wrist_calibration_current"] = ma
+        groups = dict(hand_config.calibration_current_v21_dict)
+        if groups.pop(str(hand_config.motor_type), None) is not None:
+            fields["calibration_current_v21_dict"] = groups
+        # Validate before the hardware write: a rejected value must not leave
         # the motors on it with the config and our snapshot on the old one.
         try:
-            config = dataclasses.replace(session.hand.config, max_current=ma)
+            config = dataclasses.replace(hand_config, **fields)
         except Exception as e:
             raise ServiceError(f"hand config rejected {ma} mA: {e}")
         with _bus_fence(session.hand):

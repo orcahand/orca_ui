@@ -675,12 +675,9 @@ class RunInOperation(Operation):
                 cap = int(cap)
             except (TypeError, ValueError):
                 raise ServiceError("max_current_ma must be a whole number of mA")
-            floor = service.max_current_floor()
-            if cap < max(floor, 1) or cap > RUN_IN_MAX_CURRENT_CEILING_MA:
-                low = floor if floor else 1
+            if not 1 <= cap <= RUN_IN_MAX_CURRENT_CEILING_MA:
                 raise ServiceError(
-                    f"max_current_ma must be {low}..{RUN_IN_MAX_CURRENT_CEILING_MA} mA"
-                    + (" (the floor is the calibration current)" if floor else ""))
+                    f"max_current_ma must be 1..{RUN_IN_MAX_CURRENT_CEILING_MA} mA")
             clean["max_current_ma"] = cap
         return clean
 

@@ -631,6 +631,7 @@ def test_run_in_first_pass_is_slow_then_the_chosen_speed():
     frames, rate = player.run_in_frames(cycle, duration_s=30, speed=3.0)
     assert rate == rate_hz
     assert frames[:len(warm)] == warm
+    assert frames[len(warm):len(warm) + len(fast)] == fast
     assert (len(frames) - len(warm)) % len(fast) == 0
     assert len(frames) >= 30 * rate_hz
     # At x1 the whole run is plain passes.
@@ -641,11 +642,9 @@ def test_run_in_first_pass_is_slow_then_the_chosen_speed():
 def test_run_in_caps_the_current_for_the_run_and_restores_it(client):
     client.post("/api/torque/enable")
     control = client.get("/api/hand/info").json()["control"]
-    before, floor = control["max_current"], control["max_current_floor"]
+    before = control["max_current"]
     assert before is not None
-    # Below the live ceiling where the floor allows it, above it otherwise:
-    # either way a different value that must be put back afterwards.
-    cap = floor if 0 < floor < before else int(before) + 50
+    cap = int(before) + 50
     response = client.post("/api/operation/run_in/start", json={"params": {
         "duration_s": 30, "speed": 4.0, "max_current_ma": cap}})
     assert response.status_code == 200, response.text
@@ -657,8 +656,10 @@ def test_run_in_caps_the_current_for_the_run_and_restores_it(client):
     assert client.get("/api/hand/info").json()["control"]["max_current"] == before
 
 
-def test_run_in_refuses_a_cap_below_the_floor_or_absurd(client):
+def test_run_in_refuses_an_absurd_cap_or_speed(client):
     client.post("/api/torque/enable")
+    assert client.post("/api/operation/run_in/start", json={"params": {
+        "duration_s": 30, "max_current_ma": 0}}).status_code == 400
     assert client.post("/api/operation/run_in/start", json={"params": {
         "duration_s": 30, "max_current_ma": 5000}}).status_code == 400
     assert client.post("/api/operation/run_in/start", json={"params": {

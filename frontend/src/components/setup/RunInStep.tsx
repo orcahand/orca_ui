@@ -26,7 +26,6 @@ export function RunInStep({
   const model = useAppStore((s) => s.handInfo?.model_name)
   const torque = useAppStore((s) => s.status?.torque_enabled ?? false)
   const liveMaxCurrent = useAppStore((s) => s.control?.max_current ?? null)
-  const currentFloor = useAppStore((s) => s.control?.max_current_floor ?? 0)
   const operation = useOperationStore((s) => s.operation)
   const active =
     operation?.kind === 'run_in' && isOperationActive(operation) ? operation : null
@@ -47,7 +46,7 @@ export function RunInStep({
 
   const cap = capDraft.trim() === '' ? null : parseInt(capDraft, 10)
   const capValid =
-    cap === null || (Number.isFinite(cap) && cap >= Math.max(currentFloor, 1) && cap <= 2000)
+    cap === null || (Number.isFinite(cap) && cap >= 1 && cap <= 2000)
 
   const start = async () => {
     try {
@@ -100,14 +99,13 @@ export function RunInStep({
               className="flow-row"
               title={
                 'Motor current ceiling for this run only; the previous ceiling is restored afterwards. ' +
-                `Empty keeps the hand's ${liveMaxCurrent} mA.` +
-                (currentFloor > 0 ? ` Lowest accepted: ${currentFloor} mA (the calibration current).` : '')
+                `Empty keeps the hand's ${liveMaxCurrent} mA.`
               }
             >
               <span style={{ color: 'var(--dim)', fontSize: 10 }}>current cap</span>
               <input
                 type="number"
-                min={Math.max(currentFloor, 1)}
+                min={1}
                 max={2000}
                 step={10}
                 placeholder={String(liveMaxCurrent)}
@@ -116,7 +114,7 @@ export function RunInStep({
                 style={{ width: 70 }}
               />
               <span style={{ color: capValid ? 'var(--dim)' : 'var(--danger, #c33)', fontSize: 10 }}>
-                {capValid ? 'mA' : `${Math.max(currentFloor, 1)}–2000 mA`}
+                {capValid ? 'mA' : '1–2000 mA'}
               </span>
             </div>
           )}

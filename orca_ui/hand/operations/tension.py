@@ -21,7 +21,10 @@ RELEASE_PROMPT = "Motors holding — tension the spools, then release"
 RELEASE = "Release"
 PULL_MORE = "Pull more"  # turns the finger motors further counterclockwise; the hold goes on
 # Matching orca_core's TENSION_OFFSET_DEG / TENSION_EXTRA_DEG: the slow pull, and what one Pull more adds.
-DEFAULT_TENSION_OFFSET_DEG = 15.0
+# 0 holds the motors still, as tensioning did before the guided rework. A pull
+# leaves a standing position error, which saturates the goal current and takes
+# away the headroom the motor needs to resist the ratchet.
+DEFAULT_TENSION_OFFSET_DEG = 0.0
 EXTRA_DEG = 15.0
 OFFSET_BOUNDS_DEG = (0.0, 45.0)
 

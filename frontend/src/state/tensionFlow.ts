@@ -15,7 +15,10 @@ const FORCED_KEY = 'orca.tension.forcedMode'
 const OFFSET_KEY = 'orca.tension.offsetDeg'
 // How far the finger motors slowly turn counterclockwise while you ratchet, and what one
 // "Pull more" adds. Mirror the backend's tension.py.
-export const DEFAULT_OFFSET_DEG = 15
+// 0 holds the motors still while ratcheting, as tensioning did before the guided
+// rework. A pull leaves a standing position error that saturates the goal current,
+// taking away the headroom a motor needs to resist the ratchet.
+export const DEFAULT_OFFSET_DEG = 0
 export const EXTRA_DEG = 15
 export const PULL_MORE = 'Pull more'
 export const OFFSET_BOUNDS_DEG = [0, 45] as const
