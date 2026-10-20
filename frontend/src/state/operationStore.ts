@@ -25,6 +25,7 @@ const OPERATION_LABELS: Record<string, string> = {
   slack_test: 'slack test',
   tension_sweep: 'tension sweep',
   run_in: 'run-in',
+  number_fingertip: 'fingertip numbering',
 }
 
 export function operationLabel(kind: string): string {
