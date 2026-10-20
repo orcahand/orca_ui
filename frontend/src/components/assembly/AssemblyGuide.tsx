@@ -1,4 +1,5 @@
 import {GuideBackgroundEditor} from './GuideBackgroundEditor'
+import {WEB_GUIDE} from './webMode'
 import {GuideText,GuideEditingContext,useGuideEditing} from './GuideEditing'
 import {ViewToggle} from './AssemblyComparison'
 import {TouchBoardConnection} from './TouchBoardConnection'
@@ -97,7 +98,7 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
   }
   const filtered = STEPS.filter(s => `${editing.read(`${s.id}/title`,s.title)} ${s.section??''} ${s.chapter} ${instructions(s,build).map((line,i)=>editing.read(`${s.id}/instruction/${i}`,line)).join(' ')} ${kit(s,build).join(' ')} ${stepTools(s).join(' ')}`.toLowerCase().includes(query.trim().toLowerCase()))
   if (!ready) return <div className="assembly-loading"><p><GuideText variant field="prose/AssemblyGuide.tsx/f764a6be18" text={"Restoring your build…"} label="Guide text"/></p><button className="btn" onClick={onClose}>Close</button></div>
-  return <GuideEditingContext.Provider value={editing}><div className="assembly-app">
+  return <GuideEditingContext.Provider value={WEB_GUIDE?null:editing}><div className="assembly-app">
     <header className="assembly-header">
       <div className="assembly-brand"><i className="assembly-logo" role="img" aria-label="ORCA"/><span>ASSEMBLY WORKSPACE</span></div>
       <div className="assembly-header-actions">
@@ -105,7 +106,7 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
 
         {SHOW_ASSEMBLY_REVIEW_NOTES&&<button className="assembly-text-button" aria-pressed={reviewNotes} onClick={()=>setReviewNotes(!reviewNotes)}>{reviewNotes?'Hide change notes':'Show change notes'}</button>}
         <button className="assembly-text-button" aria-expanded={glossary} onClick={() => setGlossary(!glossary)}>Parts & terms</button>
-        <button className="assembly-close" onClick={onClose} aria-label="Save and close assembly guide">Save & close ×</button>
+        {!WEB_GUIDE&&<button className="assembly-close" onClick={onClose} aria-label="Save and close assembly guide">Save & close ×</button>}
       </div>
     </header>
     {glossary && <section className="assembly-glossary" aria-label="Parts and terms"><div className="assembly-row"><h2><GuideText variant field="prose/AssemblyGuide.tsx/535bc36505" text={"Know your parts"} label="Section heading"/></h2><button className="assembly-text-button" onClick={() => setGlossary(false)}>Close glossary ×</button></div><dl>{GLOSSARY.map(([term,definition]) => <div key={term}><dt><GuideText field={`glossary/${term}/term`} text={term} label="Term"/></dt><dd><GuideText field={`glossary/${term}/definition`} text={definition} label="Definition"/></dd></div>)}</dl></section>}
@@ -121,7 +122,7 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
       </aside>
       <main ref={main} className="assembly-main">
         <button className="assembly-sidebar-chevron" aria-label={sidebarCollapsed?'Expand chapters':'Collapse chapters'} title={sidebarCollapsed?'Expand chapters':'Collapse chapters'} aria-expanded={!sidebarCollapsed} aria-controls="assembly-navigation" onClick={()=>setSidebarCollapsed(!sidebarCollapsed)}>{sidebarCollapsed?'›':'‹'}</button>
-        <GuideBackgroundEditor step={step.id}/>
+        {!WEB_GUIDE&&<GuideBackgroundEditor step={step.id}/>}
         <div className="assembly-breadcrumb"><span>{step.id!=='p1'&&<>{chapterTitle(step)}{step.section?` · ${step.section}`:''}</>}</span><span>{step.hint?'HINT · OPTIONAL':`STEP ${String(required.indexOf(step)+1).padStart(2,'0')} / ${required.length}`}</span></div>
         <h2 ref={heading} tabIndex={-1}><GuideText field={`${step.id}/title`} text={step.title} label="Step title"/></h2>
         {step.id!=='p1'&&build.version==='full'&&(ASSEMBLY_MOTIONS[step.id]||['p23','p35','p45','p80','p83','p115','p123','p126'].includes(step.id))&&<p className="assembly-muted"><GuideText variant field="prose/AssemblyGuide.tsx/4f3cffcb55" text={"Mechanical reference: Base geometry. Full-specific sensor parts are not represented in this model."} label="Guide text"/></p>}
@@ -130,7 +131,7 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
           <label><span className="assembly-sr-only">Hand</span><select aria-label="Hand" value={build.side} onChange={e=>changeBuild({side:e.target.value as Build['side']})}><option value="right">Right hand</option><option value="left">Left hand</option></select></label>
           <label><span className="assembly-sr-only">Motors</span><select aria-label="Motors" value={build.motor} onChange={e=>changeBuild({motor:e.target.value as Build['motor']})}><option value="dynamixel">Dynamixel</option><option value="feetech">FeeTech</option></select></label>
           <label><span className="assembly-sr-only">Version</span><select aria-label="Version" value={build.version} onChange={e=>changeBuild({version:e.target.value as Build['version']})}><option value="base">Base</option><option value="touch">Touch</option><option value="full">Full</option></select></label>
-          <label><span className="assembly-sr-only">Guide edition</span><select aria-label="Guide edition" value={build.audience} onChange={e=>changeBuild({audience:e.target.value as Build['audience']})}><option value="internal">Internal</option><option value="external">External</option></select></label>
+          {!WEB_GUIDE&&<label><span className="assembly-sr-only">Guide edition</span><select aria-label="Guide edition" value={build.audience} onChange={e=>changeBuild({audience:e.target.value as Build['audience']})}><option value="internal">Internal</option><option value="external">External</option></select></label>}
           </div>}
         {build.audience==='internal'&&step.chapter.startsWith('Flashing')&&<section className="assembly-flashing-choice"><h3><GuideText variant field="prose/AssemblyGuide.tsx/1c73a2d7fd" text={"Choose one flashing method"} label="Section heading"/></h3><div className="assembly-clip-tabs"><button aria-pressed={method==='console'} onClick={()=>chooseFlashing('console')}>ORCA Console</button><button aria-pressed={method==='firmware'} onClick={()=>chooseFlashing('firmware')}>orca_firmware · terminal</button></div></section>}
         {step.id !== 'p1' && <section className="assembly-supplies" aria-label="Parts and tools for this step">

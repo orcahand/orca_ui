@@ -1,6 +1,7 @@
 import { FINGER_CHECKS } from './fingerMovements'
 import { STEPS } from './guide'
 import { FINAL_CHECKS, type Build, type FlashingMethod } from './buildContent'
+import { WEB_GUIDE } from './webMode'
 
 export const PROGRESS_KEY = 'orca-ui.assembly.v2.1'
 export type Progress = {
@@ -11,7 +12,7 @@ export type Progress = {
   views: Record<string, string>
   build: Build
 }
-export const EMPTY_PROGRESS: Progress = { current: STEPS[0].id, done: [], tendons: [], checks: [], views: {'guide:revision':'assembly-v5','guide:feedback':'oct15-v1','guide:layout':'oct16-v1','guide:finger-layout':'parts-first-v1','guide:thumb-layout':'parts-first-v1','guide:thumb-cables':'oct18-v1'}, build: { side: 'right', motor: 'dynamixel', version: 'base', audience: 'internal' } }
+export const EMPTY_PROGRESS: Progress = { current: STEPS[0].id, done: [], tendons: [], checks: [], views: {'guide:revision':'assembly-v5','guide:feedback':'oct15-v1','guide:layout':'oct16-v1','guide:finger-layout':'parts-first-v1','guide:thumb-layout':'parts-first-v1','guide:thumb-cables':'oct18-v1'}, build: { side: 'right', motor: 'dynamixel', version: 'base', audience: WEB_GUIDE ? 'external' : 'internal' } }
 export function readProgress(): Progress {
   try {
     return validateProgress(JSON.parse(localStorage.getItem(PROGRESS_KEY) ?? 'null'))
@@ -76,7 +77,7 @@ function parseProgress(data: Record<string, any>): Progress {
       tendons: Array.isArray(data.tendons) ? [...new Set<number>(data.tendons.filter((n: unknown) => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n < 32))] : [],
       checks: Array.isArray(data.checks) ? [...new Set<string>(data.checks.filter((s: unknown) => typeof s === 'string'))] : [],
       views: data.views && typeof data.views === 'object' && !Array.isArray(data.views) ? Object.fromEntries(Object.entries(data.views).filter(([, value]) => typeof value === 'string')) as Record<string,string> : {},
-      build: { audience: data.build?.audience === 'external' ? 'external' : 'internal', side: data.build?.side === 'left' ? 'left' : 'right', motor: data.build?.motor === 'feetech' ? 'feetech' : 'dynamixel', version: data.build?.version === 'full' || data.build?.sensing === 'joint' ? 'full' : data.build?.version === 'touch' || data.build?.sensing === 'touch' ? 'touch' : 'base' },
+      build: { audience: WEB_GUIDE || data.build?.audience === 'external' ? 'external' : 'internal', side: data.build?.side === 'left' ? 'left' : 'right', motor: data.build?.motor === 'feetech' ? 'feetech' : 'dynamixel', version: data.build?.version === 'full' || data.build?.sensing === 'joint' ? 'full' : data.build?.version === 'touch' || data.build?.sensing === 'touch' ? 'touch' : 'base' },
     }
   } catch { return structuredClone(EMPTY_PROGRESS) }
 }
