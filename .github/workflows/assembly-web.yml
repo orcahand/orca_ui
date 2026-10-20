@@ -1,0 +1,84 @@
+name: Deploy assembly guide
+
+# Every push to the guide's branch rebuilds the standalone guide and puts it
+# live at assembly.orcahand.com/<ASSEMBLY_SLUG>/. The slug is the secret link,
+# so it lives in a repo secret, never in this public repo. The four assembly
+# GLBs are too big for a Vercel deployment and are served from Vercel Blob;
+# they are re-uploaded only when their ZIPs change (or on a manual run with
+# upload_models).
+
+on:
+  push:
+    branches: [feature/assembly-feedback-touch]
+    paths:
+      - 'frontend/**'
+      - 'orca_ui/models/assembly/**'
+      - 'scripts/package_assembly_web.py'
+      - '.github/workflows/assembly-web.yml'
+  workflow_dispatch:
+    inputs:
+      upload_models:
+        description: Re-upload the four assembly GLBs to Blob
+        type: boolean
+        default: false
+
+concurrency:
+  group: assembly-web
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+        working-directory: frontend
+
+      - run: npx tsc -b
+        working-directory: frontend
+
+      - name: Did the models change?
+        id: models
+        run: |
+          if [ "${{ inputs.upload_models }}" = "true" ] || \
+             ! git diff --quiet HEAD~1 HEAD -- orca_ui/models/assembly; then
+            echo "upload=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Stage the site
+        run: >
+          python3 scripts/package_assembly_web.py site
+          --slug "${{ secrets.ASSEMBLY_SLUG }}"
+          --models-base "${{ secrets.ASSEMBLY_MODELS_BASE }}"
+          ${{ steps.models.outputs.upload == 'true' && '--extract-models models' || '' }}
+
+      - name: Upload models to Blob
+        if: steps.models.outputs.upload == 'true'
+        env:
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          SLUG: ${{ secrets.ASSEMBLY_SLUG }}
+        run: |
+          for dir in models/*/; do
+            key=$(basename "$dir")
+            npx --yes vercel@59 blob put "$dir/assembly.glb" --access public \
+              --pathname "$SLUG/$key/assembly.glb" --content-type model/gltf-binary \
+              --cache-control-max-age 86400 --allow-overwrite true \
+              --rw-token "$BLOB_READ_WRITE_TOKEN"
+          done
+
+      - name: Deploy to production
+        working-directory: site
+        run: npx --yes vercel@59 deploy --prod --yes --token "${{ secrets.VERCEL_TOKEN }}"
