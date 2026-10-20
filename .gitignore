@@ -26,7 +26,7 @@ env/
 node_modules/
 .superpowers/
 
-# Where orca-dev remembers this machine's orca_core checkout
+# A machine-local orca_core path, from the orca-dev tool
 .orca-dev.json
 
 # Personal Claude Code instructions, never committed
