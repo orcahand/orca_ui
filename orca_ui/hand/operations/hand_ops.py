@@ -12,6 +12,8 @@ import threading
 import time
 from typing import Callable
 
+from orca_ui.hand.operations.events import OperationStopped
+
 logger = logging.getLogger(__name__)
 
 # Mirrors orca_core/scripts/calibrate.py (scripts aren't importable from the
@@ -381,3 +383,115 @@ def reset_motors_once(plan, *, progress_callback, prompt_callback,
         all_rates=all_rates,
         should_stop=should_stop,
     )
+
+
+# ----- fingertip numbering ---------------------------------------------------
+
+_simulated_fingertip_bus: dict = {}
+
+
+def open_tactile_link(presence, finger_to_sensor_id: dict | None = None,
+                      mock: bool = False, retry_s: float = 0.0,
+                      stop_event: threading.Event | None = None, probe=None):
+    """(client, link) on the hand's tactile port for fingertip numbering.
+
+    ``retry_s`` keeps re-discovering and reopening the port, for after the
+    operator power-cycles the hand. ``probe`` returns the sensing ports
+    (the supervisor's pinned-board probe); without it discovery is global.
+    In mock mode a simulated board with one fresh fingertip (module 2)
+    stands in; it persists across calls.
+    """
+    if mock:
+        from orca_core.hardware.mock_hand_serial_link import MockHandSerialLink
+        from orca_core.hardware.sensing.tactile_mock import (
+            TactileMockState,
+            install_tactile_mock,
+        )
+
+        state = _simulated_fingertip_bus.setdefault("state", None)
+        if state is None:
+            state = TactileMockState(connected_fingers=[])
+            state.numbering.modules = [2]
+            state.numbering.parts = {2: "PXSR-CMDDP18A"}
+            _simulated_fingertip_bus["state"] = state
+        link = MockHandSerialLink()
+        install_tactile_mock(link, state)
+    else:
+        from orca_core.hardware.hand_serial_link import HandSerialLink
+        from orca_core.hardware.sensing.serial_discovery import discover_sensing_ports
+
+        deadline = time.monotonic() + retry_s
+        sensing = getattr(presence, "sensing", None)
+        while True:
+            if stop_event is not None and stop_event.is_set():
+                raise OperationStopped()
+            if not getattr(sensing, "tactile", None):
+                sensing = probe() if probe else discover_sensing_ports()
+            error = None
+            if getattr(sensing, "tactile", None):
+                link = HandSerialLink(port=sensing.tactile, baudrate=sensing.tactile_baudrate)
+                try:
+                    return _connect_tactile(link, finger_to_sensor_id)
+                except Exception as e:
+                    error = e
+                    sensing = None
+            if time.monotonic() >= deadline:
+                if error is not None:
+                    raise RuntimeError(f"could not open the tactile sensor port: {error}") from error
+                raise RuntimeError("no tactile sensor port found — is the hand plugged in and powered?")
+            time.sleep(0.5)
+    return _connect_tactile(link, finger_to_sensor_id)
+
+
+def _connect_tactile(link, finger_to_sensor_id):
+    from orca_core.hardware.tactile_client import TactileClient
+
+    link.connect()
+    try:
+        client = TactileClient(link, finger_to_sensor_id=finger_to_sensor_id)
+        client.connect()
+    except Exception:
+        link.disconnect()
+        raise
+    return client, link
+
+
+def close_tactile_link(client, link) -> None:
+    for closer in (getattr(client, "disconnect", None), getattr(link, "disconnect", None)):
+        if closer is None:
+            continue
+        try:
+            closer()
+        except Exception:
+            logger.exception("tactile link close failed")
+
+
+def simulate_power_cycle() -> None:
+    """Mock mode: apply a staged renumbering, as a real power cycle would."""
+    from orca_core.hardware.sensing.tactile_mock import power_cycle
+
+    state = _simulated_fingertip_bus.get("state")
+    if state is not None:
+        power_cycle(state)
+
+
+def fingertip_numbering():
+    """orca_core's fingertip-numbering module."""
+    from orca_core.maintenance import fingertip_numbering as numbering
+
+    return numbering
+
+
+def fingertip_identities(tactile_client) -> dict | None:
+    """{'identities': {finger: name}, 'mismatches': {finger: [expected, found]}},
+    or None when the board's firmware doesn't report slot identities."""
+    numbering = fingertip_numbering()
+    try:
+        identities = numbering.read_slot_identities(tactile_client)
+    except numbering.FingertipNumberingUnsupported:
+        return None
+    mismatches = numbering.identity_mismatches(identities)
+    return {
+        "identities": identities,
+        "mismatches": {f: list(pair) for f, pair in mismatches.items()},
+    }

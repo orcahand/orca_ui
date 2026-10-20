@@ -23,6 +23,7 @@ const OPERATION_LABELS: Record<string, string> = {
   wizard: 'full setup',
   guided_tension: 'guided tensioning',
   run_in: 'run-in',
+  number_fingertip: 'fingertip numbering',
 }
 
 export function operationLabel(kind: string): string {

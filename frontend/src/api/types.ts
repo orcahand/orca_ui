@@ -257,6 +257,9 @@ export interface HandInfo {
   last_tension?: LastTension | null
   // Unfinished guided tensioning saved for this hand: best score per joint.
   tension_progress?: TensionProgress | null
+  // Fingertip model per slot and slots holding another finger's model; absent
+  // when the connector-board firmware doesn't report fingertip identities.
+  fingertips?: FingertipIdentities
   // Guided tensioning currents (mA) for this hand's motor family.
   guided_tension_defaults?: {
     motor_type: string | null
@@ -327,6 +330,31 @@ export interface OperationSnapshot {
   result: Record<string, unknown> | null
   error: string | null
   started_at: number
+}
+
+// ----- fingertip numbering (orca_ui/hand/operations/fingertips.py) ----------
+
+export interface FingertipIdentities {
+  identities: Partial<Record<Finger, string>>
+  mismatches: Partial<Record<Finger, [expected: string, found: string]>>
+}
+
+export interface FoundFingertip {
+  module: number
+  finger: Finger | 'spare' | null // the slot this module number feeds
+  part: string | null // fingertip model, when the board read it
+  fits: number[] // modules whose finger takes this model
+}
+
+export interface FingertipExtra {
+  finger: Finger | 'spare' | null // the chosen target; null for a plain read
+  target_module: number | null
+  current_module: number | null // the fingertip being renumbered
+  result: string | null // scan result: scan_ok | no_sensor | multiple | bus_error
+  found: FoundFingertip[]
+  garbled_modules: number[] // numbers two fingertips seem to share
+  targeted: boolean // the board can renumber one of several fingertips
+  verified: boolean | null
 }
 
 // ----- configure_chain operation extra (orca_ui/hand/operations/chain.py) ----
