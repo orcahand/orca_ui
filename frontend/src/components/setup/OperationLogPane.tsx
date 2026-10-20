@@ -9,8 +9,7 @@ export function OperationLogPane() {
     <LogPane
       title="Operation Log"
       lines={lines}
-      emptyText="nothing running yet — tensioning, calibration and full-setup
-          progress appears here as it happens"
+      emptyText="—"
     />
   )
 }

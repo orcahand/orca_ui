@@ -19,6 +19,10 @@ export function DashboardView() {
   const status = useAppStore((s) => s.status)
   const caps = status?.capabilities
   const missing = status?.missing ?? []
+  // Bare motor mode has no hand: the 3D scene would render a whole right hand
+  // for a motor lying on the bench, and the pseudo-joints match none of its
+  // links. The motors are the page.
+  const bare = status?.bare ?? false
 
   return (
     <>
@@ -48,23 +52,27 @@ export function DashboardView() {
         </span>
       </section>
       <HealthSummary />
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: caps?.motors
-            ? 'minmax(0, 1fr) 460px'
-            : 'minmax(0, 1fr)',
-          gap: 12,
-          alignItems: 'start',
-        }}
-      >
-        <HandScenePanel height="min(52vh, 560px)" />
-        {/* CameraPreview self-hides unless a camera teleop session is live. */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {caps?.motors && <MotorPanel />}
-          <CameraPreview />
+      {bare ? (
+        caps?.motors && <MotorPanel />
+      ) : (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: caps?.motors
+              ? 'minmax(0, 1fr) 460px'
+              : 'minmax(0, 1fr)',
+            gap: 12,
+            alignItems: 'start',
+          }}
+        >
+          <HandScenePanel height="min(52vh, 560px)" />
+          {/* CameraPreview self-hides unless a camera teleop session is live. */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {caps?.motors && <MotorPanel />}
+            <CameraPreview />
+          </div>
         </div>
-      </div>
+      )}
       {caps?.tactile && <TactilePanel />}
       {caps?.encoders && <EncoderPanel />}
     </>

@@ -37,17 +37,22 @@ def request_stop(hand) -> None:
     hand._task_stop_event.set()
 
 
-def build_maintenance_hand(config_path: str, stop_event: threading.Event,
+def build_maintenance_hand(config, stop_event: threading.Event,
                            retry_s: float = 2.0, motor_port: str | None = None):
     """Fresh motor-only OrcaHand for a maintenance operation.
 
-    Always the plain class — never the feedback subclass, whose joint loop
-    refuses to calibrate. Port-open is retried briefly to absorb the OS
-    serial release latency after the supervisor closed the session.
+    Built from the supervisor's config, so the hardware version in force (and
+    the joint map and travel features it selects) carries over. Always the
+    plain class — never the feedback subclass, whose joint loop refuses to
+    calibrate. Port-open is retried briefly to absorb the OS serial release
+    latency after the supervisor closed the session.
     """
+    import copy
+
     from orca_core import OrcaHand
 
-    hand = OrcaHand(config_path=config_path)
+    # A copy, so the port pin below never reaches the supervisor's config.
+    hand = OrcaHand(config=copy.copy(config))
     if motor_port and getattr(hand.config, "port", None) == "auto":
         # The lease already resolved the motor port, scoped to the pinned
         # board when one is pinned; connect() must not look beyond it.
@@ -140,6 +145,8 @@ def tension(
     *,
     move_motors: bool,
     progress_callback: Callable[[dict], None],
+    offset_deg: float | None = None,
+    pull_more: Callable[[], bool] | None = None,
 ) -> None:
     """Blocking tension on the calling thread; interrupt via request_stop.
 
@@ -151,7 +158,101 @@ def tension(
         move_motors=move_motors,
         blocking=True,
         progress_callback=progress_callback,
+        **({} if offset_deg is None else {"offset_deg": offset_deg}),
+        **({} if pull_more is None else {"pull_more": pull_more}),
     )
+
+
+def guided_tension_supported() -> bool:
+    try:
+        import orca_core.maintenance.guided_tension  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def guided_tension(hand, *, prompt_callback, progress_callback, should_stop,
+                   hold_current=None, tension_current=None, tension_offset_deg=None,
+                   pass_fraction=None,
+                   hand_key: str | None = None, resume: bool = True,
+                   any_hardware: bool = False) -> dict:
+    """Blocking guided tensioning on the calling thread; prompts block on the operator.
+
+    Settings left as None use orca_core's defaults; each may be a value or a
+    callable (see run_guided_tension)."""
+    from orca_core.maintenance.guided_tension import run_guided_tension
+
+    settings = {k: v for k, v in (("hold_current", hold_current),
+                                  ("tension_current", tension_current),
+                                  ("tension_offset_deg", tension_offset_deg),
+                                  ("pass_fraction", pass_fraction)) if v is not None}
+    result = run_guided_tension(
+        hand,
+        prompt_callback=prompt_callback,
+        progress_callback=progress_callback,
+        should_stop=should_stop,
+        hand_key=hand_key,
+        resume=resume,
+        any_hardware=any_hardware,
+        **settings,
+    )
+    return {"completed": result.completed, "rounds": result.rounds}
+
+
+def record_hold_tension(config) -> None:
+    """Mark the hand tensioned after a plain hold-and-ratchet."""
+    from orca_core.maintenance.guided_tension import record_hold_tension as record
+
+    try:
+        record(config)
+    except Exception:
+        logger.exception("recording the hold tension failed")
+
+
+def range_stages() -> list[dict]:
+    """orca_core's per-finger range-check stages (key, title, joints, pose)."""
+    try:
+        from orca_core.maintenance.guided_tension import DEFAULT_RANGE_STAGES
+    except ImportError:
+        return []
+    return [stage.to_dict() for stage in DEFAULT_RANGE_STAGES]
+
+
+def set_max_current(hand, current_ma: float) -> None:
+    hand.set_max_current(current_ma)
+
+
+def set_joint_currents(hand, current_for_joint) -> None:
+    """Per-motor current limits from a joint name -> mA function (wrist excluded)."""
+    from orca_core.maintenance.guided_tension import joint_currents, per_motor_currents
+
+    hand.set_max_current(per_motor_currents(hand.config, joint_currents(hand.config, current_for_joint)))
+
+
+def tension_progress(config, hand_key: str | None) -> dict | None:
+    """Saved best score per joint for this hand's unfinished guided tensioning."""
+    try:
+        from orca_core.maintenance.guided_tension import read_progress
+    except ImportError:
+        return None
+    try:
+        return read_progress(config, hand_key)
+    except Exception:
+        logger.exception("reading the tension progress failed")
+        return None
+
+
+def last_tension(config) -> dict | None:
+    """The last guided tension that reached 100 %, or None (or a core without it)."""
+    try:
+        from orca_core.maintenance.guided_tension import read_last_tension
+    except ImportError:
+        return None
+    try:
+        return read_last_tension(config)
+    except Exception:
+        logger.exception("reading the last tension record failed")
+        return None
 
 
 def pose_from_fractions(hand, fractions: dict[str, float]) -> dict[str, float]:
@@ -218,10 +319,21 @@ def resolve_motor_port(config, presence) -> str | None:
                         getattr(config, "motor_type", None))
 
 
-def detect_motor_type(port: str, progress_callback=None) -> str | None:
+def detect_motor_type(port: str, progress_callback=None, chain_config: dict | None = None) -> str | None:
+    """The family on ``port``: from a motor at factory defaults, else — given
+    ``chain_config`` — from the configured chain that config describes."""
     from orca_core.maintenance.motor_chain import detect_motor_type as detect
 
-    return detect(port, progress_callback=progress_callback)
+    return detect(port, progress_callback=progress_callback, chain_config=chain_config)
+
+
+def chain_config_mapping(config) -> dict:
+    """The raw config mapping the motor-chain library works from."""
+    return {
+        "motor_ids": list(config.motor_ids),
+        "joint_to_motor_map": dict(config.joint_to_motor_map or {}),
+        "baudrate": getattr(config, "baudrate", None),
+    }
 
 
 def build_chain_plan(config, port: str, motor_type: str):
@@ -230,11 +342,7 @@ def build_chain_plan(config, port: str, motor_type: str):
     from orca_core.maintenance.motor_chain import plan_motor_chain
 
     return plan_motor_chain(
-        {
-            "motor_ids": list(config.motor_ids),
-            "joint_to_motor_map": dict(config.joint_to_motor_map or {}),
-            "baudrate": getattr(config, "baudrate", None),
-        },
+        chain_config_mapping(config),
         port,
         motor_type,
     )
@@ -253,14 +361,23 @@ def run_chain_configure(plan, *, progress_callback, prompt_callback,
     )
 
 
+def reset_motor(plan, motor: dict) -> bool:
+    """Revert one motor, as scanned (id, baud_rate), to factory defaults."""
+    from orca_core.maintenance.motor_chain import reset_motor_to_factory
+
+    return reset_motor_to_factory(plan, motor["id"], motor["baud_rate"])
+
+
 def reset_motors_once(plan, *, progress_callback, prompt_callback,
-                      should_stop) -> list[dict]:
-    """One reset pass over whatever is on the bus (the caller loops)."""
+                      should_stop, all_rates: bool = False) -> list[dict]:
+    """One reset pass over whatever is on the bus (the caller loops);
+    ``all_rates`` also sweeps the baud rates hands never use."""
     from orca_core.maintenance.motor_chain import reset_all_motors
 
     return reset_all_motors(
         plan,
         progress_callback=progress_callback,
         prompt_callback=prompt_callback,
+        all_rates=all_rates,
         should_stop=should_stop,
     )

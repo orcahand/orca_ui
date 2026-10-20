@@ -32,13 +32,18 @@ from orca_core.hand_config import (
     OrcaHandConfig,
     OrcaHandTouchConfig,
     _resolve_config_path,
+    write_hardware_version,
 )
 from orca_core.utils.utils import read_yaml
 
-from orca_core.hardware.sensing.serial_discovery import oh_board_ports
+from orca_core.hardware.sensing.serial_discovery import (
+    SensingPorts,
+    oh_board_ports,
+)
 
 from orca_ui.hand.boards import detect_pinned_board
 from orca_ui.hand.detection import (
+    HardwarePresence,
     names_a_hand,
     presence_from_detection,
     probe_hardware,
@@ -158,6 +163,14 @@ class HandSupervisor(threading.Thread):
         # Board pin: None = first board to answer. Read/written under the
         # GIL only (str swap), like _model_pinned.
         self._board_pinned: str | None = settings.board or None
+        self._pinned_identity = None
+        # The connected hand's serial (or board id) from its last detection;
+        # None in mock mode and for boards that report no identity.
+        self._hand_id: str | None = None
+        # The hardware version the board last reported; None with no board.
+        self._board_hardware_version: int | None = None
+        # What config.yaml pins (None = auto); a fresh load is still the pin.
+        self._pinned_hardware_version: int | None = self.config.hardware_version
 
         self._lock = threading.Lock()
         self._session: Optional[HandSession] = None
@@ -197,6 +210,54 @@ class HandSupervisor(threading.Thread):
     def model_name(self) -> str:
         return model_name_of(self.config)
 
+    @property
+    def hand_id(self) -> str | None:
+        return self._hand_id
+
+    @property
+    def board_hardware_version(self) -> int | None:
+        return self._board_hardware_version
+
+    def set_hardware_version(self, version: int | None) -> None:
+        """Pin the hand's hardware version in its config.yaml, or (``None``)
+        put it back on ``auto`` so the board decides. Reconnects when the
+        version in force changes: the joint↔motor map is installed by connect.
+        """
+        with self._lock:
+            if self._maintenance_kind is not None or self._in_maintenance:
+                raise HandBusyError(
+                    "an operation holds the hand — stop it before changing "
+                    "the hardware version")
+        written = write_hardware_version(self.config.config_path, version)
+        logger.info("hardware version %s in %s",
+                    "set to auto" if version is None else f"pinned to {version}", written)
+        if self._apply_hardware_version(self._board_hardware_version):
+            self._teardown_session("hardware version changed — reconnecting")
+            self._backoff = DETECT_BACKOFF_START_S
+            self._wake.set()
+        self._publish()
+
+    def _apply_hardware_version(self, board_version: int | None) -> bool:
+        """Put in force the version config.yaml pins, else the board's.
+        Returns True when that changed the config in force."""
+        self._board_hardware_version = board_version
+        if self._settings.bare:
+            return False
+        fresh = load_config(self.config.config_path)
+        version = fresh.hardware_version if fresh.hardware_version is not None else board_version
+        if (fresh.hardware_version is not None and board_version is not None
+                and fresh.hardware_version != board_version
+                and fresh.hardware_version != self._pinned_hardware_version):
+            logger.warning(
+                "the config pins hardware_version=%r (config.yaml or local_config.yaml), "
+                "so the board's %r is not used. Lift the pin to take the board's value.",
+                fresh.hardware_version, board_version)
+        if version == self.config.hardware_version and fresh.hardware_version == self._pinned_hardware_version:
+            return False
+        self._pinned_hardware_version = fresh.hardware_version
+        self._install_config(fresh.with_hardware_version(version))
+        return True
+
     def _probeable_devices(self, session) -> tuple[str, ...]:
         """Missing devices a probe could still find: the ones whose port was
         absent, not the ones whose device answered and refused."""
@@ -224,6 +285,7 @@ class HandSupervisor(threading.Thread):
                     set(getattr(self._session, "refused", ()))
                     & set(self._missing_devices(caps)))),
                 rescanning=self._upgrade_probes_left > 0,
+                bare=self._settings.bare,
                 state=self._state,
                 capabilities=caps,
                 torque_enabled=self._torque_enabled,
@@ -235,6 +297,9 @@ class HandSupervisor(threading.Thread):
                 model_pinned=self._model_pinned,
                 released=self._released,
                 board_pinned=self._board_pinned,
+                hardware_version=config.hardware_version,
+                hardware_version_pinned=self._pinned_hardware_version is not None,
+                board_hardware_version=self._board_hardware_version,
             )
 
     def set_torque_flag(self, enabled: bool) -> None:
@@ -398,10 +463,13 @@ class HandSupervisor(threading.Thread):
         self._publish()
         self._wake.set()
 
-    def enter_maintenance(self, kind: str, timeout: float = 15.0) -> MaintenanceLease:
+    def enter_maintenance(self, kind: str, timeout: float = 15.0,
+                          probe: bool = True) -> MaintenanceLease:
         """Hand the hardware to an operation: the run loop tears the session
         down, suspends health checks and reconnects, and acks. Blocks the
-        calling (operation) thread until the hardware is actually free."""
+        calling (operation) thread until the hardware is actually free.
+        ``probe=False`` skips the port probe that follows, for an operation
+        that only needs the motor port and resolves it itself."""
         with self._lock:
             if self._released:
                 raise RuntimeError(
@@ -422,13 +490,25 @@ class HandSupervisor(threading.Thread):
                 self.exit_maintenance()
             raise RuntimeError("supervisor did not release the hand in time")
         presence = None
-        if not self._settings.mock:
+        if self._settings.bare:
+            presence = self._bare_presence()
+        elif not self._settings.mock and probe:
             # Ports are closed now — a probe finally sees the real picture.
             try:
                 presence = self._probe_hardware()
             except Exception:
                 logger.exception("maintenance port probe failed")
         return MaintenanceLease(kind=kind, presence=presence)
+
+    def _bare_presence(self) -> "HardwarePresence":
+        """Presence for bare motor mode, taken from the config rather than probed.
+
+        The bus scan at startup already resolved the port, family and rate, and
+        a bare config declares no sensing at all. Probing again could only
+        wander onto another adapter and contradict what the operator was shown.
+        """
+        return HardwarePresence(motor_port=self.config.port,
+                                sensing=SensingPorts(tactile=None, encoder=None))
 
     def _probe_hardware(self):
         """Port probe for a maintenance lease, scoped to the pinned board
@@ -564,7 +644,9 @@ class HandSupervisor(threading.Thread):
                         f"searching for board {pin}" if pin
                         else "searching for hardware")
         presence = None
-        if not self._settings.mock:
+        if self._settings.bare:
+            presence = self._bare_presence()
+        elif not self._settings.mock:
             # Nothing is connected, so every port is free and this detection
             # sees the whole hand — the one moment its answer is authoritative
             # about which model this is. Adopting it here also means the
@@ -604,6 +686,14 @@ class HandSupervisor(threading.Thread):
                     return delay
                 self._adopt_model(detection)
                 presence = presence_from_detection(self.config, detection)
+        detection = getattr(presence, "detection", None)
+        identity = getattr(detection, "identity", None)
+        if identity is not None and identity.hand_id:
+            self._hand_id = identity.hand_id
+        if identity is not None and self._board_pinned:
+            # Kept so a later probe can start from it once the pinned CDC is held.
+            self._pinned_identity = identity
+        self._apply_hardware_version(getattr(identity, "hw_version", None))
         config = self.config
         try:
             session = connect_session(self._settings, config,
@@ -783,7 +873,7 @@ class HandSupervisor(threading.Thread):
                 self._publish()
         try:
             pin = self._board_pinned
-            detection = (detect_pinned_board(pin) if pin
+            detection = (detect_pinned_board(pin, identity=self._pinned_identity) if pin
                          else run_detection(self.config, force=confirming_model))
             if confirming_model and self._adopt_model(detection, upgrade_only=True):
                 return ("hand reports more hardware than the model declared — "
@@ -869,6 +959,46 @@ class HandSupervisor(threading.Thread):
                     detection.model_name, self.model_name)
         self._install_config(config)
         return True
+
+    def install_bare_config_object(self, config) -> None:
+        """Swap in a freshly scanned bare config and reconnect.
+
+        Bare mode resolves its config once at startup from a bus scan, so a
+        motor that changed id leaves it describing a bus that is no longer
+        there. This is how that gets corrected without restarting.
+
+        Takes a loaded config rather than a path because the caller has to
+        read it while the bus is free, and the bus is free only inside the
+        maintenance window it opened to scan.
+        """
+        self._release_bus_for_reidentify()
+        self._install_config(config)
+        self.request_reconnect()
+
+    def _release_bus_for_reidentify(self) -> None:
+        """Close the port before the reconnect that follows an id or baud change.
+
+        This teardown is provoked by a bus transaction, so unlike every other
+        one it starts with the bus live. The clients' own ``disconnect`` reads
+        the SDK in-use flag before taking the bus lock and abandons the close
+        when it is set, which here is likely to be a true answer about the
+        telemetry sampler -- and abandoning it leaves the port open, so the
+        reconnect cannot replace the handler and the bench stays down.
+        ``disconnect_fixed_lock_order`` waits for the bus instead.
+
+        Best-effort: the session close that follows is still the thing that
+        guarantees teardown, and a core without this method keeps its own
+        behaviour.
+        """
+        session = self._session
+        client = getattr(getattr(session, "hand", None), "motor_client", None)
+        close = getattr(client, "disconnect_fixed_lock_order", None)
+        if close is None:
+            return
+        try:
+            close()
+        except Exception:
+            logger.exception("could not release the bus before reconnecting")
 
     def _install_config(self, config) -> None:
         """Put ``config`` in force and repoint everything keyed by the model."""

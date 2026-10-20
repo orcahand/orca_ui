@@ -353,7 +353,8 @@ def _build_hand(settings: UiSettings, config, feedback: bool, tactile: bool):
     if not feedback and not tactile and isinstance(config, OrcaHandTouchConfig):
         return OrcaHand(config=config)
     return load_hand(config_path=config.config_path,
-                     engage_feedback=feedback)
+                     engage_feedback=feedback,
+                     detected_hardware_version=config.hardware_version)
 
 
 def _connect_with_motors(settings, config, declared, presence: HardwarePresence):
@@ -389,6 +390,16 @@ def _connect_with_motors(settings, config, declared, presence: HardwarePresence)
                 # Never mutate the supervisor's shared config object.
                 hand.config = copy.copy(config)
             object.__setattr__(hand.config, "port", presence.motor_port)
+        if presence.sensing.tactile and \
+                getattr(getattr(hand, "config", None), "sensor_port", None) == "auto":
+            # The sensing port likewise: left on "auto", orca_core discovers it
+            # machine-wide and, with two boards attached, can open the other
+            # hand's board, which answers but carries none of this hand's sensors.
+            import copy
+
+            if hand.config is config:
+                hand.config = copy.copy(config)
+            object.__setattr__(hand.config, "sensor_port", presence.sensing.tactile)
         try:
             ok, msg = hand.connect(interactive=False)
         except (JointFeedbackConnectError, RuntimeError) as e:
@@ -432,6 +443,15 @@ def _connect_with_motors(settings, config, declared, presence: HardwarePresence)
                                tier=_tier_name(feedback, False),
                                message=msg, ports=ports,
                                refused=tuple(sorted(refused)))
+        # A sensing hand rolls its motor bus back when the sensor link fails,
+        # so a sensor that was found on its port but did not answer lands
+        # here. The port is what a later probe would see again; without the
+        # refusal the upgrade probe reconnects on it, fails the same way and
+        # loops. Only a Rescan may try again.
+        if tactile and presence.sensing.tactile:
+            refused.add("tactile")
+        if feedback and presence.sensing.encoder:
+            refused.add("encoders")
         attempts.append(f"{tier}: {msg}")
         logger.warning("connect tier %s failed: %s", tier, msg)
 
@@ -449,7 +469,8 @@ def _tier_name(feedback: bool, tactile: bool) -> str:
 
 def _connect_sensors_only(settings, config, declared, presence: HardwarePresence):
     """Motors unpowered: tactile viewing and/or encoder viewing only."""
-    hand = load_hand(config_path=config.config_path, engage_feedback=False)
+    hand = load_hand(config_path=config.config_path, engage_feedback=False,
+                     detected_hardware_version=config.hardware_version)
     ports = {"motor": None, "tactile": None, "encoder": None}
     messages: list[str] = []
     owned_links: list[HandSerialLink] = []

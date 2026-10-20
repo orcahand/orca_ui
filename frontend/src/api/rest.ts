@@ -1,11 +1,17 @@
 // Thin fetch wrappers over the REST API. Errors carry the backend's detail.
 
 import type {
+  MotorConfigSchema,
+  MotorConfigValues,
+  MotorConfigWriteResult,
+  BusBaudInfo,
+  BusBaudResult,
   BoardsInfo,
   DemoEntry,
   DirectMotorSnapshot,
   HandInfo,
   ModelMetadata,
+  MotorModelInfo,
   ModelsInfo,
   OperationLogPayload,
   OperationSnapshot,
@@ -25,6 +31,7 @@ import type {
   PoseSource,
   ServoGainsMap,
   ServoProfile,
+  ServoLimits,
   ServoProfileMap,
   ControlState,
 } from './types'
@@ -91,6 +98,9 @@ export const api = {
   // device null hands the choice back to "first board to answer".
   selectBoard: (device: string | null) =>
     post<BoardsInfo>('/api/board/select', { device }),
+  // Pins hardware_version in the hand's config.yaml; null = take the board's.
+  setHardwareVersion: (version: number | null) =>
+    post<StatusSnapshot>('/api/hardware_version', { version }),
   // Clears a latched hardware error. The motor returns with torque off.
   rebootMotor: (id: number) =>
     post<{
@@ -105,15 +115,33 @@ export const api = {
   // Read straight off the motors: gains are RAM and a power cycle clears
   // them, so what was last typed is not evidence of what they hold.
   servoGains: () =>
-    request<{ gains: ServoGainsMap }>('/api/motors/gains'),
+    // gain_max is the family's register width, reported rather than assumed:
+    // X-series gains are two bytes, HLS gains one.
+    request<{ gains: ServoGainsMap; gain_max: number | null }>(
+      '/api/motors/gains',
+    ),
   // Omitted fields are left alone on the motor.
   setServoGains: (id: number, gains: Partial<ServoGains>) =>
     post<{ gains: ServoGainsMap }>(`/api/motors/${id}/gains`, gains),
 
   servoProfile: () =>
-    request<{ profile: ServoProfileMap }>('/api/motors/profile'),
+    request<{ profile: ServoProfileMap; limits?: ServoLimits }>(
+      '/api/motors/profile',
+    ),
   setServoProfile: (id: number, profile: Partial<ServoProfile>) =>
     post<{ profile: ServoProfileMap }>(`/api/motors/${id}/profile`, profile),
+
+  motorConfigSchema: () =>
+    request<MotorConfigSchema>('/api/motors/config/schema'),
+  motorConfigTakenIds: () =>
+    request<{ ids: number[] }>('/api/motors/config/taken-ids'),
+  motorConfigRead: (id: number) =>
+    request<MotorConfigValues>(`/api/motors/${id}/config`),
+  motorConfigWrite: (id: number, key: string, value: number) =>
+    post<MotorConfigWriteResult>(`/api/motors/${id}/config`, { key, value }),
+  busBaud: () => request<BusBaudInfo>('/api/motors/bus/baud'),
+  setBusBaud: (baud_rate: number) =>
+    post<BusBaudResult>('/api/motors/bus/baud', { baud_rate }),
 
   models: () => request<ModelsInfo>('/api/models'),
   // name null hands the choice back to hardware detection.
@@ -162,6 +190,50 @@ export const api = {
   motorsDirect: () => request<DirectMotorSnapshot>('/api/motors/direct'),
   motorsDirectMode: (enabled: boolean) =>
     post<{ direct_mode: boolean }>('/api/motors/direct/mode', { enabled }),
+  // Bench range finding: loosen one motor so a human can turn it, then
+  // record the two ends they found.
+  motorsDirectTorque: (id: number, enabled: boolean) =>
+    post<{ id: number; torque_enabled: boolean }>('/api/motors/direct/torque', {
+      id,
+      enabled,
+    }),
+  motorsDirectRange: (id: number, low: number | null, high: number | null) =>
+    post<{ id: number; range_rad: [number, number] | null }>(
+      '/api/motors/direct/range',
+      { id, low, high },
+    ),
+  motorsModels: () =>
+    request<{ models: MotorModelInfo[] }>('/api/motors/models'),
+  motorsDirectDeclare: (
+    id: number,
+    model: string | null,
+    nickname: string | null,
+  ) =>
+    post<Record<string, unknown>>('/api/motors/direct/declare', {
+      id,
+      model,
+      nickname,
+    }),
+  motorsDirectPoints: (id: number, points: number[] | null) =>
+    post<{ id: number; points: number[] | null }>('/api/motors/direct/points', {
+      id,
+      points,
+    }),
+  motorsDirectPlay: (id: number, enabled: boolean) =>
+    post<{ id: number; playing: boolean }>('/api/motors/direct/play', {
+      id,
+      enabled,
+    }),
+  motorsDirectPacing: (
+    interp_steps: number,
+    max_settle_ms: number | null,
+    period_ms: number | null,
+  ) =>
+    post<{
+      interp_steps: number
+      max_settle_ms: number | null
+      period_ms: number
+    }>('/api/motors/direct/pacing', { interp_steps, max_settle_ms, period_ms }),
   motorsDirectPosition: (id: number, position: number) =>
     post<{ id: number; position: number; previous: number }>(
       '/api/motors/direct/position',

@@ -74,3 +74,4 @@ def test_committed_lock_resolves_orca_core_from_the_registry():
     assert source == "registry", (
         f"uv.lock in HEAD resolves orca_core from {source}, not the "
         f"registry.\n{FIX}")
+

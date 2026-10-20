@@ -28,6 +28,10 @@ class UiSettings:
     # deterministic: a pinned supervisor never opens another board's ports.
     board: str | None = None
     mock: bool = False
+    # Bare motor mode: loose motors on a bench, not a hand. The config is
+    # synthesised from a bus scan, so detection and the connect ladder are
+    # skipped entirely and the session is motors-only by construction.
+    bare: bool = False
     engage_feedback: bool = True
     motors_enabled: bool = True
     host: str = "127.0.0.1"

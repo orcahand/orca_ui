@@ -140,29 +140,23 @@ def test_wrist_is_measured_and_follows_commands(service):
 
     assert _wait_for(wrist_tracks), service.session.measured_joints()
 
-def test_max_current_floor_is_the_calibration_current(service):
-    """orca_core refuses a ceiling below the calibration current. The floor is
-    published so the UI can stop there, and a write below it is rejected
-    BEFORE the hardware is touched — a half-applied ceiling would leave the
-    motors and the config disagreeing."""
-    state = service.control_state()
-    floor = state["max_current_floor"]
-    assert floor == service.supervisor.config.calibration_current
-    assert state["max_current"] >= floor
-
+def test_the_calibration_current_follows_the_ceiling_the_console_sets(service):
+    """There is no separate calibration current to collide with: a ceiling the
+    operator types becomes what calibration drives the hardstops at, so no
+    combination of currents is refused."""
     before = service.control_state()["max_current"]
-    with pytest.raises(ServiceError) as excinfo:
-        service.set_max_current(floor - 1)
-    # The rejection names the value that was refused and quotes orca_core's
-    # reason, so the operator is not left guessing which limit bit.
-    assert str(floor - 1) in str(excinfo.value)
-    assert "calibration current" in str(excinfo.value)
-    # Nothing moved: not our snapshot, not the hand's config.
-    assert service.control_state()["max_current"] == before
-    assert service.session.hand.config.max_current == before
+    lowered = max(1, before // 2)
 
-    service.set_max_current(floor)
-    assert service.control_state()["max_current"] == floor
+    service.set_max_current(lowered)
+    assert service.control_state()["max_current"] == lowered
+    config = service.session.hand.config
+    assert config.max_current == lowered
+    assert config.calibration_current == lowered
+    # A per-group table shipped with the model no longer overrides it.
+    assert config.calibration_current_for("index_mcp") == lowered
+
+    service.set_max_current(before)
+    assert service.control_state()["max_current"] == before
 
 def test_direct_motor_mode_gating_and_moves(service):
     snapshot = service.motor_snapshot()
@@ -346,13 +340,19 @@ def test_enabling_torque_reapplies_only_gains_the_operator_chose(service):
 def test_servo_profile_round_trip_and_reapply(service):
     """Profile limits are RAM like gains, so the same rules apply: read back
     from the motors, and re-apply only what the operator chose."""
+    # Connecting leaves a usable profile rather than none: without one a goal
+    # position is a step command the servo chases as fast as it can.
     before = service.read_servo_profile()
-    assert before["1"]["velocity_rad_s"] == 0.0     # factory: no profile
+    assert before["1"]["velocity_rad_s"] > 0.0
+    client = service.supervisor.session.hand.motor_client
+    ceiling = client.read_profile_limits([1])[1].velocity_rad_s
+    assert before["1"]["velocity_rad_s"] < ceiling
 
     after = service.set_servo_profile(
         1, {"velocity_rad_s": 2.5, "acceleration_rad_s2": None})
     assert after["1"]["velocity_rad_s"] == 2.5
-    assert after["1"]["acceleration_rad_s2"] == 0.0  # untouched
+    assert (after["1"]["acceleration_rad_s2"]
+            == before["1"]["acceleration_rad_s2"])  # untouched
 
     applied = []
     hand = service.supervisor.session.hand

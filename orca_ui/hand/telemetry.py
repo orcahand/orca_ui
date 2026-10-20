@@ -41,11 +41,27 @@ logger = logging.getLogger(__name__)
 # once, one read per motor otherwise.
 HW_ERROR_SWEEP_S = 10.0
 
-# Minimum gap between motor-bus telemetry reads on a hand with no joint loop.
-# There is no loop to contend with, but the bus is half-duplex: every read
-# blocks commands for its whole round trip, and temperature moves over minutes,
-# so reading faster than this buys nothing.
-MOTOR_TELEMETRY_MIN_INTERVAL_S = 10.0
+# Bare motor mode reads position and current this often. There is no control
+# loop to starve and no tendon whose timing matters — the point of a bench is
+# watching the current while a motor pushes — so the usual pacing does not
+# apply. Two transactions a cycle for a whole chain is a fraction of what the
+# joint loop does at 200 Hz.
+BENCH_TELEMETRY_HZ = 20.0
+
+# Temperature rides the same tick but far slower: it moves over minutes, and
+# it is a bus round trip of its own. Slow enough to cost nothing, fast enough
+# that a motor heating under load is visible while it happens.
+BENCH_TEMP_HZ = 1.0
+
+# Motor-bus telemetry on a hand with no joint loop. Current is what an operator
+# watches while tensioning, so it reads at the same rate bare motor mode uses;
+# there is no control loop to starve, and one transaction a tick for a whole
+# chain is a fraction of what the joint loop does at 200 Hz. Temperature rides
+# the same tick far slower: it moves over minutes and costs a round trip of its
+# own.
+MOTOR_TELEMETRY_HZ = 20.0
+MOTOR_TELEMETRY_MIN_INTERVAL_S = 1.0 / MOTOR_TELEMETRY_HZ
+MOTOR_TEMP_HZ = 1.0
 
 # How long motor telemetry may go unread while the hand keeps moving before a
 # read is forced through anyway.
@@ -242,6 +258,9 @@ class TelemetryService:
         # Negative infinity so the first slow tick publishes straight away:
         # the panel should not sit empty for a whole interval after connect.
         self._last_motor_telemetry = float("-inf")
+        self._last_bench_read = float("-inf")
+        self._last_bench_temp = float("-inf")
+        self._last_motor_temp = float("-inf")
         self._motor_health: dict[str, dict] = {"temps": {}, "currents": {}}
         self._sensor_health = SensorHealthMonitor()
         # Joints whose encoder is currently distrusted (joint -> "verdict:
@@ -301,6 +320,9 @@ class TelemetryService:
                 self._hub.publish(T.JOINTS_MEASURED, payload)
             self._sensor_health.feed(_call(session, "encoder_reading"))
 
+        if getattr(self._service.settings, "bare", False) and session.caps.motors:
+            self._bench_tick(session)
+
         if session.caps.tactile:
             reading = session.tactile_data()
             if reading is not None:
@@ -310,6 +332,45 @@ class TelemetryService:
                 taxels = getattr(reading.taxels, "taxels", None)
                 if taxels:
                     self._hub.publish(T.TACTILE_TAXELS, {"taxels": taxels})
+
+    def _bench_tick(self, session) -> None:
+        """Position and current for bare motors, fast enough to watch a stall.
+
+        Temperature rides along at its own slower rate. The loopless hand's
+        ordinary telemetry is held to one read every ten seconds, which on a
+        bench reads as a temperature that only moves when something is
+        clicked.
+        """
+        now = time.monotonic()
+        if now - self._last_bench_read < 1.0 / BENCH_TELEMETRY_HZ:
+            return
+        self._last_bench_read = now
+        hand = getattr(session, "hand", None)
+        if hand is None:
+            return
+        try:
+            positions = hand.get_motor_pos(as_dict=True)
+            currents = hand.get_motor_current(as_dict=True)
+            if not getattr(hand, "last_read_ok", True):
+                logger.debug("bench telemetry read stale; skipping this tick")
+                return
+        except Exception:
+            logger.debug("bench telemetry read failed", exc_info=True)
+            return
+        if now - self._last_bench_temp >= 1.0 / BENCH_TEMP_HZ:
+            try:
+                self._motor_health["temps"] = {
+                    int(k): round(float(v), 1)
+                    for k, v in hand.get_motor_temp(as_dict=True).items()}
+                self._last_bench_temp = now
+            except Exception:
+                logger.debug("bench temperature read failed", exc_info=True)
+        self._motor_health["positions"] = {
+            int(k): round(float(v), 4) for k, v in positions.items()}
+        self._motor_health["currents"] = {
+            int(k): round(float(v), 1) for k, v in currents.items()}
+        self._hub.publish(T.MOTORS_TELEMETRY,
+                          self._motor_health_payload(session))
 
     def _mid_tick(self) -> None:
         session = self._service.session
@@ -347,8 +408,12 @@ class TelemetryService:
             self._sweep_hardware_errors(session)
             if not session.caps.feedback_loop:
                 if self._motor_telemetry_is_due():
-                    self._last_motor_telemetry = time.monotonic()
-                    self._publish_motor_health(session)
+                    now = time.monotonic()
+                    self._last_motor_telemetry = now
+                    temps_due = now - self._last_motor_temp >= 1.0 / MOTOR_TEMP_HZ
+                    if temps_due:
+                        self._last_motor_temp = now
+                    self._publish_motor_health(session, temps=temps_due)
             elif not self._hand_is_driven():
                 self._bus_read_tick(session)
             elif self._telemetry_is_stale():
@@ -702,9 +767,14 @@ class TelemetryService:
                     int(k): round(float(v), 1)
                     for k, v in session.hand.get_motor_temp(as_dict=True).items()}
             if currents:
+                reading = session.hand.get_motor_current(as_dict=True)
+                # A failed bus read returns the client's stale cache, so
+                # publishing it would present a frozen value as a live one.
+                if not getattr(session.hand, "last_read_ok", True):
+                    logger.debug("motor current read stale; skipping this publish")
+                    return
                 self._motor_health["currents"] = {
-                    int(k): round(float(v), 1)
-                    for k, v in session.hand.get_motor_current(as_dict=True).items()}
+                    int(k): round(float(v), 1) for k, v in reading.items()}
         except Exception:
             logger.debug("motor telemetry read failed", exc_info=True)
             return

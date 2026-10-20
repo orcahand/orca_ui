@@ -46,6 +46,12 @@ export interface StatusSnapshot {
   // board to answer". Pinned means the backend never opens another board's
   // ports — the way two consoles on one machine each keep to their own hand.
   board_pinned: string | null
+  // Hardware version in force (2 = v2.0, 21 = v2.1; null = unknown), whether
+  // config.yaml pins it, and what the board reports (null with no board).
+  // Only v2.1 gets guided tensioning and travel-checked calibration.
+  hardware_version?: number | null
+  hardware_version_pinned?: boolean
+  board_hardware_version?: number | null
   // Device classes the config declares that this session did not get, and
   // whether the backend is still probing for them. It gives up after a few
   // attempts, so the UI offers an explicit rescan rather than implying it is
@@ -55,6 +61,10 @@ export interface StatusSnapshot {
   // rescan re-attempts the connection rather than looking for a port.
   refused?: string[]
   rescanning?: boolean
+  // Bare motor mode: loose motors brought up from a bus scan, with no hand
+  // behind them. Joints are one-to-one stand-ins for motors, so anything that
+  // poses a hand or commands a joint is hidden.
+  bare?: boolean
 }
 
 export interface ModelEntry {
@@ -104,6 +114,8 @@ export interface BoardsInfo {
 }
 
 export interface JointInfo {
+  /** Direction the running joint_to_motor_map assigns to this joint. */
+  inverted?: boolean
   id: string
   // Motor driving this joint, or null when the config maps none.
   motor_id: number | null
@@ -163,17 +175,54 @@ export interface ControlState {
   effective_pose_source: 'estimate' | 'target'
 }
 
+// Control-table facts for a model a bench knows how to drive. `source` says
+// where the numbers came from, because a wrong one writes to a register the
+// motor may not have.
+export interface MotorModelInfo {
+  key: string
+  label: string
+  family: string
+  model_numbers: number[]
+  has_current_control: boolean
+  current_scale_ma: number | null
+  max_current_ma: number | null
+  source: string
+  verifiable: boolean
+}
+
 export interface DirectMotorInfo {
   id: number
   joint: string
   position: number // radians
+  // Present draw and case temperature where the family reports them. On a
+  // bench these are how a stall reads: the target is missed either way, and
+  // only the current says whether the motor is still pushing.
+  // What the operator declared is plugged in here, and whether the servo's
+  // own reported model number agrees with it.
+  nickname?: string
+  model?: MotorModelInfo
+  reported_model_number?: number | null
+  identified?: MotorModelInfo | null
+  mismatch?: boolean
+  // The travel an operator found by hand, in radians, once recorded.
+  range_rad?: [number, number] | null
+  // Points recorded by hand. One is a place to hold, two or more is a cycle.
+  points?: number[] | null
+  playing?: boolean
+  current_ma?: number | null
+  temp_c?: number | null
   hw_error: number | null
   hw_error_flags: string[] | null
 }
 
 export interface DirectMotorSnapshot {
   direct_mode: boolean
-  max_step_rad: number
+  // null in bare motor mode: the cap exists so a slider cannot yank a tendon,
+  // and a loose motor on a bench has none.
+  max_step_rad: number | null
+  // The travel this motor family can reach, in radians. null for a family with
+  // no single-turn limit.
+  span_rad?: [number, number] | null
   motors: DirectMotorInfo[]
 }
 
@@ -200,6 +249,36 @@ export interface HandInfo {
   reboot_supported?: boolean
   finger_to_sensor_id?: Record<Finger, number>
   tactile?: { active_sensors: Finger[]; num_taxels: Record<Finger, number> }
+  // Motors that did not answer when the bus was opened, and their joints.
+  absent_motors?: number[]
+  absent_joints?: string[]
+  // False when the installed orca_core predates guided tensioning.
+  guided_tension?: boolean
+  last_tension?: LastTension | null
+  // Unfinished guided tensioning saved for this hand: best score per joint.
+  tension_progress?: TensionProgress | null
+  // Guided tensioning currents (mA) for this hand's motor family.
+  guided_tension_defaults?: {
+    motor_type: string | null
+    hold_ap: number
+    hold_mcp: number
+    hold_pip: number
+  }
+}
+
+export interface TensionProgress {
+  updated_at: string // ISO 8601
+  rounds: number
+  best: Record<string, number>
+}
+
+export interface LastTension {
+  completed_at: string // ISO 8601
+  // 'hold': a plain hold-and-ratchet, which has nothing to score.
+  mode?: 'hold'
+  rounds?: number
+  pass_fraction?: Record<string, number>
+  spreads?: Record<string, number | null>
 }
 
 export type TactileMode = 'resultant' | 'taxels' | 'combined'
@@ -611,4 +690,137 @@ export interface TrajectoryData {
   }
   waypoints?: number[][]
   angles?: number[][]
+}
+
+
+// What a servo tunable accepts, and the ceiling that actually binds. The two
+// differ by orders of magnitude: a speed register stores values far faster
+// than the motor turns and never objects, so only the per-motor ceiling tells
+// an operator what asking for a number will do.
+export interface ServoLimitEntry {
+  min: number
+  max: number | null
+  unit: string
+  zero_means: string
+  register_width_only?: boolean
+  ceiling_source?: string
+}
+
+export interface ServoLimits {
+  tunables?: Record<string, ServoLimitEntry>
+  per_motor?: Record<string, { velocity_rad_s: number; acceleration_rad_s2: number }>
+}
+
+
+// ----- configuration registers (bare bench) --------------------------------
+// Rendered from what the connected family declares, never from a list here:
+// a family without a setting sends no row for it, and one that gains a
+// setting needs no change in the browser.
+
+export interface MotorConfigRegister {
+  key: string
+  label: string
+  address: number
+  size: number
+  eeprom: boolean
+  unit: string
+  min: number | null
+  max: number | null
+  // Raw value -> meaning. A baud index is 9600 on one family and 1 000 000
+  // on the other, so the raw number must never be shown on its own.
+  choices: Record<string, string> | null
+  // Changing this moves the motor on the bus.
+  reidentifies: boolean
+  note: string
+}
+
+export interface MotorConfigSchema {
+  motor_type: string | null
+  // Ids a bench re-scan will actually find. Narrower than the id register
+  // allows: offering one outside this writes fine and then loses the motor.
+  id_range: [number, number]
+  registers: MotorConfigRegister[]
+}
+
+export interface MotorConfigValues {
+  id: number
+  values: Record<string, number | null>
+}
+
+export interface MotorConfigWriteResult {
+  id: number
+  key: string
+  requested: number
+  actual: number | null
+  applied: boolean
+  rescanned: boolean
+}
+
+export interface BusBaudInfo {
+  current: number | null
+  /** Rates that are safe to select: the motor family's own map narrowed to
+   *  what the transport between host and motors can actually carry. */
+  rates: number[]
+}
+
+export interface BusBaudResult {
+  requested: number
+  changed: number[]
+  failed: number[]
+  rescanned: boolean
+}
+
+// ----- guided_tension operation extra (orca_ui/hand/operations/guided_tension.py)
+
+export type TensionStep = 'pose' | 'range' | 'score' | 'tension' | 'done'
+
+export interface RangeStage {
+  key: string
+  title: string
+  joints: string[]
+  pose: string
+}
+export type SpreadStatus = 'pass' | 'partial' | 'low' | 'unscored'
+
+export interface MotorSpread {
+  joint: string
+  motor: number
+  expected_deg: number | null
+  offset_deg: number
+  plus_deg: number
+  minus_deg: number
+  spread_deg: number
+  fraction: number | null
+  status: SpreadStatus
+  pass_fraction?: number
+  live_fraction?: number | null
+  // Best score carried in from earlier rounds or a saved session.
+  kept?: number | null
+}
+
+export interface GuidedTensionExtra {
+  step: TensionStep
+  round: number
+  motors: MotorSpread[]
+  passed?: number
+  scored?: number
+  fraction?: number
+  history: { round: number; passed: number; scored: number; fraction: number }[]
+  hold_ap?: number
+  hold_mcp?: number
+  hold_pip?: number
+  tension_offset_deg?: number
+  pulled_deg?: number
+  pass_fractions?: Record<'ap' | 'mcp' | 'pip', number>
+  completed?: boolean
+  resumed?: { rounds: number; updated_at?: string; joints: number }
+  // Every range-check stage, and the one in progress (pose / range steps).
+  stages?: RangeStage[]
+  stage?: RangeStage
+  stage_index?: number
+  stage_count?: number
+  // Joints the run leaves out (no motor answered), and the score sheet's
+  // exclusion list with a reason per joint.
+  absent_joints?: string[]
+  excluded?: { joint: string; motor: number; reason: string }[]
 }

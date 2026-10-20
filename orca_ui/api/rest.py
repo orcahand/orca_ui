@@ -86,6 +86,13 @@ def build_router(service: HandService) -> APIRouter:
         """
         return guard(service.select_board, body.device)
 
+    @router.post("/hardware_version")
+    def hardware_version(body: schemas.HardwareVersionRequest):
+        """Pin the hand's hardware version in its config.yaml, or (null) back
+        to what the board reports. A hand on a plain adapter has no board, so
+        this is how it becomes v2.1."""
+        return guard(service.set_hardware_version, body.version)
+
     @router.post("/rescan")
     def rescan():
         """Probe again for declared hardware this session did not get.
@@ -260,7 +267,8 @@ def build_router(service: HandService) -> APIRouter:
 
     @router.get("/motors/gains")
     def motors_gains():
-        return {"ok": True, "gains": guard(service.read_servo_gains)}
+        return {"ok": True, "gains": guard(service.read_servo_gains),
+                "gain_max": service.servo_gain_max()}
 
     @router.post("/motors/{motor_id}/gains")
     def motors_set_gains(motor_id: int, body: schemas.ServoGainsRequest):
@@ -269,7 +277,8 @@ def build_router(service: HandService) -> APIRouter:
 
     @router.get("/motors/profile")
     def motors_profile():
-        return {"ok": True, "profile": guard(service.read_servo_profile)}
+        return {"ok": True, "profile": guard(service.read_servo_profile),
+                "limits": service.servo_limits()}
 
     @router.post("/motors/{motor_id}/profile")
     def motors_set_profile(motor_id: int, body: schemas.ServoProfileRequest):
@@ -292,6 +301,61 @@ def build_router(service: HandService) -> APIRouter:
     @router.post("/motors/direct/position")
     def motors_direct_position(body: schemas.DirectMotorPositionRequest):
         return guard(service.set_motor_position, body.id, body.position)
+
+    # Bench range finding: loosen one motor, let a human take it to each end,
+    # then command only inside what they found.
+    @router.post("/motors/direct/torque")
+    def motors_direct_torque(body: schemas.MotorTorqueRequest):
+        return guard(service.set_motor_torque, body.id, body.enabled)
+
+    @router.post("/motors/direct/range")
+    def motors_direct_range(body: schemas.MotorRangeRequest):
+        return guard(service.set_motor_range, body.id, body.low, body.high)
+
+    @router.post("/motors/direct/points")
+    def motors_direct_points(body: schemas.MotorPointsRequest):
+        return guard(service.set_motor_points, body.id, body.points)
+
+    @router.get("/motors/models")
+    def motors_models():
+        return {"models": service.motor_model_catalogue()}
+
+    @router.post("/motors/direct/declare")
+    def motors_direct_declare(body: schemas.MotorDeclareRequest):
+        return guard(service.declare_motor, body.id, body.model, body.nickname)
+
+    @router.get("/motors/config/schema")
+    def motors_config_schema():
+        return guard(service.motor_config_schema)
+
+    @router.get("/motors/config/taken-ids")
+    def motors_config_taken_ids():
+        return {"ids": guard(service.taken_motor_ids)}
+
+    @router.get("/motors/{motor_id}/config")
+    def motors_config_read(motor_id: int):
+        return guard(service.read_motor_config, motor_id)
+
+    @router.post("/motors/{motor_id}/config")
+    def motors_config_write(motor_id: int, body: schemas.MotorConfigWriteRequest):
+        return guard(service.write_motor_config, motor_id, body.key, body.value)
+
+    @router.get("/motors/bus/baud")
+    def motors_bus_baud():
+        return guard(service.bus_baud_rates)
+
+    @router.post("/motors/bus/baud")
+    def motors_bus_baud_set(body: schemas.BusBaudRequest):
+        return guard(service.set_bus_baud, body.baud_rate)
+
+    @router.post("/motors/direct/pacing")
+    def motors_direct_pacing(body: schemas.BenchPacingRequest):
+        return guard(service.set_bench_pacing,
+                     body.interp_steps, body.max_settle_ms, body.period_ms)
+
+    @router.post("/motors/direct/play")
+    def motors_direct_play(body: schemas.MotorPlaybackRequest):
+        return guard(service.set_motor_playback, body.id, body.enabled)
 
     # ----- poses / trajectories / demos --------------------------------------------
 

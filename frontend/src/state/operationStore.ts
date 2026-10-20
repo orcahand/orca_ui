@@ -18,9 +18,12 @@ export function isOperationActive(op: OperationSnapshot | null): boolean {
   return op !== null && op.state !== 'done' && op.state !== 'error'
 }
 
-// Wire names the UI calls something else. The guided setup run is "wizard"
-// on the API; everywhere a user can see it, it is the full setup.
-const OPERATION_LABELS: Record<string, string> = { wizard: 'full setup' }
+// Wire names the UI calls something else: the API's "wizard" run is the full setup.
+const OPERATION_LABELS: Record<string, string> = {
+  wizard: 'full setup',
+  guided_tension: 'guided tensioning',
+  run_in: 'run-in',
+}
 
 export function operationLabel(kind: string): string {
   return OPERATION_LABELS[kind] ?? kind

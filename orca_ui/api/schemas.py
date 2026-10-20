@@ -28,6 +28,13 @@ class BoardSelectRequest(BaseModel):
     device: Optional[str] = None
 
 
+class HardwareVersionRequest(BaseModel):
+    """The hand's hardware version to pin in its config.yaml (2 = v2.0,
+    21 = v2.1), or null to put it back on ``auto`` so the board decides."""
+
+    version: Optional[int] = Field(default=None, ge=0, le=255)
+
+
 class TorqueRequest(BaseModel):
     # Reserved for future per-motor control; today torque toggles hand-wide.
     motor_ids: Optional[list[int]] = None
@@ -90,6 +97,35 @@ class DirectMotorModeRequest(BaseModel):
 class DirectMotorPositionRequest(BaseModel):
     id: int = Field(ge=0)
     position: float  # motor position in radians; step-clamped server-side
+
+
+class MotorTorqueRequest(BaseModel):
+    id: int = Field(ge=0)
+    enabled: bool
+
+
+class MotorRangeRequest(BaseModel):
+    id: int = Field(ge=0)
+    # Both None clears the range and puts the motor back on its full travel.
+    low: float | None = None
+    high: float | None = None
+
+
+class MotorPointsRequest(BaseModel):
+    id: int = Field(ge=0)
+    # None or empty clears the recording.
+    points: "list[float] | None" = None
+
+
+class MotorPlaybackRequest(BaseModel):
+    id: int = Field(ge=0)
+    enabled: bool
+
+
+class MotorDeclareRequest(BaseModel):
+    id: int = Field(ge=0)
+    model: "str | None" = None
+    nickname: "str | None" = None
 
 
 class ZeroRequest(BaseModel):
@@ -162,3 +198,24 @@ class TrajectoryUpdateRequest(BaseModel):
                                    pattern=r"^[A-Za-z0-9_\-]+$")
 
 
+
+
+class BenchPacingRequest(BaseModel):
+    """How bench playback paces itself. Mirrors the trajectory player."""
+
+    interp_steps: int = 1
+    max_settle_ms: "int | None" = None
+    period_ms: "int | None" = None
+
+
+class MotorConfigWriteRequest(BaseModel):
+    """One configuration register on one motor."""
+
+    key: str
+    value: int
+
+
+class BusBaudRequest(BaseModel):
+    """A new rate for every motor on the bus."""
+
+    baud_rate: int

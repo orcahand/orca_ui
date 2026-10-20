@@ -10,6 +10,8 @@ import { api } from '../../api/rest'
 import type { JointInfo } from '../../api/types'
 import { useStreamFrame } from '../../hooks/useStreamFrame'
 import { useAppStore } from '../../state/appStore'
+import { MotorRegisterPanel } from './MotorRegisterPanel'
+import { BusBaudPanel } from './BusBaudPanel'
 import { sendTarget } from '../../state/commandBus'
 import { useControlGate } from '../../state/operationStore'
 import { Panel } from '../common/Panel'
@@ -36,9 +38,12 @@ export function MotorPanel() {
   const control = useAppStore((s) => s.control)
   const setError = useAppStore((s) => s.setError)
   const gate = useControlGate()
+  const bare = status?.bare ?? false
 
   const [values, setValues] = useState<Record<string, number>>({})
   const [busy, setBusy] = useState(false)
+  const [tableOpen, setTableOpen] = useState(false)
+  const [baudOpen, setBaudOpen] = useState(false)
   const seeded = useRef(false)
   const wasLocked = useRef(false)
 
@@ -115,6 +120,38 @@ export function MotorPanel() {
 
   const toolbar = (
     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+      {bare && (
+        <>
+          <div style={{ position: 'relative' }}>
+            <button
+              className="btn btn-secondary"
+              title="read and change this motor's configuration registers"
+              onClick={() => {
+                setBaudOpen(false)
+                setTableOpen((v) => !v)
+              }}
+            >
+              Control table
+            </button>
+            {tableOpen && (
+              <MotorRegisterPanel onClose={() => setTableOpen(false)} />
+            )}
+          </div>
+          <div style={{ position: 'relative' }}>
+            <button
+              className="btn btn-secondary"
+              title="change the baud rate of every motor on the bus"
+              onClick={() => {
+                setTableOpen(false)
+                setBaudOpen((v) => !v)
+              }}
+            >
+              Bus baud
+            </button>
+            {baudOpen && <BusBaudPanel onClose={() => setBaudOpen(false)} />}
+          </div>
+        </>
+      )}
       {!torqueOn ? (
         <button
           className="btn btn-primary"
@@ -158,7 +195,14 @@ export function MotorPanel() {
           {gate.reason} — manual control resumes when it releases
         </div>
       )}
-      {!locked && uncalibrated && (
+      {!locked && bare && (
+        <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 8 }}>
+          Bare motor mode — every motor found on the bus is listed below and
+          driven directly, in its own frame. There is no hand, so there are no
+          joints to command and nothing to calibrate.
+        </div>
+      )}
+      {!locked && !bare && uncalibrated && (
         <div style={{ fontSize: 10, color: 'var(--warn)', marginBottom: 8 }}>
           ⚠ NOT CALIBRATED — {handInfo.calibration.hint ?? 'the hand is not calibrated'}.
           Sliders are disabled: a joint target silently sends no motor
@@ -167,14 +211,14 @@ export function MotorPanel() {
           directly in the meantime.
         </div>
       )}
-      {!locked && !uncalibrated && !torqueOn && (
+      {!locked && !bare && !uncalibrated && !torqueOn && (
         <div style={{ fontSize: 10, color: 'var(--dimmer)', marginBottom: 8 }}>
           enable torque to command joints — sliders re-seed from the current
           pose on enable
         </div>
       )}
       <div>
-        {joints.map((joint) => (
+        {!bare && joints.map((joint) => (
           <SliderRow
             key={joint.id}
             joint={joint}
@@ -186,7 +230,12 @@ export function MotorPanel() {
           />
         ))}
       </div>
-      <DirectMotorPanel torqueOn={torqueOn} locked={locked} forceOpen={uncalibrated} />
+      <DirectMotorPanel
+        torqueOn={torqueOn}
+        locked={locked}
+        forceOpen={uncalibrated}
+        bench={bare}
+      />
     </Panel>
   )
 }

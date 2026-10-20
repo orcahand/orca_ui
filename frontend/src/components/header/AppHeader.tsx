@@ -7,6 +7,7 @@ import type { ViewName } from '../../state/appStore'
 import { useAppStore } from '../../state/appStore'
 import { BoardPicker } from './BoardPicker'
 import { EStopButton } from './EStopButton'
+import { HardwareVersionBadge } from './HardwareVersion'
 import { LinkControls } from './LinkControls'
 import { ModelPicker } from './ModelPicker'
 import { ThemeToggle } from './ThemeToggle'
@@ -49,8 +50,13 @@ export function AppHeader() {
 
   // Every tab is offered for every hand: the dashboard's own sections are
   // capability-gated one level down, so a motors-only hand gets a shorter
-  // page rather than no page.
-  const tabs = TABS
+  // page rather than no page. Bare motor mode is the exception — there is no
+  // hand to pose, no pose library worth keeping and nothing to calibrate, so
+  // only the two tabs that act on motors are offered.
+  const bare = status?.bare ?? false
+  const tabs = bare
+    ? TABS.filter((tab) => tab.id === 'dashboard' || tab.id === 'motors')
+    : TABS
 
   const state: HandState = !wsConnected
     ? 'disconnected'
@@ -63,10 +69,11 @@ export function AppHeader() {
   return (
     <header>
       <h1 className="brand">
-        <span className="brand-mark">◈ ORCA</span>
+        <span className="brand-logo" role="img" aria-label="ORCA" />
         <span className="brand-sub">HAND CONSOLE</span>
       </h1>
       <ModelPicker />
+      <HardwareVersionBadge />
       <BoardPicker />
       {handInfo?.core?.development && (
         // Only shown off a release: on a dev build the hand's behaviour may

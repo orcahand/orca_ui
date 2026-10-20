@@ -51,6 +51,7 @@ export function TrajectoryPanel({
   // With 0 steps this is the waypoint-to-waypoint time — the motor's own
   // controller does the travelling, the period just sets the rhythm.
   const [periods, setPeriods] = useState<Record<string, string>>({})
+  const [settles, setSettles] = useState<Record<string, string>>({})
   const [editing, setEditing] = useState<string | null>(null)
   const [mode, setMode] = useState<
     'continuous' | 'waypoints' | 'motor_waypoints'
@@ -81,9 +82,9 @@ export function TrajectoryPanel({
     const parsed = parseInt(raw, 10)
     const interp =
       raw !== '' && Number.isFinite(parsed)
-        ? Math.min(200, Math.max(0, parsed))
+        ? Math.min(200, Math.max(1, parsed))
         : traj.type === 'motor_waypoints'
-          ? 0
+          ? 1
           : null
     const periodRaw = periods[traj.name] ?? ''
     const periodMs = parseInt(periodRaw, 10)
@@ -93,6 +94,14 @@ export function TrajectoryPanel({
       Number.isFinite(periodMs)
         ? Math.min(5000, Math.max(20, periodMs)) / 1000
         : null
+    const settleRaw = settles[traj.name] ?? ''
+    const settleMs = parseInt(settleRaw, 10)
+    const settle =
+      traj.type === 'motor_waypoints' &&
+      settleRaw !== '' &&
+      Number.isFinite(settleMs)
+        ? Math.min(60000, Math.max(1, settleMs))
+        : null
     void api
       .operationStart('replay', {
         name: traj.name,
@@ -100,6 +109,7 @@ export function TrajectoryPanel({
         loop: loops[traj.name] ?? false,
         ...(interp !== null ? { interp_steps: interp } : {}),
         ...(period !== null ? { step_period_s: period } : {}),
+        ...(settle !== null ? { max_settle_ms: settle } : {}),
         ...(uncalibrated ? { allow_uncalibrated: true } : {}),
       })
       .catch(fail)
@@ -190,35 +200,45 @@ export function TrajectoryPanel({
                   </td>
                   <td>
                     <span className="traj-actions">
-                      <select
-                        value={speeds[traj.name] ?? 1}
-                        title="playback speed"
-                        onChange={(e) =>
-                          setSpeeds((prev) => ({
-                            ...prev,
-                            [traj.name]: Number(e.target.value),
-                          }))
-                        }
-                      >
-                        {SPEEDS.map((speed) => (
-                          <option key={speed} value={speed}>
-                            ×{speed}
-                          </option>
-                        ))}
-                      </select>
+                      {/* Motor waypoints pace themselves: each point is
+                          commanded once and the next waits for every motor
+                          to arrive, so scaling the dwell between them says
+                          nothing about how fast the hand moves. The other
+                          kinds still stream frames on a clock, where it
+                          does. */}
+                      {traj.type !== 'motor_waypoints' && (
+                        <select
+                          value={speeds[traj.name] ?? 1}
+                          title="playback speed"
+                          onChange={(e) =>
+                            setSpeeds((prev) => ({
+                              ...prev,
+                              [traj.name]: Number(e.target.value),
+                            }))
+                          }
+                        >
+                          {SPEEDS.map((speed) => (
+                            <option key={speed} value={speed}>
+                              ×{speed}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       {traj.type !== 'continuous' && (
                         <input
                           type="number"
-                          min={0}
+                          min={1}
                           max={200}
                           placeholder={
-                            traj.type === 'motor_waypoints' ? '0' : 'glide'
+                            traj.type === 'motor_waypoints' ? '1' : 'glide'
                           }
                           title={
-                            'interpolation steps per segment — 0 jumps ' +
-                            'straight to each point; empty keeps the ' +
+                            'commands per segment — 1 moves directly from ' +
+                            'each waypoint to the next, and the motor\u2019s ' +
+                            'own controller does the travelling; empty keeps ' +
+                            'the ' +
                             (traj.type === 'motor_waypoints'
-                              ? 'direct stepping default (0)'
+                              ? 'direct move default (1)'
                               : 'smooth cruise-speed glide with waypoint holds')
                           }
                           value={steps[traj.name] ?? ''}
@@ -235,11 +255,13 @@ export function TrajectoryPanel({
                         <label
                           className="traj-loop"
                           title={
-                            'ms between motor commands — with 0 steps this is ' +
-                            'the time from one waypoint to the next. The ' +
-                            'motors\u2019 own controller does the moving, so a ' +
-                            'short period snaps between positions; speed ' +
-                            'divides it further.'
+                            'ms between commands, which is also the rest at ' +
+                            'each waypoint once every motor has arrived. At ' +
+                            '1 command per segment that rest is all it is; ' +
+                            'above 1 it also spaces the steps spanning a ' +
+                            'segment. A dwell longer than the settle cap ' +
+                            'outlasts it, so the cap only bites once this is ' +
+                            'short enough to notice.'
                           }
                         >
                           <input
@@ -251,6 +273,37 @@ export function TrajectoryPanel({
                             value={periods[traj.name] ?? ''}
                             onChange={(e) =>
                               setPeriods((prev) => ({
+                                ...prev,
+                                [traj.name]: e.target.value,
+                              }))
+                            }
+                            style={{ width: 56 }}
+                          />
+                          ms
+                        </label>
+                      )}
+                      {traj.type === 'motor_waypoints' && (
+                        <label
+                          className="traj-loop"
+                          title={
+                            'max settle — ms to wait at each waypoint before ' +
+                            'sending the next command even if a motor has ' +
+                            'not reported arriving. Empty waits for every ' +
+                            'motor, which is what makes a recorded motion ' +
+                            'synchronous; set it when one motor cannot reach ' +
+                            'its point and should not hold up the rest.'
+                          }
+                        >
+                          settle
+                          <input
+                            type="number"
+                            min={1}
+                            max={60000}
+                            step={50}
+                            placeholder="wait"
+                            value={settles[traj.name] ?? ''}
+                            onChange={(e) =>
+                              setSettles((prev) => ({
                                 ...prev,
                                 [traj.name]: e.target.value,
                               }))

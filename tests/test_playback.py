@@ -403,22 +403,25 @@ def test_demo_loop_runs_until_stopped(client):
 # ----- stepped playback and motor-space waypoints -------------------------
 
 
-def test_stepped_frames_interpolates_and_splits_a_violent_segment():
-    """``steps`` sets the commands per segment; ``max_step`` splits a segment
-    that would jump further than a raw motor command may, which is what keeps
-    "no interpolation" from flinging a motor across its range."""
-    frames = player._stepped_frames([[0.0], [1.0]], 3)
+def test_stepped_frames_commands_exactly_what_was_asked_for():
+    """``steps`` is the commands per segment. One means a direct move, and
+    nothing is inserted behind the operator's back: a segment recorded as one
+    move stays one move however far it travels."""
+    frames = player._stepped_frames([[0.0], [1.0]], 4)
     assert [round(f[0], 3) for f in frames] == [0.0, 0.25, 0.5, 0.75, 1.0]
 
-    # 0 steps is a straight jump to each point...
+    assert player._stepped_frames([[0.0], [1.0]], 1) == [[0.0], [1.0]]
+
+    # The whole point: a long segment is still one command at steps=1.
+    violent = player._stepped_frames([[0.0], [100.0]], 1)
+    assert violent == [[0.0], [100.0]]
+
+    # Zero would be a second spelling of "no interpolation", so it is not a
+    # separate case -- it is floored to one.
     assert player._stepped_frames([[0.0], [1.0]], 0) == [[0.0], [1.0]]
-    # ...unless the jump exceeds max_step, which auto-splits it.
-    split = player._stepped_frames([[0.0], [1.0]], 0, max_step=0.3)
-    assert len(split) == 5 and split[-1] == [1.0]
-    assert max(abs(b[0] - a[0]) for a, b in zip(split, split[1:])) <= 0.3 + 1e-9
 
     # A joint some waypoints omit stays absent until the endpoint.
-    gapped = player._stepped_frames([[0.0, None], [1.0, 2.0]], 1)
+    gapped = player._stepped_frames([[0.0, None], [1.0, 2.0]], 2)
     assert gapped[1][1] is None and gapped[-1][1] == 2.0
 
 
@@ -436,8 +439,8 @@ def test_stepped_replay_commands_each_step_at_the_asked_period(client):
         "name": "stepped", "interp_steps": 4, "step_period_s": 0.02}})
     assert response.status_code == 200, response.text
     snapshot = _wait_op_state(client, "done")
-    # The opening waypoint, four intermediate steps, and the endpoint.
-    assert snapshot["result"]["frames"] == 6
+    # The opening waypoint, then four commands spanning the one segment.
+    assert snapshot["result"]["frames"] == 5
 
 
 def test_stepped_pacing_is_refused_where_it_means_nothing(client):
@@ -496,7 +499,7 @@ def test_motor_waypoints_record_then_replay_in_motor_space(client):
 
     client.post("/api/torque/enable")
     response = client.post("/api/operation/replay/start", json={"params": {
-        "name": "mw", "interp_steps": 0, "step_period_s": 0.02}})
+        "name": "mw", "interp_steps": 1, "step_period_s": 0.02}})
     assert response.status_code == 200, response.text
     snapshot = _wait_op_state(client, "done")
     assert snapshot["result"]["frames"] == 2
@@ -539,3 +542,78 @@ def test_translating_a_joint_recording_to_motor_space(client):
     _synthetic_trajectory(client, name="cont2", frames=5)
     response = client.post("/api/trajectories/cont2/to_motor", json={})
     assert response.status_code == 409 and "waypoint" in response.text
+
+
+def test_max_settle_is_off_unless_asked_for(client):
+    """Waiting for every motor is what makes a recorded motion synchronous,
+    so the cap that gives that up has to be opted into -- an unasked-for
+    replay must carry None, not some default number of milliseconds."""
+    from orca_ui.hand.operations.player import ReplayOperation
+
+    _waypoint_trajectory(client, "uncapped", [
+        [0.0] * len(_joint_ids(client)),
+        [5.0] + [0.0] * (len(_joint_ids(client)) - 1),
+    ])
+    client.post("/api/torque/enable")
+    service = client.app.state.service
+
+    params = ReplayOperation.validate(
+        service, {"name": "uncapped", "interp_steps": 1})
+
+    assert params["max_settle_ms"] is None
+
+
+def test_max_settle_out_of_range_is_refused(client):
+    _waypoint_trajectory(client, "capped", [
+        [0.0] * len(_joint_ids(client)),
+        [5.0] + [0.0] * (len(_joint_ids(client)) - 1),
+    ])
+    client.post("/api/torque/enable")
+
+    response = client.post("/api/operation/replay/start", json={"params": {
+        "name": "capped", "interp_steps": 1, "max_settle_ms": 0}})
+    assert response.status_code >= 400
+    assert "max_settle_ms" in response.text
+
+
+def test_a_capped_wait_passes_quietly_where_an_uncapped_one_complains():
+    """Hitting a cap the operator set is the point of setting it, not a
+    fault, so it must not read like one in the log."""
+    from orca_core.hardware.motor_client import MotionTimeoutError
+    from orca_ui.hand.operations import player as pl
+
+    class _Hand:
+        def wait_for_motion(self, timeout):
+            raise MotionTimeoutError("motor 3 short of goal")
+
+    class _Ctx:
+        def __init__(self):
+            self.logs = []
+
+        def log(self, message):
+            self.logs.append(message)
+
+    capped = _Ctx()
+    assert pl._await_arrival(capped, _Hand(), "waypoint 1", 0.05) is False
+    assert capped.logs == []
+
+    uncapped = _Ctx()
+    assert pl._await_arrival(uncapped, _Hand(), "waypoint 1", None) is False
+    assert len(uncapped.logs) == 1
+    assert "motor 3" in uncapped.logs[0]
+
+
+def test_the_cap_is_the_timeout_rather_than_stacking_with_the_backstop():
+    """A cap longer than the backstop would otherwise never be reached."""
+    from orca_ui.hand.operations import player as pl
+
+    seen = []
+
+    class _Hand:
+        def wait_for_motion(self, timeout):
+            seen.append(timeout)
+
+    pl._await_arrival(_Ctx := type("C", (), {"log": lambda *_: None})(),
+                      _Hand(), "waypoint 1", 20.0)
+    assert seen == [20.0]
+    assert seen[0] > pl.WAYPOINT_ARRIVAL_TIMEOUT_S

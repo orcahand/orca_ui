@@ -63,3 +63,23 @@ BUILTIN_SEQUENCES: dict[str, list[dict[str, float]]] = {
         BUILTIN_POSES["open"],
     ],
 }
+
+# Full-range run-in, collision-free: the thumb parks out of the palm while the fingers curl,
+# the fingers stay straight while the thumb moves, and the wrist rides with the thumb sweep.
+_THUMB_OUT = {"thumb_cmc": -21.0, "thumb_abd": 45.0, "thumb_dip": 17.0}
+_FINGERS = ("index", "middle", "ring", "pinky")
+
+RUN_IN_SEQUENCE: list[dict[str, float]] = [
+    _pose(**_THUMB_OUT),
+    _pose(**_THUMB_OUT, **_curl(*_FINGERS, mcp=95.0, pip=0.0)),
+    _pose(**_THUMB_OUT, **_curl(*_FINGERS, mcp=95.0, pip=102.0)),
+    _pose(**_THUMB_OUT, **_curl(*_FINGERS, mcp=0.0, pip=102.0)),
+    _pose(**_THUMB_OUT),
+    _pose(**_THUMB_OUT, index_abd=20.0, middle_abd=22.0, ring_abd=22.0, pinky_abd=24.0),
+    _pose(**_THUMB_OUT, index_abd=-24.0, middle_abd=-22.0, ring_abd=-22.0, pinky_abd=-24.0),
+    _pose(**{**_THUMB_OUT, "thumb_mcp": 95.0, "thumb_dip": 100.0}),
+    _pose(**_THUMB_OUT),
+    _pose(**{**_THUMB_OUT, "thumb_abd": -12.0}),
+    _pose(**{**_THUMB_OUT, "thumb_cmc": -40.0}, wrist=-60.0),
+    _pose(**{**_THUMB_OUT, "thumb_cmc": 28.0}, wrist=30.0),
+]

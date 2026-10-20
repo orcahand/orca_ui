@@ -21,6 +21,7 @@ import { subscribeFrames } from '../../state/streamStore'
 import { ForceArrowLayer } from './ForceArrowLayer'
 import { JointGlowLayer } from './JointGlowLayer'
 import { JointPoseAdapter } from './JointPoseAdapter'
+import { FRONT_VIEW, standUpright } from './frontView'
 import { palette } from '../../theme/palette'
 import { usePalette } from '../../theme/themeStore'
 import {
@@ -76,6 +77,7 @@ function HandRig({
           return
         }
         robot.updateMatrixWorld(true)
+        standUpright(robot, joints)
         const bounds = new THREE.Box3()
           .setFromObject(robot)
           .getBoundingSphere(new THREE.Sphere())
@@ -140,7 +142,7 @@ function HandRig({
   }, [rig, sceneColors, invalidate])
 
   // Frame the camera on the hand once it exists: fit the whole model with a
-  // margin, looking down from a 3/4 angle.
+  // margin, looking at the palm from slightly above.
   const camera = useThree((s) => s.camera)
   useEffect(() => {
     if (!rig || !controls) return
@@ -148,30 +150,7 @@ function HandRig({
     const persp = camera as THREE.PerspectiveCamera
     const fovRad = (persp.fov * Math.PI) / 180
     const distance = (sphere.radius / Math.tan(fovRad / 2)) * 1.15
-    // View from the thumb's side of the hand (so the thumb is never hidden
-    // behind the palm), nudged toward the fingertips for a 3/4 look, from
-    // ~40° above. Derived from the model, so left hands frame correctly too.
-    const worldPos = new THREE.Vector3()
-    const direction = new THREE.Vector3(1, 0, 1)
-    const thumbLink = rig.robot.links['thumb_fingertip']
-    if (thumbLink) {
-      thumbLink.getWorldPosition(worldPos)
-      direction.copy(worldPos).sub(sphere.center)
-      direction.y = 0
-      if (direction.lengthSq() > 1e-8) direction.normalize()
-      else direction.set(1, 0, 1).normalize()
-    }
-    const middleLink = rig.robot.links['middle_fingertip']
-    if (middleLink) {
-      middleLink.getWorldPosition(worldPos)
-      const toward = worldPos.sub(sphere.center)
-      toward.y = 0
-      if (toward.lengthSq() > 1e-8) {
-        direction.addScaledVector(toward.normalize(), 0.45)
-      }
-    }
-    direction.normalize().y = 0.8
-    direction.normalize()
+    const direction = FRONT_VIEW
     persp.position.copy(sphere.center).addScaledVector(direction, distance)
     persp.near = distance / 100
     persp.far = distance * 50

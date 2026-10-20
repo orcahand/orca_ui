@@ -181,12 +181,44 @@ def test_the_loopless_read_returns_once_the_interval_has_passed():
     telemetry._last_motor_telemetry -= MOTOR_TELEMETRY_MIN_INTERVAL_S
     telemetry._slow_tick()
 
+    # Current rides every due tick; temperature moves over minutes and keeps
+    # its own far slower cadence, so it does not come along at 20 Hz.
+    assert session.hand.bus_reads == ["current"]
+
+    session.hand.bus_reads.clear()
+    telemetry._last_motor_telemetry -= MOTOR_TELEMETRY_MIN_INTERVAL_S
+    telemetry._last_motor_temp -= 1.0 / MOTOR_TEMP_HZ
+    telemetry._slow_tick()
     assert session.hand.bus_reads == ["temp", "current"]
+
+
+def test_a_stale_current_read_is_not_published_as_live():
+    """A failed bus read returns the client's cache. Publishing it would show a
+    frozen number as a live one, which is indistinguishable from a held motor."""
+    from orca_ui.streaming import topics as T
+
+    def motor_publishes():
+        return sum(1 for topic in telemetry._hub.published if topic == T.MOTORS_TELEMETRY)
+
+    telemetry, session = _build(feedback_loop=False)
+    telemetry._slow_tick()
+    before = motor_publishes()
+
+    session.hand.last_read_ok = False
+    telemetry._last_motor_telemetry -= MOTOR_TELEMETRY_MIN_INTERVAL_S
+    telemetry._slow_tick()
+    assert motor_publishes() == before, "stale read was published as live"
+
+    session.hand.last_read_ok = True
+    telemetry._last_motor_telemetry -= MOTOR_TELEMETRY_MIN_INTERVAL_S
+    telemetry._slow_tick()
+    assert motor_publishes() > before, "fresh read was dropped"
 
 
 # ----- measured-stream fallback for unhealthy encoders ---------------------------
 
 
+from orca_ui.hand.telemetry import MOTOR_TEMP_HZ  # noqa: E402
 from orca_ui.hand.telemetry import ENCODER_RESTORE_WINDOWS  # noqa: E402
 
 
