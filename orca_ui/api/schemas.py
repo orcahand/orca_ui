@@ -58,6 +58,20 @@ class MaxCurrentRequest(BaseModel):
     ma: int = Field(gt=0, le=2000)
 
 
+class FaultBudgetsRequest(BaseModel):
+    """Fault-recovery thresholds, per motor. Omitted fields are left alone.
+
+    ``thermal_giveup_after_reboots`` accepts null, meaning never give up: a
+    motor that has cooled can work again, and the wait is self-limiting.
+    """
+
+    report_after_reboots: Optional[int] = Field(default=None, ge=1, le=100)
+    giveup_after_reboots: Optional[int] = Field(default=None, ge=1, le=100)
+    thermal_giveup_after_reboots: Optional[int] = Field(default=None, ge=1,
+                                                        le=100)
+    thermal_unlimited: bool = False
+
+
 class ServoGainsRequest(BaseModel):
     """Servo position-PID and feedforward gains. Omitted fields are left as
     they are on the motor, so one gain can be nudged without restating the

@@ -183,6 +183,14 @@ export const api = {
   resetGains: (joints?: string[]) =>
     post('/api/control/gains/reset', { joints: joints ?? null }),
   setMaxCurrent: (ma: number) => post('/api/control/max_current', { ma }),
+  // Omitted fields are left alone. thermal_unlimited clears the thermal
+  // budget, which cannot be expressed as a number.
+  setFaultBudgets: (body: {
+    report_after_reboots?: number
+    giveup_after_reboots?: number
+    thermal_giveup_after_reboots?: number
+    thermal_unlimited?: boolean
+  }) => post('/api/control/fault_budgets', body),
   setPoseSource: (mode: PoseSource) =>
     post<{ control: ControlState }>('/api/control/pose_source', { mode }),
   rebase: () => post('/api/control/rebase'),

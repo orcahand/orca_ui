@@ -6,7 +6,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../../api/rest'
-import type { MotorFaultEntry, MotorsFaults } from '../../api/types'
+import type {
+  FaultBudgets,
+  MotorFaultEntry,
+  MotorRecovery,
+  MotorsFaults,
+} from '../../api/types'
 import { useStreamFrame } from '../../hooks/useStreamFrame'
 import { useAppStore } from '../../state/appStore'
 import { Diagnosable } from '../common/Diagnosable'
@@ -192,6 +197,7 @@ export function MotorHealthPanel() {
   }, [joints])
 
   const [maxTemp, setMaxTemp] = useState<number>(DEFAULT_MAX_TEMP_C)
+  const budgets = useAppStore((state) => state.control?.fault_budgets ?? null)
   const [bus, setBus] = useState<MotorsFaults['bus'] | null>(null)
   useStreamFrame((frames) => {
     const next = buildRows(
@@ -242,7 +248,15 @@ export function MotorHealthPanel() {
   )
 
   return (
-    <Panel title="Motor Health" toolbar={<MaxCurrentControl />}>
+    <Panel
+      title="Motor Health"
+      toolbar={
+        <span style={{ display: 'inline-flex', gap: 14, alignItems: 'center' }}>
+          <FaultBudgetsControl />
+          <MaxCurrentControl />
+        </span>
+      }
+    >
       {rows.length === 0 ? (
         <div style={{ fontSize: 10, color: 'var(--dimmer)' }}>
           no motor telemetry yet — appears at 1 Hz once motors are connected
@@ -271,6 +285,9 @@ export function MotorHealthPanel() {
               <th title="is the motor actually following its commanded target?">
                 TRACK
               </th>
+              <th title="recoveries orca_core has performed on this motor: load reboots / thermal recoveries">
+                RECOV
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -283,6 +300,7 @@ export function MotorHealthPanel() {
                 issueToDiagnosis,
               )
               const hw = row.faults?.hw_error ?? null
+              const recovery = row.faults?.recovery ?? null
               const faults = row.faults
               const tracking = faults?.tracking ?? null
               const idCell =
@@ -381,6 +399,22 @@ export function MotorHealthPanel() {
                           : 'ok'
                         : `✗ ${tracking.deviation_deg?.toFixed(0) ?? '?'}° ${tracking.stall_s.toFixed(0)}s`}
                   </td>
+                  <td
+                    className={recovery?.given_up || recovery?.thermal_given_up
+                      ? 'bad' : recovery?.cooling ? 'warn' : undefined}
+                    title={recoveryTitle(recovery, budgets)}
+                  >
+                    {recovery === null || recovery === undefined
+                      ? '--'
+                      : recovery.cooling
+                        ? 'cooling'
+                        : recovery.load_reboots === 0 &&
+                            recovery.thermal_recoveries === 0
+                          ? recovery.faults > 0
+                            ? `${recovery.faults} logged`
+                            : 'ok'
+                          : `${recovery.load_reboots} / ${recovery.thermal_recoveries}`}
+                  </td>
                 </tr>
               )
             })}
@@ -423,5 +457,137 @@ export function MotorHealthPanel() {
         </>
       )}
     </Panel>
+  )
+}
+
+// What orca_core has done to a motor, spelled out: the counts alone do not
+// say whether it is still being recovered or has been given up on.
+function recoveryTitle(
+  recovery: MotorRecovery | null | undefined,
+  budgets: FaultBudgets | null,
+): string {
+  if (!recovery) {
+    return 'no recovery data yet — appears after the first fault poll'
+  }
+  if (recovery.given_up) {
+    return (
+      `left latched after ${recovery.load_reboots} load reboots: it kept ` +
+      'overloading, so recovering it again would only hide the mechanical cause'
+    )
+  }
+  if (recovery.thermal_given_up) {
+    return `left latched after ${recovery.thermal_recoveries} thermal recoveries`
+  }
+  if (recovery.cooling) {
+    return 'overheated and stopped — waiting for it to cool before the latch is cleared'
+  }
+  const budget = budgets?.giveup_after_reboots
+  return [
+    `${recovery.load_reboots} load reboot(s)` +
+      (budget ? ` of ${budget} before it is left latched` : ''),
+    `${recovery.thermal_recoveries} thermal recovery(s)`,
+    `${recovery.faults} fault(s) seen, including ones that did not stop the motor`,
+  ].join(' · ')
+}
+
+// Three thresholds, all per motor, all counting reboots. The thermal one is
+// unlimited by default: a motor that has cooled can work again, and the wait
+// is self-limiting because it does not come back until it has.
+function FaultBudgetsControl() {
+  const budgets = useAppStore((state) => state.control?.fault_budgets ?? null)
+  const setError = useAppStore((state) => state.setError)
+  const [busy, setBusy] = useState(false)
+
+  if (!budgets) return null
+
+  const send = (body: Parameters<typeof api.setFaultBudgets>[0]) => {
+    setBusy(true)
+    void api
+      .setFaultBudgets(body)
+      .then(() => setError(null))
+      .catch((e) => setError(String((e as Error).message ?? e)))
+      .finally(() => setBusy(false))
+  }
+
+  const field = (
+    label: string,
+    hint: string,
+    value: number,
+    key: 'report_after_reboots' | 'giveup_after_reboots',
+  ) => (
+    <label
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+      title={hint}
+    >
+      <span style={{ color: 'var(--dim)' }}>{label}</span>
+      <input
+        type="number"
+        min={1}
+        max={100}
+        value={value}
+        disabled={busy}
+        style={{ width: 42, fontSize: 10 }}
+        onChange={(e) => {
+          const next = parseInt(e.target.value, 10)
+          if (Number.isFinite(next) && next >= 1) send({ [key]: next })
+        }}
+      />
+    </label>
+  )
+
+  const thermal = budgets.thermal_giveup_after_reboots
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 10,
+        fontSize: 10,
+      }}
+    >
+      {field(
+        'report at',
+        'reboots of one motor before its repetition is called out prominently',
+        budgets.report_after_reboots,
+        'report_after_reboots',
+      )}
+      {field(
+        'give up at',
+        'load reboots of one motor before it is left latched instead of ' +
+          'recovered — a joint that keeps stalling is a mechanical fault, and ' +
+          'recovering it again only hides the cause',
+        budgets.giveup_after_reboots,
+        'giveup_after_reboots',
+      )}
+      <label
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+        title={
+          'thermal recoveries before giving up. Blank means unlimited, the ' +
+          'default: a motor that has cooled can work again, and the wait is ' +
+          'self-limiting because it does not come back until it has cooled.'
+        }
+      >
+        <span style={{ color: 'var(--dim)' }}>thermal</span>
+        <input
+          type="number"
+          min={1}
+          max={100}
+          placeholder="∞"
+          value={thermal ?? ''}
+          disabled={busy}
+          style={{ width: 42, fontSize: 10 }}
+          onChange={(e) => {
+            if (e.target.value === '') {
+              send({ thermal_unlimited: true })
+              return
+            }
+            const next = parseInt(e.target.value, 10)
+            if (Number.isFinite(next) && next >= 1) {
+              send({ thermal_giveup_after_reboots: next })
+            }
+          }}
+        />
+      </label>
+    </span>
   )
 }

@@ -155,6 +155,9 @@ export interface JointGains {
 export interface ControlState {
   torque_enabled: boolean
   max_current: number
+  // Fault-recovery thresholds, per motor. The thermal one is null when
+  // unlimited, which is the default.
+  fault_budgets?: FaultBudgets
   // The one gain set every loop joint shares, or null when they differ.
   gains: JointGains | null
   // Live gains per loop-controlled joint, read back from the controller.
@@ -528,6 +531,25 @@ export interface MotorFaultEntry {
   // Did this motor answer the last error sweep? null before the first one:
   // "not asked yet" is not "not answering".
   answering?: boolean | null
+  // What orca_core's fault policy has done about this motor. null before the
+  // first poll, or on a core that predates fault recovery.
+  recovery?: MotorRecovery | null
+}
+
+export interface MotorRecovery {
+  // Reboots after a fault that stopped the motor under load.
+  load_reboots: number
+  // Latches cleared after the motor cooled. Budgeted separately, and
+  // unlimited by default.
+  thermal_recoveries: number
+  // Waiting for this motor to cool before clearing its thermal latch.
+  cooling: boolean
+  // Left latched: it kept overloading, so recovering it again would only
+  // hide the mechanical cause.
+  given_up: boolean
+  thermal_given_up: boolean
+  // Every fault seen, including ones that did not stop the motor.
+  faults: number
 }
 
 // The servo's own position-PID and feedforward gains (X-series registers
@@ -854,4 +876,13 @@ export interface GuidedTensionExtra {
   // exclusion list with a reason per joint.
   absent_joints?: string[]
   excluded?: { joint: string; motor: number; reason: string }[]
+}
+
+export interface FaultBudgets {
+  // Reboots of one motor before its repetition is called out prominently.
+  report_after_reboots: number
+  // Load reboots before the motor is left latched instead of recovered.
+  giveup_after_reboots: number
+  // Thermal recoveries before giving up; null means never.
+  thermal_giveup_after_reboots: number | null
 }

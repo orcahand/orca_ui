@@ -706,8 +706,12 @@ class TelemetryService:
         if now - self._last_fault_poll < HW_ERROR_SWEEP_S:
             return
         self._last_fault_poll = now
+        config = None
+        get_config = getattr(self._service, "fault_policy_config", None)
+        if get_config is not None:
+            config = get_config()
         try:
-            actions = poll()
+            actions = poll(config) if config is not None else poll()
         except Exception:
             logger.debug("fault poll failed", exc_info=True)
             return
