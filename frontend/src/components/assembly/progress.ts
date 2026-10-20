@@ -1,6 +1,7 @@
 import { FINGER_CHECKS } from './fingerMovements'
 import { STEPS } from './guide'
 import { BASE_STEP_REDIRECTS, FINAL_CHECKS, type Build, type FlashingMethod } from './buildContent'
+import { WEB_GUIDE } from './webMode'
 
 export const PROGRESS_KEY = 'orca-ui.assembly.v2.1'
 export type Progress = {
@@ -77,7 +78,7 @@ function parseProgress(data: Record<string, any>): Progress {
       tendons: Array.isArray(data.tendons) ? [...new Set<number>(data.tendons.filter((n: unknown) => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n < 32))] : [],
       checks: Array.isArray(data.checks) ? [...new Set<string>(data.checks.filter((s: unknown) => typeof s === 'string'))] : [],
       views: data.views && typeof data.views === 'object' && !Array.isArray(data.views) ? Object.fromEntries(Object.entries(data.views).filter(([, value]) => typeof value === 'string')) as Record<string,string> : {},
-      build: { audience: data.build?.audience === 'external' ? 'external' : 'internal', side: data.build?.side === 'left' ? 'left' : 'right', motor: data.build?.motor === 'feetech' ? 'feetech' : 'dynamixel', version: data.build?.version === 'full' || data.build?.sensing === 'joint' ? 'full' : data.build?.version === 'touch' || data.build?.sensing === 'touch' ? 'touch' : 'base' },
+      build: { audience: WEB_GUIDE || data.build?.audience === 'external' ? 'external' : 'internal', side: data.build?.side === 'left' ? 'left' : 'right', motor: data.build?.motor === 'feetech' ? 'feetech' : 'dynamixel', version: WEB_GUIDE ? 'base' : data.build?.version === 'full' || data.build?.sensing === 'joint' ? 'full' : data.build?.version === 'touch' || data.build?.sensing === 'touch' ? 'touch' : 'base' },
     }
   } catch { return structuredClone(EMPTY_PROGRESS) }
 }

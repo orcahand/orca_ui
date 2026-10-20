@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { PROGRESS_KEY, readProgress, validateProgress, type Progress } from './progress'
+import { WEB_GUIDE } from './webMode'
 
 // Serialize writes across popup mounts so an older save cannot finish last.
 let writes = Promise.resolve()
@@ -20,6 +21,7 @@ export function useAssemblyProgress() {
   const generation=useRef(0)
   useEffect(()=>{
     let active=true
+    if(WEB_GUIDE) {setReady(true);return}
     // Flush a previous popup's last save before restoring its state.
     writes.catch(()=>{}).then(()=>fetch('/api/assembly/progress',{signal:AbortSignal.timeout(4000)})).then(async response=>{
       if(!response.ok) throw new Error('Load failed')
@@ -33,6 +35,7 @@ export function useAssemblyProgress() {
     const revision=++generation.current
     let local=true
     try {localStorage.setItem(PROGRESS_KEY,JSON.stringify(progress))} catch {local=false}
+    if(WEB_GUIDE) {setSaveStatus(local ? 'Your place is saved in this browser.' : 'Saving is unavailable. Keep the guide open to retain your progress.');return}
     if(!serverAvailable) {setSaveStatus(local ? 'Saved in this browser; server saving is unavailable.' : 'Saving is unavailable. Keep the guide open to retain your progress.');return}
     setSaveStatus('Saving your place…')
     persist(progress).then(()=>{if(generation.current===revision)setSaveStatus('Your place is saved automatically.')}).catch(()=>{

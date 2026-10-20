@@ -1,4 +1,5 @@
 import {GuideBackgroundEditor} from './GuideBackgroundEditor'
+import {WEB_GUIDE} from './webMode'
 import {GuideText,GuideEditingContext,useGuideEditing} from './GuideEditing'
 import {ViewToggle} from './AssemblyComparison'
 import {TouchBoardConnection} from './TouchBoardConnection'
@@ -91,14 +92,14 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
   }
   const filtered = STEPS.filter(s => `${editing.read(`${s.id}/title`,s.title)} ${s.section??''} ${s.chapter} ${instructions(s,build).map((line,i)=>editing.read(`${s.id}/instruction/${i}`,line)).join(' ')} ${kit(s,build).join(' ')} ${stepTools(s).join(' ')}`.toLowerCase().includes(query.trim().toLowerCase()))
   if (!ready) return <div className="assembly-loading"><p><GuideText variant field="prose/AssemblyGuide.tsx/f764a6be18" text={"Restoring your build…"} label="Guide text"/></p><button className="btn" onClick={onClose}>Close</button></div>
-  return <GuideEditingContext.Provider value={editing}><div className="assembly-app" data-version={build.version}>
+  return <GuideEditingContext.Provider value={WEB_GUIDE?null:editing}><div className="assembly-app" data-version={build.version}>
     <header className="assembly-header">
       <div className="assembly-brand"><i className="assembly-logo" role="img" aria-label="ORCA"/><span>ASSEMBLY WORKSPACE</span></div>
       <div className="assembly-header-actions">
         {safetyControl}
 
         <button className="assembly-text-button" aria-expanded={glossary} onClick={() => setGlossary(!glossary)}>Parts & terms</button>
-        <button className="assembly-close" onClick={onClose} aria-label="Save and close assembly guide">Save & close ×</button>
+        {!WEB_GUIDE&&<button className="assembly-close" onClick={onClose} aria-label="Save and close assembly guide">Save & close ×</button>}
       </div>
     </header>
     {glossary && <section className="assembly-glossary" aria-label="Parts and terms"><div className="assembly-row"><h2><GuideText variant field="prose/AssemblyGuide.tsx/535bc36505" text={"Know your parts"} label="Section heading"/></h2><button className="assembly-text-button" onClick={() => setGlossary(false)}>Close basics ×</button></div><dl>{GLOSSARY.map(([term,definition]) => <div key={term}><dt><GuideText field={`glossary/${term}/term`} text={term} label="Term"/></dt><dd><GuideText field={`glossary/${term}/definition`} text={definition} label="Definition"/></dd></div>)}</dl></section>}
@@ -114,7 +115,7 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
       </aside>
       <main ref={main} className="assembly-main">
         <button className="assembly-sidebar-chevron" aria-label={sidebarCollapsed?'Expand chapters':'Collapse chapters'} title={sidebarCollapsed?'Expand chapters':'Collapse chapters'} aria-expanded={!sidebarCollapsed} aria-controls="assembly-navigation" onClick={()=>setSidebarCollapsed(!sidebarCollapsed)}>{sidebarCollapsed?'›':'‹'}</button>
-        <GuideBackgroundEditor step={step.id}/>
+        {!WEB_GUIDE&&<GuideBackgroundEditor step={step.id}/>}
         <div className="assembly-breadcrumb"><span>{step.id!=='p1'&&<>{chapterTitle(step)}{step.section?` · ${step.section}`:''}</>}</span><span>{step.id==='p1'?'':step.hint?'HINT · OPTIONAL':`STEP ${String(required.indexOf(step)+1).padStart(2,'0')} / ${required.length}`}</span></div>
         <div className="assembly-step-heading"><h2 ref={heading} tabIndex={-1}><GuideText singleLine field={`${step.id}/title`} text={step.title} label="Step title"/></h2>{step.id!=='p1'&&<StepSupplies key={step.id} step={step.id} build={build} parts={parts} tools={tools}/>}</div>
         {step.id!=='p1'&&build.version==='full'&&(ASSEMBLY_MOTIONS[step.id]||['p23','p35','p45','p80','p83','p115','p123','p126'].includes(step.id))&&<p className="assembly-muted"><GuideText variant field="prose/AssemblyGuide.tsx/4f3cffcb55" text={"Mechanical reference: Base geometry. Full-specific sensor parts are not represented in this model."} label="Guide text"/></p>}
@@ -122,7 +123,7 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
         {step.id === 'p1' && <div className="assembly-step-meta assembly-config-chips">
           <label><span className="assembly-sr-only">Hand</span><select aria-label="Hand" value={build.side} onChange={e=>changeBuild({side:e.target.value as Build['side']})}><option value="right">Right hand</option><option value="left">Left hand</option></select></label>
           <label><span className="assembly-sr-only">Motors</span><select aria-label="Motors" value={build.motor} onChange={e=>changeBuild({motor:e.target.value as Build['motor']})}><option value="dynamixel">Dynamixel</option><option value="feetech">FeeTech</option></select></label>
-          <label><span className="assembly-sr-only">Version</span><select aria-label="Version" value={build.version} onChange={e=>changeBuild({version:e.target.value as Build['version']})}><option value="base">Base</option><option value="touch">Touch</option><option value="full">Full</option></select></label>
+          {!WEB_GUIDE&&<label><span className="assembly-sr-only">Version</span><select aria-label="Version" value={build.version} onChange={e=>changeBuild({version:e.target.value as Build['version']})}><option value="base">Base</option><option value="touch">Touch</option><option value="full">Full</option></select></label>}
           </div>}
         {step.id === 'p1' && <><Suspense fallback={<p>{"Loading your hand…"}</p>}><PartsExplorer build={build}/></Suspense>{build.version==='touch'&&<p className="assembly-muted"><GuideText variant field="prose/AssemblyGuide.tsx/750d98ce89" text={"Build the fingers and thumb with all skins off. Connect and mount their Touch sensors next, then fit the PP skins before building the hand and tower. Connect the sensor cable tails to the connector board later. Touch uses sensors instead of DP skins."} label="Guide text"/></p>}{build.version==='full'&&<p className="assembly-note"><GuideText variant field="prose/AssemblyGuide.tsx/d6745dd89a" text={"Full-specific sensor installation and harness routing still need a verified procedure before closing the hand."} label="Guide text"/></p>}</>}
         {step.id==='p1'&&<section className="assembly-tool-overview"><h3><GuideText variant field="prose/AssemblyGuide.tsx/f7fe31ffad" text={"Tools"} label="Section heading"/></h3><div className="assembly-tool-columns"><div><h4><GuideText variant field="prose/AssemblyGuide.tsx/5e36900b3e" text={"At the bench"} label="Section heading"/></h4><ul>{equipment.assembly.map((item,i)=><li key={i}><GuideText field={`equipment/assembly/${i}`} text={item} label={`Tool ${i+1}`}/></li>)}</ul></div><div><h4><GuideText variant field="prose/AssemblyGuide.tsx/fb93ba8114" text={"Setup and electronics"} label="Section heading"/></h4><ul>{equipment.setup.map((item,i)=><li key={i}><GuideText field={`equipment/setup/${i}`} text={item} label={`Tool ${i+1}`}/></li>)}</ul></div></div></section>}
