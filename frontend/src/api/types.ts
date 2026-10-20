@@ -290,6 +290,9 @@ export interface TaxelGeometry {
   [finger: string]: {
     frame: string
     positions: [number, number, number][] // mm, fingertip-local
+    // Per taxel, row-major 3x3 rotation from the taxel's own force axes
+    // (z = outward surface normal) into the sensor frame.
+    orientations?: number[][][]
     source: string
   }
 }

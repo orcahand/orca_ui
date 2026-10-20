@@ -6,9 +6,14 @@
 // both the taxel positions and the streamed forces are expressed in. The
 // URDF kinematics then carries the arrows with the finger for free.
 //
-// Two independently toggleable layers:
+// Three independently toggleable layers:
 //   resultant — one arrow per finger at the taxel centroid
 //   taxels    — instanced shaft+head arrows, one per taxel
+//   normals   — each taxel's outward surface normal (static)
+//
+// Streamed taxel forces are in each taxel's own axes (fz along its surface
+// normal); the geometry's per-taxel orientations rotate them into the sensor
+// frame before drawing.
 
 import * as THREE from 'three'
 import type { URDFRobot } from 'urdf-loader'
@@ -27,6 +32,7 @@ const RESULTANT_MAX_LEN_M = 0.035
 const TAXEL_MIN_N = 0.3
 const TAXEL_BASE_LEN_M = 0.002
 const TAXEL_MAX_EXTRA_LEN_M = 0.012
+const NORMAL_LEN_M = 0.003
 const MM_TO_M = 0.001
 
 interface FingerEntry {
@@ -34,8 +40,11 @@ interface FingerEntry {
   resultant: THREE.ArrowHelper
   centroid: THREE.Vector3
   taxelPositions: THREE.Vector3[] // meters, sensor frame
+  // Taxel-local -> sensor-frame rotation per taxel; empty if the backend sent none.
+  taxelOrientations: THREE.Matrix3[]
   shafts: THREE.InstancedMesh
   heads: THREE.InstancedMesh
+  normals: THREE.LineSegments | null
 }
 
 const UP = new THREE.Vector3(0, 1, 0)
@@ -44,6 +53,7 @@ export class ForceArrowLayer {
   private entries = new Map<Finger, FingerEntry>()
   private resultantVisible = false
   private taxelsVisible = false
+  private normalsVisible = false
 
   // scratch
   private v = new THREE.Vector3()
@@ -87,6 +97,13 @@ export class ForceArrowLayer {
       const taxelPositions = (geometry?.[finger]?.positions ?? []).map(
         ([x, y, z]) => new THREE.Vector3(x * MM_TO_M, y * MM_TO_M, z * MM_TO_M),
       )
+      const taxelOrientations = (geometry?.[finger]?.orientations ?? []).map(
+        (r) => new THREE.Matrix3().set(
+          r[0][0], r[0][1], r[0][2],
+          r[1][0], r[1][1], r[1][2],
+          r[2][0], r[2][1], r[2][2],
+        ),
+      )
       const centroid = taxelPositions
         .reduce((acc, p) => acc.add(p), new THREE.Vector3())
         .divideScalar(Math.max(taxelPositions.length, 1))
@@ -112,8 +129,27 @@ export class ForceArrowLayer {
       group.add(shafts)
       group.add(heads)
 
+      let normals: THREE.LineSegments | null = null
+      if (taxelOrientations.length === taxelPositions.length && taxelPositions.length) {
+        const points: number[] = []
+        taxelPositions.forEach((p, i) => {
+          // Column 2 of each rotation is the taxel's outward surface normal.
+          const e = taxelOrientations[i].elements // column-major
+          points.push(p.x, p.y, p.z,
+            p.x + e[6] * NORMAL_LEN_M, p.y + e[7] * NORMAL_LEN_M, p.z + e[8] * NORMAL_LEN_M)
+        })
+        const lineGeometry = new THREE.BufferGeometry()
+        lineGeometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3))
+        normals = new THREE.LineSegments(lineGeometry,
+          new THREE.LineBasicMaterial({ color: 0x9ad7ff, toneMapped: false }))
+        normals.visible = false
+        normals.frustumCulled = false
+        group.add(normals)
+      }
+
       this.entries.set(finger as Finger, {
-        group, resultant, centroid, taxelPositions, shafts, heads,
+        group, resultant, centroid, taxelPositions, taxelOrientations,
+        shafts, heads, normals,
       })
     }
   }
@@ -134,6 +170,21 @@ export class ForceArrowLayer {
     for (const entry of this.entries.values()) {
       entry.shafts.visible = visible
       entry.heads.visible = visible
+    }
+  }
+
+  get hasOrientations(): boolean {
+    for (const entry of this.entries.values()) {
+      if (entry.taxelOrientations.length) return true
+    }
+    return false
+  }
+
+  setNormalsVisible(visible: boolean): void {
+    if (visible === this.normalsVisible) return
+    this.normalsVisible = visible
+    for (const entry of this.entries.values()) {
+      if (entry.normals) entry.normals.visible = visible
     }
   }
 
@@ -197,7 +248,10 @@ export class ForceArrowLayer {
         }
         const normalized = Math.min(magnitude / maxForce, 1)
         const length = TAXEL_BASE_LEN_M + normalized * TAXEL_MAX_EXTRA_LEN_M
-        this.v.set(fx, fy, fz).normalize()
+        this.v.set(fx, fy, fz)
+        const orientation = entry.taxelOrientations[i]
+        if (orientation) this.v.applyMatrix3(orientation)
+        this.v.normalize()
         this.q.setFromUnitVectors(UP, this.v)
         this.s.set(1, length, 1)
         this.m.compose(position, this.q, this.s)
@@ -231,6 +285,7 @@ export class ForceArrowLayer {
       entry.resultant.dispose()
       entry.shafts.dispose()
       entry.heads.dispose()
+      entry.normals?.geometry.dispose()
     }
     this.entries.clear()
   }
