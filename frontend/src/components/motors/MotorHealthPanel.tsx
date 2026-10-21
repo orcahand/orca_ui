@@ -319,6 +319,11 @@ export function MotorHealthPanel() {
               )
               const hw = row.faults?.hw_error ?? null
               const recovery = row.faults?.recovery ?? null
+              // Left latched on purpose: the system stopped recovering this
+              // motor because it kept faulting, so it is waiting on a person.
+              const abandoned = Boolean(
+                recovery?.given_up || recovery?.thermal_given_up,
+              )
               const faults = row.faults
               const tracking = faults?.tracking ?? null
               const idCell =
@@ -381,14 +386,27 @@ export function MotorHealthPanel() {
                     className={hw ? 'err' : ''}
                     title={
                       hw
-                        ? `${hw.headline}. ${hw.disabled_note} ${hw.advice}`
+                        ? abandoned
+                          ? `${hw.headline}. ${hw.advice} It has been left ` +
+                            'latched rather than recovered again, so fix the ' +
+                            'cause and reboot it by hand.'
+                          : `${hw.headline}. ${hw.advice}`
                         : 'no latched hardware error'
                     }
                   >
                     {hw ? (
                       <span className="fault-cell">
                         {HW_KIND_LABEL[hw.kind] ?? hw.kind.toUpperCase()}
-                        <RebootButton id={row.id} needsCooling={hw.needs_cooling} />
+                        {/* Recovery is automatic, so a reboot control only
+                            belongs here once the system has stopped doing it:
+                            a motor left latched for exceeding its reboot
+                            budget is the one case a human has to act on. */}
+                        {abandoned && (
+                          <RebootButton
+                            id={row.id}
+                            needsCooling={hw.needs_cooling}
+                          />
+                        )}
                       </span>
                     ) : (
                       '--'

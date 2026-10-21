@@ -372,3 +372,24 @@ class TestABusThatGoesQuietIsReported:
             sampler._note_read_ok()
         assert any("answering again" in r.message for r in caplog.records)
         assert sampler._stale_reads == 0
+
+
+class TestTheFaultColumnDoesNotGoStale:
+    def test_a_reboot_drops_the_cached_cause(self):
+        """The error sweep is deferred while the hand is driven, so without
+        this the fault sits on the panel next to a motor that is already
+        working again. One still present comes back on the next sweep."""
+        from orca_ui.hand.telemetry import TelemetryService
+
+        sampler = TelemetryService.__new__(TelemetryService)
+        sampler._hw_errors = {3: ["overheating"], 4: ["overload"]}
+        sampler._hw_error_info = {3: {"kind": "thermal"}, 4: {"kind": "load"}}
+        sampler._hw_errors_warned = {3, 4}
+
+        sampler.forget_hw_error(3)
+
+        assert 3 not in sampler._hw_errors
+        assert 3 not in sampler._hw_error_info
+        assert 3 not in sampler._hw_errors_warned
+        # The other motor is untouched.
+        assert sampler._hw_errors[4] == ["overload"]

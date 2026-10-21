@@ -800,6 +800,13 @@ class TelemetryService:
             return
         self._fault_poll_failures = 0
         for action in actions:
+            # A reboot cleared that motor's latch, so drop the cached cause
+            # rather than leaving it on the panel until the next sweep - which
+            # is deferred while the hand is driven, so the fault would sit
+            # there beside a motor that is working again. A fault still
+            # present comes straight back on the next sweep.
+            if action.kind == "reboot":
+                self.forget_hw_error(action.motor_id)
             if action.prominent:
                 message = f"motor {action.motor_id} {action.reason}"
                 logger.warning(message)
