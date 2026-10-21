@@ -1510,19 +1510,21 @@ class HandService:
         The only way back from a latched Hardware Error Status short of
         power-cycling the hand: the motor keeps answering the bus and keeps
         acknowledging torque enable, but its power stage stays inhibited
-        until it is rebooted. Comes back with torque off, and torque is not
-        re-enabled here — if the fault is a supply or wiring one it latches
-        again on the next command, and that should happen under a deliberate
-        torque enable rather than silently inside a recovery call.
+        until it is rebooted.
+
+        Torque is restored afterwards when the rest of the hand has it, and
+        the motor's reboot count is cleared: a manual reboot is the operator
+        taking the decision back, so a motor left latched for exceeding its
+        threshold is not abandoned for the rest of the session.
         """
         session = self._require_motors()
         self._require_manual_control()
-        if self.supervisor.status().torque_enabled:
-            # A rebooted motor comes back limp while the rest stay torqued,
-            # and the streams keep writing to it while it restarts.
-            raise ServiceError("disable torque before rebooting a motor",
-                               status_code=409)
         hand = session.hand
+        # Torque is deliberately not a precondition. The fault policy reboots
+        # single motors with the hand energized and restores their torque
+        # afterwards, so refusing to let a person do the same was an
+        # arbitrary gate. Torque is put back below if the hand had it.
+        was_torqued = bool(self.supervisor.status().torque_enabled)
         motor_id = int(motor_id)
         if motor_id not in set(hand.config.motor_ids):
             raise ServiceError(f"unknown motor {motor_id}", status_code=404)
@@ -1548,6 +1550,22 @@ class HandService:
                     error = read_error(motor_id)
                 except Exception:
                     error = None
+
+        # A reboot leaves the motor limp. Put its torque back if the rest of
+        # the hand has torque, so one rebooted joint is not left dead in an
+        # otherwise live hand.
+        if was_torqued:
+            try:
+                hand.enable_torque([motor_id])
+            except Exception:
+                logger.warning("motor %d rebooted but its torque could not be "
+                               "restored", motor_id, exc_info=True)
+
+        # A manual reboot is the operator taking the decision back, so the
+        # count that stopped us recovering this motor starts again.
+        clear_record = getattr(hand, "clear_fault_record", None)
+        if clear_record is not None:
+            clear_record(motor_id)
 
         flags = _decode_hw_error(client, error)
         joint = hand.config.motor_to_joint_dict.get(motor_id)

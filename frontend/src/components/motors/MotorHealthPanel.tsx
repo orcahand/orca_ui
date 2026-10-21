@@ -387,9 +387,13 @@ export function MotorHealthPanel() {
                     title={
                       hw
                         ? abandoned
-                          ? `${hw.headline}. ${hw.advice} It has been left ` +
-                            'latched rather than recovered again, so fix the ' +
-                            'cause and reboot it by hand.'
+                          ? `${hw.headline}. ${hw.advice} It has exceeded ` +
+                            'its reboot threshold, so the system stopped ' +
+                            'recovering it — you may be consistently ' +
+                            'overloading it. Reboot it here if you wish, or ' +
+                            'raise the threshold in the toolbar. A manual ' +
+                            'reboot restores its torque and starts the count ' +
+                            'again.'
                           : `${hw.headline}. ${hw.advice}`
                         : 'no latched hardware error'
                     }
@@ -399,13 +403,23 @@ export function MotorHealthPanel() {
                         {HW_KIND_LABEL[hw.kind] ?? hw.kind.toUpperCase()}
                         {/* Recovery is automatic, so a reboot control only
                             belongs here once the system has stopped doing it:
-                            a motor left latched for exceeding its reboot
-                            budget is the one case a human has to act on. */}
+                            a motor left latched for exceeding its threshold
+                            is the one case a human has to act on. Say so in
+                            the row rather than only in a tooltip. */}
                         {abandoned && (
-                          <RebootButton
-                            id={row.id}
-                            needsCooling={hw.needs_cooling}
-                          />
+                          <>
+                            <span style={{ color: 'var(--dim)' }}>
+                              {`reboot threshold exceeded (${
+                                recovery?.given_up
+                                  ? recovery.load_reboots
+                                  : (recovery?.thermal_recoveries ?? 0)
+                              }) — reboot it or raise the threshold`}
+                            </span>
+                            <RebootButton
+                              id={row.id}
+                              needsCooling={hw.needs_cooling}
+                            />
+                          </>
                         )}
                       </span>
                     ) : (

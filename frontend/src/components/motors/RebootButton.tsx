@@ -1,7 +1,8 @@
 // The only way back from a latched hardware error short of power-cycling the
-// hand. The motor returns with torque off; if the underlying fault is still
-// there it latches again the next time it is driven, which is itself the
-// useful diagnostic.
+// hand. Torque is restored afterwards when the hand has torque, and the
+// motor's reboot count starts again - a manual reboot is the operator taking
+// the decision back. If the underlying fault is still there it latches again
+// the next time it is driven, which is itself the useful diagnostic.
 
 import { useState } from 'react'
 import { api } from '../../api/rest'
@@ -17,20 +18,17 @@ export function RebootButton({
 }) {
   const [busy, setBusy] = useState(false)
   const setError = useAppStore((s) => s.setError)
-  const torqueOn = useAppStore((s) => s.control?.torque_enabled ?? false)
   const supported = useAppStore((s) => s.handInfo?.reboot_supported ?? true)
   if (!supported) return null
   return (
     <button
       type="button"
       className="btn btn-secondary reboot-btn"
-      disabled={busy || torqueOn}
+      disabled={busy}
       title={
-        torqueOn
-          ? 'Disable torque first: a rebooted motor comes back limp while the rest stay torqued.'
-          : needsCooling
+        needsCooling
           ? 'Reboot this motor. It is a heat fault — let it cool first or it latches again immediately.'
-          : 'Reboot this motor to clear the latch. It returns with torque off; if the fault persists it latches again when next driven.'
+          : 'Reboot this motor to clear the latch. Its torque is restored if the hand has torque, and its reboot count starts again. If the fault persists it latches again when next driven.'
       }
       onClick={() => {
         setBusy(true)
