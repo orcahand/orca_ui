@@ -23,7 +23,8 @@ const ThreeDView = lazy(() =>
 )
 
 // Pre-session states show the boot hero. Maintenance/reconnecting/degraded
-// keep the normal views — a session exists (or existed moments ago).
+// keep the normal views — a session exists (or existed moments ago) — and so
+// does the reconnect that follows an operation handing the bus back.
 const BOOT_STATES = new Set(['disconnected', 'detecting', 'connecting'])
 
 export default function App() {
@@ -37,8 +38,15 @@ export default function App() {
     api.handInfo().then(useAppStore.getState().setHandInfo).catch(() => undefined)
   }, [])
 
+  // Rebuilding the session after an operation is the expected end of
+  // calibration or tensioning, not a lost hand, so the views stay up.
+  const leavingMaintenance = useAppStore(
+    (s) => s.status?.leaving_maintenance ?? false,
+  )
   const booting =
-    !wsConnected || handState === null || BOOT_STATES.has(handState)
+    !wsConnected ||
+    handState === null ||
+    (BOOT_STATES.has(handState) && !leavingMaintenance)
 
   return (
     <div className="container">

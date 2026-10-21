@@ -22,6 +22,10 @@ const STATE_CLASS: Record<HandState, string> = {
   disconnected: 'disconnected',
 }
 
+// Shown in place of the connection state while the bus is handed back after
+// an operation: "Detecting…" there reads as a hand that dropped out.
+const LEAVING_MAINTENANCE_LABEL = 'Leaving maintenance…'
+
 const STATE_LABEL: Record<HandState, string> = {
   connected: 'Connected',
   degraded: 'Degraded',
@@ -61,10 +65,13 @@ export function AppHeader() {
   const state: HandState = !wsConnected
     ? 'disconnected'
     : (status?.state ?? 'detecting')
+  const leavingMaintenance = status?.leaving_maintenance ?? false
   // Defensive: a backend state this build doesn't know yet must still render
   // a legible pill, not a blank one.
   const pillClass: string = STATE_CLASS[state] ?? 'busy'
-  const pillLabel: string = STATE_LABEL[state] ?? state
+  const pillLabel: string = leavingMaintenance
+    ? LEAVING_MAINTENANCE_LABEL
+    : (STATE_LABEL[state] ?? state)
 
   return (
     <header>

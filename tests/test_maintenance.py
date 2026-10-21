@@ -225,3 +225,27 @@ def test_the_hold_is_reported_so_a_reload_knows_which_run_it_is(client):
     client.post("/api/operation/input", json={"value": "Release"})
     _wait_op_state(client, "done")
     _wait_reconnected(client)
+
+
+class TestLeavingMaintenanceIsNotALostHand:
+    """Handing the bus back rebuilds the session, and the detect that follows
+    looked identical to a hand dropping out — which made a normal exit from
+    calibration read as an unstable connection rather than the end of a job."""
+
+    def test_the_exit_is_flagged_and_then_clears(self, client):
+        supervisor = client.app.state.service.supervisor
+        supervisor.enter_maintenance("calibrate")
+        assert _state(client) == "maintenance"
+        assert client.get("/api/status").json()["leaving_maintenance"] is False
+
+        supervisor.exit_maintenance()
+        # Either still handing back, or already reconnected if it was quick.
+        status = client.get("/api/status").json()
+        if status["state"] != "connected":
+            assert status["leaving_maintenance"] is True, \
+                "the reconnect after an operation must be distinguishable"
+            # Not the message: the reconnect ladder overwrites it with its own
+            # progress within milliseconds. The flag is what the console reads.
+
+        assert _wait_for(lambda: _state(client) == "connected")
+        assert client.get("/api/status").json()["leaving_maintenance"] is False

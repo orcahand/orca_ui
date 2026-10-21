@@ -26,6 +26,11 @@ export interface Capabilities {
 
 export interface StatusSnapshot {
   state: HandState
+  // True from the moment maintenance hands the bus back until a session is
+  // live again. The reconnect that follows is routine, so the views stay up
+  // rather than dropping to the boot screen — a normal exit from calibration
+  // should not look like an unstable hand.
+  leaving_maintenance?: boolean
   capabilities: Capabilities | null
   torque_enabled: boolean
   message: string
