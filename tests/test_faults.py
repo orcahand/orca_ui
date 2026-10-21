@@ -74,7 +74,7 @@ class TestHardwareErrorClassification:
 
     def test_overheating_is_a_thermal_fault_that_wants_cooling(self):
         info = classify_hw_error(["overheating"], motor=3, joint="index_mcp",
-                                 temperature_c=71.0)
+                                 temperature_c=71.0, stopped=True)
 
         assert info["kind"] == "thermal"
         assert info["needs_cooling"] is True
@@ -233,7 +233,8 @@ def test_every_family_bit_name_has_a_kind_and_a_reboot_less_note():
 
     assert classify_hw_error(["overcurrent"])["kind"] == "load"
     assert classify_hw_error(["angle_sensor"])["kind"] == "encoder"
-    note = classify_hw_error(["overload"], can_reboot=False)["disabled_note"]
+    note = classify_hw_error(["overload"], can_reboot=False,
+                             stopped=True)["disabled_note"]
     assert "power-cycled" in note and "rebooted" not in note
     assert classify_hw_error(["overload"])["can_reboot"] is True
 
@@ -294,3 +295,32 @@ class TestMotorLiveness:
         sampler._sweep_hardware_errors(session)
 
         assert sampler._motor_answering is None
+
+
+class TestWhetherAFaultStopsTheMotorIsRead:
+    """Whether a latched bit de-energizes a motor is a writable register, and
+    the families ship almost disjoint sets - three of the six conditions stop
+    one family and not the other. Asserting it was wrong about half the time.
+    """
+
+    def test_a_fault_the_hand_does_not_unload_on_says_it_is_still_driving(self):
+        from orca_ui.hand.faults import classify_hw_error
+
+        info = classify_hw_error(["overload"], motor=3, stopped=False)
+        assert info["disabled"] is False
+        assert "still being driven" in info["disabled_note"]
+        assert "will not move" not in info["disabled_note"]
+
+    def test_a_fault_that_does_stop_it_keeps_the_old_note(self):
+        from orca_ui.hand.faults import classify_hw_error
+
+        info = classify_hw_error(["overload"], motor=3, stopped=True)
+        assert info["disabled"] is True
+        assert "will not move until it is rebooted" in info["disabled_note"]
+
+    def test_an_unreadable_mask_is_reported_as_unknown_not_guessed(self):
+        from orca_ui.hand.faults import classify_hw_error
+
+        info = classify_hw_error(["overload"], motor=3)
+        assert info["disabled"] is None
+        assert "unknown" in info["disabled_note"]

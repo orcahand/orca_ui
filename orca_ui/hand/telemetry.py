@@ -297,6 +297,9 @@ class TelemetryService:
         # Per-motor shutdown threshold from the motors themselves; None until
         # read, {} when the family cannot report it.
         self._shutdown_temps: "dict[int, float] | None" = None
+        # Per-motor stop mask: which latched bits de-energize that motor.
+        # None until read, {} when the family cannot report it.
+        self._stop_masks: "dict[int, int] | None" = None
         # Consecutive failed or stale motor reads, for reporting a bus that
         # has gone quiet rather than silently withholding telemetry.
         self._stale_reads = 0
@@ -701,10 +704,22 @@ class TelemetryService:
             if not flags:
                 self._hw_errors_warned.discard(int(mid))
                 continue
+            # Whether this motor de-energized itself comes from its own stop
+            # mask. Asserting it instead was wrong for every condition a
+            # given hand does not unload on, which is three of the six.
+            mask = self._sweep_stop_masks(client).get(int(mid))
+            stopped = None
+            if mask is not None:
+                try:
+                    halted, _ = client.split_faults(raw[int(mid)], mask)
+                    stopped = bool(halted)
+                except Exception:
+                    stopped = None
             info = classify_hw_error(
                 flags, motor=mid, joint=motor_to_joint.get(mid),
                 temperature_c=(self._motor_health.get("temps") or {}).get(int(mid)),
-                can_reboot=hasattr(client, "reboot_motor"))
+                can_reboot=hasattr(client, "reboot_motor"),
+                stopped=stopped)
             found[int(mid)] = flags
             classified[int(mid)] = info
             if int(mid) in self._hw_errors_warned:
@@ -815,6 +830,23 @@ class TelemetryService:
                 print(f"\033[93mWarning: {message}\033[0m")
         self._fault_records = getattr(hand, "fault_records", {}) or {}
 
+    def _sweep_stop_masks(self, client) -> dict:
+        """Each motor's stop mask, read once per session.
+
+        EEPROM on both families, so it does not change under us, and it is
+        the only honest answer to "did this fault stop the motor".
+        """
+        if getattr(self, "_stop_masks", None) is None:
+            read = getattr(client, "read_stop_mask", None)
+            try:
+                self._stop_masks = {} if read is None else {
+                    int(mid): value for mid, value in (read() or {}).items()}
+            except Exception:
+                logger.warning("stop masks unreadable; whether a fault stops "
+                               "a motor cannot be reported", exc_info=True)
+                self._stop_masks = {}
+        return self._stop_masks
+
     @staticmethod
     def _drain_alerts(client) -> dict:
         """Motors whose status packets carried the Alert bit since last asked.
@@ -866,6 +898,7 @@ class TelemetryService:
                 self._motor_answering = None
                 self._fault_records = {}
                 self._shutdown_temps = None
+                self._stop_masks = None
         bus = self._bus_errors.snapshot()
         tracking = self._tracking.snapshot()
         config = getattr(getattr(self._service, "supervisor", None),

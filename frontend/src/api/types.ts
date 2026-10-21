@@ -510,7 +510,11 @@ export type HwErrorKind = 'thermal' | 'power' | 'load' | 'encoder' | 'unknown'
 export interface HwErrorInfo {
   flags: string[]
   kind: HwErrorKind
-  disabled: boolean // always true today; the motor will not move until reboot
+  // Whether this motor de-energized itself, read from its own stop mask.
+  // Not a property of the fault: the families ship almost disjoint masks, so
+  // the same condition stops one and not the other. null when the mask could
+  // not be read.
+  disabled: boolean | null
   needs_cooling: boolean // separate from kind: a motor can latch both
   temperature_c: number | null
   headline: string

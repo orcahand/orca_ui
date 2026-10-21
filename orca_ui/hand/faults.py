@@ -112,11 +112,24 @@ _HW_DISABLED_NOTE_NO_REBOOT = (
     "will not move until the hand is power-cycled (this motor family has no "
     "reboot instruction)."
 )
+# Whether a latched bit de-energizes the motor is configuration, not a given:
+# each family holds it in a writable register and they ship different sets.
+# Three conditions stop one family and not the other, so claiming a latched
+# motor cannot move is wrong about half the time.
+_HW_STILL_DRIVING_NOTE = (
+    "It is still being driven: this hand is not configured to de-energize "
+    "for this fault, so the motor keeps working against whatever caused it."
+)
+_HW_DISABLED_UNKNOWN_NOTE = (
+    "Whether it de-energized itself is unknown — its stop mask could not be "
+    "read."
+)
 
 
 def classify_hw_error(flags, *, motor=None, joint=None,
                       temperature_c: float | None = None,
-                      can_reboot: bool = True) -> dict | None:
+                      can_reboot: bool = True,
+                      stopped: bool | None = None) -> dict | None:
     """Describe a motor's latched Hardware Error Status.
 
     Returns ``None`` when nothing is latched. Otherwise a dict carrying the
@@ -126,6 +139,12 @@ def classify_hw_error(flags, *, motor=None, joint=None,
     ``needs_cooling`` is deliberately separate from ``kind``: a motor can
     latch thermal *and* power at once, and the operator needs to know that
     waiting is part of the job without being told that waiting is the job.
+
+    ``stopped`` says whether this motor's own stop mask covers the bits that
+    latched. Pass it: whether a fault de-energizes a motor is a writable
+    register and the families ship different sets, so it cannot be inferred
+    from the fault alone. ``None`` means the mask was unreadable, which is
+    reported as unknown rather than guessed.
     """
     flags = [str(f) for f in (flags or [])]
     if not flags:
@@ -144,16 +163,20 @@ def classify_hw_error(flags, *, motor=None, joint=None,
     return {
         "flags": flags,
         "kind": kind,
-        # Every latched bit disables the power stage; named so callers do not
-        # have to know that, and so it survives a bit we do not decode yet.
-        "disabled": True,
+        # Read from the motor's own stop mask, not assumed: the two families
+        # ship almost disjoint sets, so the same condition stops one and not
+        # the other. ``None`` when the mask could not be read.
+        "disabled": stopped,
         "needs_cooling": "overheating" in flags,
         "temperature_c": (None if temperature_c is None
                           else float(temperature_c)),
         "headline": f"{who} has latched {' + '.join(flags)}{temp}",
         "advice": _HW_KIND_ADVICE[kind],
-        "disabled_note": (_HW_DISABLED_NOTE if can_reboot
-                          else _HW_DISABLED_NOTE_NO_REBOOT),
+        "disabled_note": (
+            _HW_DISABLED_UNKNOWN_NOTE if stopped is None
+            else _HW_STILL_DRIVING_NOTE if not stopped
+            else _HW_DISABLED_NOTE if can_reboot
+            else _HW_DISABLED_NOTE_NO_REBOOT),
         "can_reboot": can_reboot,
     }
 
