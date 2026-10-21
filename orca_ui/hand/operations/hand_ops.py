@@ -252,6 +252,15 @@ def detect_motor_type(port: str, progress_callback=None) -> str | None:
     return detect(port, progress_callback=progress_callback)
 
 
+def scan_bus(motor_type: str, port: str, baudrate: int,
+             id_range: tuple[int, int]) -> list[dict]:
+    """Ping ``id_range`` at one baud rate; rows of id / model_name / baud_rate.
+    Opens and closes the port itself — the caller must hold the bus free."""
+    from orca_core.maintenance.motor_chain import scan_motors
+
+    return scan_motors(motor_type, port, baudrate, id_range)
+
+
 def build_chain_plan(config, port: str, motor_type: str):
     """MotorChainPlan from an OrcaHandConfig (the library takes the raw
     config mapping)."""

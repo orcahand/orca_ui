@@ -14,6 +14,7 @@ import { api } from './rest'
 import type {
   ControlState,
   MotorsFaults,
+  MotorsState,
   OperationLogPayload,
   OperationSnapshot,
   SensorsHealth,
@@ -21,13 +22,20 @@ import type {
   StatusSnapshot,
   TeleopInstallState,
   TeleopSnapshot,
+  UsbPresence,
 } from './types'
 import { TOPICS } from './types'
 
 // teleop.preview (base64 JPEG frames) is opt-in: the CameraPreview component
-// subscribes while visible via subscribeTopic/unsubscribeTopic below.
+// subscribes while visible via subscribeTopic/unsubscribeTopic below. So is
+// motors.state (10 Hz raw shaft readings), which only the bench page reads.
+const OPT_IN_TOPICS = new Set<string>([
+  TOPICS.teleopPreview,
+  TOPICS.motorsState,
+  TOPICS.usbPresence,
+])
 const DEFAULT_TOPICS = Object.values(TOPICS).filter(
-  (topic) => topic !== TOPICS.teleopPreview,
+  (topic) => !OPT_IN_TOPICS.has(topic),
 )
 const BACKOFF_START_MS = 500
 const BACKOFF_MAX_MS = 5000
@@ -237,6 +245,18 @@ function dispatch(message: ServerMessage): void {
       latest.motors.maxTempC =
         (data.max_temp_c as number | undefined) ?? latest.motors.maxTempC
       markDirty()
+      break
+    case TOPICS.motorsState: {
+      const state = data as unknown as MotorsState
+      latest.motors.positions = state.positions
+      latest.motors.velocities = state.velocities
+      latest.motors.currents = state.currents
+      latest.motors.tState = t ?? Date.now()
+      markDirty()
+      break
+    }
+    case TOPICS.usbPresence:
+      useAppStore.getState().setUsb(data as unknown as UsbPresence)
       break
     case TOPICS.motorsFaults: {
       const faults = data as unknown as MotorsFaults

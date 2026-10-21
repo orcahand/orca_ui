@@ -123,10 +123,24 @@ export const api = {
   ports: () => request<PortInfo[]>('/api/ports'),
   taxelGeometry: () => request<TaxelGeometry>('/api/tactile/geometry'),
   reconnect: () => post<{ status: StatusSnapshot }>('/api/reconnect'),
+  // Bench only: adopt a motor set (a bus scan's answer, each bus id with the
+  // number the operator gives it) and reconnect.
+  benchMotors: (motors: { id: number; number: number }[]) =>
+    post<{
+      motors: { id: number; number: number }[]
+      changed: boolean
+      status: StatusSnapshot
+    }>('/api/bench/motors', { motors }),
   // Closes the session and holds the ports free; only reconnect() lifts it.
   disconnect: () => post<{ status: StatusSnapshot }>('/api/disconnect'),
 
   // Clears a latched hardware error. The motor returns with torque off.
+  // Hold (torque on) or release one motor; the torque flag is on while any is held.
+  motorTorque: (id: number, enabled: boolean) =>
+    post<{ motor: number; held: boolean; held_motors: number[] }>(
+      `/api/motors/${id}/torque`,
+      { enabled },
+    ),
   rebootMotor: (id: number) =>
     post<{
       motor: number

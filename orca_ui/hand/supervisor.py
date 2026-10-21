@@ -287,6 +287,27 @@ class HandSupervisor(threading.Thread):
         self._wake.set()
         return self.model_name
 
+    def reload_config(self) -> None:
+        """Re-read the config in force from disk and reconnect on it.
+
+        For a config that was edited in place (the bench's motor set after a
+        scan): the motor list, joint names and map are installed by
+        ``connect()``, so nothing short of a fresh session picks them up.
+        """
+        with self._lock:
+            if self._maintenance_kind is not None or self._in_maintenance:
+                raise HandBusyError(
+                    "an operation holds the hand — stop it before changing "
+                    "the config")
+        config = load_config(self.config.config_path)
+        logger.info("config reloaded: %s motors %s", self.model_name,
+                    list(config.motor_ids))
+        self._install_config(config)
+        self._teardown_session("config changed — reconnecting")
+        self._backoff = DETECT_BACKOFF_START_S
+        self._publish()
+        self._wake.set()
+
     def select_board(self, device: str | None) -> None:
         """Pin the console to one board by device path, or (``None``) let it
         take the first board that answers. Reconnects on any change.

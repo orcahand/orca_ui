@@ -26,6 +26,7 @@ dependencies = [
 
 [project.scripts]
 orca-ui = "orca_ui.cli:main"
+orca-bench = "orca_ui.bench:main"
 orca-ui-mcp = "orca_ui.mcp.cli:main"
 orca-dev = "orca_ui.core_source:main"
 

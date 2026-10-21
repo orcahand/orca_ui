@@ -147,6 +147,9 @@ class HandService:
 
         self._state_lock = threading.Lock()
         self._targets: dict[str, float] = {}
+        # Motors held individually (bench tensioning): id -> torque on. The
+        # supervisor's torque flag is "any motor held"; this is which ones.
+        self._motor_torque: dict[int, bool] = {}
         self._direct_motor_mode = False
         self._tactile_mode = "combined"
         self._control_source = ControlSource.MANUAL
@@ -295,6 +298,7 @@ class HandService:
             "model_name": model_name_of(config),
             "side": config.type,
             "mock": self.settings.mock,
+            "bench": self.settings.bench,
             "rom_frame": rom_frame,
             "joints": joints,
             "calibration": self._calibration_state(
@@ -367,6 +371,65 @@ class HandService:
         except (HandBusyError, ModelSelectError) as e:
             raise ServiceError(str(e), status_code=409)
         return self.models()
+
+    def set_bench_motors(self, motors: list) -> dict:
+        """Adopt a motor set into the bench config (what a bus scan found)
+        and reconnect on it. ``motors`` is a list of ``{"id": bus id,
+        "number": what the operator calls it}``, or plain bus ids, which keep
+        their current numbers and take the lowest free ones otherwise.
+
+        Refused on a hand model: its motor list is the hand's, and a scan
+        disagreeing with it means a wiring problem, not a config to rewrite.
+        """
+        from orca_ui.bench import (
+            assignments_of,
+            default_assignments,
+            is_bench_config,
+            rewrite_bench_motors,
+        )
+
+        config = self.supervisor.config
+        if not is_bench_config(config):
+            raise ServiceError(
+                f"{model_name_of(config)} is a hand model, not the bench — "
+                "its motor list is not editable from here", status_code=409)
+        if not isinstance(motors, (list, tuple)) or not motors:
+            raise ServiceError("pick at least one motor")
+        current = assignments_of(config)
+        pairs: list[tuple[int, int]] = []
+        try:
+            if all(isinstance(m, dict) for m in motors):
+                for entry in motors:
+                    pairs.append((int(entry["id"]), int(entry["number"])))
+            else:
+                pairs = default_assignments([int(m) for m in motors], current)
+        except (TypeError, ValueError, KeyError):
+            raise ServiceError("each motor needs an integer id and number")
+        ids = [m for m, _ in pairs]
+        numbers = [n for _, n in pairs]
+        if len(set(ids)) != len(ids):
+            raise ServiceError("a motor id is listed twice")
+        if len(set(numbers)) != len(numbers):
+            raise ServiceError("two motors have the same number")
+        if any(not 0 <= m <= 252 for m in ids):
+            raise ServiceError("motor ids are 0..252")
+        if any(not 1 <= n <= 999 for n in numbers):
+            raise ServiceError("motor numbers are 1..999")
+        manager = self._operation_manager
+        if manager is not None and manager.active():
+            raise ServiceError("an operation is running — stop it first",
+                               status_code=409)
+        self.require_manual_control()
+        pairs.sort(key=lambda p: p[1])
+        assignments = [{"id": m, "number": n} for m, n in pairs]
+        if dict(pairs) == current:
+            return {"motors": assignments, "changed": False, "status": self.status()}
+        rewrite_bench_motors(config.config_path, pairs)
+        try:
+            self.supervisor.reload_config()
+        except HandBusyError as e:
+            raise ServiceError(str(e), status_code=409)
+        return {"motors": assignments, "changed": True, "status": self.status()}
 
     def boards(self) -> dict:
         """The board menu: every board on this machine, and the pin in force.
@@ -524,6 +587,7 @@ class HandService:
         joint_gains = self._live_gains()
         # Resolved outside the lock: effective_pose_source takes it too.
         effective_source = self.effective_pose_source()
+        held = self.held_motors()
         with self._state_lock:
             return {
                 "torque_enabled": self.supervisor.status().torque_enabled,
@@ -547,6 +611,7 @@ class HandService:
                 "control_source": self._control_source.value,
                 "control_owner": self._control_owner_label,
                 "direct_motor_mode": self._direct_motor_mode,
+                "held_motors": held,
                 "pose_source": self._pose_source,
                 "effective_pose_source": effective_source,
             }
@@ -608,6 +673,7 @@ class HandService:
             # Fresh session, fresh (unpaused) loop: a stale armed flag must
             # not survive the reconnect and block joint targets.
             self._direct_motor_mode = False
+            self._motor_torque = {}
             self._config_gains = config_gains
         self._publish_control_state()
         if session.caps.tactile:
@@ -771,6 +837,8 @@ class HandService:
             if session is not None and session.caps.motors:
                 session.hand.disable_torque()
                 self.supervisor.set_torque_flag(False)
+                with self._state_lock:
+                    self._motor_torque = {}
                 self.worker.reset()
                 self._publish_control_state()
                 report["torque_disabled"] = True
@@ -796,13 +864,8 @@ class HandService:
         from orca_ui.streaming import topics as T
         self._publish_topic(T.CONTROL_STATE, self.control_state())
 
-    def enable_torque(self, *, from_operation: bool = False) -> dict:
-        """``from_operation`` skips the manual-control gate: the running
-        operation owns the control source, so a demo enabling torque for
-        itself is not a second client fighting the owner."""
-        session = self._require_motors()
-        if not from_operation:
-            self._require_manual_control()
+    def _prepare_torque(self, session: HandSession) -> None:
+        """Everything that must be in place before a motor energizes."""
         if session.caps.feedback_loop:
             # Re-anchor first so enabling torque never lurches toward a stale
             # target (the hand may have been posed by hand while limp).
@@ -814,7 +877,8 @@ class HandService:
         self._apply_current_ceiling(session)
         self._apply_servo_gains(session)
         self._apply_servo_profiles(session)
-        session.hand.enable_torque()
+
+    def _torque_came_on(self, session: HandSession) -> None:
         self.supervisor.set_torque_flag(True)
         seed = self._current_pose(session)
         # The hand may have been posed by hand while limp: the interpolator
@@ -824,14 +888,78 @@ class HandService:
             self._targets = dict(seed)
         self._publish_control_state()
         self._publish_targets()
-        return {"seed": seed}
+
+    def enable_torque(self, *, from_operation: bool = False) -> dict:
+        """``from_operation`` skips the manual-control gate: the running
+        operation owns the control source, so a demo enabling torque for
+        itself is not a second client fighting the owner."""
+        session = self._require_motors()
+        if not from_operation:
+            self._require_manual_control()
+        self._prepare_torque(session)
+        session.hand.enable_torque()
+        with self._state_lock:
+            self._motor_torque = {int(m): True for m in session.hand.config.motor_ids}
+        self._torque_came_on(session)
+        with self._state_lock:
+            return {"seed": dict(self._targets)}
 
     def disable_torque(self) -> None:
         session = self._require_motors()
         session.hand.disable_torque()
         self.supervisor.set_torque_flag(False)
+        with self._state_lock:
+            self._motor_torque = {}
         self.worker.reset()
         self._publish_control_state()
+
+    def held_motors(self) -> list[int]:
+        """Motor ids with torque on. Every motor once ``enable_torque`` ran,
+        the individually held ones otherwise."""
+        with self._state_lock:
+            held = [m for m, on in self._motor_torque.items() if on]
+        if held:
+            return sorted(held)
+        session = self.session
+        if session is not None and self.supervisor.status().torque_enabled:
+            return [int(m) for m in session.hand.config.motor_ids]
+        return []
+
+    def set_motor_torque(self, motor_id: int, enabled: bool) -> dict:
+        """Hold or release one motor (bench tensioning: hold one spool while
+        the other is wound by hand). The torque flag is on while any motor is
+        held; the first hold applies the current ceiling like a full enable."""
+        session = self._require_motors()
+        self._require_manual_control()
+        motor_id = int(motor_id)
+        if motor_id not in [int(m) for m in session.hand.config.motor_ids]:
+            raise ServiceError(f"unknown motor {motor_id}", status_code=404)
+        held_before = bool(self.held_motors())
+        if enabled:
+            if not held_before:
+                self._prepare_torque(session)
+            failed = session.hand.enable_torque([motor_id])
+            if failed:
+                raise ServiceError(f"motor {motor_id} did not acknowledge torque "
+                                   "enable", status_code=502)
+            with self._state_lock:
+                self._motor_torque[motor_id] = True
+            if not held_before:
+                self._torque_came_on(session)
+        else:
+            session.hand.disable_torque([motor_id])
+            with self._state_lock:
+                if not self._motor_torque:
+                    # Released one out of a full enable: the rest stay held.
+                    self._motor_torque = {
+                        int(m): True for m in session.hand.config.motor_ids}
+                self._motor_torque[motor_id] = False
+            if not self.held_motors():
+                self.supervisor.set_torque_flag(False)
+                self.worker.reset()
+        self._publish_control_state()
+        return {"motor": motor_id, "held": bool(enabled),
+                "held_motors": self.held_motors()}
 
     def _current_pose(self, session: HandSession) -> dict:
         measured = session.measured_joints()

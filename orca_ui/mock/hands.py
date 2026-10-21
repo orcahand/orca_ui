@@ -19,8 +19,15 @@ from orca_core import (
 )
 from orca_core.utils.utils import read_yaml
 
+from orca_core.calibration import CalibrationResult
+
+from orca_ui.bench import is_bench_config
 from orca_ui.mock.pumps import EncoderPump, TactilePump
 from orca_ui.mock.tactile_responder import TactileMockState, install_tactile_mock
+
+# Ten shaft turns either way: past the cycle operation's span cap, so the
+# mock bench never clamps a range the real one would accept.
+_BENCH_MOCK_LIMIT_RAD = 20.0 * 3.141592653589793
 
 
 class _PumpOwner:
@@ -203,5 +210,23 @@ def build_mock_hand(config_path: str, engage_feedback: bool = True):
 
     feedback = engage_feedback and config.joint_feedback_enabled
     hand = _UI_MOCK_MATRIX[(bool(feedback), tactile)](config=config)
-    _synthetic_calibration(hand)
+    if is_bench_config(config):
+        # A bench is loose motors, uncalibrated, with no hardstops — simulate
+        # exactly that rather than a hand: no synthetic calibration, and the
+        # mock servo's ±1 rad hardstop clamp opened up to the cycle cap.
+        hand.calibration = CalibrationResult.empty(list(config.motor_ids))
+        hand._create_motor_client = _unclamped_client_factory(
+            hand._create_motor_client)
+    else:
+        _synthetic_calibration(hand)
     return hand
+
+
+def _unclamped_client_factory(create):
+    def factory():
+        client = create()
+        if hasattr(client, "_max_motor_pos"):
+            client._max_motor_pos = _BENCH_MOCK_LIMIT_RAD
+            client._min_pos = -_BENCH_MOCK_LIMIT_RAD
+        return client
+    return factory

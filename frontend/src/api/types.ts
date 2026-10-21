@@ -181,6 +181,9 @@ export interface ControlState {
   control_owner: string
   // Raw motor-space control armed: loop writes paused, joint targets 409.
   direct_motor_mode: boolean
+  // Motor ids with torque on: every motor after Enable Torque, the ones held
+  // one by one on the bench otherwise. torque_enabled is "any of these".
+  held_motors?: number[]
   // Which stream the 3D model follows. "auto" tracks the torque state:
   // motor estimate while limp (polled), commanded targets once torqued (no
   // polling, so reads stop competing with commands for the bus).
@@ -222,6 +225,8 @@ export interface HandInfo {
   rom_frame?: RomFrame | null
   side: 'left' | 'right'
   mock: boolean
+  // Launched with --bench: the config is a few loose motors, not a hand.
+  bench?: boolean
   joints: JointInfo[]
   calibration: CalibrationInfo
   control: ControlState
@@ -316,6 +321,126 @@ export interface StressTestExtra {
   // it just cannot report how far the joints got.
   measured: boolean
   joints: StressJointReach[]
+}
+
+// ----- motor_cycle operation extra (orca_ui/hand/operations/bench.py) --------
+// Everything in motor-shaft degrees and mA; nothing here is a joint.
+
+export type CycleEnd = 'from' | 'to' // A | B
+
+export interface MotorCycleMotorReport {
+  id: number
+  from_deg: number
+  to_deg: number
+  start_at: CycleEnd
+  speed_deg_s: number
+  hold_s: number
+  mode: 'glide' | 'step'
+  loop: boolean
+  cycles: number | null // null while nonstop
+  cycle: number // completed
+  state: 'approach' | 'moving' | 'settling' | 'holding' | 'done'
+  heading: CycleEnd | null // which end the motor is going to / sitting at
+  progress: number | null
+  cycle_s: number | null
+  cycles_per_min: number | null
+  eta_s: number | null
+  commanded_span_deg: number
+  // Settled position at each of the motor's own ends; null until reached.
+  reached_from_deg: number | null
+  reached_to_deg: number | null
+  span_deg: number | null
+  shortfall_deg: number | null
+  // Mean current over the dwell at each end — the tension indicator.
+  hold_current_from_ma: number | null
+  hold_current_to_ma: number | null
+  peak_current_ma: number
+  // Commanded shaft travel accumulated over the run (the odometer).
+  travel_deg: number
+  temp_c: number | null
+  temp_max_c: number | null
+  finished_s: number | null // seconds since this motor finished its count
+}
+
+export interface MotorCycleLive {
+  t: number
+  positions: Record<string, number>
+  currents: Record<string, number>
+  velocities: Record<string, number>
+  targets: Record<string, number>
+}
+
+export interface MotorCycleExtra {
+  elapsed_s: number
+  progress: number | null // mean over motors; null while any is nonstop
+  finished: number // motors that completed their count
+  total: number
+  max_temp_c: number | null
+  live: MotorCycleLive
+  motors: MotorCycleMotorReport[]
+  log: { on: boolean; file: string; files: string[]; rows: number }
+}
+
+export interface MotorCycleResult {
+  elapsed_s: number
+  cycles: Record<string, number>
+  motors: MotorCycleMotorReport[]
+  log_file: string | null
+  log_files: string[]
+  log_rows: number
+}
+
+// ----- bus_scan operation (orca_ui/hand/operations/scan.py) ------------------
+
+export interface BusScanMotor {
+  id: number
+  model_name: string
+  baud_rate: number
+}
+
+export interface BusScanExtra {
+  port: string | null
+  motor_type: string | null
+  baud_rate: number | null
+  scanned_to: number // highest id pinged so far at this baud rate
+  id_range: [number, number]
+  motors: BusScanMotor[]
+  configured: number[]
+  done: boolean
+}
+
+export interface BusScanResult {
+  port: string | null
+  motor_type: string | null
+  motors: BusScanMotor[]
+  motor_ids: number[]
+  configured: number[]
+  missing: number[] // configured but not on the bus
+  unconfigured: number[] // on the bus but not in the config
+  mixed_baud: boolean
+  baud_rates: number[]
+  simulated?: boolean
+}
+
+// usb.presence: known USB serial devices the PC sees (by vendor id), 1 Hz.
+// "present" is the board being plugged in; a session is the motors answering.
+export interface UsbDevice {
+  device: string
+  description: string
+  kind: string // dynamixel | feetech | oh_board | tactile_sensor | mock
+}
+
+export interface UsbPresence {
+  present: boolean
+  devices: UsbDevice[]
+  motor_port: string | null // the session's motor port, when connected
+}
+
+// motors.state: raw shaft state per motor id, 10 Hz while the motors are read.
+export interface MotorsState {
+  positions: Record<string, number> // degrees
+  velocities: Record<string, number> // degrees/s
+  currents: Record<string, number> // mA
 }
 
 export interface OperationLogLine {
@@ -535,6 +660,8 @@ export const TOPICS = {
   jointsCorrection: 'joints.correction',
   motorsTelemetry: 'motors.telemetry',
   motorsFaults: 'motors.faults',
+  motorsState: 'motors.state',
+  usbPresence: 'usb.presence',
   stats: 'stats',
   sensorsHealth: 'sensors.health',
   teleopState: 'teleop.state',

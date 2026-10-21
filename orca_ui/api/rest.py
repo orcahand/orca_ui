@@ -302,6 +302,28 @@ def build_router(service: HandService, telemetry=None) -> APIRouter:
         """
         return guard(service.select_board, body.device)
 
+    @router.get("/bench/logs/{name}")
+    def bench_log(name: str):
+        """A cycle run's CSV, by the file name the run reported."""
+        from fastapi.responses import FileResponse
+
+        from orca_ui.hand.operations.bench import cycle_log_dir
+
+        if name != os.path.basename(name) or not name.endswith(".csv"):
+            raise HTTPException(status_code=404, detail="no such log")
+        path = os.path.join(cycle_log_dir(service.settings), name)
+        if not os.path.isfile(path):
+            raise HTTPException(status_code=404, detail="no such log")
+        return FileResponse(path, media_type="text/csv", filename=name)
+
+    @router.post("/bench/motors")
+    def bench_motors(body: schemas.BenchMotorsRequest):
+        """Adopt a motor set into the bench config and reconnect on it —
+        the step after a bus scan. 409 on a hand model."""
+        motors = ([m.model_dump() for m in body.motors] if body.motors
+                  else list(body.motor_ids or []))
+        return guard(service.set_bench_motors, motors)
+
     @router.post("/reconnect")
     def reconnect():
         # Also lifts a /disconnect hold — this is the way back from one.
@@ -532,6 +554,11 @@ def build_router(service: HandService, telemetry=None) -> APIRouter:
     def motors_set_profile(motor_id: int, body: schemas.ServoProfileRequest):
         profile = guard(service.set_servo_profile, motor_id, body.model_dump())
         return {"ok": True, "profile": profile}
+
+    @router.post("/motors/{motor_id}/torque")
+    def motor_torque(motor_id: int, body: schemas.MotorTorqueRequest):
+        """Hold or release one motor. The torque flag is on while any is held."""
+        return guard(service.set_motor_torque, motor_id, body.enabled)
 
     @router.post("/motors/{motor_id}/reboot")
     def motor_reboot(motor_id: int):

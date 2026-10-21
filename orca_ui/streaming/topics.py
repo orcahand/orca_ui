@@ -28,6 +28,15 @@ MOTORS_TELEMETRY = "motors.telemetry"
 # client logs) and command adherence (target vs sampled pose, stall
 # durations). 1 Hz from telemetry's slow tick; counters reset per session.
 MOTORS_FAULTS = "motors.faults"
+# Raw motor state — shaft positions (degrees), velocities and currents per
+# motor id — from the same bus read that feeds the joint estimate. Opt-in on
+# the frontend: the bench page lives on it, the console does not need it.
+MOTORS_STATE = "motors.state"
+# Which known USB serial devices (motor adapters, ORCA boards) the PC sees,
+# by vendor id — enumerated, never opened, so it tells "board plugged in"
+# apart from "motors answering" without touching a live session. 1 Hz,
+# with or without a session. Opt-in; the bench page's board indicator.
+USB_PRESENCE = "usb.presence"
 STATS = "stats"
 
 # Electrical bring-up monitor: per-joint encoder health verdicts, tactile
@@ -57,7 +66,8 @@ ALL_TOPICS = [
     OPERATION_STATE, OPERATION_LOG,
     TACTILE_FORCES, TACTILE_TAXELS,
     JOINTS_MEASURED, JOINTS_ESTIMATE, JOINTS_TARGET, JOINTS_CORRECTION,
-    MOTORS_TELEMETRY, MOTORS_FAULTS, STATS, SENSORS_HEALTH,
+    MOTORS_TELEMETRY, MOTORS_FAULTS, MOTORS_STATE, USB_PRESENCE, STATS,
+    SENSORS_HEALTH,
     TELEOP_STATE, TELEOP_TARGETS, TELEOP_LOG, TELEOP_PREVIEW,
     TELEOP_INSTALL, TELEOP_INSTALL_LOG,
 ]
@@ -69,6 +79,7 @@ MIN_INTERVAL_S = {
     TACTILE_TAXELS: 1.0 / 30.0,
     TELEOP_TARGETS: 1.0 / 30.0,
     TELEOP_PREVIEW: 1.0 / 10.0,
+    MOTORS_STATE: 1.0 / 10.0,
     # uv sync is chatty. The payload is cumulative, so throttling drops
     # snapshots, never lines.
     TELEOP_INSTALL_LOG: 1.0 / 10.0,

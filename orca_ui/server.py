@@ -54,6 +54,13 @@ def create_app(settings: UiSettings) -> FastAPI:
     service.attach_teleop_installer(installer)
     telemetry = TelemetryService(service, hub, settings)
     service.attach_telemetry(telemetry)
+    # The bench finds its own motors: with nothing connected it scans the bus
+    # and adopts what answers. Not in mock mode, whose motors are the config's
+    # by construction.
+    auto_adopt = None
+    if settings.bench and not settings.mock:
+        from orca_ui.bench import BenchAutoAdopt
+        auto_adopt = BenchAutoAdopt(service)
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -61,11 +68,15 @@ def create_app(settings: UiSettings) -> FastAPI:
         await asyncio.to_thread(prepare_assembly_models)
         service.start()
         telemetry.start()
+        if auto_adopt is not None:
+            auto_adopt.start()
         broadcaster = asyncio.create_task(hub.broadcaster())
         try:
             yield
         finally:
             broadcaster.cancel()
+            if auto_adopt is not None:
+                auto_adopt.shutdown()
             # Teleop first: no targets may race into a dying stack.
             if teleop is not None:
                 teleop.shutdown()
@@ -74,7 +85,8 @@ def create_app(settings: UiSettings) -> FastAPI:
             telemetry.stop()
             service.stop()
 
-    app = FastAPI(title="ORCA Hand Console", version="0.2.0", lifespan=lifespan)
+    app = FastAPI(title="ORCA Motor Bench" if settings.bench else "ORCA Hand Console",
+                  version="0.2.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.service = service
     app.state.hub = hub
@@ -93,12 +105,17 @@ def create_app(settings: UiSettings) -> FastAPI:
     # Order matters: /assets/hand (bundle) must register before the frontend's
     # /assets mount so the more specific prefix wins.
     mount_assets(app)
-    _mount_webui(app)
+    _mount_webui(app, bench=settings.bench)
     return app
 
 
-def _mount_webui(app: FastAPI) -> None:
-    """Serve the built frontend, or a clear hint when it hasn't been built."""
+def _mount_webui(app: FastAPI, bench: bool = False) -> None:
+    """Serve the built frontend, or a clear hint when it hasn't been built.
+
+    Two pages share the bundle: the console (index.html) and the motor bench
+    (bench.html). Which one ``/`` is depends on the tool that launched the
+    server; the other stays reachable at ``/console`` or ``/bench``.
+    """
     index_html = os.path.join(WEBUI_DIR, "index.html")
 
     if not os.path.isfile(index_html):
@@ -122,11 +139,21 @@ def _mount_webui(app: FastAPI) -> None:
     # the old JS. The ETag keeps the common case a 304.
     no_cache = {"Cache-Control": "no-cache"}
 
-    # SPA fallback: any non-API path serves index.html so client-side routes work.
+    bench_html = os.path.join(WEBUI_DIR, "bench.html")
+    has_bench = os.path.isfile(bench_html)
+    home = bench_html if bench and has_bench else index_html
+
+    # SPA fallback: any non-API path serves the home page so client-side
+    # routes work; the two named pages pick the other entry explicitly.
     @app.get("/{path:path}")
     def spa(path: str):
+        route = path.strip("/")
+        if route == "bench" and has_bench:
+            return FileResponse(bench_html, headers=no_cache)
+        if route == "console":
+            return FileResponse(index_html, headers=no_cache)
         candidate = os.path.realpath(os.path.join(WEBUI_DIR, path))
         if path and candidate.startswith(os.path.realpath(WEBUI_DIR) + os.sep) \
                 and os.path.isfile(candidate):
             return FileResponse(candidate, headers=no_cache)
-        return FileResponse(index_html, headers=no_cache)
+        return FileResponse(home, headers=no_cache)

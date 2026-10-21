@@ -23,6 +23,8 @@ export function isOperationActive(op: OperationSnapshot | null): boolean {
 const OPERATION_LABELS: Record<string, string> = {
   wizard: 'full setup',
   stress_test: 'stress test',
+  motor_cycle: 'motor cycle',
+  bus_scan: 'bus scan',
 }
 
 export function operationLabel(kind: string): string {

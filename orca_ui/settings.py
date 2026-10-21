@@ -28,6 +28,9 @@ class UiSettings:
     # deterministic: a pinned supervisor never opens another board's ports.
     board: str | None = None
     mock: bool = False
+    # Launched as ``orca-bench``: the config names a few loose motors, the
+    # bench page is served at / and the console moves to /console.
+    bench: bool = False
     engage_feedback: bool = True
     motors_enabled: bool = True
     # 0.0.0.0: reachable from the network (LAN, Tailscale). The UI can move

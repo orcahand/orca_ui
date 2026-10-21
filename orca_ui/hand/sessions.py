@@ -17,6 +17,7 @@ each rung constructs a *fresh* hand and tries again with less.
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, field
 
 from orca_core import load_hand
@@ -180,13 +181,30 @@ class HandSession:
     def motor_snapshot(self) -> tuple[dict | None, dict | None]:
         """``(joint estimate, per-motor currents)`` from one bus read — they
         share a register block, so asking separately costs two round trips."""
+        estimate, raw = self.motor_state_snapshot()
+        return estimate, (raw or {}).get("currents") if raw else None
+
+    def motor_state_snapshot(self) -> tuple[dict | None, dict | None]:
+        """``(joint estimate, raw motor state)`` from one bus read.
+
+        The raw state is ``{"positions": {id: deg}, "velocities": {id: deg/s},
+        "currents": {id: mA}}`` keyed by motor id — what a motor is doing
+        regardless of whether anything is calibrated. The estimate is ``None``
+        on an uncalibrated hand (a testbench); the raw state never is."""
         if not self.caps.motors:
             return None, None
         state = self.hand.get_motor_state()
-        currents = dict(zip(self.hand.config.motor_ids, state.current))
+        ids = [int(m) for m in self.hand.config.motor_ids]
+        raw = {
+            "positions": {m: math.degrees(float(p))
+                          for m, p in zip(ids, state.position)},
+            "velocities": {m: math.degrees(float(v))
+                           for m, v in zip(ids, state.velocity)},
+            "currents": {m: float(c) for m, c in zip(ids, state.current)},
+        }
         if not self._estimate_allowed():
-            return None, currents
-        return self._joint_estimate(state.position), currents
+            return None, raw
+        return self._joint_estimate(state.position), raw
 
     def loop_correction(self) -> dict | None:
         return self.hand.get_loop_correction() if self.caps.feedback_loop else None

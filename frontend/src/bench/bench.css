@@ -1,0 +1,757 @@
+/* Motor bench page. Layout only — every colour comes from theme.css tokens. */
+
+.bench {
+  max-width: 1100px;
+}
+
+.bench header .brand-sub {
+  letter-spacing: 1.5px;
+}
+
+.bench-console-link {
+  text-decoration: none;
+}
+
+/* --- USB / board indicator --- */
+
+.bench-usb {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border: 1px solid var(--panel-border-strong);
+  color: var(--dim);
+  background: var(--panel-strong);
+  white-space: nowrap;
+}
+
+.bench-usb i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--dimmer);
+  flex: none;
+}
+
+.bench-usb small {
+  font-weight: 400;
+  color: var(--dimmer);
+  margin-left: 2px;
+}
+
+.bench-usb.live {
+  color: var(--ok);
+  border-color: rgb(var(--ok-rgb) / 0.35);
+  background: rgb(var(--ok-rgb) / 0.08);
+}
+
+.bench-usb.live i {
+  background: var(--ok);
+  box-shadow: 0 0 6px rgb(var(--ok-rgb) / 0.7);
+}
+
+.bench-usb.silent {
+  color: var(--warn);
+  border-color: rgb(var(--warn-rgb) / 0.4);
+  background: rgb(var(--warn-rgb) / 0.08);
+}
+
+.bench-usb.silent i {
+  background: var(--warn);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.bench-usb.absent {
+  color: var(--err);
+  border-color: rgb(var(--err-rgb) / 0.4);
+  background: rgb(var(--err-rgb) / 0.08);
+}
+
+.bench-usb.absent i {
+  background: var(--err);
+}
+
+/* --- Hold / release bar --- */
+
+.bench-torque {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+}
+
+.bench-hold {
+  min-width: 170px;
+}
+
+.bench-torque-state {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.bench-torque-state.on {
+  color: var(--ok);
+}
+
+/* --- Bus scan --- */
+
+.bench-bus {
+  padding: 10px 12px;
+}
+
+.bench-bus-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.bench-bus-head h2 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-bright);
+  margin: 0;
+}
+
+.bench-bus-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font-family: var(--font);
+}
+
+.bench-chevron {
+  display: inline-block;
+  color: var(--dim);
+  transition: transform 0.15s;
+}
+
+.bench-chevron.open {
+  transform: rotate(90deg);
+}
+
+.bench-hold-one {
+  margin-left: 6px;
+}
+
+.bench-bus-progress {
+  font-size: 11px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.bench-bus-summary {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.bench-bus-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.bench-bus-chip {
+  font-size: 10px;
+  padding: 3px 8px;
+  border: 1px solid var(--panel-border-strong);
+  color: var(--muted);
+  background: var(--panel-strong);
+}
+
+.bench-bus-chip b {
+  color: var(--text-bright);
+}
+
+.bench-bus-chip.new {
+  border-color: rgb(var(--ok-rgb) / 0.4);
+  color: var(--ok);
+}
+
+.bench-bus-chip.new b {
+  color: var(--ok);
+}
+
+.bench-bus-chip.missing {
+  border-color: rgb(var(--err-rgb) / 0.35);
+  color: var(--err);
+}
+
+.bench-bus-chip.missing b {
+  color: var(--err);
+}
+
+.bench-assign {
+  margin-top: 8px;
+}
+
+.bench-assign-table {
+  border-collapse: collapse;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bench-assign-table th {
+  text-align: left;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--dimmer);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 3px 10px 3px 0;
+  border-bottom: 1px solid var(--panel-border-strong);
+}
+
+.bench-assign-table td {
+  padding: 4px 10px 4px 0;
+  border-bottom: 1px solid var(--panel-border);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.bench-assign-table td b {
+  color: var(--text-bright);
+}
+
+.bench-assign-table tr.off td {
+  color: var(--dimmer);
+}
+
+.bench-assign-table tr.missing td {
+  color: var(--err);
+}
+
+.bench-assign-table input[type='number'] {
+  width: 52px;
+  background: var(--panel-strong);
+  color: var(--text);
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 0;
+  font-size: 11px;
+  font-family: var(--font);
+  padding: 2px 5px;
+  text-align: center;
+  outline: none;
+}
+
+.bench-assign-table input[type='number']:focus {
+  border-color: rgb(var(--accent-rgb) / 0.4);
+}
+
+.bench-assign-now {
+  font-size: 10px;
+  color: var(--dim);
+}
+
+.bench-assign-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.bench-bus-note {
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--warn);
+}
+
+/* --- Motor cards --- */
+
+.bench-motors {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.bench-motor {
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bench-motor.excluded {
+  opacity: 0.55;
+}
+
+.bench-motor-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bench-include {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.bench-include h2 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-bright);
+  margin: 0;
+}
+
+.bench-joint {
+  font-size: 10px;
+  color: var(--dim);
+}
+
+.bench-fault {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.bench-fault.err {
+  color: var(--err);
+}
+
+.bench-fault.warn {
+  color: var(--warn);
+}
+
+.bench-readout {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 6px 0 2px;
+  border-top: 1px solid var(--panel-border);
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.bench-pos {
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--text-bright);
+  font-variant-numeric: tabular-nums;
+  min-width: 150px;
+}
+
+.bench-readout-side {
+  display: flex;
+  gap: 14px;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.bench-readout-side > span {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 13px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.bench-readout-side small {
+  font-size: 9px;
+  color: var(--dimmer);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.bench-readout-side .ok {
+  color: var(--ok);
+}
+
+.bench-readout-side .warn {
+  color: var(--warn);
+}
+
+.bench-readout-side .err {
+  color: var(--err);
+}
+
+/* --- Jog --- */
+
+.bench-jog {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bench-jog-btn {
+  width: 44px;
+  height: 32px;
+  font-size: 18px;
+  line-height: 1;
+  user-select: none;
+  touch-action: none;
+}
+
+.bench-jog-steps {
+  display: inline-flex;
+  gap: 2px;
+  flex: 1;
+  justify-content: center;
+}
+
+.bench-jogging {
+  font-size: 10px;
+  color: var(--accent);
+}
+
+/* --- Endpoints --- */
+
+.bench-endpoints {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 10px;
+}
+
+.bench-endpoint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bench-endpoint-name {
+  font-weight: 700;
+  color: var(--text-bright);
+  width: 12px;
+}
+
+.bench-endpoint input[type='number'] {
+  width: 72px;
+  background: var(--panel-strong);
+  color: var(--text);
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 0;
+  font-size: 12px;
+  font-family: var(--font);
+  padding: 4px 6px;
+  text-align: right;
+  outline: none;
+}
+
+.bench-endpoint input[type='number']:focus {
+  border-color: rgb(var(--accent-rgb) / 0.4);
+}
+
+.bench-unit {
+  color: var(--dim);
+  font-size: 11px;
+}
+
+.bench-span {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--dim);
+}
+
+/* --- Cycle + run --- */
+
+.bench-main {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 760px) {
+  .bench-main {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bench-main > .panel {
+  margin-bottom: 0;
+}
+
+.bench-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.bench-fields .stress-field {
+  font-size: 11px;
+}
+
+.bench-check {
+  cursor: pointer;
+}
+
+.bench-mode {
+  font-size: 11px;
+}
+
+.bench-run-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bench-defaults {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.bench-defaults-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--dimmer);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.bench-motor .bench-fields {
+  margin-bottom: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--panel-border);
+  gap: 6px 10px;
+}
+
+.bench-table tr.done td {
+  color: var(--dim);
+}
+
+.bench-start {
+  padding: 8px 18px;
+  font-size: 12px;
+}
+
+.bench-blocked {
+  font-size: 10px;
+  color: var(--dim);
+}
+
+.bench-run-state.error {
+  color: var(--err);
+}
+
+.bench-run-state.running,
+.bench-run-state.paused {
+  color: var(--accent);
+}
+
+.bench-progress {
+  height: 4px;
+  background: var(--panel-border-strong);
+  margin-bottom: 10px;
+}
+
+.bench-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s linear;
+}
+
+.bench-progress-fill.live {
+  box-shadow: 0 0 6px rgb(var(--accent-rgb) / 0.6);
+}
+
+.bench-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.bench-stat {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 8px;
+  background: var(--panel-strong);
+  border: 1px solid var(--panel-border);
+}
+
+.bench-stat-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-bright);
+  font-variant-numeric: tabular-nums;
+}
+
+.bench-stat-label {
+  font-size: 9px;
+  color: var(--dimmer);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.bench-table-scroll {
+  overflow-x: auto;
+  margin-bottom: 10px;
+}
+
+.bench-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bench-table th {
+  text-align: left;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--dimmer);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--panel-border-strong);
+}
+
+.bench-table td {
+  padding: 5px 5px;
+  border-bottom: 1px solid var(--panel-border);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.bench-table td small {
+  color: var(--dim);
+}
+
+.bench-table td.ok {
+  color: var(--ok);
+}
+
+.bench-table td.warn {
+  color: var(--warn);
+}
+
+.bench-table td.err {
+  color: var(--err);
+}
+
+.bench-empty {
+  color: var(--dim);
+  text-align: center;
+  padding: 14px !important;
+}
+
+/* --- Charts --- */
+
+.bench-charts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bench-chart-legend {
+  display: flex;
+  gap: 12px;
+  font-size: 10px;
+}
+
+.bench-chart-title {
+  font-size: 9px;
+  color: var(--dimmer);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+/* --- Log --- */
+
+.bench-log {
+  font-size: 10px;
+  color: var(--muted);
+  padding: 8px 12px;
+}
+
+.bench-log-line {
+  display: flex;
+  gap: 10px;
+  line-height: 1.6;
+}
+
+.bench-log-time {
+  color: var(--dimmer);
+  flex: none;
+}
+
+.bench-log-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--dim);
+  cursor: pointer;
+  user-select: none;
+}
+
+.bench-log-toggle.on {
+  color: var(--accent);
+}
+
+.bench-log-toggle input {
+  margin: 0;
+}
+
+.bench-log-toggle small {
+  font-size: 9px;
+  color: var(--dimmer);
+  font-variant-numeric: tabular-nums;
+}
+
+.bench-log-file a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.bench-log-file a:hover {
+  color: var(--accent);
+}
+
+.bench-log-file .bench-stat-label a {
+  margin-right: 4px;
+  text-decoration: underline;
+}
+
+.bench-log-part {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--dimmer);
+}
+
+.bench-log-part input {
+  width: 48px;
+  font-size: 10px;
+  padding: 2px 4px;
+}
+
+.bench-log-file .bench-stat-label {
+  text-transform: none;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.bench-log-file.live .bench-stat-value::after {
+  content: ' ●';
+  color: var(--accent);
+  font-size: 9px;
+  vertical-align: middle;
+}

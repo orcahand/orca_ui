@@ -377,6 +377,7 @@ class TelemetryService:
             _Sampler("telemetry-mid", 1.0 / settings.mid_hz, self._mid_tick),
             _Sampler("telemetry-slow", 1.0 / settings.slow_hz, self._slow_tick),
         ]
+        self._mock = bool(getattr(settings, "mock", False))
         self._bus_reads = ("state", "temps")
         self._bus_read_index = 0
         # Start the staleness window now, so a hand already moving at startup
@@ -573,8 +574,11 @@ class TelemetryService:
     def _slow_tick(self) -> None:
         session = self._service.session
         # Faults publish with or without a session: bus errors during a failed
-        # connect are exactly what the panel needs to show.
+        # connect are exactly what the panel needs to show. Same for the USB
+        # picture: "no board" versus "board but silent motors" matters most
+        # while there is nothing to connect to.
         self._publish_motor_faults(session)
+        self._publish_usb_presence(session)
         if session is None:
             return
 
@@ -706,7 +710,7 @@ class TelemetryService:
     def _publish_motor_state(self, session) -> None:
         """Joint estimate and currents, from one read."""
         try:
-            estimate, currents = session.motor_snapshot()
+            estimate, raw = session.motor_state_snapshot()
         except Exception:
             logger.debug("motor state read failed", exc_info=True)
             return
@@ -715,14 +719,35 @@ class TelemetryService:
             self._hub.publish(T.JOINTS_ESTIMATE, {"angles": angles})
             if not session.caps.encoders:
                 self._feed_usage(angles)
-        if currents:
+        if raw:
+            self._publish_raw_motor_state(raw)
             self._motor_health["currents"] = {
-                int(k): round(float(v), 1) for k, v in currents.items()}
+                int(k): round(float(v), 1) for k, v in raw["currents"].items()}
             self._hub.publish(T.MOTORS_TELEMETRY,
                               self._motor_health_payload(session))
 
+    def _publish_raw_motor_state(self, raw: dict) -> None:
+        self._hub.publish(T.MOTORS_STATE, {
+            "positions": {int(k): round(float(v), 2)
+                          for k, v in raw["positions"].items()},
+            "velocities": {int(k): round(float(v), 1)
+                           for k, v in raw["velocities"].items()},
+            "currents": {int(k): round(float(v), 1)
+                         for k, v in raw["currents"].items()},
+        })
+
     def _publish_estimate(self, session) -> dict | None:
-        estimate = _clean_angles(session.estimate_joints())
+        """The estimate and the raw motor state ride the same read: an
+        uncalibrated hand has no estimate, but its motors still have
+        positions, and the bench page is built on those."""
+        try:
+            estimate, raw = session.motor_state_snapshot()
+        except Exception:
+            logger.debug("motor state read failed", exc_info=True)
+            return None
+        if raw:
+            self._publish_raw_motor_state(raw)
+        estimate = _clean_angles(estimate)
         if estimate:
             self._hub.publish(T.JOINTS_ESTIMATE, {"angles": estimate})
             # Encoder hands are already fed from the fast tick's measured
@@ -889,6 +914,45 @@ class TelemetryService:
             motors[mid] = entry
         self._last_faults = {"motors": motors, "bus": bus["bus"]}
         self._hub.publish(T.MOTORS_FAULTS, self._last_faults)
+
+    def _publish_usb_presence(self, session) -> None:
+        """Known USB serial devices by vendor id — enumeration only, no port
+        is opened, so this is safe beside a live session and other tools."""
+        try:
+            devices = self._usb_devices()
+        except Exception:
+            logger.debug("usb enumeration failed", exc_info=True)
+            return
+        motor_port = None
+        if session is not None:
+            motor_port = (getattr(session, "ports", None) or {}).get("motor")
+        self._hub.publish(T.USB_PRESENCE, {
+            "present": bool(devices),
+            "devices": devices,
+            "motor_port": motor_port,
+        })
+
+    def _usb_devices(self) -> list[dict]:
+        if self._mock:
+            return [{"device": "mock", "description": "simulated motor bus",
+                     "kind": "mock"}]
+        import serial.tools.list_ports
+        from orca_core.constants import KNOWN_VIDS
+
+        labels: dict[int, str] = {}
+        for kind, vids in KNOWN_VIDS.items():
+            for vid in (vids if isinstance(vids, (list, tuple)) else [vids]):
+                labels.setdefault(int(vid), str(kind))
+        out = []
+        for port in serial.tools.list_ports.comports():
+            kind = labels.get(port.vid) if port.vid is not None else None
+            if kind is None:
+                continue
+            out.append({"device": port.device,
+                        "description": port.description or "",
+                        "kind": kind})
+        out.sort(key=lambda d: d["device"])
+        return out
 
     def _publish_motor_health(self, session, temps: bool = True,
                               currents: bool = True) -> None:

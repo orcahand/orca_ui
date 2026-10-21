@@ -65,6 +65,15 @@ class _Session:
         return {"index_mcp": 5.0}, dict(zip(self.hand.config.motor_ids,
                                             state.current))
 
+    def motor_state_snapshot(self):
+        state = self.hand.get_motor_state()
+        ids = self.hand.config.motor_ids
+        return {"index_mcp": 5.0}, {
+            "positions": dict(zip(ids, state.position)),
+            "velocities": dict(zip(ids, state.velocity)),
+            "currents": dict(zip(ids, state.current)),
+        }
+
     def loop_correction(self):
         return {"index_mcp": 0.1}
 
@@ -208,9 +217,10 @@ def _build_with_source(source, feedback_loop=False):
 
 
 def test_estimate_is_read_while_the_model_follows_it():
+    """One transaction: the estimate and the raw shaft state share it."""
     telemetry, session = _build_with_source('estimate')
     telemetry._mid_tick()
-    assert session.hand.bus_reads == ['pos']
+    assert session.hand.bus_reads == ['state']
 
 
 def test_no_estimate_read_once_the_model_follows_commands():

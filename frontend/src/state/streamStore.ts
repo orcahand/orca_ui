@@ -32,6 +32,11 @@ export interface LatestFrames {
     maxTempC: number | null
     // Per-motor fault table (bus errors + command adherence), 1 Hz.
     faults: MotorsFaults | null
+    // Raw shaft state (motors.state, opt-in): degrees and degrees/s per
+    // motor id. The bench page's readout; empty until it subscribes.
+    positions: Record<string, number>
+    velocities: Record<string, number>
+    tState: number
   }
   teleop: {
     preview: { jpeg: string; seq: number | null } | null
@@ -52,7 +57,15 @@ export const latest: LatestFrames = {
     tTeleopTarget: 0,
   },
   tactile: { forces: null, taxels: null, tForces: 0, tTaxels: 0 },
-  motors: { temps: {}, currents: {}, maxTempC: null, faults: null },
+  motors: {
+    temps: {},
+    currents: {},
+    maxTempC: null,
+    faults: null,
+    positions: {},
+    velocities: {},
+    tState: 0,
+  },
   teleop: { preview: null },
   stats: null,
   health: null,

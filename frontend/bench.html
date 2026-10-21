@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ORCA Motor Bench</title>
+    <script>
+      // Same pre-paint theme resolution as index.html; see the note there.
+      (function () {
+        var theme
+        try {
+          var stored = localStorage.getItem('orca-ui.theme')
+          if (stored === 'dark' || stored === 'light') theme = stored
+        } catch (e) {
+          /* storage disabled: fall through to the default */
+        }
+        if (!theme) theme = 'light'
+        var root = document.documentElement
+        root.dataset.theme = theme
+        root.style.colorScheme = theme
+        root.style.background = theme === 'light' ? '#f6f5f1' : '#1a1c2a'
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/bench/main.tsx"></script>
+  </body>
+</html>

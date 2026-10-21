@@ -183,17 +183,21 @@ def _reachable_ips() -> list[str]:
     return ips
 
 
-def main(argv=None) -> None:
+def run_server(settings: UiSettings, *, product: str = "ORCA UI",
+               mode: str | None = None) -> None:
+    """Print the banner, build the app, open the browser, serve. Shared by
+    the console (``orca-ui``) and the motor bench (``orca-bench``), which
+    differ in what they are called and how they are configured, not in what
+    runs underneath."""
     import uvicorn
     from orca_ui.console import install_stdout_dedupe
     from orca_ui.core_source import resolve as resolve_core_source
     from orca_ui.server import create_app
 
-    settings = build_settings(argv)
-
-    mode = "MOCK — no hardware" if settings.mock else "hardware"
-    if settings.mock is False and not settings.motors_enabled:
-        mode += ", sensors only (--no-motors)"
+    if mode is None:
+        mode = "MOCK — no hardware" if settings.mock else "hardware"
+        if settings.mock is False and not settings.motors_enabled:
+            mode += ", sensors only (--no-motors)"
     # Which orca_core is driving the hardware is invisible otherwise: a dev
     # checkout and the release it was cut from carry the same version string.
     core = resolve_core_source()
@@ -207,9 +211,10 @@ def main(argv=None) -> None:
         if urls:
             network = f"  network   {urls}\n"
         network += ("  caution   exposed beyond localhost — anyone who can "
-                    "reach the port can move the hand\n")
+                    "reach the port can move the motors\n")
+    label = f"{product:<9}"
     print(f"\n{rule}\n"
-          f"  ORCA UI   http://localhost:{settings.port}\n"
+          f"  {label} http://localhost:{settings.port}\n"
           f"{network}"
           f"  config    {settings.config_path}{provisional}\n"
           f"  mode      {mode}\n"
@@ -232,6 +237,10 @@ def main(argv=None) -> None:
     # HTTP siblings) drown the hardware diagnostics that actually matter.
     uvicorn.run(app, host=settings.host, port=settings.port,
                 log_level="info", access_log=False)
+
+
+def main(argv=None) -> None:
+    run_server(build_settings(argv))
 
 
 if __name__ == "__main__":

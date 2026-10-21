@@ -28,6 +28,27 @@ class JointCalibrateRequest(BaseModel):
     angle_deg: float
 
 
+class MotorTorqueRequest(BaseModel):
+    """Hold (true) or release (false) one motor."""
+
+    enabled: bool
+
+
+class BenchMotorAssignment(BaseModel):
+    """One bench motor: its bus id and the number the operator calls it."""
+
+    id: int
+    number: int
+
+
+class BenchMotorsRequest(BaseModel):
+    """The motor set the bench config should name (a bus scan's answer):
+    either explicit assignments, or bare ids that keep their numbers."""
+
+    motors: Optional[list[BenchMotorAssignment]] = None
+    motor_ids: Optional[list[int]] = None
+
+
 class ModelSelectRequest(BaseModel):
     """Which hand config to run. ``name`` null hands the choice back to
     hardware detection; ``version`` defaults to the model's newest."""

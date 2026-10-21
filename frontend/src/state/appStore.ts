@@ -8,6 +8,7 @@ import type {
   HandInfo,
   StatusSnapshot,
   TactileMode,
+  UsbPresence,
 } from '../api/types'
 
 export type TaxelDisplayMode = 'magnitude' | 'direction' | 'arrows'
@@ -83,7 +84,12 @@ interface AppState {
   rates: Record<string, number>
   error: string | null
 
+  // Known USB serial devices the PC sees (usb.presence, opt-in); null until
+  // a page subscribes.
+  usb: UsbPresence | null
+
   setWsConnected(up: boolean): void
+  setUsb(usb: UsbPresence | null): void
   setStatus(status: StatusSnapshot): void
   setHandInfo(info: HandInfo): void
   setControl(control: ControlState): void
@@ -125,6 +131,7 @@ const storedScene = ((): SceneSettings => {
 
 export const useAppStore = create<AppState>((set) => ({
   wsConnected: false,
+  usb: null,
   status: null,
   handInfo: null,
   control: null,
@@ -160,6 +167,7 @@ export const useAppStore = create<AppState>((set) => ({
   error: null,
 
   setWsConnected: (up) => set({ wsConnected: up }),
+  setUsb: (usb) => set({ usb }),
   setStatus: (status) => set({ status }),
   setHandInfo: (info) => set({ handInfo: info, control: info.control }),
   setControl: (control) => set({ control }),
