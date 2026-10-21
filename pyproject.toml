@@ -1,6 +1,6 @@
 [project]
 name = "orca_ui"
-version = "0.2.0"
+version = "0.3.0"
 description = "Web UI for the ORCA Hand: live sensor visualization, motor control, and a 3D hand view. Depends on orca_core for hardware communication."
 authors = [
     {name = "clemens-chr", email = "cchristoph@student.ethz.ch"},

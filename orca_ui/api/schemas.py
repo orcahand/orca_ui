@@ -13,6 +13,12 @@ class JointTargets(BaseModel):
     angles: dict[str, float]
 
 
+class ChangelogSeenRequest(BaseModel):
+    """Whether this release's notes should stay shut until the next one."""
+
+    dismissed: bool
+
+
 class ModelSelectRequest(BaseModel):
     """Which hand config to run. ``name`` null hands the choice back to
     hardware detection; ``version`` defaults to the model's newest."""

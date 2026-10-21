@@ -1,5 +1,5 @@
 // Console header: brand lockup, model picker, status pill, the link controls
-// (disconnect / reconnect), the view tabs, and the E-stop hard right.
+// (disconnect / reconnect), the view tabs, what's-new, and the E-stop hard right.
 // Capability badges + Hz meters live in the Motors tab.
 
 import type { HandState } from '../../api/types'
@@ -11,6 +11,7 @@ import { HardwareVersionBadge } from './HardwareVersion'
 import { LinkControls } from './LinkControls'
 import { ModelPicker } from './ModelPicker'
 import { ThemeToggle } from './ThemeToggle'
+import { WhatsNewButton } from './WhatsNewButton'
 
 const STATE_CLASS: Record<HandState, string> = {
   connected: 'connected',
@@ -107,6 +108,7 @@ export function AppHeader() {
           </button>
         ))}
       </nav>
+      <WhatsNewButton />
       <ThemeToggle />
       <EStopButton />
     </header>

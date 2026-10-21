@@ -6,6 +6,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from orca_ui.api import schemas
+from orca_ui import changelog as changelog_doc
 from orca_ui.hand.service import HandService, ServiceError
 from orca_ui.hand.taxel_geometry import get_taxel_geometry
 
@@ -32,6 +33,16 @@ def build_router(service: HandService) -> APIRouter:
     @router.get("/stats")
     def stats():
         return service.stats()
+
+    @router.get("/changelog")
+    def changelog():
+        return changelog_doc.changelog()
+
+    @router.post("/changelog/seen")
+    def changelog_seen(body: schemas.ChangelogSeenRequest):
+        latest = changelog_doc.latest_version()
+        changelog_doc.set_seen(latest if body.dismissed else None)
+        return changelog_doc.changelog()
 
     @router.get("/ports")
     def ports():

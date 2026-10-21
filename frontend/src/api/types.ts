@@ -907,3 +907,14 @@ export interface FaultBudgets {
   // neighbours never gets back under the margin on its own.
   thermal_hold_all: boolean
 }
+
+export interface ChangelogDoc {
+  ui_version: string
+  latest_version: string | null
+  /** The orca_core release the latest entry pairs with. */
+  recommended_core: string | null
+  versions: string[]
+  /** True while an indicator file beside the backend dismisses this release. */
+  dismissed: boolean
+  markdown: string
+}

@@ -3,6 +3,7 @@ import { api } from './api/rest'
 import { startStreamClient } from './api/streamClient'
 import { BootHero } from './components/BootHero'
 import { ErrorBanner } from './components/common/ErrorBanner'
+import { ChangelogDialog } from './components/common/ChangelogDialog'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
 import { MaintenanceBanner } from './components/common/MaintenanceBanner'
 import { AppHeader } from './components/header/AppHeader'
@@ -14,6 +15,8 @@ import { PosesView } from './components/views/PosesView'
 import { SetupView } from './components/views/SetupView'
 import { TeleopView } from './components/views/TeleopView'
 import { useAppStore } from './state/appStore'
+import { hasUnseenChangelog, useChangelogStore } from './state/changelogStore'
+import { useOperationActive } from './state/operationStore'
 
 // three.js only loads when the 3D tab first opens.
 const ThreeDView = lazy(() =>
@@ -27,6 +30,23 @@ const ThreeDView = lazy(() =>
 // does the reconnect that follows an operation handing the bus back.
 const BOOT_STATES = new Set(['disconnected', 'detecting', 'connecting'])
 
+// A new release shows its notes once per browser, but never over a running
+// hand: an operation or anything else driving the joints holds the dialog back
+// until the console is idle again — which may be the next launch.
+function useChangelogAutoOpen(): void {
+  const unseen = useChangelogStore(hasUnseenChangelog)
+  const autoOpened = useChangelogStore((s) => s.autoOpened)
+  const operationActive = useOperationActive()
+  const owner = useAppStore((s) => s.control?.control_owner ?? 'manual')
+  const busy = operationActive || owner !== 'manual'
+
+  useEffect(() => {
+    if (!unseen || autoOpened || busy) return
+    useChangelogStore.getState().markAutoOpened()
+    useChangelogStore.getState().open()
+  }, [unseen, autoOpened, busy])
+}
+
 export default function App() {
   const view = useAppStore((s) => s.view)
   const wsConnected = useAppStore((s) => s.wsConnected)
@@ -36,7 +56,10 @@ export default function App() {
     startStreamClient()
     api.status().then(useAppStore.getState().setStatus).catch(() => undefined)
     api.handInfo().then(useAppStore.getState().setHandInfo).catch(() => undefined)
+    void useChangelogStore.getState().load()
   }, [])
+
+  useChangelogAutoOpen()
 
   // Rebuilding the session after an operation is the expected end of
   // calibration or tensioning, not a lost hand, so the views stay up.
@@ -88,6 +111,9 @@ export default function App() {
       )}
       <ErrorBoundary label="The tensioning dialog">
         <TensionDialogs />
+      </ErrorBoundary>
+      <ErrorBoundary label="The changelog">
+        <ChangelogDialog />
       </ErrorBoundary>
     </div>
   )
