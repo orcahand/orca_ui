@@ -1,0 +1,362 @@
+{
+  "p64": [
+    {
+      "src": "./assembly/clips/p64-1510.mp4",
+      "poster": "./assembly/clips/p64-1510.jpg",
+      "title": "Route a finger into the carpals",
+      "duration": 125
+    },
+    {
+      "src": "./assembly/clips/p64-1635.mp4",
+      "poster": "./assembly/clips/p64-1635.jpg",
+      "title": "Seat the finger joint",
+      "duration": 80
+    }
+  ],
+  "p68": [
+    {
+      "src": "./assembly/clips/p68-1761.mp4",
+      "poster": "./assembly/clips/p68-1761.jpg",
+      "title": "Attach the thumb to the carpals",
+      "duration": 84
+    }
+  ],
+  "p75": [
+    {
+      "src": "./assembly/clips/p75-2330.mp4",
+      "poster": "./assembly/clips/p75-2330.jpg",
+      "title": "Prepare the wrist screws and sleeves",
+      "duration": 130
+    }
+  ],
+  "p77": [
+    {
+      "src": "./assembly/clips/p77-2486.mp4",
+      "poster": "./assembly/clips/p77-2486.jpg",
+      "title": "Start threading the wrist",
+      "duration": 104
+    },
+    {
+      "src": "./assembly/clips/p77-2590.mp4",
+      "poster": "./assembly/clips/p77-2590.jpg",
+      "title": "Finish the wrist routing",
+      "duration": 70
+    }
+  ],
+  "p93": [
+    {
+      "src": "./assembly/clips/p93-2917.mp4",
+      "poster": "./assembly/clips/p93-2917.jpg",
+      "title": "Route the tower wires and fit the fans",
+      "duration": 128
+    },
+    {
+      "src": "./assembly/clips/p93-3045.mp4",
+      "poster": "./assembly/clips/p93-3045.jpg",
+      "title": "Secure the fans and tower nuts",
+      "duration": 125
+    }
+  ],
+  "p98": [
+    {
+      "src": "./assembly/clips/p98-3403.mp4",
+      "poster": "./assembly/clips/p98-3403.jpg",
+      "title": "Seat the Dynamixel connector PCB",
+      "duration": 27
+    }
+  ],
+  "p99": [
+    {
+      "src": "./assembly/clips/p99-3238.mp4",
+      "poster": "./assembly/clips/p99-3238.jpg",
+      "title": "Assemble a motor spool and ratchet",
+      "duration": 135
+    }
+  ],
+  "p123": [
+    {
+      "src": "./assembly/clips/p123-4146.mp4",
+      "poster": "./assembly/clips/p123-4146.jpg",
+      "title": "Thread and knot a bottom spool",
+      "duration": 89
+    },
+    {
+      "src": "./assembly/clips/p123-4235.mp4",
+      "poster": "./assembly/clips/p123-4235.jpg",
+      "title": "Wind the remaining bottom spools",
+      "duration": 72
+    }
+  ],
+  "p127": [
+    {
+      "src": "./assembly/clips/p127-4617.mp4",
+      "poster": "./assembly/clips/p127-4617.jpg",
+      "title": "Fit the spool holders",
+      "duration": 133
+    }
+  ],
+  "p129": [
+    {
+      "src": "./assembly/clips/p129-1940.mp4",
+      "poster": "./assembly/clips/p129-1940.jpg",
+      "title": "Fit the tower magnets",
+      "duration": 100
+    }
+  ],
+  "p132": [
+    {
+      "src": "./assembly/clips/p132-2100.mp4",
+      "poster": "./assembly/clips/p132-2100.jpg",
+      "title": "Fit the hull magnets",
+      "duration": 95
+    }
+  ],
+  "p115": [
+    {
+      "src": "./assembly/clips/p117-3500.mp4",
+      "poster": "./assembly/clips/p117-3500.jpg",
+      "title": "Install motors in the tower",
+      "duration": 90
+    },
+    {
+      "src": "./assembly/clips/p119-3690.mp4",
+      "poster": "./assembly/clips/p119-3690.jpg",
+      "title": "Link the motor columns",
+      "duration": 85
+    }
+  ],
+  "p26": [
+    {
+      "src": "./assembly/clips/p26-78-review.mp4",
+      "poster": "./assembly/clips/p26-78-review.jpg",
+      "title": "Tie the double-knot tendon",
+      "duration": 75
+    }
+  ],
+  "p29": [
+    {
+      "src": "./assembly/clips/p29-153-review.mp4",
+      "poster": "./assembly/clips/p29-153-review.jpg",
+      "title": "Thread and seat the DP tendon and bearings",
+      "duration": 86
+    }
+  ],
+  "p33": [
+    {
+      "src": "./assembly/clips/p33-239-review.mp4",
+      "poster": "./assembly/clips/p33-239-review.jpg",
+      "title": "Fit the PP tendon and pins",
+      "duration": 82
+    },
+    {
+      "src": "./assembly/clips/p33-347-review.mp4",
+      "poster": "./assembly/clips/p33-347-review.jpg",
+      "title": "Route DP through PP and seat the joint",
+      "duration": 69
+    }
+  ],
+  "p35": [
+    {
+      "src": "./assembly/clips/p35-416-review.mp4",
+      "poster": "./assembly/clips/p35-416-review.jpg",
+      "title": "Check free movement",
+      "duration": 10
+    }
+  ],
+  "p37": [
+    {
+      "src": "./assembly/clips/p37-638-review.mp4",
+      "poster": "./assembly/clips/p37-638-review.jpg",
+      "title": "Cut and anchor the AP tendons",
+      "duration": 47
+    }
+  ],
+  "p42": [
+    {
+      "src": "./assembly/clips/p42-475-review.mp4",
+      "poster": "./assembly/clips/p42-475-review.jpg",
+      "title": "Route the four AP tendons",
+      "duration": 83
+    },
+    {
+      "src": "./assembly/clips/p42-558-review.mp4",
+      "poster": "./assembly/clips/p42-558-review.jpg",
+      "title": "Seat the AP, pins and bearings",
+      "duration": 80
+    }
+  ],
+  "p40": [
+    {
+      "src": "./assembly/clips/p40-685-review.mp4",
+      "poster": "./assembly/clips/p40-685-review.jpg",
+      "title": "Trim and tuck the AP stopper",
+      "duration": 33
+    }
+  ],
+  "p18": [
+    {
+      "src": "./assembly/clips/p18-1483-review.mp4",
+      "poster": "./assembly/clips/p18-1483-review.jpg",
+      "title": "Finish the carpal openings",
+      "duration": 19
+    }
+  ],
+  "p89": [
+    {
+      "src": "./assembly/clips/p89-2678-review.mp4",
+      "poster": "./assembly/clips/p89-2678-review.jpg",
+      "title": "Fit the belt and seat the hand in the wrist",
+      "duration": 77
+    }
+  ],
+  "p122": [
+    {
+      "src": "./assembly/clips/p122-2755-review.mp4",
+      "poster": "./assembly/clips/p122-2755-review.jpg",
+      "title": "Fit the wrist motor carrier",
+      "duration": 73
+    },
+    {
+      "src": "./assembly/clips/p122-2828-review.mp4",
+      "poster": "./assembly/clips/p122-2828-review.jpg",
+      "title": "Fit the pulley, bearing and wrist drive",
+      "duration": 88
+    },
+    {
+      "src": "./assembly/clips/p122-3976-review.mp4",
+      "poster": "./assembly/clips/p122-3976-review.jpg",
+      "title": "Join the wrist and tower",
+      "duration": 44
+    }
+  ],
+  "p126": [
+    {
+      "src": "./assembly/clips/p126-4307-review.mp4",
+      "poster": "./assembly/clips/p126-4307-review.jpg",
+      "title": "Thread the top spool and fit its bearing and screw",
+      "duration": 141
+    },
+    {
+      "src": "./assembly/clips/p126-4448-review.mp4",
+      "poster": "./assembly/clips/p126-4448-review.jpg",
+      "title": "Repeat and check joint pairing",
+      "duration": 157
+    }
+  ],
+  "p59": [
+    {
+      "src": "./assembly/clips/p59-1305-walkthrough.mp4",
+      "poster": "./assembly/clips/p59-1305-walkthrough.jpg",
+      "title": "Route the six tendons through TP",
+      "duration": 100
+    }
+  ],
+  "p54": [
+    {
+      "src": "./assembly/clips/p54-1006-walkthrough.mp4",
+      "poster": "./assembly/clips/p54-1006-walkthrough.jpg",
+      "title": "Route and join the thumb AP",
+      "duration": 102
+    }
+  ],
+  "p62": [
+    {
+      "src": "./assembly/clips/p62-1405-walkthrough.mp4",
+      "poster": "./assembly/clips/p62-1405-walkthrough.jpg",
+      "title": "Seat the thumb joint and bearings",
+      "duration": 60
+    }
+  ],
+  "p136": [
+    {
+      "src": "./assembly/clips/p136-4985-walkthrough.mp4",
+      "poster": "./assembly/clips/p136-4985-walkthrough.jpg",
+      "title": "Seat the rear hull cover",
+      "duration": 40
+    }
+  ],
+  "p49": [
+    {
+      "src": "./assembly/clips/p49-1108-walkthrough.mp4",
+      "poster": "./assembly/clips/p49-1108-walkthrough.jpg",
+      "title": "Anchor the thumb AP tendons",
+      "duration": 87
+    }
+  ],
+  "p52": [
+    {
+      "src": "./assembly/clips/p52-1195-walkthrough.mp4",
+      "poster": "./assembly/clips/p52-1195-walkthrough.jpg",
+      "title": "Trim and seat the thumb AP stoppers",
+      "duration": 25
+    }
+  ],
+  "p56": [
+    {
+      "src": "./assembly/clips/p56-1220-walkthrough.mp4",
+      "poster": "./assembly/clips/p56-1220-walkthrough.jpg",
+      "title": "Prepare the TP tendon anchors",
+      "duration": 60
+    }
+  ],
+  "p135": [
+    {
+      "src": "./assembly/clips/p135-5035-walkthrough.mp4",
+      "poster": "./assembly/clips/p135-5035-walkthrough.jpg",
+      "title": "Fit the side and hull covers",
+      "duration": 100
+    }
+  ],
+  "p6": [
+    {
+      "src": "./assembly/clips/p6-86-walkthrough.mp4",
+      "poster": "./assembly/clips/p6-86-walkthrough.jpg",
+      "title": "Tie an Ashley stopper",
+      "duration": 32
+    }
+  ],
+  "p112": [
+    {
+      "src": "./assembly/clips/p112-3479-walkthrough.mp4",
+      "poster": "./assembly/clips/p112-3479-walkthrough.jpg",
+      "title": "Motor setup reference",
+      "duration": 21
+    }
+  ],
+  "p46": [
+    {
+      "src": "./assembly/clips/p46-768-walkthrough.mp4",
+      "poster": "./assembly/clips/p46-768-walkthrough.jpg",
+      "title": "Prepare the thumb DP and PP pins",
+      "duration": 120
+    },
+    {
+      "src": "./assembly/clips/p46-888-walkthrough.mp4",
+      "poster": "./assembly/clips/p46-888-walkthrough.jpg",
+      "title": "Seat the thumb tendons, joint and skins",
+      "duration": 118
+    }
+  ],
+  "finishing-pp": [
+    {
+      "src": "./assembly/clips/p35-329-review.mp4",
+      "poster": "./assembly/clips/p35-329-review.jpg",
+      "title": "Fit the DP skin",
+      "duration": 17
+    },
+    {
+      "src": "./assembly/clips/p35-426-review.mp4",
+      "poster": "./assembly/clips/p35-426-review.jpg",
+      "title": "Fit the PP skin",
+      "duration": 19
+    }
+  ],
+  "p73": [
+    {
+      "src": "./assembly/clips/p73-1845-walkthrough.mp4",
+      "poster": "./assembly/clips/p73-1845-walkthrough.jpg",
+      "title": "Fit the carpal pins, pulley and skin",
+      "duration": 71
+    }
+  ]
+}
