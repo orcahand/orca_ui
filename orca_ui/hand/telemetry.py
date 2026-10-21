@@ -828,7 +828,11 @@ class TelemetryService:
         try:
             return take() or {}
         except Exception:
-            logger.debug("hardware-alert drain failed", exc_info=True)
+            # Not debug: this is how a fault is noticed between sweeps. If it
+            # fails, faults go unnoticed while the hand is being driven and
+            # nothing says so.
+            logger.warning("hardware-alert drain failed; faults raised between "
+                           "sweeps will be missed", exc_info=True)
             return {}
 
     @staticmethod
@@ -843,7 +847,8 @@ class TelemetryService:
             if read_one is not None:
                 return {int(mid): read_one(mid) for mid in hand.config.motor_ids}
         except Exception:
-            logger.debug("hardware-error sweep failed", exc_info=True)
+            logger.warning("hardware-error sweep failed; no motor's latch "
+                           "state is known this tick", exc_info=True)
         return None
 
     def _publish_motor_faults(self, session) -> None:

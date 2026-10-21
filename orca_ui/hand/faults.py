@@ -136,7 +136,11 @@ def classify_hw_error(flags, *, motor=None, joint=None,
     who = f"motor {motor}" if motor is not None else "the motor"
     if joint:
         who += f" ({joint})"
-    temp = "" if temperature_c is None else f" at {float(temperature_c):.0f} °C"
+    # Only a thermal fault is about temperature. Appending it to an overload
+    # read as though 26 degC were the cause, which sends whoever is debugging
+    # it looking at the wrong thing entirely.
+    temp = ("" if temperature_c is None or "overheating" not in flags
+            else f" at {float(temperature_c):.0f} °C")
     return {
         "flags": flags,
         "kind": kind,
