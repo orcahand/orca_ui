@@ -26,7 +26,6 @@ import type {
   TeleopSourceId,
   TeleopSourcesInfo,
   TrajectoryData,
-  TensionProbes,
   TensionSweeps,
   TravelBaseline,
   TravelBaselines,
@@ -155,9 +154,6 @@ export const api = {
   sweeps: () => request<TensionSweeps>('/api/sweeps'),
   sweepReference: (name: string | null) =>
     post<{ reference: string | null }>('/api/sweeps/reference', { name }),
-  probes: () => request<TensionProbes>('/api/probes'),
-  probeReference: (name: string | null) =>
-    post<{ reference: string | null }>('/api/probes/reference', { name }),
   baselines: () => request<TravelBaselines>('/api/baselines'),
   baselinePromote: (snapshot: string, name: string, note?: string, activate = true) =>
     post<TravelBaseline & { name: string }>('/api/baselines/promote', {

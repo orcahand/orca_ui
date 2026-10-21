@@ -41,33 +41,6 @@ def build_router(service: HandService) -> APIRouter:
 
         return baselines.state(service.supervisor.config)
 
-    @router.get("/probes")
-    def probes_state():
-        from orca_ui.hand import probes
-        from orca_ui.hand.operations import hand_ops
-        from orca_ui.hand.operations.guided_tension import motor_family
-
-        supported = hand_ops.tension_probe_supported()
-        if supported:
-            from orca_ui.hand.operations.tension_probe import probe_defaults
-
-        return {
-            **probes.state(service.supervisor.config),
-            "supported": supported,
-            "motor_type": motor_family(service),
-            "defaults": probe_defaults(service) if supported else None,
-        }
-
-    @router.post("/probes/reference")
-    def probes_reference(body: schemas.ProbeReferenceRequest):
-        from orca_ui.hand import probes
-
-        try:
-            probes.set_reference(service.supervisor.config, body.name)
-        except KeyError as e:
-            raise HTTPException(404, str(e))
-        return {"reference": body.name}
-
     @router.get("/sweeps")
     def sweeps_state():
         from orca_ui.hand import sweeps
@@ -79,7 +52,7 @@ def build_router(service: HandService) -> APIRouter:
             from orca_ui.hand.operations.tension_sweep import sweep_defaults
 
         return {
-            **sweeps.state(service.supervisor.config),
+            **sweeps.state(service.supervisor.config, motor_family(service)),
             "supported": supported,
             "motor_type": motor_family(service),
             "defaults": sweep_defaults(service) if supported else None,
@@ -95,7 +68,7 @@ def build_router(service: HandService) -> APIRouter:
         return {"name": name, **found}
 
     @router.post("/sweeps/reference")
-    def sweeps_reference(body: schemas.ProbeReferenceRequest):
+    def sweeps_reference(body: schemas.SweepReferenceRequest):
         from orca_ui.hand import sweeps
 
         try:

@@ -1,10 +1,9 @@
-import type {Build} from './buildContent'
 import type {AssemblyStep} from './guide'
 
 const TOOLS = {
   measure: 'Ruler or tape measure · millimetres',
   cut: 'Sharp scissors or flush cutters · tendon and PTFE',
-  driver: 'Hand screwdriver / hex keys with bits matching the supplied screws',
+  driver: 'Metric hex bits · 1.5 / 2.5 / 3mm',
   tuck: 'Small blunt tool · tuck knots and tails without piercing the cord',
   finish: 'Small file or fine sandpaper',
   brush: 'Soft brush · remove loose print debris',
@@ -54,13 +53,10 @@ export function stepTools(step:AssemblyStep):string[] {
   return (STEP_TOOLS[step.id]??[]).map(id=>TOOLS[id])
 }
 
-export function buildTools(steps:AssemblyStep[],build:Build) {
-  const core=steps.filter(s=>!s.hint&&!s.chapter.startsWith('Appendix'))
-  const ids=new Set(core.flatMap(s=>STEP_TOOLS[s.id]??[]))
+export function buildTools() {
   return {
-    assembly:([...ids] as Tool[]).filter(id=>!['computer','flash','console','firmware','paxini'].includes(id)).map(id=>TOOLS[id]),
-    setup:([...ids] as Tool[]).filter(id=>['computer','flash','console','firmware','paxini'].includes(id)).map(id=>TOOLS[id]),
-    optional:['Reusing a deformed PTFE tube: approximately Ø0.45 mm iron wire and fine wire cutters, only if needed.',`Making ${build.version==='base'?'Base':build.version==='touch'?'Touch':'Full'} skins: digital scale, separate cups and sticks, suitable gloves.`,'Arm mounting: drivers and any tightening tool specified by your robot arm manufacturer.'],
+    assembly:['Sharp scissors or flush cutters','Ruler or tape measure',TOOLS.finish,TOOLS.tuck,TOOLS.driver],
+    setup:[TOOLS.computer],
   }
 }
 

@@ -344,7 +344,9 @@ class HandService:
         from orca_ui.hand import sweeps
 
         try:
-            ref = sweeps.reference(config)
+            from orca_ui.hand.operations.guided_tension import motor_family
+
+            ref = sweeps.reference(config, motor_family(self))
             mine = sweeps.for_hand(config, self.supervisor.hand_id)
         except Exception:
             logger.exception("reading tension sweeps failed")

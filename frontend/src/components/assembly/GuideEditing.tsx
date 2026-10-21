@@ -21,10 +21,15 @@ export function useGuideEditing(scope:string){
 type Editing=ReturnType<typeof useGuideEditing>
 export const GuideEditingContext=createContext<Editing|null>(null)
 function sourceKey(text:string){let h=2166136261;for(let i=0;i<text.length;i++)h=Math.imul(h^text.charCodeAt(i),16777619);return (h>>>0).toString(36)}
-export function GuideText({field,text,label,variant=false}:{field:string;text:string;label?:string;variant?:boolean}){
+export function GuideText({field,text,label,variant=false,singleLine=false}:{field:string;text:string;label?:string;variant?:boolean;singleLine?:boolean}){
  if(variant)field+=`/${sourceKey(text)}`
- const editing=useContext(GuideEditingContext),ref=useRef<HTMLTextAreaElement>(null),value=editing?.read(field,text)??text
- useLayoutEffect(()=>{const el=ref.current;if(!el)return;const fit=()=>{el.style.height='0';el.style.height=`${el.scrollHeight+2}px`};fit();const observer=new ResizeObserver(()=>{if(el.clientWidth!==Number(el.dataset.width)){el.dataset.width=String(el.clientWidth);fit()}});observer.observe(el);return()=>observer.disconnect()},[value])
+ const editing=useContext(GuideEditingContext),ref=useRef<HTMLTextAreaElement>(null),wrapper=useRef<HTMLSpanElement>(null),input=useRef<HTMLInputElement>(null),value=editing?.read(field,text)??text
+ const [heading,setHeading]=useState(label==='Section heading'||label==='Step title')
+ singleLine=singleLine||heading
+ useLayoutEffect(()=>{if(wrapper.current?.closest('h1,h2,h3,h4,h5,h6'))setHeading(true)},[])
+ useLayoutEffect(()=>{const el=input.current;if(!el)return;const fit=()=>{el.style.fontSize='';const style=getComputedStyle(el),canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');if(!ctx)return;ctx.font=style.font;const width=ctx.measureText(value).width,available=el.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)-2;if(width>available&&available>0)el.style.fontSize=`${parseFloat(style.fontSize)*available/width}px`};fit();const observer=new ResizeObserver(fit);observer.observe(el);return()=>observer.disconnect()},[value,singleLine])
+ useLayoutEffect(()=>{const el=ref.current;if(!el)return;const fit=()=>{el.style.height='0';el.style.height=`${el.scrollHeight+2}px`};fit();const observer=new ResizeObserver(()=>{if(el.clientWidth!==Number(el.dataset.width)){el.dataset.width=String(el.clientWidth);fit()}});observer.observe(el);return()=>observer.disconnect()},[value,singleLine])
  if(!editing)return <>{text}</>
- return <span className="assembly-edit-field"><textarea ref={ref} rows={1} aria-label={label??`Edit ${field}`} value={value} onClick={e=>e.stopPropagation()} onKeyDown={e=>e.stopPropagation()} onChange={e=>editing.write(field,text,e.target.value)}/>{value!==text&&<button type="button" className="assembly-edit-undo" aria-label={`Restore ${label??field}`} title="Restore original text" onClick={e=>{e.preventDefault();editing.write(field,text,text)}}>↶</button>}</span>
+ const props={ 'aria-label':label??`Edit ${field}`,value,onClick:(e:React.MouseEvent)=>e.stopPropagation(),onKeyDown:(e:React.KeyboardEvent)=>e.stopPropagation(),onChange:(e:React.ChangeEvent<HTMLInputElement|HTMLTextAreaElement>)=>editing.write(field,text,e.target.value) }
+ return <span ref={wrapper} className="assembly-edit-field">{singleLine?<input ref={input} type="text" {...props}/>:<textarea ref={ref} rows={1} {...props}/>} {value!==text&&<button type="button" className="assembly-edit-undo" aria-label={`Restore ${label??field}`} title="Restore original text" onClick={e=>{e.preventDefault();editing.write(field,text,text)}}>↶</button>}</span>
 }

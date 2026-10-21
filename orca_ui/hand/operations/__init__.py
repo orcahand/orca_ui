@@ -37,12 +37,10 @@ def build_operation_manager(service, settings, publish_topic) -> OperationManage
             SimulatedTensionOperation,
         )
         from orca_ui.hand.operations.slack_test import SimulatedSlackTestOperation
-        from orca_ui.hand.operations.tension_probe import SimulatedTensionProbeOperation
         from orca_ui.hand.operations.tension_sweep import SimulatedTensionSweepOperation
         from orca_ui.hand.operations.wizard import SimulatedWizardOperation
         manager.register(SimulatedCalibrateOperation)
         manager.register(SimulatedSlackTestOperation)
-        manager.register(SimulatedTensionProbeOperation)
         manager.register(SimulatedTensionSweepOperation)
         manager.register(SimulatedTensionOperation)
         manager.register(SimulatedGuidedTensionOperation)
@@ -54,12 +52,10 @@ def build_operation_manager(service, settings, publish_topic) -> OperationManage
         from orca_ui.hand.operations.guided_tension import GuidedTensionOperation
         from orca_ui.hand.operations.tension import TensionOperation
         from orca_ui.hand.operations.slack_test import SlackTestOperation
-        from orca_ui.hand.operations.tension_probe import TensionProbeOperation
         from orca_ui.hand.operations.tension_sweep import TensionSweepOperation
         from orca_ui.hand.operations.wizard import WizardOperation
         manager.register(CalibrateOperation)
         manager.register(SlackTestOperation)
-        manager.register(TensionProbeOperation)
         manager.register(TensionSweepOperation)
         manager.register(TensionOperation)
         manager.register(GuidedTensionOperation)

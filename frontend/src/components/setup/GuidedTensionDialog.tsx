@@ -6,11 +6,9 @@
 //
 // The run's scoring (extra.scoring) picks what the rows say: fraction scoring
 // shows percent of the expected travel with kept scores; slack scoring shows
-// the slack in motor degrees, the ends reached, probe findings and clicks.
-//
-// Between the score and the ratchet sits the tension check (extra.check): the
-// hand goes limp for the mid-range pose, the breakaway probe runs from there,
-// and the ratchet step then lists only the tendons the check found loose.
+// the slack in motor degrees and the ends reached. The ratchet step lists the
+// clicks each joint's missing travel needs, rounded down, so a round aims a
+// little loose; the tension sweep after calibration counts the last clicks.
 
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -28,12 +26,7 @@ import { useAppStore } from '../../state/appStore'
 import { ErrorBoundary } from '../common/ErrorBoundary'
 import { isOperationActive } from '../../state/operationStore'
 import { EXTRA_DEG, PULL_MORE } from '../../state/tensionFlow'
-import { CHECK_HINT, startTensionCheck } from './probeStart'
 import type { PreviewMode } from './TensionPreview'
-import { PosePreview } from './PosePreview'
-import { jointsOver, jointsToTension, label as jointLabel, marksFromProbe, ProbeBody } from './ProbeBody'
-import { clicksFor, clicksText, compareProbe, loadPctPerClick, usableReference, useProbes } from './ProbeReference'
-import { POSE_TEXT } from './TensionProbeDialog'
 import { TowerFaces } from './TowerFaces'
 import {
   DEFAULT_PASS,
@@ -51,9 +44,8 @@ const TensionPreview = lazy(() =>
   import('./TensionPreview').then((m) => ({ default: m.TensionPreview })),
 )
 
-// The loop as the sidebar shows it: check → ratchet → move each finger → score, and round again.
+// The loop as the sidebar shows it: ratchet → move each finger → score, and round again.
 const BEFORE_STAGES: { key: TensionStep; title: string; note: string }[] = [
-  { key: 'check', title: 'Tension check', note: 'pose, then probe' },
   { key: 'tension', title: 'Ratchet', note: 'the listed spools' },
 ]
 const AFTER_STAGES: { key: TensionStep; title: string; note: string }[] = [
@@ -90,16 +82,17 @@ const deg = (value: number | null | undefined, digits = 0) =>
 function slackCell(motor: MotorSpread): string {
   if (motor.status === 'fault') return 'FAULT'
   if (motor.slack_deg == null) return 'n/a'
-  if (motor.status === 'slack') return `probe ${deg(motor.probe_slack_deg)}`
   return deg(Math.max(0, motor.slack_deg))
 }
 
-// Slack scoring: what the ratchet step says for a joint, clicks when a click model exists.
-function slackTodoCell(motor: MotorSpread): string {
+const clicksText = (clicks: number) => `~${clicks} click${clicks === 1 ? '' : 's'}`
+
+// What the ratchet step says for a joint: the clicks its missing travel
+// needs, or the travel itself while the degrees per click are unknown.
+function todoCell(motor: MotorSpread, slack: boolean): string {
   if (motor.status === 'fault') return 'FAULT'
-  if (motor.clicks_left != null && motor.clicks_left > 0) return `~${motor.clicks_left} clicks`
-  const slack = Math.max(motor.slack_deg ?? 0, motor.probe_slack_deg ?? 0)
-  return `${deg(slack)} slack`
+  if (motor.clicks_left != null) return motor.clicks_left > 0 ? clicksText(motor.clicks_left) : 'under 1 click'
+  return slack ? `${deg(Math.max(0, motor.slack_deg ?? 0))} slack` : pct(motor.fraction)
 }
 
 // Thresholds the rows fall back on when a row carries none of its own.
@@ -126,9 +119,6 @@ export function GuidedTensionDialog({
   const extra = operation.extra as GuidedTensionExtra | null
   const active = isOperationActive(operation)
   const step: TensionStep | null = active ? (extra?.step ?? null) : 'done'
-  // The breakaway reference the in-round tension check is scored against.
-  const { state: probes } = useProbes(extra?.check?.saved ?? null)
-  const probeRef = usableReference(probes, extra?.check?.methods?.find((m) => m !== 'takeup') ?? 'stroke')
   const awaiting = operation.state === 'awaiting_input' ? operation.awaiting : null
   const slack = extra?.scoring === 'slack'
   const thresholds: Thresholds = {
@@ -230,7 +220,7 @@ export function GuidedTensionDialog({
     ...stages.map((st) => ({ key: `stage:${st.key}`, title: st.title, note: 'pose, then move' })),
     ...AFTER_STAGES,
   ]
-  const currentKey = stage ? `stage:${stage.key}` : step === 'check_pose' ? 'check' : step
+  const currentKey = stage ? `stage:${stage.key}` : step
   const buttons = awaiting?.options.filter((o) => !o.startsWith(GOTO)) ?? []
   const stepIndex = steps.findIndex((s) => s.key === currentKey)
   const keptBefore = motors.filter(
@@ -252,7 +242,7 @@ export function GuidedTensionDialog({
                   : 'Expected travel per joint from the shared v2.1 block'
               }
             >
-              vs {extra.baseline.name ?? 'v2.1 shared'}
+              vs {extra.baseline.source === 'reference' ? 'reference hand' : (extra.baseline.name ?? 'v2.1 shared')}
             </span>
           )}
           {extra?.resumed && !slack && (
@@ -266,19 +256,6 @@ export function GuidedTensionDialog({
               title="Every joint is checked again this round; the earlier rounds only count towards the total"
             >
               round {extra.resumed.rounds} before · {extra.resumed.passed ?? 0}/{extra.resumed.joints} passed then
-            </span>
-          )}
-          {extra?.probe && (
-            <span
-              className={`setup-badge${extra.probe.flagged.length ? ' warn' : ''}`}
-              title={
-                extra.probe.flagged.length
-                  ? `Probe ${extra.probe.name} measured slack above tolerance on ${extra.probe.flagged.join(', ')}: these cannot pass the first round before the ratchet`
-                  : `Probe ${extra.probe.name} found no slack above tolerance`
-              }
-            >
-              probe {extra.probe.name}
-              {extra.probe.flagged.length ? ` · ${extra.probe.flagged.length} to tension` : ''}
             </span>
           )}
           <span className="gt-header-spacer" />
@@ -367,7 +344,6 @@ export function GuidedTensionDialog({
               step={step}
               preview={preview}
               thresholds={thresholds}
-              probeRef={probeRef}
             />
             {awaiting && (
               <div className="gt-actions">
@@ -406,14 +382,12 @@ function StepContent({
   step,
   preview,
   thresholds,
-  probeRef,
 }: {
   operation: OperationSnapshot
   extra: GuidedTensionExtra | null
   step: TensionStep | null
   preview: ReactNode
   thresholds: Thresholds
-  probeRef: ReturnType<typeof usableReference>
 }) {
   if (operation.state === 'error') {
     return (
@@ -496,7 +470,7 @@ function StepContent({
               <ScoreLine extra={extra} slack={slack} />
             </div>
           </div>
-          <MotorGrid motors={motors} thresholds={thresholds} focus={testing} />
+          <MotorGrid motors={motors} thresholds={thresholds} focus={testing} canRetest />
           <ExcludedNote excluded={extra.excluded} />
         </div>
       )
@@ -531,146 +505,52 @@ function StepContent({
               )}
             </div>
           </div>
-          <MotorGrid motors={motors} thresholds={thresholds} />
+          <MotorGrid motors={motors} thresholds={thresholds} canRetest />
           <ExcludedNote excluded={extra.excluded} />
         </div>
       )
-    case 'check_pose':
-      return (
-        <div className="gt-split">
-          <PosePreview caption={<div className="gt-preview-caption">mid-range pose · torque off</div>} />
-          <div className="gt-pane">
-            <div className="gt-todo-title">Tension check · round {extra.round}</div>
-            <h3 className="gt-heading">Bring the hand to this pose first</h3>
-            <p className="setup-copy">{POSE_TEXT}</p>
-            <p className="setup-copy">
-              Continue runs the check: the four fingers of each joint kind move together 40° and back under one
-              current limit, then each thumb joint; each motor's mean current is compared with the reference hand's.
-              A tendon under 90 % still needs the ratchet (under 70 % is loose); the ratchet step then lists only
-              those. Skip goes to the ratchet with the range check's findings instead.
-            </p>
-          </div>
-        </div>
-      )
-    case 'check':
-      return (
-        <div className="gt-range">
-          <ProbeBody
-            extra={extra.check ?? null}
-            active
-            reference={probeRef.dataset}
-            refName={probeRef.name}
-            mismatch={probeRef.mismatch}
-            heading={
-              <div className="gt-pane">
-                <h3 className="gt-heading">Tension check · keep clear of the hand</h3>
-              </div>
-            }
-          />
-        </div>
-      )
     case 'tension': {
-      const checkVerdict =
-        extra.check?.results?.length && probeRef.dataset ? compareProbe(extra.check.results, probeRef.dataset) : null
-      // The list comes from this round's check, or from the measurement the run was opened with.
-      const fromCheck = checkVerdict
-        ? jointsToTension(checkVerdict)
-        : extra.ratchet
-          ? Object.entries(extra.ratchet)
-              .map(([joint, pct]) => ({ joint, pct: pct ?? 0 }))
-              .sort((a, b) => a.pct - b.pct)
-          : null
-      const tooTight = checkVerdict ? jointsOver(checkVerdict) : []
-      const todo = slack
-        ? motors
-            .filter((m) => !['pass', 'unconfirmed', 'unscored'].includes(m.status))
-            .sort((a, b) => (b.slack_deg ?? 0) - (a.slack_deg ?? 0))
-        : motors
-            .filter((m) => m.status !== 'pass' && m.status !== 'unscored')
-            .sort((a, b) => (a.fraction ?? 0) - (b.fraction ?? 0))
-      const hasClicks = (extra.clicks?.samples ?? 0) > 0
-      const checkMotors: Record<string, number> = {}
-      for (const r of extra.check?.results ?? []) checkMotors[r.joint] = r.motor_id
+      // From the sweep the run was opened with, or from this round's score;
+      // each listed spool carries its clicks on the tower.
+      const motorOf = Object.fromEntries(motors.map((m) => [m.joint, m.motor]))
+      const marks = extra.ratchet
+        ? Object.entries(extra.ratchet).map(([joint, r]) => ({
+            joint,
+            motor: motorOf[joint] ?? 0,
+            status: ((r.pct ?? 0) < 70 ? 'low' : 'partial') as SpreadStatus,
+            fraction: null,
+            tag: r.clicks ? clicksText(r.clicks) : 'under 1 click',
+          }))
+        : motors.map((m) => ({
+            joint: m.joint,
+            motor: m.motor,
+            status: m.status,
+            fraction: m.fraction,
+            tag: ['pass', 'unconfirmed', 'unscored'].includes(m.status) ? undefined : todoCell(m, slack),
+          }))
       return (
         <div className="gt-tension">
-          <ErrorBoundary label="The tower preview" fallback={previewUnavailable}>
-            <TowerFaces
-              withList={false}
-              marks={
-                checkVerdict
-                  ? marksFromProbe(checkVerdict, checkMotors, extra.check?.joints ?? Object.keys(checkVerdict.joints))
-                  : motors.map((m) => ({ joint: m.joint, motor: m.motor, status: m.status, fraction: m.fraction }))
-              }
-              head={[]}
-              columns=""
-              row={() => []}
-            />
-          </ErrorBoundary>
           <div className="gt-pane">
             <h3 className="gt-heading">Now use the ratchet tool</h3>
             <p className="setup-copy">
-              Hulls off. The finger motors have slowly turned{' '}
-              {extra.pulled_deg ?? extra.tension_offset_deg}° counterclockwise and are holding
-              with {extra.tension_current} mA of current, the rotation should have placed some
-              tension on all tendons attached to the bottom spools.
+              Hulls off. The finger motors have slowly turned {extra.pulled_deg ?? extra.tension_offset_deg}°
+              counterclockwise and are holding with {extra.tension_current} mA of current, the rotation should have
+              placed some tension on all tendons attached to the bottom spools. If any bottom spool tendons still feel
+              loose, press "{PULL_MORE}" ({EXTRA_DEG}° more).
             </p>
             <p className="setup-copy">
-              If any bottom spool tendons still feel loose, press "{PULL_MORE}" ({EXTRA_DEG}° more).
+              Turn the top spool of each marked motor by the clicks shown next to it. The counts are rounded down on
+              purpose: stay a little loose here — the tension sweep after calibration counts the last clicks.
+              {extra.deg_per_click == null &&
+                ' The degrees one click takes up are not set yet, so the spools show the missing travel instead.'}
             </p>
-            <p className="setup-copy">
-              Now use your tensioning tool to turn the top spools of each red and then orange
-              highlighted motor.
-              {slack && (
-                <>
-                  {' '}
-                  {hasClicks
-                    ? 'The click counts come from the saved click tests; stop early if a tendon feels firm before the count is up.'
-                    : 'Each row shows the slack still in the tendon, in motor degrees; run a click test (scripts/click_test.py) to turn that into a click count.'}
-                </>
-              )}
-            </p>
-            <div className="gt-warning">
-              Tension carefully. Stop as soon as the tendon feels firm — overtensioning makes the
-              joint stall short of its range and wears the motor.
-            </div>
-            {fromCheck ? (
-              <div className="gt-todo">
-                <div className="gt-todo-title">
-                  Still to tension · {fromCheck.length} ·{' '}
-                  {checkVerdict ? `from the tension check${extra.check?.saved ? ` ${extra.check.saved}` : ''}` : 'from the last measurement'}
-                </div>
-                {fromCheck.map((t) => {
-                  const clicks = clicksFor(t.pct, loadPctPerClick())
-                  return (
-                    <div key={t.joint} className={`gt-todo-row ${t.pct < 70 ? 'low' : 'partial'} wide`} title="current as a share of the reference; under 90 % needs the ratchet, under 70 % is loose">
-                      <b>M{checkMotors[t.joint] ?? '?'}</b>
-                      <span>{jointLabel(t.joint)}</span>
-                      <span>{Math.round(t.pct)}%</span>
-                      <span>{clicksText(clicks)}</span>
-                    </div>
-                  )
-                })}
-                {fromCheck.length === 0 && (
-                  <p className="setup-copy">Every tendon is at or above 90 % of the reference: nothing to ratchet this round.</p>
-                )}
-                {tooTight.length > 0 && (
-                  <p className="setup-copy">Tighter than the reference (grey), left alone: {tooTight.map(jointLabel).join(', ')}.</p>
-                )}
-              </div>
-            ) : (
-              <div className="gt-todo">
-                <div className="gt-todo-title">
-                  Still to tension · {todo.length}
-                </div>
-                {todo.map((m) => (
-                  <div key={m.joint} className={`gt-todo-row ${m.status}`}>
-                    <b>M{m.motor}</b>
-                    <span>{m.joint}</span>
-                    <span>{slack ? slackTodoCell(m) : pct(m.fraction)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+          </div>
+          <ErrorBoundary label="The tower preview" fallback={previewUnavailable}>
+            <TowerFaces withList={false} tags="full" marks={marks} head={[]} columns="" row={() => []} />
+          </ErrorBoundary>
+          <div className="gt-warning">
+            Tension carefully. Stop as soon as the tendon feels firm — overtensioning makes the joint stall short of
+            its range and wears the motor.
           </div>
         </div>
       )
@@ -694,21 +574,12 @@ function StepContent({
               </h3>
               <p className="setup-copy">
                 {extra.completed
-                  ? 'Saved as this hand’s last successful tension. Next: the slack test and the calibration in the Calibrate step — tensioning changes the tendon lengths.'
-                  : 'Not recorded as a successful tension. Run the slack test and calibrate (Calibrate step) before use.'}
+                  ? 'Saved as this hand’s last successful tension. Next: calibrate, then the tension sweep counts the clicks still missing.'
+                  : 'Not recorded as a successful tension. Calibrate (Calibrate step), then run the tension sweep.'}
               </p>
             </div>
           </div>
           {motors.length > 0 && <MotorGrid motors={motors} thresholds={thresholds} />}
-          <div className="gt-actions">
-            <button
-              className="btn btn-secondary"
-              title={CHECK_HINT}
-              onClick={() => void startTensionCheck().catch(fail)}
-            >
-              Tension check
-            </button>
-          </div>
         </div>
       )
   }
@@ -725,7 +596,7 @@ function stagePossessive(stage?: RangeStage): string {
   return stage && stage.title.toLowerCase().includes(' and ') ? 'their' : 'its'
 }
 
-// The pass target per joint group: "85% APs / 85% MCPs / 85% PIPs" under
+// The pass target per joint group: "80% APs / 80% MCPs / 80% PIPs" under
 // fraction scoring, "3° APs / 5° MCPs / 5° PIPs" of slack under slack scoring.
 function passTargets(extra: GuidedTensionExtra): string {
   if (extra.scoring === 'slack') {
@@ -769,10 +640,13 @@ function MotorGrid({
   motors,
   thresholds,
   focus,
+  canRetest = false,
 }: {
   motors: MotorSpread[]
   thresholds: Thresholds
   focus?: Set<string>
+  // A passed row gets a button that drops its pass so it is tested again.
+  canRetest?: boolean
 }) {
   // The stage's joints first; the rest stay visible but dimmed.
   const ordered = focus
@@ -787,6 +661,7 @@ function MotorGrid({
           motor={m}
           thresholds={thresholds}
           dim={focus !== undefined && !focus.has(m.joint)}
+          canRetest={canRetest}
         />
       ))}
     </div>
@@ -797,10 +672,26 @@ interface RowProps {
   motor: MotorSpread
   thresholds: Thresholds
   dim?: boolean
+  canRetest?: boolean
+}
+
+// The last cell of a row: on a passed joint, a button that drops the pass so
+// the range check scores it again; empty otherwise, so the columns line up.
+function RetestCell({ motor, canRetest }: { motor: MotorSpread; canRetest?: boolean }) {
+  if (!canRetest || (motor.status !== 'pass' && motor.status !== 'unconfirmed')) return <span />
+  return (
+    <button
+      className="gt-retest"
+      title={`Test ${motor.joint.replace('_', ' ')} again: drop its pass and sweep it once more`}
+      onClick={() => answer(`again:${motor.joint}`)}
+    >
+      ↺
+    </button>
+  )
 }
 
 // Fraction scoring: percent of the expected travel, the pass band on the track.
-function FractionRow({ motor, thresholds, dim = false }: RowProps) {
+function FractionRow({ motor, thresholds, dim = false, canRetest }: RowProps) {
   const passFraction = motor.pass_fraction ?? thresholds.passFraction
   // Passing on an earlier score rather than this check's movement.
   const keptPass =
@@ -829,13 +720,14 @@ function FractionRow({ motor, thresholds, dim = false }: RowProps) {
         {motor.status === 'fault' ? 'FAULT' : motor.expected_deg == null ? 'n/a' : pct(motor.fraction)}
         {motor.status !== 'fault' && <small>/{Math.round(passFraction * 100)}</small>}
       </span>
+      <RetestCell motor={motor} canRetest={canRetest} />
     </div>
   )
 }
 
 // Slack scoring: slack in motor degrees, the goal band is the travel less the
 // tolerance, and the ends reached so far.
-function SlackRow({ motor, thresholds, dim = false }: RowProps) {
+function SlackRow({ motor, thresholds, dim = false, canRetest }: RowProps) {
   const tolerance = motor.pass_slack_deg ?? thresholds.passSlack
   const half = (motor.expected_deg ?? 1) / 2
   const goal = Math.max(0, half - tolerance / 2)
@@ -843,15 +735,13 @@ function SlackRow({ motor, thresholds, dim = false }: RowProps) {
   const ends = `${motor.plus_hits}/${motor.minus_hits}`
   const title =
     `${motor.spread_deg.toFixed(0)}° swept of ${motor.expected_deg ?? '?'}° · slack ${deg(motor.slack_deg)} ` +
-    `(tolerance ${tolerance}°) · ends reached +${motor.plus_hits} / −${motor.minus_hits}` +
-    (motor.probe_slack_deg != null ? ` · probe measured ${deg(motor.probe_slack_deg, 1)} slack` : '')
+    `(tolerance ${tolerance}°) · ends reached +${motor.plus_hits} / −${motor.minus_hits}`
   return (
     <div className={`gt-row ${motor.status}${dim ? ' dim' : ''}`} title={title}>
       <span className="gt-row-id">M{motor.motor}</span>
       <span className="gt-row-joint">
         {motor.joint}
         {motor.status === 'unconfirmed' && <em className="gt-again"> again</em>}
-        {motor.status === 'slack' && <em className="gt-again"> probe</em>}
       </span>
       <span className="gt-track">
         {motor.expected_deg != null && (
@@ -869,6 +759,7 @@ function SlackRow({ motor, thresholds, dim = false }: RowProps) {
           <small title="ends reached: + / −">/{tolerance}° · {ends}</small>
         )}
       </span>
+      <RetestCell motor={motor} canRetest={canRetest} />
     </div>
   )
 }

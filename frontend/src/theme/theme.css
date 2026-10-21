@@ -2661,7 +2661,7 @@ header h1 {
 .gt-row {
   --row-rgb: var(--err-rgb);
   display: grid;
-  grid-template-columns: 30px 82px 1fr 54px;
+  grid-template-columns: 30px 82px 1fr 54px 16px;
   align-items: center;
   gap: 8px;
   height: 22px;
@@ -2716,6 +2716,23 @@ header h1 {
   text-align: right;
   font-weight: 700;
   color: rgb(var(--row-rgb));
+}
+
+.gt-retest {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid rgb(var(--row-rgb) / 0.5);
+  border-radius: 3px;
+  background: none;
+  color: rgb(var(--row-rgb));
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.gt-retest:hover {
+  background: rgb(var(--row-rgb) / 0.15);
 }
 
 .gt-track {
@@ -4167,6 +4184,11 @@ header h1 {
 .wf-arrow text {
   fill: var(--dim);
   font-size: 10px;
+  /* A halo in the chart's background keeps a label readable where a line crosses it. */
+  paint-order: stroke;
+  stroke: var(--panel);
+  stroke-width: 4px;
+  stroke-linejoin: round;
 }
 
 #wf-head path {
@@ -4268,6 +4290,30 @@ header h1 {
   border-radius: 2px;
 }
 
+.tower-spool-label {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 1px 4px;
+  font-size: 9.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--text-bright);
+  background: var(--bg);
+  border-left: 3px solid rgb(var(--spool-rgb));
+  border-radius: 2px;
+}
+
+.tower-spool-label.left {
+  right: calc(100% + 6px);
+  border-left: none;
+  border-right: 3px solid rgb(var(--spool-rgb));
+}
+
+.tower-spool-label.right {
+  left: calc(100% + 6px);
+}
+
 .tower-spool.unscored b {
   background: rgb(var(--overlay-rgb) / 0.6);
 }
@@ -4312,7 +4358,7 @@ header h1 {
   font-variant-numeric: tabular-nums;
 }
 
-.sweep-curve svg {
+.sweep-curve > svg {
   display: block;
   width: 100%;
   height: auto;
@@ -4354,6 +4400,43 @@ header h1 {
   fill: rgb(var(--err-rgb) / 0.14);
 }
 
+.sweep-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.sweep-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sweep-legend .dim {
+  color: var(--dim);
+}
+
+.sweep-swatch {
+  flex: none;
+  width: 24px;
+  height: 8px;
+}
+
+.sweep-band {
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+  background: rgb(var(--warn-rgb) / 0.3);
+}
+
+.sweep-band.above {
+  background: rgb(var(--err-rgb) / 0.3);
+}
+
 /* ----- one joint's sweep curves over the whole dialog ----- */
 
 .gt-dialog {
@@ -4389,7 +4472,7 @@ header h1 {
   font-size: 13px;
 }
 
-.sweep-plot-body .sweep-curve svg {
+.sweep-plot-body .sweep-curve > svg {
   flex: 1;
   min-height: 0;
   width: 100%;
@@ -4404,22 +4487,47 @@ header h1 {
   background: rgb(var(--accent-rgb) / 0.08);
 }
 
-/* ----- ratchet step: pictures only on the left, the list to tension on the right ----- */
+/* ----- ratchet step: the text across the top, both faces large side by side, the warning below ----- */
 
 .gt-dialog {
   width: min(1400px, 100%);
 }
 
-.probe-face-row.pictures-only {
+.gt-tension {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gt-tension .setup-copy {
+  max-width: none;
+}
+
+.probe-faces.pictures-only {
+  flex-direction: row;
+}
+
+.probe-faces.pictures-only > .probe-face-row {
+  flex: 1;
   grid-template-columns: 1fr;
 }
 
 .probe-faces.pictures-only .probe-face-view {
-  height: 250px;
+  height: clamp(260px, calc(100vh - 560px), 560px);
 }
 
-.gt-tension {
-  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+.probe-faces.pictures-only .tower-spool {
+  font-size: 11px;
+}
+
+.probe-faces.pictures-only .tower-spool-label {
+  font-size: 12px;
+}
+
+@media (max-width: 800px) {
+  .probe-faces.pictures-only {
+    flex-direction: column;
+  }
 }
 
 .gt-todo-row.wide {

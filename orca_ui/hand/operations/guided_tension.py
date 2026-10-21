@@ -22,7 +22,7 @@ from orca_core.constants import (
     SUPPORTED_MOTOR_TYPES,
 )
 
-from orca_ui.hand import probes
+from orca_ui.hand import reference
 from orca_ui.hand.faults import classify_hw_error
 from orca_ui.hand.operations import hand_ops
 from orca_ui.hand.operations.base import OpContext, Operation
@@ -34,7 +34,6 @@ PROMPTS = {
     "pose": "Torque off — pose the hand for the next finger",
     "range_check": "Drive the highlighted joints through their full range",
     "score": "Range check scored",
-    "check_pose": "Torque off — bring the hand to the pose shown, clear of every stop",
     "tension": "Tension carefully with the ratchet tool — do not overtension",
 }
 GOTO = (
@@ -65,6 +64,8 @@ LIVE_STEP = {
 PASS_INPUT = "pass:"
 # Input values "reboot:<motor id>" clear a motor's latched hardware error and hold it again.
 REBOOT_INPUT = "reboot:"
+# "again:<joint>": drop the joint's kept pass so the range check tests it again.
+AGAIN_INPUT = "again:"
 PASS_GROUPS = ("ap", "mcp", "pip")
 # Which rule scores the range check (see run_guided_tension): "fraction" is
 # the spread as a share of the expected travel with the best kept across
@@ -73,7 +74,7 @@ SCORING_FRACTION = "fraction"
 SCORING_SLACK = "slack"
 SCORINGS = (SCORING_FRACTION, SCORING_SLACK)
 PASS_BOUNDS_FRACTION = (0.1, 1.0)
-DEFAULT_PASS_FRACTION = 0.85
+DEFAULT_PASS_FRACTION = 0.8
 # Slack tolerance (expected travel minus the swept spread), motor degrees.
 PASS_BOUNDS_DEG = (0.5, 30.0)
 DEFAULT_PASS_SLACK_DEG = {"ap": 3.0, "mcp": 5.0, "pip": 5.0}
@@ -112,6 +113,8 @@ def motor_family(service) -> str | None:
     session = service.session
     config = session.hand.config if session is not None else service.supervisor.config
     family = getattr(config, "motor_type", None)
+    if family is None and session is not None:
+        family = hand_ops.hand_family(session.hand)
     return family if family in SUPPORTED_MOTOR_TYPES else None
 
 
@@ -174,27 +177,32 @@ def validate_guided_tension_params(service, params: dict) -> dict:
     clean["resume"] = bool(params.get("resume", True))
     clean["any_hardware"] = bool(params.get("any_hardware", False))
     config = service.supervisor.config
-    # Opened from a tension check: carry its results and go straight to the ratchet.
-    check_from = params.get("check_from")
-    if check_from is not None:
-        if probes.state(config)["probes"].get(check_from) is None:
-            raise ServiceError(f"no probe dataset named {check_from!r}", status_code=422)
-        clean["check_from"] = str(check_from)
     start_at = params.get("start_at")
     if start_at not in (None, "tension"):
         raise ServiceError("start_at must be 'tension' or omitted", status_code=422)
     if start_at is not None:
         clean["start_at"] = start_at
-    # Begin with the tension check and its ratchet before any finger is moved.
-    clean["check_first"] = bool(params.get("check_first", False))
-    # Tendons to ratchet, with their share of the reference, from a measurement
-    # (the sweep after calibration) rather than a check.
+    # Tendons to ratchet from the sweep after calibration: per joint its
+    # friction as a percentage of the reference and the clicks the sweep counted.
     ratchet = params.get("ratchet_joints")
     if ratchet is not None:
         known = set(config.joint_ids) - {"wrist"}
-        if not isinstance(ratchet, dict) or not set(ratchet) <= known:
-            raise ServiceError("ratchet_joints must map this hand's finger joints to a percentage", status_code=422)
-        clean["ratchet_joints"] = {j: (float(v) if v is not None else None) for j, v in ratchet.items()}
+        if not isinstance(ratchet, dict) or not set(ratchet) <= known or not all(
+            isinstance(v, dict) for v in ratchet.values()
+        ):
+            raise ServiceError(
+                "ratchet_joints must map this hand's finger joints to {pct, clicks}", status_code=422
+            )
+        try:
+            clean["ratchet_joints"] = {
+                j: {
+                    "pct": None if v.get("pct") is None else float(v["pct"]),
+                    "clicks": None if v.get("clicks") is None else int(v["clicks"]),
+                }
+                for j, v in ratchet.items()
+            }
+        except (TypeError, ValueError):
+            raise ServiceError("ratchet_joints values must be numbers", status_code=422)
     if not (getattr(config, "uses_motor_travel", True) or clean["any_hardware"]):
         raise ServiceError(
             "guided tensioning needs v2.1 hardware — use the hold dialog, or "
@@ -210,11 +218,9 @@ def validate_guided_tension_params(service, params: dict) -> dict:
 class _Presenter:
     """Turns the routine's prompts and progress events into snapshot updates."""
 
-    def __init__(self, ctx: OpContext, currents: dict, on_prompt=None, clicks: dict | None = None,
-                 start_at: str | None = None):
+    def __init__(self, ctx: OpContext, currents: dict, on_prompt=None, start_at: str | None = None):
         self._ctx = ctx
         self._on_prompt = on_prompt
-        self._clicks = clicks or {}
         # "tension": the first pose prompt is answered with goto:tension by itself.
         self._start_at = start_at
         self._extra: dict = {
@@ -329,13 +335,12 @@ class _Presenter:
                 self._ctx.log(f"cleanup failed: {event.get('error')}")
 
     def _with_clicks(self, motor: dict) -> dict:
-        """Add the ratchet clicks the click model says this joint's slack needs."""
-        if not self._clicks:
-            return motor
+        """Add the ratchet clicks the joint's slack still needs: its slack in
+        degrees, or the travel it is short of (expected × (1 − fraction))."""
         slack = motor.get("slack_deg")
-        if motor.get("probe_slack_deg") is not None:
-            slack = max(slack or 0.0, motor["probe_slack_deg"])
-        return {**motor, "clicks_left": probes.clicks_left(self._clicks, motor["joint"], slack)}
+        if slack is None and motor.get("fraction") is not None and motor.get("expected_deg"):
+            slack = motor["expected_deg"] * max(0.0, 1.0 - motor["fraction"])
+        return {**motor, "clicks_left": reference.clicks_for_slack(slack, motor["joint"])}
 
     def _set_fault(self, motor: int, joint, flags: list, relatched: bool = False) -> None:
         info = classify_hw_error(flags, motor=motor, joint=joint)
@@ -357,36 +362,15 @@ class _Presenter:
             self._on_prompt()
         if self._start_at == "tension" and action == "pose" and GOTO_TENSION in prompt["options"]:
             self._start_at = None
-            self._ctx.log("opened from a tension check: straight to the ratchet")
+            self._ctx.log("opened with a ratchet list: straight to the ratchet")
             return GOTO_TENSION
         self._start_at = None
         return self._ctx.wait_input(PROMPTS[action], list(prompt["options"]))
-
-    def check_update(self, extra: dict) -> None:
-        """The tension check running inside this round, as the probe presenter publishes it."""
-        with self._lock:
-            self._extra["check"] = {**extra, "round": self._extra["round"]}
-            self._publish()
 
     def seed_ratchet(self, ratchet: dict) -> None:
         """A ratchet list the run was opened with (from the sweep after calibration)."""
         with self._lock:
             self._extra["ratchet"] = dict(ratchet)
-            self._publish()
-
-    def seed_check(self, config, name: str) -> None:
-        """Show a saved check's results from the start (opened from its dialog)."""
-        dataset = probes.state(config)["probes"].get(name)
-        if not dataset:
-            return
-        with self._lock:
-            self._extra["check"] = {
-                "step": "done", "check": True, "saved": name, "methods": dataset.get("methods", ["breakaway"]),
-                "joints": dataset.get("joints", []), "repeats": dataset.get("repeats", 1),
-                "results": list(dataset.get("results", [])), "index": 0, "done": 0, "total": 0,
-                "current": None, "active": [], "centre_deg": dataset.get("centre_deg", {}),
-                "round": 0,
-            }
             self._publish()
 
     def log(self, line: str) -> None:
@@ -416,6 +400,8 @@ class _LiveCurrents(Operation):
         self.pass_fractions.update(params.get("pass_fractions") or {})
         self.pass_slack = dict(DEFAULT_PASS_SLACK_DEG)
         self.pass_slack.update(params.get("pass_slack_deg") or {})
+        self._again: set[str] = set()
+        self._again_lock = threading.Lock()
         self._hand = None
         self._presenter: _Presenter | None = None
         self._answered = False
@@ -497,7 +483,20 @@ class _LiveCurrents(Operation):
             # The routine confirms on its next sweep; the dialog need not wait for it.
             presenter.progress({"event": "fault_cleared", "motor": motor, "joint": joint})
 
+    def drain_again(self) -> set[str]:
+        """The joints asked to be tested again since the last call."""
+        with self._again_lock:
+            joints, self._again = self._again, set()
+        return joints
+
     def handle_input(self, value: str) -> bool:
+        if value.startswith(AGAIN_INPUT):
+            joint = value[len(AGAIN_INPUT):]
+            with self._again_lock:
+                self._again.add(joint)
+            if self._presenter is not None:
+                self._presenter.log(f"{joint}: tested again, its earlier pass dropped")
+            return True
         if value.startswith(REBOOT_INPUT):
             self._reboot(value[len(REBOOT_INPUT):])
             return True
@@ -539,26 +538,21 @@ class _LiveCurrents(Operation):
 
 class GuidedTensionOperation(_LiveCurrents):
     def run(self, ctx: OpContext) -> dict:
-        from orca_ui.hand.operations.tension_probe import hand_family
-
         supervisor = ctx.service.supervisor
+        # Read before the lease: in maintenance the session (and its family) is gone.
+        family = motor_family(ctx.service)
         ctx.set_phase("acquiring", detail="taking the hand into maintenance")
         lease = supervisor.enter_maintenance(self.kind)
         hand = None
         config = supervisor.config
-        slack = self.slack_scoring
-        clicks = _click_model(config) if slack else {}
         extra = {
             **self.settings(),
-            "hold_fixed": fixed_holds(config, motor_family(ctx.service)),
+            "hold_fixed": fixed_holds(config, family),
+            "deg_per_click": reference.deg_per_click(),
         }
-        if slack:
-            extra["clicks"] = clicks
         presenter = self._presenter = _Presenter(
-            ctx, extra, self._new_prompt, clicks, start_at=self.params.get("start_at")
+            ctx, extra, self._new_prompt, start_at=self.params.get("start_at")
         )
-        if self.params.get("check_from"):
-            presenter.seed_check(config, self.params["check_from"])
         if self.params.get("ratchet_joints") is not None:
             presenter.seed_ratchet(self.params["ratchet_joints"])
         try:
@@ -570,26 +564,11 @@ class GuidedTensionOperation(_LiveCurrents):
                 motor_port=lease.presence.motor_port if lease.presence else None,
             )
             self._hand = hand
-            family = hand_family(hand)
-            probe = None
-            if slack:
-                baseline, travel = active_travel_baseline(supervisor.config)
-                if travel:
-                    hand_ops.override_travel(hand, travel)
-                presenter.set_currents({"baseline": baseline})
-                ctx.log(f"scoring against {baseline['label']}")
-                probe = _probe_slack(config, supervisor.hand_id)
-            if probe is not None:
-                name, slack = probe
-                flagged = sorted(j for j, v in slack.items() if v > self.pass_slack_deg(j))
-                presenter.set_currents(
-                    {"probe": {"name": name, "joints": len(slack), "flagged": flagged}}
-                )
-                ctx.log(
-                    f"probe {name} measured slack on {len(slack)} joints; "
-                    + (f"{', '.join(flagged)} must be tensioned this round"
-                       if flagged else "none above tolerance")
-                )
+            baseline, travel = active_travel_baseline(supervisor.config, family)
+            if travel:
+                hand_ops.override_travel(hand, travel)
+            presenter.set_currents({"baseline": baseline})
+            ctx.log(f"scoring against {baseline['label']}")
             result = hand_ops.guided_tension(
                 hand,
                 prompt_callback=presenter.prompt,
@@ -601,12 +580,10 @@ class GuidedTensionOperation(_LiveCurrents):
                 scoring=self.scoring,
                 pass_fraction=self.pass_fraction,
                 pass_slack_deg=self.pass_slack_deg,
-                probe_slack_deg=probe[1] if probe else None,
                 hand_key=supervisor.hand_id,
                 resume=self.params.get("resume", True),
                 any_hardware=self.params.get("any_hardware", False),
-                check_callback=lambda h: run_check(ctx, h, presenter, family),
-                check_first=self.params.get("check_first", False),
+                forget=self.drain_again,
             )
             presenter.finish(result["completed"])
             ctx.set_phase("released", detail="torque off, control mode restored")
@@ -618,46 +595,26 @@ class GuidedTensionOperation(_LiveCurrents):
             supervisor.exit_maintenance()
 
 
-def run_check(ctx: OpContext, hand, presenter: _Presenter, family: str | None) -> None:
-    """The tension check between the range check and the ratchet: the breakaway
-    probe from where the hand stands, limits ignored, one pass, one joint kind
-    at a time, published under the round's ``check`` and saved as a dataset."""
-    from orca_ui.hand.operations.tension_probe import CHECK_PARAMS, _Presenter as _ProbePresenter, run_probe
-
-    params = {**CHECK_PARAMS, "note": f"guided tensioning round {presenter._extra['round']}"}
-    probe_presenter = _ProbePresenter(ctx, params["methods"], check=True, publish=presenter.check_update)
-    ctx.log("tension check: breakaway from where the hand stands, limits ignored")
-    run_probe(ctx, hand, params, probe_presenter, family)
-
-
 # ----- simulated (mock) ---------------------------------------------------------
 
 
-def _probe_slack(config, hand_key: str | None) -> tuple[str, dict[str, float]] | None:
-    """Slack the hand's newest probe measured, if it is newer than its last tensioning."""
-    try:
-        last = hand_ops.last_tension(config) or {}
-        return probes.probe_slack(config, hand_key, since=last.get("completed_at"))
-    except Exception:
-        logger.exception("reading the tension probe failed")
-        return None
-
-
-def _click_model(config) -> dict:
-    try:
-        return probes.click_model(config)
-    except Exception:
-        logger.exception("reading the click tests failed")
-        return {}
-
-
-def active_travel_baseline(config) -> tuple[dict, dict[str, float] | None]:
-    """(what the dialog shows, the travel table to score against or None for
-    the config's own baseline)."""
+def active_travel_baseline(config, family: str | None) -> tuple[dict, dict[str, float] | None]:
+    """(what the dialog shows, the travel table to score against): the hand's
+    active baseline, else the shipped reference hand's, else None for the
+    config's own v2.1 block."""
     from orca_ui.hand import baselines
 
     found = baselines.active_baseline(config)
     if found is None:
+        shipped = reference.travel(config, family)
+        if shipped:
+            ref = reference.entry(config, family)
+            return {
+                "name": ref.get("travel_from"),
+                "source": "reference",
+                "joints": len(shipped),
+                "label": f"the reference hand {ref.get('hand_key')} ({ref.get('travel_from')})",
+            }, shipped
         return {
             "name": None,
             "source": "shared",
@@ -720,7 +677,6 @@ def _sim_score(motors: list[dict], threshold, scoring: str) -> dict:
         m["pass_slack_deg"] = threshold(m["joint"]) if slack_mode else None
         m.setdefault("kept", None)
         m.setdefault("confirmed", False)
-        m.setdefault("probe_slack_deg", None)
         m.setdefault("fault", None)
         # The sim has no end tracker: both ends count as visited twice once confirmed.
         hits = 2 if m["confirmed"] else (1 if spread > 0 else 0)
@@ -754,7 +710,7 @@ class SimulatedGuidedTensionOperation(_LiveCurrents):
     each round, so the dialog can be exercised without a hand. Progress is
     kept in memory for the life of the mock console."""
 
-    # Saved progress per scoring, as the real routine keeps it in tension_progress.yaml.
+    # Saved progress per scoring, as the real routine keeps it in setup.yaml.
     _progress: dict = {}
     _progress_slack: dict = {}
 
@@ -771,29 +727,24 @@ class SimulatedGuidedTensionOperation(_LiveCurrents):
 
     def run(self, ctx: OpContext) -> dict:
         supervisor = ctx.service.supervisor
+        family = motor_family(ctx.service)
         ctx.set_phase("acquiring", detail="taking the hand into maintenance")
         supervisor.enter_maintenance(self.kind)
         slack = self.slack_scoring
         threshold = self.pass_slack_deg if slack else self.pass_fraction
-        clicks = _click_model(supervisor.config) if slack else {}
         extra = {
             **self.settings(),
-            "hold_fixed": fixed_holds(supervisor.config, motor_family(ctx.service)),
+            "hold_fixed": fixed_holds(supervisor.config, family),
+            "deg_per_click": reference.deg_per_click(),
         }
-        if slack:
-            extra["clicks"] = clicks
         presenter = self._presenter = _Presenter(
-            ctx, extra, self._new_prompt, clicks, start_at=self.params.get("start_at")
+            ctx, extra, self._new_prompt, start_at=self.params.get("start_at")
         )
-        if self.params.get("check_from"):
-            presenter.seed_check(supervisor.config, self.params["check_from"])
         if self.params.get("ratchet_joints") is not None:
             presenter.seed_ratchet(self.params["ratchet_joints"])
-        travel = None
-        if slack:
-            baseline, travel = active_travel_baseline(supervisor.config)
-            presenter.set_currents({"baseline": baseline})
-            ctx.log(f"scoring against {baseline['label']}")
+        baseline, travel = active_travel_baseline(supervisor.config, family)
+        presenter.set_currents({"baseline": baseline})
+        ctx.log(f"scoring against {baseline['label']}")
         targets = _sim_targets(
             supervisor.config, self.params.get("any_hardware", False), travel
         )
@@ -820,6 +771,8 @@ class SimulatedGuidedTensionOperation(_LiveCurrents):
             round_no = 0
             while True:
                 round_no += 1
+                for joint in self.drain_again():
+                    best.pop(joint, None)
                 motors = [
                     dict(t, offset_deg=0.0, plus_deg=0.0, minus_deg=0.0, confirmed=False,
                          kept=best.get(t["joint"]))
@@ -838,13 +791,8 @@ class SimulatedGuidedTensionOperation(_LiveCurrents):
                     for st in stages
                 ]
                 i = _sim_next(passed, 0) if start is None else start
-                first = self.params.get("check_first", False) and round_no == 1
                 while True:
                     jump = None
-                    if first:
-                        first = False
-                        i = len(stages)
-                        jump = "Check & tension"
                     while i < len(stages):
                         stage = stages[i]
                         info = {
@@ -882,6 +830,7 @@ class SimulatedGuidedTensionOperation(_LiveCurrents):
                                 round_no,
                                 done,
                                 set(stage["joints"]),
+                                best,
                                 threshold,
                             ),
                             daemon=True,
@@ -922,22 +871,21 @@ class SimulatedGuidedTensionOperation(_LiveCurrents):
                             if m["fraction"] is not None:
                                 best[m["joint"]] = max(best.get(m["joint"], 0.0), m["fraction"])
                         record["best"] = dict(best)
-                    if jump != "Check & tension":
-                        self._set_progress(self.scoring, record)
+                    self._set_progress(self.scoring, record)
                     completed = (
                         result["scored"] > 0 and result["passed"] == result["scored"]
                     )
-                    if jump in (GOTO_TENSION, "Check & tension"):
+                    if jump == GOTO_TENSION:
                         presenter.progress(
                             {"event": "score", "round": round_no, **result}
                         )
-                        answer = "Tension" if jump == GOTO_TENSION else "Check & tension"
+                        answer = "Tension"
                         break
                     presenter.progress(
                         {"event": "step", "step": "score", "round": round_no}
                     )
                     presenter.progress({"event": "score", "round": round_no, **result})
-                    options = ["Finish"] if completed else ["Check & tension", "Finish anyway"]
+                    options = ["Finish"] if completed else ["Tension", "Finish anyway"]
                     back = _sim_previous(passed, len(stages))
                     options += (
                         (["Back"] if back is not None else []) + goto() + [GOTO_TENSION]
@@ -951,13 +899,6 @@ class SimulatedGuidedTensionOperation(_LiveCurrents):
                         i = back if answer == "Back" else stage_of[answer]
                         continue
                     break
-                if answer == "Check & tension":
-                    presenter.progress({"event": "step", "step": "check_pose", "round": round_no})
-                    if presenter.prompt({"action": "check_pose", "options": ["Continue", "Skip check"],
-                                         "round": round_no}) == "Continue":
-                        presenter.progress({"event": "step", "step": "check", "round": round_no})
-                        self._simulate_check(ctx, presenter, reach)
-                    answer = "Tension"
                 if answer != "Tension":
                     break
                 presenter.progress(
@@ -988,22 +929,15 @@ class SimulatedGuidedTensionOperation(_LiveCurrents):
         finally:
             supervisor.exit_maintenance()
 
-    def _simulate_check(self, ctx: OpContext, presenter: _Presenter, reach: dict) -> None:
-        """The in-round tension check on the mock: joints that reached little of
-        their travel read as slack tendons."""
-        from orca_ui.hand.operations.simulated import _sim_step_duration
-        from orca_ui.hand.operations.tension_probe import CHECK_PARAMS, _Presenter as _ProbePresenter, simulate_probe
-
-        params = {**CHECK_PARAMS, "step_duration_s": _sim_step_duration(self.params),
-                  "note": f"guided tensioning round {presenter._extra['round']}"}
-        probe_presenter = _ProbePresenter(ctx, params["methods"], check=True, publish=presenter.check_update)
-        slack = {j: max(0.0, (1.0 - r) * 15.0) for j, r in reach.items()}
-        simulate_probe(ctx, ctx.service.supervisor.config, params, probe_presenter, slack)
-
-    def _sample(self, presenter, motors, reach, round_no, done, joints: set, threshold) -> None:
+    def _sample(self, presenter, motors, reach, round_no, done, joints: set, best: dict, threshold) -> None:
         start = time.monotonic()
         while not done.wait(0.05):
             t = time.monotonic() - start
+            again = self.drain_again()
+            for m in motors:
+                if m["joint"] in again:
+                    best.pop(m["joint"], None)
+                    m.update(kept=None, plus_deg=0.0, minus_deg=0.0, confirmed=False)
             for i, m in enumerate(motors):
                 if not m["expected_deg"] or m["joint"] not in joints:
                     continue

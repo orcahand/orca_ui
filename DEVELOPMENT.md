@@ -50,8 +50,20 @@ needed it goes quiet.
 ## Working against an unreleased orca_core
 
 `pyproject.toml` depends on the published `orca_core`, which is what a plain
-clone installs and what the wheel declares. To develop against a local
-checkout:
+clone installs and what the wheel declares. To run a branch that needs an
+unreleased core, check the matching `orca_core` branch out beside this repo
+and use
+
+```bash
+./dev run [ARGS]     # the console, on whatever ../orca_core has checked out
+./dev test [ARGS]    # the suite, the same way
+```
+
+which layers the checkout over the project env for that one process
+(`uv run --with-editable`) and edits no tracked file, so there is nothing to
+switch back or keep out of a commit. `ORCA_CORE=PATH` points elsewhere.
+
+To switch the project env itself:
 
 ```bash
 ./dev local          # point at the sibling ../orca_core (found automatically)

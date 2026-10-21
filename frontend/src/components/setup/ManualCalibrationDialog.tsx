@@ -9,7 +9,7 @@ import type { ManualCalibrationExtra, ModelMetadata, OperationSnapshot } from '.
 import { useAppStore } from '../../state/appStore'
 import { isOperationActive } from '../../state/operationStore'
 import { ErrorBoundary } from '../common/ErrorBoundary'
-import { startTensionProbe } from './probeStart'
+import { SWEEP_HINT, startTensionSweep } from './probeStart'
 
 const TensionPreview = lazy(() =>
   import('./TensionPreview').then((m) => ({ default: m.TensionPreview })),
@@ -253,10 +253,10 @@ export function ManualCalibrationDialog({
                   <button
                     className="btn btn-secondary"
                     disabled={moving}
-                    title="Measure each tendon's slack and breakaway current against this fresh calibration"
-                    onClick={() => void startTensionProbe().catch(fail)}
+                    title={SWEEP_HINT}
+                    onClick={() => void startTensionSweep().catch(fail)}
                   >
-                    Measure tension (probe)
+                    Tension sweep
                   </button>
                 )}
               </div>

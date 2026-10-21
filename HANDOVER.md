@@ -1,6 +1,6 @@
 # ORCA assembly guide — handover
 
-Updated: 18 October 2026. Intended for the next Astra/Codex instance and human maintainers.
+Updated: 21 October 2026. Intended for the next Astra/Codex instance and human maintainers.
 
 ## Start here
 
@@ -9,6 +9,105 @@ The assembly guide is implemented in this checkout. Open **Setup → Open assemb
 The goal is a self-contained guide that makes building the hand straightforward without needing to consult the teaching PDF or ask for missing instructions. The current version is substantial and reviewable, but some mechanical specifications and procedures remain unresolved. Do not describe it as a physically validated, independently complete assembly manual yet.
 
 Read this document first, then [the assembly implementation notes](frontend/src/components/assembly/README.md), [DEVELOPMENT.md](DEVELOPMENT.md) and [CLAUDE.md](CLAUDE.md). The assembly README contains detailed historical development notes; some early statements are superseded. In particular, its opening statement that the guide never starts a hand operation predates the explicitly enabled connected-hand test described below.
+
+## Base guide cleanup and exported edits · 21 October
+
+Active checkout: `/Users/kaistewart/Documents/Projects/orca/orca_ui_merge`, branch
+`merge/assembly-calibration`. These are working-tree edits, not a commit.
+
+- Base prepares all ten 2 m DP/PP tendons together. Its separate thumb-tendon
+  preparation step is removed, and thumb PP uses the same prepared-tendon method
+  as the other PPs. Cable-channel threading remains in Touch.
+- The Base thumb no longer repeats the Ashley photo lesson, reinforcement
+  animations or reinforcement-only figures. Anchor-specific knot counts remain
+  in the assembly instructions. The index AP reinforcement animation precedes
+  instruction 2.
+- Single-step Base chapters open directly, including other fingers, the control
+  board and the final **Check the hand** chapter. Base no longer includes the
+  separate tensioning handoff or connected motor-check steps. The final check
+  has no Next button; its closing text directs builders to tensioning,
+  calibration and test stages in the same ORCA UI Setup tab.
+- Saved Base locations on removed steps redirect to thumb preparation or the
+  final check, including when switching from Touch to Base.
+- `/Users/kaistewart/Downloads/orca-assembly-edits.json` contained three text edits
+  and no backgrounds or saved colors. Applied the index preparation title and
+  DP flexor positioning wording, including the analogous Base thumb instruction.
+  The exported tendon wording uses nine lengths; Base uses ten consistently
+  because its thumb PP no longer reserves an unknotted length.
+- Base page and input backgrounds are white; selected controls and model areas
+  use white or muted mint. Touch-specific content and palette remain unchanged.
+  Browser drafts were not cleared; source mismatches remain retained in exports.
+
+Validation: production frontend build, browser checks of Base navigation,
+instruction placement, thumb cleanup, progress redirects, final completion gate,
+and desktop/mobile title fit. Data assertions covered eight Base combinations
+(side, motor and legacy audience scope). Compared all Touch steps, instructions,
+kits, figures and notes against a pre-change snapshot for both sides and motors;
+they are unchanged. Bundle regenerated in `orca_ui/webui`.
+
+## Opening-page simplification · 21 October
+
+The guide has one edition. The audience selector, flashing chapters and programming
+references are removed from the displayed walkthrough. Legacy audience values remain
+in saved state to preserve existing editorial draft keys; they no longer select content.
+Saved flashing positions resume at OH board identification.
+
+Your ORCA hand opens directly from its chapter button. Its stable `p1` ID remains,
+but the overview has no nested step, completion checklist or numbered progress entry.
+The tools overview contains the five bench tools and the setup computer.
+
+Exploded-view and BOM popups share compact cards: quantity at top right, smaller
+images, and an editable single-line name/dimensions field. Explanatory paragraphs
+and the tendon-groups section are removed. Tendon stock is ten 2m lengths and twelve
+75cm lengths. The finger PTFE card uses the review's 15mm label; later fitting
+instructions are unchanged. Touch copper wire appears with cables, not tendons.
+The BOM and CSV group printed parts, mechanical components, electronics, skins,
+tendons/PTFE and tools. Existing local drafts remain stored; changed labels use new
+field sources so old combined name/quantity text cannot restore the removed layout.
+
+Validation: production build; lint with existing warnings; content and saved-position
+checks across 24 configurations; isolated browser checks of Base/Touch and both sides,
+desktop/mobile cards, CSV categories, direct chapter navigation, and label edit/reload/
+restore behavior. User progress was intercepted in the review browser, not overwritten.
+
+## Tube dimensions and viewer alignment · 21 October
+
+Parts and Movement use the same viewport bounds; face, finger and joint controls sit
+beside the image. Guide/Video tabs remain, with the separate video arrow removed.
+The parts list now separates eight finger AP tubes at 5–6mm, two thumb tubes at 18mm,
+and 32 carpal tubes with a longest length of 60mm. Metric hex bits are 1.5, 2.5 and 3mm.
+These dimensions appear in the parts popups and relevant preparation instructions.
+
+The screenshot also specifies “TT: 50mm ×32”; its mapping to the wrist is awaiting
+user clarification. The requested unidentified “second point” still needs its step or exact text.
+Repeated end-of-step completion prose, hints, review notes and up-next text are removed;
+a compact footer button retains completion tracking and its prerequisite checks.
+Trailing video and anatomy lesson notes are removed. Browser editorial changes remain
+localStorage-only; an exported edits JSON is needed to incorporate the user's drafts.
+
+Validation: production build, targeted lint, desktop/mobile browser checks for matching
+viewer bounds, controls beside images, video tabs, tube labels/counts and hex-bit sizes.
+
+## Compact step layout and Basics · 21 October
+
+The Basics chapter replaces the Glossary chapter name. Anatomy opens with the whole
+hand opaque and no part selected; selecting a part fades the rest. Parts and Movement
+now occupy the same viewer area, with tabs instead of two stacked views.
+
+Step headings are smaller and stay on one line. Parts and Tools open native dialogs
+from buttons beside the heading. Step parts reuse the matching inventory/supply images
+from the exploded view, while retaining their existing editable kit text and draft keys.
+Guide and Video tabs replace videos appended below the step; the translucent right arrow
+switches tabs. Videos have no separate heading, and switching away unmounts playback.
+
+BOM categories are individually collapsible and search expands matching groups. Printed
+carpal and cable covers no longer appear in standard-component popups. Tendon stock is
+listed only under Fingers; wrist cables belong to Tower, which also lists a 12V power cable.
+
+Validation: production build; targeted lint (existing Fast Refresh warnings only); 24-build
+supply/image checks and 280 referenced image assets; isolated desktop/mobile browser
+checks of dialogs, saved edits, BOM filtering, initial anatomy, movement, keyboard tabs,
+Touch/left-hand images and FeeTech videos. Review browsers intercepted progress APIs.
 
 ## Direct editing and fixed hand navigation · 18 October
 

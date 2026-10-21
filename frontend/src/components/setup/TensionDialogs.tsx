@@ -10,7 +10,6 @@ import { GuidedTensionDialog } from './GuidedTensionDialog'
 import { HoldTensionDialog } from './HoldTensionDialog'
 import { ManualCalibrationDialog } from './ManualCalibrationDialog'
 import { SlackTestDialog } from './SlackTestDialog'
-import { TensionProbeDialog } from './TensionProbeDialog'
 import { TensionSweepDialog } from './TensionSweepDialog'
 
 export function TensionDialogs() {
@@ -25,7 +24,6 @@ export function TensionDialogs() {
   const tension =
     operation?.kind === 'guided_tension' ||
     operation?.kind === 'tension' ||
-    operation?.kind === 'tension_probe' ||
     operation?.kind === 'slack_test' ||
     operation?.kind === 'tension_sweep' ||
     manualCalibration
@@ -50,7 +48,6 @@ export function TensionDialogs() {
   }
   if (shown?.kind === 'calibrate') return <ManualCalibrationDialog operation={shown} onClose={close} />
   if (shown?.kind === 'tension') return <HoldTensionDialog operation={shown} onClose={close} />
-  if (shown?.kind === 'tension_probe') return <TensionProbeDialog operation={shown} onClose={close} />
   if (shown?.kind === 'slack_test') return <SlackTestDialog operation={shown} onClose={close} />
   if (shown?.kind === 'tension_sweep') return <TensionSweepDialog operation={shown} onClose={close} />
   if (holdOpen) return <HoldTensionDialog operation={null} onClose={closeHold} />

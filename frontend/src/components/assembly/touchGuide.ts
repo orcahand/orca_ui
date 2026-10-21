@@ -46,10 +46,10 @@ export const TOUCH_STEPS:AssemblyStep[]=[
   'Fit the matching PP skin to the index, middle, ring, pinky and thumb. Guide it into place without pulling on a connector or trapping a cable. Touch has no DP skins: leave the fingertip sensors exposed.',
   'Seat the skin edges and gently move every finger and the thumb through their free movement. Check that no skin rubs a joint or pulls a cable. Repeat the six-tendon finger checks and eight-tendon thumb check after fitting the skins.',
  ],'All five PP skins are seated; cables are free and every finger and thumb moves freely.','Touch skins'),
- step('touch-board-mount','Mount the flashed Touch connector board',[
-  'Flash the board for your hand side before mounting it. Switch power off.',
+ step('touch-board-mount','Mount the Touch connector board',[
+  'Switch power off before mounting the connector board.',
   'Seat the board as pictured and secure it gently with two M1.4×6 self-tapping screws.',
- ],'The flashed connector board is correctly oriented and gently secured.','Touch connector board'),
+ ],'The connector board is correctly oriented and gently secured.','Touch connector board'),
  step('touch-board-connect','Connect the five finger cables',[
   'With power off, match each plug to the correct orientation pictured.',
   'With the white 4-wire connector at the bottom, connect the fingers to the labeled ports. The physical port map is the same for left and right hands.',
@@ -78,7 +78,7 @@ export const TOUCH_KITS:Record<string,string[]>={
  'touch-connect':['5 tested, ID-labeled sensors','5 routed connector cables'],
  'touch-mount':['5 connected Paxini sensors','8 screws · M1.4×3','10 screws · M1.4×4','2 screws · M1.4×6','Hand screwdriver'],
  'touch-skins':['Five connected, secured sensors on assembled fingers and thumb','Matching index, middle, ring, pinky and thumb PP skins'],
- 'touch-board-mount':['Flashed Touch connector board','2 self-tapping screws · M1.4×6','Hand screwdriver'],
+ 'touch-board-mount':['Touch connector board','2 self-tapping screws · M1.4×6','Hand screwdriver'],
  'touch-board-connect':['5 routed sensor cables','Mounted Touch connector board'],
  'touch-board-link':['Mounted Touch connector board','OH board in its rear cover','1 four-wire connector-board cable'],
  'touch-test':['Completed Touch hand','12 V supply','USB-C data cable','ORCA UI'],

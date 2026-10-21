@@ -5,8 +5,8 @@
 // (tower_<face>.png beside the model, with tower_faces.json saying where each
 // spool sits in it), overlaid with a box the size of the spool in the spool's
 // colour; a model without the pictures falls back to the live 3D view.
-// `tags="motor"` keeps only the motor number on each spool for a view that
-// has its own list beside it.
+// `tags="motor"` leaves the score off each spool for a view that has its own
+// list beside it; motor id and joint are always shown.
 
 import { Canvas, useThree } from '@react-three/fiber'
 import { Html, OrbitControls } from '@react-three/drei'
@@ -165,7 +165,10 @@ function FaceRig({
         <Html key={tag.pos} position={tag.at} center zIndexRange={[10, 0]}>
           <div className={`gt-spool-tag ${tagStyle} ${tag.motor?.status ?? 'unscored'}`}>
             {tagStyle === 'motor' ? (
-              <b>M{tag.motor?.motor ?? '?'}</b>
+              <>
+                <b>M{tag.motor?.motor ?? '?'}</b>
+                <small>{tag.joint}</small>
+              </>
             ) : (
               <>
                 <span>
@@ -215,6 +218,7 @@ function FaceImageView({
   tags: TagStyle
   image: FaceImage
 }) {
+  const motorIds = useMotorIds()
   const [box, setBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null)
   const holder = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -252,10 +256,11 @@ function FaceImageView({
               }}
               title={`${joint}${motor?.tag ? ` · ${motor.tag}` : ''}`}
             >
-              <b>
-                M{motor?.motor ?? '?'}
-                {tags === 'full' && motor?.tag ? ` ${motor.tag}` : ''}
-              </b>
+              <b>M{motor?.motor || motorIds[joint] || '?'}</b>
+              <span className={`tower-spool-label ${r.x + r.w / 2 < 0.5 ? 'left' : 'right'}`}>
+                {joint.replace('_', ' ')}
+                {tags === 'full' && motor?.tag ? ` · ${motor.tag}` : ''}
+              </span>
             </div>
           )
         })}
@@ -308,6 +313,15 @@ export function FaceView({
         <FaceRig side={side} face={face} byJoint={byJoint} tags={tags} />
       </Canvas>
     </div>
+  )
+}
+
+// Each joint's motor from the hand's config, for spools no result has marked yet.
+export function useMotorIds(): Record<string, number> {
+  const joints = useAppStore((s) => s.handInfo?.joints)
+  return useMemo(
+    () => Object.fromEntries((joints ?? []).filter((j) => j.motor_id != null).map((j) => [j.id, j.motor_id as number])),
+    [joints],
   )
 }
 

@@ -4,7 +4,7 @@ import type {AssemblyStep} from './guide'
 import type {Build} from './buildContent'
 
 const CHAPTER_NAMES:Record<string,string> = {
-  'Start here':'Your ORCA hand','Fundamentals':'Glossary','Prepare the parts':'Prepare the parts',
+  'Start here':'Your ORCA hand','Fundamentals':'Basics','Prepare the parts':'Prepare the parts',
   'Fingers':'Assemble the index finger','Other fingers':'Assemble the other fingers',
   'Thumb':'Assemble the thumb','Carpals':'Assemble the palm','Wrist & routing':'Route and fit the wrist',
   'Tower':'Build the tower','Electronics':'Prepare the control board',
@@ -34,7 +34,7 @@ export function AssemblyNavigation({steps,current,done,query,filtered,build,onGo
   useLayoutEffect(()=>{
     const nav=contents.current;if(!nav)return
     const reveal=()=>{
-      const target=nav.querySelector<HTMLElement>('[aria-current=step]');if(!target||!nav.clientHeight)return
+      const target=nav.querySelector<HTMLElement>('[aria-current=step],[aria-current=page]');if(!target||!nav.clientHeight)return
       const box=nav.getBoundingClientRect(),row=target.getBoundingClientRect()
       const chapter=target.closest('.assembly-chapter')?.querySelector('.assembly-chapter-button')?.getBoundingClientRect()
       const top=chapter&&row.bottom-chapter.top<nav.clientHeight*.7?chapter.top:row.top
@@ -46,8 +46,9 @@ export function AssemblyNavigation({steps,current,done,query,filtered,build,onGo
   useEffect(()=>{setOpen(active)},[active])
   const chapters=[...new Set(steps.map(chapterKey))]
   const region=regionFor(current)
-  const pickedActive=REGIONS.find(r=>r.id===picked)?.step===current.id?picked:''
-  const select=(id:string,step:string)=>{const target=steps.find(s=>s.id===step);if(target)setOpen(chapterKey(target));onGo(step);setPicked(id);setJump(n=>n+1)}
+  const regionStep=(step:string)=>build.version==='base'&&step==='thumb-tendons'?'thumb-parts':step
+  const pickedActive=regionStep(REGIONS.find(r=>r.id===picked)?.step??'')===current.id?picked:''
+  const select=(id:string,step:string)=>{const target=steps.find(s=>s.id===regionStep(step));if(!target)return;setOpen(chapterKey(target));onGo(target.id);setPicked(id);setJump(n=>n+1)}
   let previousPhase=''
   return <div className="assembly-navigation-layers">
     <div className="assembly-hand-navigation">
@@ -78,6 +79,10 @@ export function AssemblyNavigation({steps,current,done,query,filtered,build,onGo
         const count=required.filter(s=>done.includes(s.id)).length
         const phase=chapter.startsWith('Appendix')?'Optional':n<3?'Prepare':['Fingers','Other fingers','Thumb','Touch sensors','Touch skins'].includes(chapter)?'Build the fingers':['Carpals','Wrist & routing','Tower'].includes(chapter)?'Build the hand':'Complete the hand'
         const showPhase=phase!==previousPhase;previousPhase=phase
+        if(chapter==='Start here'||build.version==='base'&&all.length===1)return <div className="assembly-chapter" key={chapter}>
+          {showPhase&&<p className="assembly-nav-phase">{phase}</p>}
+          <button className={`assembly-chapter-button ${current.id===all[0].id?'active':''}`} aria-current={current.id===all[0].id?'page':undefined} onClick={()=>{setPicked('');onGo(all[0].id)}}><span className={count>0&&count===required.length?'is-complete':''}>{count>0&&count===required.length?'✓':String(n+1).padStart(2,'0')}</span><span>{CHAPTER_NAMES[chapter]??chapter}</span></button>
+        </div>
         return <div className="assembly-chapter" key={chapter}>
           {showPhase&&<p className="assembly-nav-phase">{phase}</p>}
           <button className={`assembly-chapter-button ${chapter===active?'active':''}`} aria-expanded={expanded} aria-controls={`chapter-${n}`} onClick={()=>setOpen(expanded?'':chapter)}>

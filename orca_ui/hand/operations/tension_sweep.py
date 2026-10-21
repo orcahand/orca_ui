@@ -11,7 +11,6 @@ against. Live samples stream through the snapshot ``extra`` (TensionSweepExtra).
 from __future__ import annotations
 
 import logging
-import math
 import random
 import threading
 import time
@@ -37,8 +36,7 @@ SETTING_BOUNDS = {
 
 def validate_sweep_params(service, params: dict) -> dict:
     from orca_ui.hand.service import ServiceError
-    from orca_ui.hand.operations.tension_probe import _current_ceiling
-
+    
     session = service.session
     if session is None:
         raise ServiceError("hand not connected", status_code=503)
@@ -58,7 +56,7 @@ def validate_sweep_params(service, params: dict) -> dict:
         if not isinstance(joints, list) or not joints or not set(joints) <= known:
             raise ServiceError("joints must be a non-empty list of this hand's finger joints", status_code=422)
         clean["joints"] = list(joints)
-    ceiling = _current_ceiling(config, session)
+    ceiling = hand_ops.current_ceiling(config, session)
     settings = {}
     for key, (low, high) in SETTING_BOUNDS.items():
         if params.get(key) is None:
@@ -89,11 +87,10 @@ def validate_sweep_params(service, params: dict) -> dict:
 def sweep_defaults(service, family: str | None = None) -> dict:
     """SweepSettings defaults for the motor family, currents scaled like the probe's."""
     from orca_ui.hand.operations.guided_tension import motor_family
-    from orca_ui.hand.operations.tension_probe import _current_ceiling
-
+    
     defaults = hand_ops.sweep_setting_defaults()
     scale = FAMILY_CURRENT_SCALE.get(family or motor_family(service) or "", 1.0)
-    ceiling = _current_ceiling(service.supervisor.config, service.session)
+    ceiling = hand_ops.current_ceiling(service.supervisor.config, service.session)
     for key in list(defaults):
         if not key.endswith("_ma") or key == "deadband_ma":
             continue
@@ -135,6 +132,12 @@ class _Presenter:
             return
         self._last = now
         self._ctx.set_extra({**self.extra, "results": list(self.extra["results"]), "active": list(self.extra["active"])})
+
+    def set_reference(self, reference: tuple[str, dict] | None) -> None:
+        """The reference for the family the opened hand reports."""
+        with self._lock:
+            self._reference = reference
+            self.extra["reference"] = reference[0] if reference else None
 
     def _rescore(self) -> None:
         from orca_ui.hand import sweeps
@@ -234,13 +237,14 @@ class TensionSweepOperation(Operation):
 
     def run(self, ctx: OpContext) -> dict:
         from orca_ui.hand import sweeps
-        from orca_ui.hand.operations.tension_probe import hand_family
+        from orca_ui.hand.operations.guided_tension import motor_family
 
         supervisor = ctx.service.supervisor
+        family = motor_family(ctx.service)
         ctx.set_phase("acquiring", detail="taking the hand into maintenance")
         lease = supervisor.enter_maintenance(self.kind)
         hand = None
-        presenter = _Presenter(ctx, sweeps.reference(supervisor.config))
+        presenter = _Presenter(ctx, sweeps.reference(supervisor.config, family))
         try:
             ctx.check_stop()
             ctx.set_phase("connecting", detail="opening motor-only connection")
@@ -249,8 +253,9 @@ class TensionSweepOperation(Operation):
                 motor_port=lease.presence.motor_port if lease.presence else None,
             )
             self._hand = hand
-            family = hand_family(hand)
+            family = hand_ops.hand_family(hand)
             ctx.log(f"motor family: {family or 'unknown'}")
+            presenter.set_reference(sweeps.reference(supervisor.config, family))
             report = hand_ops.tension_sweep(
                 hand,
                 joints=self.params.get("joints"),
@@ -293,14 +298,15 @@ class SimulatedTensionSweepOperation(Operation):
 
     def run(self, ctx: OpContext) -> dict:
         from orca_ui.hand import sweeps
+        from orca_ui.hand.operations.guided_tension import motor_family
 
         supervisor = ctx.service.supervisor
         config = supervisor.config
         step_s = self.params["step_duration_s"]
         settings = {**sweep_defaults(ctx.service), **(self.params.get("settings") or {})}
+        presenter = _Presenter(ctx, sweeps.reference(config, motor_family(ctx.service)))
         ctx.set_phase("acquiring", detail="taking the hand into maintenance")
         supervisor.enter_maintenance(self.kind)
-        presenter = _Presenter(ctx, sweeps.reference(config))
         try:
             ctx.set_phase("connecting", detail="opening motor-only connection")
             ctx.sleep(step_s)
@@ -310,10 +316,10 @@ class SimulatedTensionSweepOperation(Operation):
             repeats = int(self.params.get("repeats", DEFAULT_REPEATS))
             travel = {j: 100.0 for j in joints}
             total = len(joints) * 2 * repeats
-            from orca_core.maintenance.tension_probe import probe_groups
+            from orca_core.maintenance.joint_motion import joint_groups
 
             presenter.progress({"event": "sweep_plan", "joints": joints, "total": total,
-                                "repeats": repeats, "travel_deg": travel, "groups": probe_groups(joints)})
+                                "repeats": repeats, "travel_deg": travel, "groups": joint_groups(joints)})
             index = 0
             results = []
             rng = random.Random(7)

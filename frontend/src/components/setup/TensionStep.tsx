@@ -1,11 +1,11 @@
-// Step 1, in three parts: the slack test (no spool may run half a turn free),
-// the tension check against the reference hand, and the tensioning itself,
-// which opens on that check's ratchet list and then loops move → check →
-// ratchet until the check is green. v2.1 hands get guided tensioning; v2.0
-// and unknown hands get the hold dialog. The dialogs live in TensionDialogs.
+// Step 1, in two parts: the slack test (each joint held, at most half a turn
+// of slack, with the clicks that slack needs) and the tensioning itself, which
+// aims a little loose: the tension sweep after calibration counts the clicks
+// still missing. v2.1 hands get guided tensioning; v2.0 and unknown hands get
+// the hold dialog. The dialogs live in TensionDialogs.
 
 import { useEffect, useState } from 'react'
-import type { TensionProgress } from '../../api/types'
+import type { SlackJoint, TensionProgress } from '../../api/types'
 import { api } from '../../api/rest'
 import { useAppStore } from '../../state/appStore'
 import {
@@ -18,7 +18,6 @@ import {
   formatHardwareVersion,
   DEFAULT_OFFSET_DEG,
   OFFSET_BOUNDS_DEG,
-  PROBE_REPEAT_CHOICES,
   useTensionFlow,
   useTensionMode,
   type TensionMode,
@@ -27,8 +26,7 @@ import { FlowStep, type StepState } from './FlowStep'
 import { jointGroup, loadPassFractions, loadPassSlack } from './guidedSettings'
 import { failToBanner, shortDate } from './setupUtils'
 import { BaselinePicker } from './TravelBaselines'
-import { ReferencePicker, useProbes } from './ProbeReference'
-import { CHECK_HINT, SLACK_HINT, startSlackTest, startTensionCheck } from './probeStart'
+import { SLACK_HINT, startSlackTest } from './probeStart'
 import { SLACK_CURRENT_CHOICES } from '../../state/tensionFlow'
 
 const MODE_LABEL: Record<TensionMode, string> = {
@@ -58,20 +56,14 @@ export function TensionStep({ state, variant }: { state: StepState; variant: Set
   const [overrides, setOverrides] = useState<Partial<GuidedCurrents>>({})
   // Restart wipes the saved scores, so it takes a second click to confirm.
   const [confirmRestart, setConfirmRestart] = useState(false)
-  // The probe moves the fingers to neutral first unless told to hold in place.
-  const probeRepeats = useTensionFlow((s) => s.probeRepeats)
-  const setProbeRepeats = useTensionFlow((s) => s.setProbeRepeats)
-  const runNote = useTensionFlow((s) => s.runNote)
-  const setRunNote = useTensionFlow((s) => s.setRunNote)
   const slackCurrentMa = useTensionFlow((s) => s.slackCurrentMa)
   const setSlackCurrentMa = useTensionFlow((s) => s.setSlackCurrentMa)
   const slackTest = handInfo?.slack_test ?? null
   const slackBlock = slackTest?.block ?? null
-  const slackCount = slackTest ? Object.values(slackTest.results).filter((r) => r.status === 'slack').length : 0
-  const { state: probes } = useProbes()
+  const slackMax = slackTest ? Math.max(0, ...Object.values(slackTest.results).map((r) => r.total_deg ?? 0)) : 0
+  const slackClicks = slackTest ? clicksText(slackTest.results) : ''
   const runningKind = operation && isOperationActive(operation) ? operation.kind : null
   const slackState = slackBlock ? 'warn' : slackTest ? 'done' : 'next'
-  const checkState = slackBlock ? 'todo' : slackTest ? 'next' : 'todo'
   const tensionState = slackBlock ? 'todo' : 'next'
   useEffect(() => {
     if (!confirmRestart) return
@@ -114,8 +106,6 @@ export function TensionStep({ state, variant }: { state: StepState; variant: Set
           : { scoring: 'fraction', pass_fractions: loadPassFractions() }),
         resume,
         any_hardware: !isV21,
-        // Open on the tension check and its ratchet list before any finger is moved.
-        check_first: true,
       })
       .catch(failToBanner)
 
@@ -173,7 +163,6 @@ export function TensionStep({ state, variant }: { state: StepState; variant: Set
         </label>
       </div>
       {kai && guided && <BaselinePicker />}
-      {kai && <ReferencePicker />}
       {guided ? (
         <details className="flow-advanced">
           <summary className="flow-field">Advanced settings</summary>
@@ -233,14 +222,14 @@ export function TensionStep({ state, variant }: { state: StepState; variant: Set
               <div className="calib-step-title">Slack test</div>
               <div className="calib-step-note">
                 {slackBlock
-                  ? slackBlock
+                  ? `${slackBlock}${slackClicks ? ` · ${slackClicks}` : ''}`
                   : slackTest
-                    ? `passed ${shortDate(slackTest.recorded_at)} · ${slackCount ? `slack on ${slackCount}` : 'all taut'} at ${slackTest.current_ma ?? '?'} mA`
-                    : 'half a turn each way at low current; no spool may run free'}
+                    ? `passed ${shortDate(slackTest.recorded_at)} · most slack ${slackMax.toFixed(0)}°${slackClicks ? ` · ${slackClicks}` : ''}`
+                    : 'hold each joint while its motor winds; at most half a turn of slack'}
               </div>
             </span>
             <span className="calib-step-actions">
-              <label className="flow-field" title="The winding current: under what any tensioned joint needs to move">
+              <label className="flow-field" title="The winding current: enough to turn the spool through its slack against the held joint">
                 <span>at</span>
                 <select value={slackCurrentMa} onChange={(e) => setSlackCurrentMa(Number(e.target.value))}>
                   {SLACK_CURRENT_CHOICES.map((v) => (
@@ -260,51 +249,16 @@ export function TensionStep({ state, variant }: { state: StepState; variant: Set
               </button>
             </span>
           </div>
-          <div className={`calib-step ${checkState}`}>
-            <span className="calib-step-num">b</span>
-            <span>
-              <div className="calib-step-title">Tension check</div>
-              <div className="calib-step-note">
-                {probes?.reference
-                  ? `breakaway per tendon vs ${probes.reference}; under 80 % = ratchet`
-                  : 'no reference set: the check is saved but not scored'}
-              </div>
-            </span>
-            <span className="calib-step-actions">
-              <label className="flow-field" title="Passes over every tendon (one is enough between rounds)">
-                <span>passes</span>
-                <select value={probeRepeats} onChange={(e) => setProbeRepeats(Number(e.target.value))}>
-                  {PROBE_REPEAT_CHOICES.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flow-field" title="Saved with the next check or measurement, e.g. 'before clicks'">
-                <span>note</span>
-                <input type="text" value={runNote} placeholder="label this run" onChange={(e) => setRunNote(e.target.value)} />
-              </label>
-              <button
-                className="btn btn-secondary"
-                disabled={gate.blocked || !!slackBlock}
-                title={gate.reason ?? slackBlock ?? CHECK_HINT}
-                onClick={() => void startTensionCheck().catch(failToBanner)}
-              >
-                Tension check
-              </button>
-            </span>
-          </div>
           <div className={`calib-step ${tensionState}`}>
-            <span className="calib-step-num">c</span>
+            <span className="calib-step-num">b</span>
             <span>
               <div className="calib-step-title">Tension</div>
               <div className="calib-step-note">
                 {slackBlock
                   ? 'pass the slack test first'
                   : guided
-                    ? 'starts with the tension check and its ratchet list, then move → check → ratchet until green'
-                    : 'activate the current and ratchet every top spool until it clicks'}
+                    ? 'move each finger → ratchet the listed spools, aiming a little loose; the sweep after calibration counts the rest'
+                    : 'activate the current and ratchet every top spool until it clicks, aiming a little loose'}
               </div>
             </span>
             <span className="calib-step-actions">
@@ -336,6 +290,15 @@ export function TensionStep({ state, variant }: { state: StepState; variant: Set
       )}
     </FlowStep>
   )
+}
+
+// The joints whose slack still needs clicks: "index mcp ~3 clicks, …".
+function clicksText(results: Record<string, SlackJoint>): string {
+  return Object.entries(results)
+    .filter(([, r]) => (r.clicks ?? 0) > 0)
+    .sort(([, a], [, b]) => (b.clicks ?? 0) - (a.clicks ?? 0))
+    .map(([joint, r]) => `${joint.replace('_', ' ')} ~${r.clicks} click${r.clicks === 1 ? '' : 's'}`)
+    .join(', ')
 }
 
 function ProgressChip({ progress, kai }: { progress: TensionProgress; kai: boolean }) {

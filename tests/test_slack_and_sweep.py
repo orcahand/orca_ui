@@ -1,5 +1,5 @@
-"""Slack test and tension sweep: a half-turn-free spool blocks calibration until
-a passing test; a sweep is saved as a named dataset and scored against the
+"""Slack test and tension sweep: more than half a turn of slack on a held joint
+blocks calibration until a passing test; a sweep is saved as a named dataset and scored against the
 reference. Both release the lease when e-stopped."""
 
 import time
@@ -44,15 +44,24 @@ def _done(client):
     return _operation(client)
 
 
-def test_a_half_turn_free_spool_blocks_calibration_until_a_passing_test(client):
+def _hold_each(client, answers):
+    """Answer the slack test's hold prompt once per joint, in order."""
+    for answer in answers:
+        assert _wait_for(lambda: _operation(client).get("state") == "awaiting_input")
+        assert client.post("/api/operation/input", json={"value": answer}).status_code == 200
+        _wait_for(lambda: _operation(client).get("state") != "awaiting_input")
+
+
+def test_too_much_slack_blocks_calibration_until_a_passing_test(client):
+    joints = ["index_pip", "ring_mcp"]
     response = client.post("/api/operation/slack_test/start",
-                           json={"params": {**FAST, "unspool": ["ring_mcp"]}})
+                           json={"params": {**FAST, "joints": joints, "unspool": ["ring_mcp"]}})
     assert response.status_code == 200, response.text
+    _hold_each(client, ["Test", "Test"])
     snapshot = _done(client)
     assert snapshot["state"] == "done" and snapshot["result"]["blocked"] is True
-    assert snapshot["result"]["slack"]["ring_mcp"] == "unspool"
-    extra = snapshot["extra"]
-    assert extra["step"] == "done" and extra["results"]["ring_mcp"]["plus_capped"]
+    assert snapshot["result"]["slack"] == {"index_pip": "pass", "ring_mcp": "fail"}
+    assert snapshot["extra"]["step"] == "done"
     info = client.get("/api/hand/info").json()["slack_test"]
     assert info["blocked"] and "ring_mcp" in info["block"]
 
@@ -61,10 +70,12 @@ def test_a_half_turn_free_spool_blocks_calibration_until_a_passing_test(client):
     assert client.post("/api/operation/calibrate/start",
                        json={"params": {**FAST, "manual": True}}).status_code == 409
 
-    assert client.post("/api/operation/slack_test/start", json={"params": FAST}).status_code == 200
+    assert client.post("/api/operation/slack_test/start",
+                       json={"params": {**FAST, "joints": joints}}).status_code == 200
+    _hold_each(client, ["Test", "Skip"])
     snapshot = _done(client)
     assert snapshot["result"]["blocked"] is False
-    assert set(snapshot["result"]["slack"].values()) <= {"taut", "slack"}
+    assert snapshot["result"]["slack"] == {"index_pip": "pass", "ring_mcp": "skipped"}
     assert client.get("/api/hand/info").json()["slack_test"]["block"] is None
     assert len(client.get("/api/slack_tests").json()["tests"]) == 2
     assert client.post("/api/operation/calibrate/start",
@@ -86,7 +97,9 @@ def test_a_sweep_is_saved_and_scored_against_the_reference(client):
     assert name.startswith("sweep_20") and snapshot["result"] == {"saved": name, "results": 8}
     extra = snapshot["extra"]
     assert extra["step"] == "done" and extra["repeats"] == 2 and extra["total"] == 8
-    assert extra["reference"] is None and extra["verdict"]["joints"]["index_pip"]["status"] == "none"
+    # Before a hand has its own reference it is scored against the shipped one.
+    assert extra["reference"] and extra["reference"].startswith("sweep_")
+    assert extra["verdict"]["joints"]["index_pip"]["clicks"] is not None
     assert isinstance(extra["results"][0]["samples"], int)
 
     saved = client.get(f"/api/sweeps/{name}").json()
@@ -99,16 +112,17 @@ def test_a_sweep_is_saved_and_scored_against_the_reference(client):
     # The newest sweep scored against the reference rides along: the reference against itself is ok.
     assert info["verdict"]["index_pip"]["status"] == "ok"
 
-    # A loose index_pip reads as under-tensioned against the reference; middle_mcp is fine.
+    # A loose index_pip reads as under-tensioned against the reference and gets clicks; middle_mcp is fine.
     response = client.post("/api/operation/tension_sweep/start",
                            json={"params": {**FAST, "joints": ["index_pip", "middle_mcp"],
-                                            "load_scale": {"index_pip": 0.5}}})
+                                            "load_scale": {"index_pip": 0.3}}})
     assert response.status_code == 200, response.text
     extra = _done(client)["extra"]
     assert extra["reference"] == name and extra["saved"] != name
     joints = extra["verdict"]["joints"]
     # Scored as curves: the loose tendon's friction runs below the reference's along the whole travel.
-    assert joints["index_pip"]["status"] == "low" and joints["index_pip"]["share"] < 0.7
+    assert joints["index_pip"]["status"] == "low" and joints["index_pip"]["share"] < 0.4
+    assert joints["index_pip"]["clicks"] >= 1
     assert joints["index_pip"]["stretches"][0]["kind"] == "friction" and joints["index_pip"]["stretches"][0]["to"] == 100
     assert len(joints["index_pip"]["friction"]) == 20 and len(joints["index_pip"]["ref_friction"]) == 20
     assert joints["middle_mcp"]["status"] == "ok"

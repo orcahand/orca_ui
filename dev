@@ -13,6 +13,10 @@
 #   ./dev branch NAME  track a branch of the orca_core repo, no checkout needed
 #   ./dev release      back to the published package
 #   ./dev status       which orca_core is installed
+#   ./dev run [ARGS]   start the console on whatever branch ../orca_core has
+#                      checked out (or $ORCA_CORE), without touching any
+#                      tracked file — the way to run a paired branch
+#   ./dev test [ARGS]  the test suite, the same way
 #
 # Once the project resolves, `uv run orca-dev ...` does the same thing.
 
@@ -23,5 +27,26 @@ if [ -z "$PY" ]; then
     echo "dev: no python3 on PATH — install Python 3.10+ and retry." >&2
     exit 1
 fi
+
+# run/test layer the checkout over the project env for this one process, so
+# pyproject.toml and uv.lock keep the published pin. `python -m`, not the
+# console scripts: those are pinned to the base env's interpreter.
+case "$1" in
+run | test)
+    CORE=${ORCA_CORE:-../orca_core}
+    if [ ! -f "$CORE/pyproject.toml" ]; then
+        echo "dev: no orca_core checkout at $CORE — clone it there or set ORCA_CORE=PATH." >&2
+        exit 1
+    fi
+    if [ "$1" = run ]; then
+        shift
+        set -- -m orca_ui "$@"
+    else
+        shift
+        set -- -m pytest tests/ "$@"
+    fi
+    exec uv run --with-editable "$CORE" python "$@"
+    ;;
+esac
 
 exec "$PY" -m orca_ui.core_source "$@"

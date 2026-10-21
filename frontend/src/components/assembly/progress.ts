@@ -1,6 +1,6 @@
 import { FINGER_CHECKS } from './fingerMovements'
 import { STEPS } from './guide'
-import { FINAL_CHECKS, type Build, type FlashingMethod } from './buildContent'
+import { BASE_STEP_REDIRECTS, FINAL_CHECKS, type Build, type FlashingMethod } from './buildContent'
 
 export const PROGRESS_KEY = 'orca-ui.assembly.v2.1'
 export type Progress = {
@@ -11,7 +11,7 @@ export type Progress = {
   views: Record<string, string>
   build: Build
 }
-export const EMPTY_PROGRESS: Progress = { current: STEPS[0].id, done: [], tendons: [], checks: [], views: {'guide:revision':'assembly-v5','guide:feedback':'oct15-v1','guide:layout':'oct16-v1','guide:finger-layout':'parts-first-v1','guide:thumb-layout':'parts-first-v1','guide:thumb-cables':'oct18-v1'}, build: { side: 'right', motor: 'dynamixel', version: 'base', audience: 'internal' } }
+export const EMPTY_PROGRESS: Progress = { current: STEPS[0].id, done: [], tendons: [], checks: [], views: {'guide:revision':'assembly-v5','guide:feedback':'oct15-v1','guide:layout':'oct16-v1','guide:finger-layout':'parts-first-v1','guide:thumb-layout':'parts-first-v1','guide:thumb-cables':'oct18-v1'}, build: { side: 'right', motor: 'dynamixel', version: 'base', audience: 'external' } }
 export function readProgress(): Progress {
   try {
     return validateProgress(JSON.parse(localStorage.getItem(PROGRESS_KEY) ?? 'null'))
@@ -51,6 +51,7 @@ export function validateProgress(data: unknown): Progress {
       progress.checks=progress.checks.filter(key=>!changed.some(id=>key.startsWith(`${id}:`)))
     }
     progress.views['guide:thumb-cables']='oct18-v1'
+    if(progress.build.version==='base')progress.current=BASE_STEP_REDIRECTS[progress.current]??progress.current
     if(progress.build.version==='touch'){
       if(['finishing-pp','thumb-skins'].includes(progress.current))progress.current='touch-skins'
       progress.done=progress.done.filter(id=>!['finishing-pp','thumb-skins'].includes(id))
@@ -71,7 +72,7 @@ function parseProgress(data: Record<string, any>): Progress {
   try {
     if (!data || typeof data !== 'object') return structuredClone(EMPTY_PROGRESS)
     return {
-      current: data.current==='p52'?'p49':data.current==='p40'?'p37':data.current==='p97'?'p99':['p117','p119'].includes(data.current) ? 'p115' : STEPS.some(s => s.id === data.current) ? data.current : EMPTY_PROGRESS.current,
+      current: ['p105','p110','p150','p154'].includes(data.current)?'p101':data.current==='p52'?'p49':data.current==='p40'?'p37':data.current==='p97'?'p99':['p117','p119'].includes(data.current) ? 'p115' : STEPS.some(s => s.id === data.current) ? data.current : EMPTY_PROGRESS.current,
       done: Array.isArray(data.done) ? [...new Set<string>(data.done.filter((id: unknown) => STEPS.some(s => s.id === id)))] : [],
       tendons: Array.isArray(data.tendons) ? [...new Set<number>(data.tendons.filter((n: unknown) => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n < 32))] : [],
       checks: Array.isArray(data.checks) ? [...new Set<string>(data.checks.filter((s: unknown) => typeof s === 'string'))] : [],
@@ -94,7 +95,7 @@ export function changeBuildProgress(progress: Progress, value: Partial<Build>): 
     ((side||version)&&s.chapter!=='Fundamentals')||
     (motor&&['Tower','Electronics','Motors','Spooling','Hull','Finish'].includes(s.chapter))||
     ((motor||audience)&&s.chapter.startsWith('Flashing'))).map(s=>s.id)
-  return {...progress,build:{...progress.build,...value},done:progress.done.filter(id=>!affected.includes(id)),
+  return {...progress,current:(value.version??progress.build.version)==='base'?(BASE_STEP_REDIRECTS[progress.current]??progress.current):progress.current,build:{...progress.build,...value},done:progress.done.filter(id=>!affected.includes(id)),
     checks:progress.checks.filter(key=>!affected.some(id=>key.startsWith(`${id}:`))),
     tendons:side||version?[]:progress.tendons,
     views:side||version?{'guide:revision':'assembly-v5','guide:feedback':'oct15-v1','guide:layout':'oct16-v1','guide:finger-layout':'parts-first-v1','guide:thumb-layout':'parts-first-v1','guide:thumb-cables':'oct18-v1','flashing:method':flashingMethod(progress)}:progress.views}

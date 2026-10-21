@@ -233,13 +233,17 @@
 .assembly-part-tray > span { display: block; font-size: 10px; color: var(--dim); margin-top: 10px; }
 .assembly-tray-preview { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); grid-template-rows: repeat(2,52px); margin-top: 12px; background: #e3e9ed; border-radius: 6px; }
 .assembly-tray-preview img { width: 100%; height: 100%; object-fit: contain; }
-.assembly-parts-dialog { width: min(1000px,92vw); max-height: 85vh; padding: 0; border: 1px solid var(--panel-border-strong); border-radius: 13px; background: var(--bg); color: var(--text); box-shadow: 0 24px 100px #0005; }
+.assembly-parts-dialog { width: min(1200px,94vw); max-height: 85vh; padding: 0; border: 1px solid var(--panel-border-strong); border-radius: 13px; background: var(--bg); color: var(--text); box-shadow: 0 24px 100px #0005; }
 .assembly-parts-dialog::backdrop { background: #10242ecc; backdrop-filter: blur(3px); }
 .assembly-parts-dialog-header { position: sticky; top: 0; z-index: 1; padding: 24px; background: var(--bg); border-bottom: 1px solid var(--panel-border); }
-.assembly-parts-dialog-header h3 { margin: 7px 0 0; font-size: 24px; }
-.assembly-part-detail-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 18px; padding: 24px; }
+.assembly-parts-dialog-header > div { flex: 1; min-width: 0; }
+.assembly-parts-dialog-header > button { flex-shrink: 0; }
+.assembly-parts-dialog-header h3 { margin: 0; font-size: 24px; width: 100%; }
+.assembly-part-detail-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,340px),1fr)); gap: 18px; padding: 24px; }
 .assembly-part-detail-grid figure { margin: 0; padding: 12px; border: 1px solid var(--panel-border); border-radius: 8px; }
-.assembly-part-detail-grid img { width: 100%; background: #e3e9ed; border-radius: 5px; }
+.assembly-part-picture { position: relative; padding: 12px 28px; }
+.assembly-part-picture .assembly-part-quantity { position: absolute; right: 0; top: 0; font-size: 15px; font-weight: 600; color: var(--text); }
+.assembly-part-detail-grid img { display: block; width: 100%; height: 125px; object-fit: contain; border-radius: 5px; }
 .assembly-part-detail-grid figcaption { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; font-size: 12px; padding-top: 10px; }
 .assembly-part-detail-grid strong { color: var(--accent); white-space: nowrap; }
 .assembly-tendon-identities { padding: 0 24px 24px; }
@@ -248,7 +252,7 @@
 .assembly-tendon-identities li span { color: var(--accent); margin-right: 10px; font: 10px var(--font); }
 @keyframes assembly-label-reveal { from { opacity: 0; } 55% { opacity: 0; } to { opacity: 1; } }
 @media(max-width:1150px) { .assembly-visual-inventory { grid-template-columns: repeat(2,minmax(0,1fr)); } }
-@media(max-width:650px) { .assembly-cad-toolbar { padding: 13px; } .assembly-cad-toolbar .assembly-eyebrow { font-size: 8px; } .assembly-part-detail-grid { grid-template-columns: repeat(2,minmax(0,1fr)); padding: 16px; gap: 10px; } .assembly-parts-dialog-header { padding: 16px; } .assembly-parts-dialog-header h3 { font-size: 20px; } .assembly-tendon-identities ul { grid-template-columns: repeat(2,minmax(0,1fr)); } .assembly-visual-inventory + .assembly-row { align-items: start; } }
+@media(max-width:650px) { .assembly-cad-toolbar { padding: 13px; } .assembly-cad-toolbar .assembly-eyebrow { font-size: 8px; } .assembly-part-detail-grid { grid-template-columns: minmax(0,1fr); padding: 16px; gap: 10px; } .assembly-parts-dialog-header { padding: 16px; flex-wrap: wrap; } .assembly-parts-dialog-header > div { flex-basis: 100%; } .assembly-parts-dialog-header h3 { font-size: 20px; } .assembly-tendon-identities ul { grid-template-columns: repeat(2,minmax(0,1fr)); } .assembly-visual-inventory + .assembly-row { align-items: start; } }
 @media(prefers-reduced-motion:reduce) { .assembly-cad-labels { animation: none; } }
 .assembly-parts-dialog { margin: auto; overflow: auto; }
 .assembly-part-detail-grid:has(> figure:only-child) { grid-template-columns: minmax(0,440px); justify-content: center; }
