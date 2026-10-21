@@ -225,3 +225,35 @@ def test_the_hold_is_reported_so_a_reload_knows_which_run_it_is(client):
     client.post("/api/operation/input", json={"value": "Release"})
     _wait_op_state(client, "done")
     _wait_reconnected(client)
+
+
+def test_manual_calibration_back_re_asks_the_previous_hardstop(client):
+    """Back forgets the previous capture and asks for it again — a limit recorded
+    at the wrong pose would otherwise send the joint into its hardstop later."""
+    client.post("/api/operation/calibrate/start",
+                json={"params": {**FAST, "manual": True, "joints": ["thumb_cmc"]}})
+
+    def awaiting(options):
+        def check():
+            op = _operation(client) or {}
+            return op if op.get("state") == "awaiting_input" and \
+                (op.get("awaiting") or {}).get("options") == options else None
+        op = _wait_for(check)
+        assert op, f"never awaited {options}: {_operation(client)}"
+        return op
+
+    first = awaiting(["Record", "Skip"])            # step 1: no Back yet
+    assert first["extra"]["current"]["direction"] == "flex"
+    client.post("/api/operation/input", json={"value": "Record"})
+    second = awaiting(["Record", "Skip", "Back"])   # step 2 offers Back
+    assert second["extra"]["current"]["direction"] == "extend"
+    assert len(second["extra"]["captured"]) == 1
+    client.post("/api/operation/input", json={"value": "Back"})
+    again = awaiting(["Record", "Skip"])
+    assert again["extra"]["current"]["direction"] == "flex"
+    assert again["extra"]["captured"] == []          # the flex capture is forgotten
+    client.post("/api/operation/input", json={"value": "Record"})
+    awaiting(["Record", "Skip", "Back"])
+    client.post("/api/operation/input", json={"value": "Record"})
+    snapshot = _wait_op_state(client, "done")
+    assert snapshot["result"]["joints_calibrated"] == ["thumb_cmc"]

@@ -33,6 +33,117 @@ def build_router(service: HandService) -> APIRouter:
     def stats():
         return service.stats()
 
+    # ----- travel baselines (named ground truths for tensioning) -------------
+
+    @router.get("/baselines")
+    def baselines_state():
+        from orca_ui.hand import baselines
+
+        return baselines.state(service.supervisor.config)
+
+    @router.get("/probes")
+    def probes_state():
+        from orca_ui.hand import probes
+        from orca_ui.hand.operations import hand_ops
+        from orca_ui.hand.operations.guided_tension import motor_family
+
+        supported = hand_ops.tension_probe_supported()
+        if supported:
+            from orca_ui.hand.operations.tension_probe import probe_defaults
+
+        return {
+            **probes.state(service.supervisor.config),
+            "supported": supported,
+            "motor_type": motor_family(service),
+            "defaults": probe_defaults(service) if supported else None,
+        }
+
+    @router.post("/probes/reference")
+    def probes_reference(body: schemas.ProbeReferenceRequest):
+        from orca_ui.hand import probes
+
+        try:
+            probes.set_reference(service.supervisor.config, body.name)
+        except KeyError as e:
+            raise HTTPException(404, str(e))
+        return {"reference": body.name}
+
+    @router.get("/sweeps")
+    def sweeps_state():
+        from orca_ui.hand import sweeps
+        from orca_ui.hand.operations import hand_ops
+        from orca_ui.hand.operations.guided_tension import motor_family
+
+        supported = hand_ops.tension_sweep_supported()
+        if supported:
+            from orca_ui.hand.operations.tension_sweep import sweep_defaults
+
+        return {
+            **sweeps.state(service.supervisor.config),
+            "supported": supported,
+            "motor_type": motor_family(service),
+            "defaults": sweep_defaults(service) if supported else None,
+        }
+
+    @router.get("/sweeps/{name}")
+    def sweep_dataset(name: str):
+        from orca_ui.hand import sweeps
+
+        found = sweeps.dataset(service.supervisor.config, name)
+        if found is None:
+            raise HTTPException(404, f"no sweep dataset named {name!r}")
+        return {"name": name, **found}
+
+    @router.post("/sweeps/reference")
+    def sweeps_reference(body: schemas.ProbeReferenceRequest):
+        from orca_ui.hand import sweeps
+
+        try:
+            sweeps.set_reference(service.supervisor.config, body.name)
+        except KeyError as e:
+            raise HTTPException(404, str(e))
+        return {"reference": body.name}
+
+    @router.get("/slack_tests")
+    def slack_tests_state():
+        from orca_ui.hand import slack_tests
+        from orca_ui.hand.operations import hand_ops
+
+        supported = hand_ops.slack_test_supported()
+        return {
+            **slack_tests.state(service.supervisor.config),
+            "supported": supported,
+            "defaults": hand_ops.slack_setting_defaults() if supported else None,
+        }
+
+    @router.post("/baselines/promote")
+    def baselines_promote(body: schemas.BaselinePromoteRequest):
+        from orca_ui.hand import baselines
+
+        try:
+            entry = baselines.promote(
+                service.supervisor.config,
+                body.snapshot,
+                body.name,
+                note=body.note,
+                activate_it=body.activate,
+            )
+        except KeyError as e:
+            raise HTTPException(status_code=409, detail=str(e.args[0]))
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+        return {"name": body.name, **entry}
+
+    @router.post("/baselines/activate")
+    def baselines_activate(body: schemas.BaselineActivateRequest):
+        from orca_ui.hand import baselines
+
+        try:
+            baselines.activate(service.supervisor.config, body.name)
+        except KeyError as e:
+            raise HTTPException(status_code=404, detail=str(e.args[0]))
+        return {"active": body.name}
+
     @router.get("/ports")
     def ports():
         import serial.tools.list_ports
@@ -47,11 +158,13 @@ def build_router(service: HandService) -> APIRouter:
         for p in serial.tools.list_ports.comports():
             if p.vid is None:
                 continue
-            out.append({
-                "device": p.device,
-                "description": p.description,
-                "kind": vid_labels.get(p.vid),
-            })
+            out.append(
+                {
+                    "device": p.device,
+                    "description": p.description,
+                    "kind": vid_labels.get(p.vid),
+                }
+            )
         out.sort(key=lambda x: (x["kind"] is None, x["device"]))
         return out
 
@@ -122,8 +235,7 @@ def build_router(service: HandService) -> APIRouter:
     def _manager():
         manager = service.operation_manager
         if manager is None:
-            raise HTTPException(status_code=503,
-                                detail="operations unavailable")
+            raise HTTPException(status_code=503, detail="operations unavailable")
         return manager
 
     @router.get("/operation")
@@ -135,8 +247,7 @@ def build_router(service: HandService) -> APIRouter:
         return _manager().log_payload()
 
     @router.post("/operation/{kind}/start")
-    def operation_start(kind: str,
-                        body: schemas.OperationStartRequest | None = None):
+    def operation_start(kind: str, body: schemas.OperationStartRequest | None = None):
         params = body.params if body else {}
         return {"operation": guard(_manager().start, kind, params)}
 
@@ -245,8 +356,7 @@ def build_router(service: HandService) -> APIRouter:
 
     @router.post("/control/gains")
     def control_gains(body: schemas.GainsRequest):
-        guard(service.set_gains, body.kp, body.ki, body.correction_max_deg,
-              body.joints)
+        guard(service.set_gains, body.kp, body.ki, body.correction_max_deg, body.joints)
         return {"ok": True, "control": service.control_state()}
 
     @router.post("/control/gains/reset")
@@ -272,8 +382,11 @@ def build_router(service: HandService) -> APIRouter:
 
     @router.get("/motors/gains")
     def motors_gains():
-        return {"ok": True, "gains": guard(service.read_servo_gains),
-                "gain_max": service.servo_gain_max()}
+        return {
+            "ok": True,
+            "gains": guard(service.read_servo_gains),
+            "gain_max": service.servo_gain_max(),
+        }
 
     @router.post("/motors/{motor_id}/gains")
     def motors_set_gains(motor_id: int, body: schemas.ServoGainsRequest):
@@ -282,8 +395,11 @@ def build_router(service: HandService) -> APIRouter:
 
     @router.get("/motors/profile")
     def motors_profile():
-        return {"ok": True, "profile": guard(service.read_servo_profile),
-                "limits": service.servo_limits()}
+        return {
+            "ok": True,
+            "profile": guard(service.read_servo_profile),
+            "limits": service.servo_limits(),
+        }
 
     @router.post("/motors/{motor_id}/profile")
     def motors_set_profile(motor_id: int, body: schemas.ServoProfileRequest):
@@ -355,8 +471,12 @@ def build_router(service: HandService) -> APIRouter:
 
     @router.post("/motors/direct/pacing")
     def motors_direct_pacing(body: schemas.BenchPacingRequest):
-        return guard(service.set_bench_pacing,
-                     body.interp_steps, body.max_settle_ms, body.period_ms)
+        return guard(
+            service.set_bench_pacing,
+            body.interp_steps,
+            body.max_settle_ms,
+            body.period_ms,
+        )
 
     @router.post("/motors/direct/play")
     def motors_direct_play(body: schemas.MotorPlaybackRequest):
@@ -392,6 +512,7 @@ def build_router(service: HandService) -> APIRouter:
 
     def _library_call(fn, *args, **kwargs):
         from orca_ui.library import LibraryError
+
         try:
             return fn(*args, **kwargs)
         except LibraryError as e:
@@ -417,9 +538,12 @@ def build_router(service: HandService) -> APIRouter:
             if meta.get("type") != WAYPOINTS:
                 raise ServiceError(
                     "only waypoint recordings are editable — continuous "
-                    "recordings are sampled motion", status_code=409)
-            joint_ids = list(meta.get("joint_ids")
-                             or service.supervisor.config.joint_ids)
+                    "recordings are sampled motion",
+                    status_code=409,
+                )
+            joint_ids = list(
+                meta.get("joint_ids") or service.supervisor.config.joint_ids
+            )
             if not body.waypoints:
                 raise ServiceError("a trajectory needs at least one waypoint")
             roms = service.supervisor.config.joint_roms_dict
@@ -428,7 +552,8 @@ def build_router(service: HandService) -> APIRouter:
                 if len(waypoint) != len(joint_ids):
                     raise ServiceError(
                         f"waypoint {index + 1}: expected {len(joint_ids)} "
-                        f"joint values, got {len(waypoint)}")
+                        f"joint values, got {len(waypoint)}"
+                    )
                 row = []
                 for joint, value in zip(joint_ids, waypoint):
                     angle = float(value)
@@ -438,19 +563,20 @@ def build_router(service: HandService) -> APIRouter:
                     row.append(round(angle, 3))
                 clean.append(row)
             data["waypoints"] = clean
-            meta["edited_at"] = datetime.now(
-                timezone.utc).astimezone().isoformat(timespec="seconds")
+            meta["edited_at"] = (
+                datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+            )
             data["metadata"] = meta
             target = body.save_as or name
-            _library_call(service.library.save_trajectory, target, data,
-                          overwrite=target == name)
+            _library_call(
+                service.library.save_trajectory, target, data, overwrite=target == name
+            )
             return {"ok": True, "name": target, "frames": len(clean)}
 
         return guard(apply)
 
     @router.post("/trajectories/{name}/to_motor")
-    def trajectory_to_motor(name: str,
-                            body: schemas.TrajectoryToMotorRequest):
+    def trajectory_to_motor(name: str, body: schemas.TrajectoryToMotorRequest):
         # Translate a joint-space waypoint recording into raw motor
         # positions via the calibrated joint<->motor map. Refused without a
         # completed calibration — the map does not exist without one.
@@ -466,20 +592,24 @@ def build_router(service: HandService) -> APIRouter:
             if not getattr(hand, "calibrated", False):
                 raise ServiceError(
                     "joint->motor translation needs a calibrated hand — "
-                    "calibrate first", status_code=409)
+                    "calibrate first",
+                    status_code=409,
+                )
             data = _library_call(service.library.load_trajectory, name)
             meta = data.get("metadata") or {}
             if meta.get("type") != WAYPOINTS:
                 raise ServiceError(
-                    "only joint waypoint recordings can be translated to "
-                    "motor space", status_code=409)
+                    "only joint waypoint recordings can be translated to motor space",
+                    status_code=409,
+                )
             config = service.supervisor.config
             joint_ids = list(meta.get("joint_ids") or config.joint_ids)
             motor_ids = [int(m) for m in config.motor_ids]
             rows = []
             for index, waypoint in enumerate(data.get("waypoints") or []):
-                pose = {j: float(v) for j, v in zip(joint_ids, waypoint)
-                        if v is not None}
+                pose = {
+                    j: float(v) for j, v in zip(joint_ids, waypoint) if v is not None
+                }
                 motor_pos = hand._joint_to_motor_pos(pose)
                 row = []
                 for idx, motor_id in enumerate(motor_ids):
@@ -488,22 +618,28 @@ def build_router(service: HandService) -> APIRouter:
                         raise ServiceError(
                             f"waypoint {index + 1}: motor {motor_id} has no "
                             "calibrated joint<->motor mapping — recalibrate "
-                            "that joint first", status_code=409)
+                            "that joint first",
+                            status_code=409,
+                        )
                     row.append(round(float(value), 5))
                 rows.append(row)
             if not rows:
                 raise ServiceError("trajectory contains no waypoints")
             target = body.save_as or f"{name}_motor"
-            _library_call(service.library.save_trajectory, target, {
-                "metadata": {
-                    "type": MOTOR_WAYPOINTS,
-                    "motor_ids": motor_ids,
-                    "hand_type": config.type,
-                    "created_at": _time.strftime("%Y%m%d_%H%M%S"),
-                    "translated_from": name,
+            _library_call(
+                service.library.save_trajectory,
+                target,
+                {
+                    "metadata": {
+                        "type": MOTOR_WAYPOINTS,
+                        "motor_ids": motor_ids,
+                        "hand_type": config.type,
+                        "created_at": _time.strftime("%Y%m%d_%H%M%S"),
+                        "translated_from": name,
+                    },
+                    "waypoints": rows,
                 },
-                "waypoints": rows,
-            })
+            )
             return {"ok": True, "name": target, "frames": len(rows)}
 
         return guard(convert)
@@ -545,7 +681,7 @@ def build_router(service: HandService) -> APIRouter:
         from orca_ui.hand.sweep import JointSweeper
 
         sweeper = JointSweeper(service)
-        service.attach_sweeper(sweeper)   # so estop can reach it
+        service.attach_sweeper(sweeper)  # so estop can reach it
 
         @router.post("/mock/joint_sweep")
         def mock_joint_sweep(body: schemas.SweepRequest):

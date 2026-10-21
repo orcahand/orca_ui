@@ -9,6 +9,7 @@ import type { ManualCalibrationExtra, ModelMetadata, OperationSnapshot } from '.
 import { useAppStore } from '../../state/appStore'
 import { isOperationActive } from '../../state/operationStore'
 import { ErrorBoundary } from '../common/ErrorBoundary'
+import { startTensionProbe } from './probeStart'
 
 const TensionPreview = lazy(() =>
   import('./TensionPreview').then((m) => ({ default: m.TensionPreview })),
@@ -52,7 +53,8 @@ export function ManualCalibrationDialog({
   const awaiting = operation.state === 'awaiting_input' ? operation.awaiting : null
   const current = extra?.current ?? null
   // One answer per prompt: the buttons lock until the next hardstop is asked for.
-  const promptKey = awaiting && current ? `${current.joints.join(',')}:${current.direction}` : null
+  const promptKey =
+    awaiting && current ? `${extra?.prompt_seq ?? 0}:${current.joints.join(',')}:${current.direction}` : null
   const [sentFor, setSentFor] = useState<string | null>(null)
   const sent = promptKey !== null && sentFor === promptKey
   const send = (option: string) => {
@@ -247,6 +249,16 @@ export function ManualCalibrationDialog({
                 <button className="btn btn-primary" disabled={moving} onClick={() => void moveToZero()}>
                   {moving ? 'Moving to zero…' : 'Move to zero'} <span className="gt-key">↵</span>
                 </button>
+                {operation.result && (
+                  <button
+                    className="btn btn-secondary"
+                    disabled={moving}
+                    title="Measure each tendon's slack and breakaway current against this fresh calibration"
+                    onClick={() => void startTensionProbe().catch(fail)}
+                  >
+                    Measure tension (probe)
+                  </button>
+                )}
               </div>
             )}
           </section>

@@ -138,6 +138,7 @@ class TestHardwareErrorSweep:
         sampler._hw_errors_warned = set()
         sampler._last_hw_error_sweep = 0.0
         sampler._motor_health = {}
+        sampler._was_driven = False
 
         client = _SweepClient(flags_by_motor)
         config = SimpleNamespace(
@@ -224,6 +225,13 @@ class TestHardwareErrorSweep:
 
         assert client.reads == first
 
+        # ...except once an operation lets go of the bus: it may have
+        # rebooted a motor, and its latch must not linger for an interval.
+        sampler._was_driven = True
+        sampler._sweep_hardware_errors(session)
+
+        assert client.reads > first
+
 
 def test_every_family_bit_name_has_a_kind_and_a_reboot_less_note():
     """orca_core decodes Feetech latches to angle_sensor/overcurrent; those
@@ -264,6 +272,7 @@ class TestMotorLiveness:
         sampler._hw_errors_warned = set()
         sampler._last_hw_error_sweep = -1e6
         sampler._motor_health = {}
+        sampler._was_driven = False
         sampler._motor_answering = None
 
         client = _SilentMotorClient({}, silent)
