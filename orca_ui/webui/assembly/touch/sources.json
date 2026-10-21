@@ -1,0 +1,212 @@
+{
+  "parts-sensors": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 1,
+    "crop": [
+      17,
+      81,
+      278,
+      262
+    ]
+  },
+  "parts-cables": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 1,
+    "crop": [
+      359,
+      81,
+      682,
+      262
+    ]
+  },
+  "clove-hitch": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 2,
+    "crop": [
+      40,
+      257,
+      178,
+      361
+    ]
+  },
+  "wrap-start": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 2,
+    "crop": [
+      194,
+      256,
+      292,
+      350
+    ]
+  },
+  "wrap-short": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 2,
+    "crop": [
+      319,
+      259,
+      695,
+      361
+    ]
+  },
+  "paint-before": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 4,
+    "crop": [
+      18,
+      164,
+      342,
+      340
+    ]
+  },
+  "paint-after": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 4,
+    "crop": [
+      380,
+      165,
+      704,
+      340
+    ]
+  },
+  "route-thumb": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 5,
+    "crop": [
+      158,
+      143,
+      330,
+      391
+    ]
+  },
+  "route-finger": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 5,
+    "crop": [
+      358,
+      133,
+      622,
+      391
+    ]
+  },
+  "sensor-seat": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 6,
+    "crop": [
+      530,
+      35,
+      699,
+      194
+    ]
+  },
+  "sensor-flush": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 6,
+    "crop": [
+      524,
+      206,
+      699,
+      389
+    ]
+  },
+  "sensor-plug-face": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 8,
+    "crop": [
+      43,
+      150,
+      166,
+      265
+    ]
+  },
+  "sensor-correct": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 8,
+    "crop": [
+      184,
+      184,
+      306,
+      358
+    ]
+  },
+  "sensor-correct-angle": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 8,
+    "crop": [
+      321,
+      201,
+      462,
+      341
+    ]
+  },
+  "sensor-wrong": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 8,
+    "crop": [
+      541,
+      148,
+      664,
+      325
+    ]
+  },
+  "screws-fingers": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 9,
+    "crop": [
+      17,
+      75,
+      360,
+      357
+    ]
+  },
+  "screws-thumb": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 9,
+    "crop": [
+      372,
+      125,
+      590,
+      357
+    ]
+  },
+  "board-mount": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 11,
+    "crop": [
+      397,
+      100,
+      704,
+      380
+    ]
+  },
+  "board-correct": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 12,
+    "crop": [
+      29,
+      201,
+      186,
+      343
+    ]
+  },
+  "board-wrong": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 12,
+    "crop": [
+      214,
+      201,
+      378,
+      343
+    ]
+  },
+  "board-map": {
+    "document": "Touch Assembly Instructions.pdf",
+    "page": 12,
+    "crop": [
+      434,
+      119,
+      681,
+      344
+    ]
+  }
+}

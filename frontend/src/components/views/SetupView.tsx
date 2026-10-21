@@ -2,6 +2,7 @@
 // flow only marks which one is next. Cross-tab control of a running operation
 // lives in the TransportBar.
 
+import { AssemblyCard } from '../assembly/AssemblyCard'
 import { useAppStore } from '../../state/appStore'
 import { useOperationStore } from '../../state/operationStore'
 import { HardwareVersionPrompt } from '../header/HardwareVersion'
@@ -41,6 +42,7 @@ export function SetupView() {
 
   return (
     <>
+      <AssemblyCard />
       {caps !== null && !caps.motors && (
         <div className="flow-info warn">⚠ motor bus unavailable</div>
       )}

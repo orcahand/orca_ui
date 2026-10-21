@@ -1,0 +1,72 @@
+[
+  {
+    "file": "base-plate-2.png",
+    "source": "orca_v2/base/SiliconeMolds-1100.3mf",
+    "member": "Metadata/plate_2.png"
+  },
+  {
+    "file": "base-plate-3.png",
+    "source": "orca_v2/base/SiliconeMolds-1100.3mf",
+    "member": "Metadata/plate_3.png"
+  },
+  {
+    "file": "base-plate-4.png",
+    "source": "orca_v2/base/SiliconeMolds-1100.3mf",
+    "member": "Metadata/plate_4.png"
+  },
+  {
+    "file": "base-plate-5.png",
+    "source": "orca_v2/base/SiliconeMolds-1100.3mf",
+    "member": "Metadata/plate_5.png"
+  },
+  {
+    "file": "base-plate-6.png",
+    "source": "orca_v2/base/SiliconeMolds-1100.3mf",
+    "member": "Metadata/plate_6.png"
+  },
+  {
+    "file": "base-plate-7.png",
+    "source": "orca_v2/base/SiliconeMolds-1100.3mf",
+    "member": "Metadata/plate_7.png"
+  },
+  {
+    "file": "base-plate-8.png",
+    "source": "orca_v2/base/SiliconeMolds-1100.3mf",
+    "member": "Metadata/plate_8.png"
+  },
+  {
+    "file": "base-plate-9.png",
+    "source": "orca_v2/base/SiliconeMolds-1100.3mf",
+    "member": "Metadata/plate_9.png"
+  },
+  {
+    "file": "touch-plate-2.png",
+    "source": "orca_v2/touch/SiliconeMolds-2100.3mf",
+    "member": "Metadata/plate_2.png"
+  },
+  {
+    "file": "touch-plate-3.png",
+    "source": "orca_v2/touch/SiliconeMolds-2100.3mf",
+    "member": "Metadata/plate_3.png"
+  },
+  {
+    "file": "touch-plate-4.png",
+    "source": "orca_v2/touch/SiliconeMolds-2100.3mf",
+    "member": "Metadata/plate_4.png"
+  },
+  {
+    "file": "touch-plate-5.png",
+    "source": "orca_v2/touch/SiliconeMolds-2100.3mf",
+    "member": "Metadata/plate_5.png"
+  },
+  {
+    "file": "touch-plate-6.png",
+    "source": "orca_v2/touch/SiliconeMolds-2100.3mf",
+    "member": "Metadata/plate_6.png"
+  },
+  {
+    "file": "touch-plate-7.png",
+    "source": "orca_v2/touch/SiliconeMolds-2100.3mf",
+    "member": "Metadata/plate_7.png"
+  }
+]

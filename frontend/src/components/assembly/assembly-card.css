@@ -1,0 +1,12 @@
+.assembly-launch { display: flex; align-items: center; gap: 24px; padding: 26px; margin: 16px 0 24px; border: 1px solid var(--panel-border-strong); border-radius: 12px; background: var(--panel); }
+.assembly-launch-icon { display: grid; place-items: center; flex: 0 0 58px; height: 58px; color: var(--accent); background: rgb(var(--accent-rgb) / .08); border-radius: 14px; font-size: 30px; }
+.assembly-launch-copy { flex: 1; }
+.assembly-launch-kicker { color: var(--accent); font-size: 10px; letter-spacing: .14em; }
+.assembly-launch h2 { color: var(--text-bright); font-size: 19px; margin: 6px 0 8px; }
+.assembly-launch p { max-width: 690px; color: var(--muted); font-size: 12px; line-height: 1.8; }
+.assembly-launch a { text-decoration: none; text-align: center; }
+@media (max-width: 760px) { .assembly-launch { flex-wrap: wrap; gap: 16px; padding: 20px; } .assembly-launch-icon { display: none; } .assembly-launch-copy { flex-basis: 100%; } }
+.assembly-dialog { margin: auto; width: min(1560px, 96vw); height: 94vh; max-width: 96vw; max-height: 94vh; padding: 0; border: 1px solid var(--panel-border-strong); border-radius: 16px; background: var(--bg); color: var(--text); overflow: hidden; box-shadow: 0 24px 100px rgb(0 0 0 / .25); }
+.assembly-dialog::backdrop { background: rgb(0 0 0 / .45); backdrop-filter: blur(5px); }
+.assembly-loading { padding: 48px; display: grid; gap: 20px; justify-items: start; }
+@media (max-width: 760px) { .assembly-dialog { width: 100vw; height: 100dvh; max-width: 100vw; max-height: 100dvh; border: 0; border-radius: 0; } }

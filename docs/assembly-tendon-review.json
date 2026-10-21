@@ -1,0 +1,15 @@
+{
+  "date": "14 October 2026 \u00b7 second sweep",
+  "result": "No additional tendon rendering defects found in this sweep. The 20 corrected images from the first pass remain the only changed stills.",
+  "checks": [
+    "328 current illustrations loaded and visually reviewed across Base/Touch \u00d7 left/right Dynamixel.",
+    "All tube vertices checked in 208 tendon/PTFE-containing still scenes: 204 fully framed; four intentional carpal-exit close-ups retain their focused crop.",
+    "128 carpal exits are fully visible; all 512 published overlay coordinates match projections from the current CAD scenes.",
+    "624 live animation and inspection states checked at multiple canvas sizes, with no tendon vertices clipped.",
+    "384 live tendon selections checked: all 32 identities \u00d7 four configurations \u00d7 wrist, bottom-spool and top-spool viewers.",
+    "840 assembly scene states inspected at 21 slider positions per scene across the four configurations."
+  ],
+  "note": "The carpal-lining close-up intentionally crops internal PTFE lengths to show the exits. Free working ends, pulled-out knots and the 8 cm spool measurement are intentional. These checks concern visual framing and model context, not physical routing validation. Manual zoom/pan can move geometry out of view. Full/FeeTech do not have complete CAD coverage.",
+  "baseline": "3985b50",
+  "evidenceDirectory": "/tmp/orca-tendon-sweep2"
+}

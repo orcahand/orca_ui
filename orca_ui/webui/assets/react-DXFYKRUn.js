@@ -1,0 +1,1 @@
+import{n as e,o as t,r as n}from"./jsx-runtime-CYJaXqyf.js";var r=t(n(),1),i=e=>e;function a(e,t=i){let n=r.useSyncExternalStore(e.subscribe,r.useCallback(()=>t(e.getState()),[e,t]),r.useCallback(()=>t(e.getInitialState()),[e,t]));return r.useDebugValue(n),n}var o=t=>{let n=e(t),r=e=>a(n,e);return Object.assign(r,n),r},s=(e=>e?o(e):o);export{s as t};

@@ -1,0 +1,1787 @@
+{
+  "key": "base-left-dynamixel",
+  "parts": [
+    {
+      "id": "4f845c5944",
+      "label": "Index AP",
+      "category": "Fingers",
+      "count": 1,
+      "nodes": [
+        "piece_0314"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0314"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/4f845c5944.png"
+    },
+    {
+      "id": "c8000db55b",
+      "label": "Index DP",
+      "category": "Fingers",
+      "count": 1,
+      "nodes": [
+        "piece_0309"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0309"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/c8000db55b.png"
+    },
+    {
+      "id": "a8aab80846",
+      "label": "Index PP",
+      "category": "Fingers",
+      "count": 1,
+      "nodes": [
+        "piece_0305"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0305"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/a8aab80846.png"
+    },
+    {
+      "id": "a4a0f1b6f0",
+      "label": "Middle AP",
+      "category": "Fingers",
+      "count": 1,
+      "nodes": [
+        "piece_0330"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0330"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/a4a0f1b6f0.png"
+    },
+    {
+      "id": "ad98c67c72",
+      "label": "Middle DP",
+      "category": "Fingers",
+      "count": 1,
+      "nodes": [
+        "piece_0325"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0325"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/ad98c67c72.png"
+    },
+    {
+      "id": "9b9c4faa40",
+      "label": "Middle PP",
+      "category": "Fingers",
+      "count": 1,
+      "nodes": [
+        "piece_0321"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0321"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/9b9c4faa40.png"
+    },
+    {
+      "id": "e6ecc025ea",
+      "label": "Pinky AP",
+      "category": "Fingers",
+      "count": 1,
+      "nodes": [
+        "piece_0346"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0346"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/e6ecc025ea.png"
+    },
+    {
+      "id": "33e3c9a582",
+      "label": "Pinky DP",
+      "category": "Fingers",
+      "count": 1,
+      "nodes": [
+        "piece_0341"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0341"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/33e3c9a582.png"
+    },
+    {
+      "id": "b846feafee",
+      "label": "Pinky PP",
+      "category": "Fingers",
+      "count": 1,
+      "nodes": [
+        "piece_0337"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0337"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/b846feafee.png"
+    },
+    {
+      "id": "982c714a48",
+      "label": "Ring AP",
+      "category": "Fingers",
+      "count": 1,
+      "nodes": [
+        "piece_0362"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0362"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/982c714a48.png"
+    },
+    {
+      "id": "69959118bc",
+      "label": "Ring DP",
+      "category": "Fingers",
+      "count": 1,
+      "nodes": [
+        "piece_0357"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0357"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/69959118bc.png"
+    },
+    {
+      "id": "656e35008b",
+      "label": "Ring PP",
+      "category": "Fingers",
+      "count": 1,
+      "nodes": [
+        "piece_0353"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0353"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/656e35008b.png"
+    },
+    {
+      "id": "5e5fa71d2d",
+      "label": "Thumb AP",
+      "category": "Thumb",
+      "count": 1,
+      "nodes": [
+        "piece_0394"
+      ],
+      "areas": {
+        "Thumb": [
+          "piece_0394"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/5e5fa71d2d.png"
+    },
+    {
+      "id": "70234a9a39",
+      "label": "Thumb DP",
+      "category": "Thumb",
+      "count": 1,
+      "nodes": [
+        "piece_0387"
+      ],
+      "areas": {
+        "Thumb": [
+          "piece_0387"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/70234a9a39.png"
+    },
+    {
+      "id": "79c6e3a0f1",
+      "label": "Thumb PP",
+      "category": "Thumb",
+      "count": 1,
+      "nodes": [
+        "piece_0385"
+      ],
+      "areas": {
+        "Thumb": [
+          "piece_0385"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/79c6e3a0f1.png"
+    },
+    {
+      "id": "a4bb6570ae",
+      "label": "Thumb TP",
+      "category": "Thumb",
+      "count": 1,
+      "nodes": [
+        "piece_0378"
+      ],
+      "areas": {
+        "Thumb": [
+          "piece_0378"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/a4bb6570ae.png"
+    },
+    {
+      "id": "c2c18370de",
+      "label": "Carpal core",
+      "category": "Carpals",
+      "count": 1,
+      "nodes": [
+        "piece_0297"
+      ],
+      "areas": {
+        "Carpals": [
+          "piece_0297"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/c2c18370de.png"
+    },
+    {
+      "id": "952754b102",
+      "label": "Carpal pulley",
+      "category": "Carpals",
+      "count": 1,
+      "nodes": [
+        "piece_0291"
+      ],
+      "areas": {
+        "Carpals": [
+          "piece_0291"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/952754b102.png"
+    },
+    {
+      "id": "6a15a621ca",
+      "label": "Carpals",
+      "category": "Carpals",
+      "count": 1,
+      "nodes": [
+        "piece_0298"
+      ],
+      "areas": {
+        "Carpals": [
+          "piece_0298"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/6a15a621ca.png"
+    },
+    {
+      "id": "ffad82075d",
+      "label": "Arm mounting adapter (optional)",
+      "category": "Wrist & tower",
+      "count": 1,
+      "nodes": [
+        "piece_0213"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0213"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/ffad82075d.png"
+    },
+    {
+      "id": "6b74f66dfc",
+      "label": "Fan cover \u00b7 two fans",
+      "category": "Wrist & tower",
+      "count": 1,
+      "nodes": [
+        "piece_0015"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0015"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/6b74f66dfc.png"
+    },
+    {
+      "id": "df220860a1",
+      "label": "GT2 belt \u00b7 142 mm",
+      "category": "Wrist & tower",
+      "count": 1,
+      "nodes": [
+        "piece_0257"
+      ],
+      "areas": {
+        "Wrist": [
+          "piece_0257"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/df220860a1.png"
+    },
+    {
+      "id": "8dbef51f40",
+      "label": "Hull cover",
+      "category": "Wrist & tower",
+      "count": 1,
+      "nodes": [
+        "piece_0367"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0367"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/8dbef51f40.png"
+    },
+    {
+      "id": "d7812c0263",
+      "label": "Motor tower",
+      "category": "Wrist & tower",
+      "count": 1,
+      "nodes": [
+        "piece_0000"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0000"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/d7812c0263.png"
+    },
+    {
+      "id": "a10b5dd957",
+      "label": "Rear hull cover",
+      "category": "Wrist & tower",
+      "count": 1,
+      "nodes": [
+        "piece_0373"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0373"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/a10b5dd957.png"
+    },
+    {
+      "id": "92be502e02",
+      "label": "Side plate",
+      "category": "Wrist & tower",
+      "count": 1,
+      "nodes": [
+        "piece_0258"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0258"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/92be502e02.png"
+    },
+    {
+      "id": "fea2650845",
+      "label": "Wrist frame",
+      "category": "Wrist & tower",
+      "count": 1,
+      "nodes": [
+        "piece_0234"
+      ],
+      "areas": {
+        "Wrist": [
+          "piece_0234"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/fea2650845.png"
+    },
+    {
+      "id": "c2ae471791",
+      "label": "Wrist motor adapter",
+      "category": "Wrist & tower",
+      "count": 1,
+      "nodes": [
+        "piece_0236"
+      ],
+      "areas": {
+        "Wrist": [
+          "piece_0236"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/c2ae471791.png"
+    },
+    {
+      "id": "41114d15dc",
+      "label": "Wrist pulley",
+      "category": "Wrist & tower",
+      "count": 1,
+      "nodes": [
+        "piece_0241"
+      ],
+      "areas": {
+        "Wrist": [
+          "piece_0241"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/41114d15dc.png"
+    },
+    {
+      "id": "3e8c8cf2e7",
+      "label": "Index DP skin",
+      "category": "Skins",
+      "count": 1,
+      "nodes": [
+        "piece_0306"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0306"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/3e8c8cf2e7.png"
+    },
+    {
+      "id": "7315a2bfdf",
+      "label": "Index PP skin",
+      "category": "Skins",
+      "count": 1,
+      "nodes": [
+        "piece_0301"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0301"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/7315a2bfdf.png"
+    },
+    {
+      "id": "a76d7abae0",
+      "label": "Middle / ring DP skin",
+      "category": "Skins",
+      "count": 2,
+      "nodes": [
+        "piece_0322",
+        "piece_0354"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0322",
+          "piece_0354"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/a76d7abae0.png"
+    },
+    {
+      "id": "0f4e5dc8e8",
+      "label": "Middle PP skin",
+      "category": "Skins",
+      "count": 1,
+      "nodes": [
+        "piece_0317"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0317"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/0f4e5dc8e8.png"
+    },
+    {
+      "id": "02db127025",
+      "label": "Palm skin",
+      "category": "Skins",
+      "count": 1,
+      "nodes": [
+        "piece_0296"
+      ],
+      "areas": {
+        "Carpals": [
+          "piece_0296"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/02db127025.png"
+    },
+    {
+      "id": "2f9839c628",
+      "label": "Pinky DP skin",
+      "category": "Skins",
+      "count": 1,
+      "nodes": [
+        "piece_0338"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0338"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/2f9839c628.png"
+    },
+    {
+      "id": "57e3af0e10",
+      "label": "Pinky PP skin",
+      "category": "Skins",
+      "count": 1,
+      "nodes": [
+        "piece_0333"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0333"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/57e3af0e10.png"
+    },
+    {
+      "id": "2fe308f9c0",
+      "label": "Ring PP skin",
+      "category": "Skins",
+      "count": 1,
+      "nodes": [
+        "piece_0349"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0349"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/2fe308f9c0.png"
+    },
+    {
+      "id": "97123e1bdb",
+      "label": "Thumb DP skin",
+      "category": "Skins",
+      "count": 1,
+      "nodes": [
+        "piece_0388"
+      ],
+      "areas": {
+        "Thumb": [
+          "piece_0388"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/97123e1bdb.png"
+    },
+    {
+      "id": "57db7c2147",
+      "label": "Thumb PP skin",
+      "category": "Skins",
+      "count": 1,
+      "nodes": [
+        "piece_0380"
+      ],
+      "areas": {
+        "Thumb": [
+          "piece_0380"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/57db7c2147.png"
+    },
+    {
+      "id": "30d3151b3c",
+      "label": "Bottom spool",
+      "category": "Drive & electronics",
+      "count": 16,
+      "nodes": [
+        "piece_0019",
+        "piece_0031",
+        "piece_0043",
+        "piece_0055",
+        "piece_0067",
+        "piece_0079",
+        "piece_0091",
+        "piece_0103",
+        "piece_0115",
+        "piece_0127",
+        "piece_0139",
+        "piece_0151",
+        "piece_0163",
+        "piece_0175",
+        "piece_0187",
+        "piece_0199"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0019",
+          "piece_0031",
+          "piece_0043",
+          "piece_0055",
+          "piece_0067",
+          "piece_0079",
+          "piece_0091",
+          "piece_0103",
+          "piece_0115",
+          "piece_0127",
+          "piece_0139",
+          "piece_0151",
+          "piece_0163",
+          "piece_0175",
+          "piece_0187",
+          "piece_0199"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/30d3151b3c.png"
+    },
+    {
+      "id": "cc87355d7b",
+      "label": "Cooling fan",
+      "category": "Drive & electronics",
+      "count": 2,
+      "nodes": [
+        "piece_0001",
+        "piece_0002"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0001",
+          "piece_0002"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/cc87355d7b.png"
+    },
+    {
+      "id": "bfccb91fbd",
+      "label": "Dynamixel XC330 motor",
+      "category": "Drive & electronics",
+      "count": 16,
+      "nodes": [
+        "piece_0020",
+        "piece_0032",
+        "piece_0044",
+        "piece_0056",
+        "piece_0068",
+        "piece_0080",
+        "piece_0092",
+        "piece_0104",
+        "piece_0116",
+        "piece_0128",
+        "piece_0140",
+        "piece_0152",
+        "piece_0164",
+        "piece_0176",
+        "piece_0188",
+        "piece_0200"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0020",
+          "piece_0032",
+          "piece_0044",
+          "piece_0056",
+          "piece_0068",
+          "piece_0080",
+          "piece_0092",
+          "piece_0104",
+          "piece_0116",
+          "piece_0128",
+          "piece_0140",
+          "piece_0152",
+          "piece_0164",
+          "piece_0176",
+          "piece_0188",
+          "piece_0200"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/bfccb91fbd.png"
+    },
+    {
+      "id": "6dd7167777",
+      "label": "Dynamixel XC430 wrist motor",
+      "category": "Drive & electronics",
+      "count": 1,
+      "nodes": [
+        "piece_0235"
+      ],
+      "areas": {
+        "Wrist": [
+          "piece_0235"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/6dd7167777.png"
+    },
+    {
+      "id": "b1d61c8dd7",
+      "label": "Metal spool holder",
+      "category": "Drive & electronics",
+      "count": 4,
+      "nodes": [
+        "piece_0003",
+        "piece_0208",
+        "piece_0209",
+        "piece_0210"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0003",
+          "piece_0208",
+          "piece_0209",
+          "piece_0210"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/b1d61c8dd7.png"
+    },
+    {
+      "id": "788f157ef6",
+      "label": "Motor connector PCB",
+      "category": "Drive & electronics",
+      "count": 12,
+      "nodes": [
+        "piece_0214",
+        "piece_0215",
+        "piece_0216",
+        "piece_0217",
+        "piece_0218",
+        "piece_0219",
+        "piece_0220",
+        "piece_0221",
+        "piece_0222",
+        "piece_0223",
+        "piece_0224",
+        "piece_0225"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0214",
+          "piece_0215",
+          "piece_0216",
+          "piece_0217",
+          "piece_0218",
+          "piece_0219",
+          "piece_0220",
+          "piece_0221",
+          "piece_0222",
+          "piece_0223",
+          "piece_0224",
+          "piece_0225"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/788f157ef6.png"
+    },
+    {
+      "id": "e2fd92904c",
+      "label": "OH control board",
+      "category": "Drive & electronics",
+      "count": 1,
+      "nodes": [
+        "piece_0372"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0372"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/e2fd92904c.png"
+    },
+    {
+      "id": "f0c9a4e32c",
+      "label": "Ratchet",
+      "category": "Drive & electronics",
+      "count": 16,
+      "nodes": [
+        "piece_0017",
+        "piece_0029",
+        "piece_0041",
+        "piece_0053",
+        "piece_0065",
+        "piece_0077",
+        "piece_0089",
+        "piece_0101",
+        "piece_0113",
+        "piece_0125",
+        "piece_0137",
+        "piece_0149",
+        "piece_0161",
+        "piece_0173",
+        "piece_0185",
+        "piece_0197"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0017",
+          "piece_0029",
+          "piece_0041",
+          "piece_0053",
+          "piece_0065",
+          "piece_0077",
+          "piece_0089",
+          "piece_0101",
+          "piece_0113",
+          "piece_0125",
+          "piece_0137",
+          "piece_0149",
+          "piece_0161",
+          "piece_0173",
+          "piece_0185",
+          "piece_0197"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/f0c9a4e32c.png"
+    },
+    {
+      "id": "daa2bf3246",
+      "label": "Spool ORCA insert",
+      "category": "Drive & electronics",
+      "count": 16,
+      "nodes": [
+        "piece_0018",
+        "piece_0030",
+        "piece_0042",
+        "piece_0054",
+        "piece_0066",
+        "piece_0078",
+        "piece_0090",
+        "piece_0102",
+        "piece_0114",
+        "piece_0126",
+        "piece_0138",
+        "piece_0150",
+        "piece_0162",
+        "piece_0174",
+        "piece_0186",
+        "piece_0198"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0018",
+          "piece_0030",
+          "piece_0042",
+          "piece_0054",
+          "piece_0066",
+          "piece_0078",
+          "piece_0090",
+          "piece_0102",
+          "piece_0114",
+          "piece_0126",
+          "piece_0138",
+          "piece_0150",
+          "piece_0162",
+          "piece_0174",
+          "piece_0186",
+          "piece_0198"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/daa2bf3246.png"
+    },
+    {
+      "id": "5985d6a280",
+      "label": "Spool cover",
+      "category": "Drive & electronics",
+      "count": 16,
+      "nodes": [
+        "piece_0024",
+        "piece_0036",
+        "piece_0048",
+        "piece_0060",
+        "piece_0072",
+        "piece_0084",
+        "piece_0096",
+        "piece_0108",
+        "piece_0120",
+        "piece_0132",
+        "piece_0144",
+        "piece_0156",
+        "piece_0168",
+        "piece_0180",
+        "piece_0192",
+        "piece_0204"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0024",
+          "piece_0036",
+          "piece_0048",
+          "piece_0060",
+          "piece_0072",
+          "piece_0084",
+          "piece_0096",
+          "piece_0108",
+          "piece_0120",
+          "piece_0132",
+          "piece_0144",
+          "piece_0156",
+          "piece_0168",
+          "piece_0180",
+          "piece_0192",
+          "piece_0204"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/5985d6a280.png"
+    },
+    {
+      "id": "a2179afbf8",
+      "label": "Top spool / tensioner",
+      "category": "Drive & electronics",
+      "count": 16,
+      "nodes": [
+        "piece_0023",
+        "piece_0035",
+        "piece_0047",
+        "piece_0059",
+        "piece_0071",
+        "piece_0083",
+        "piece_0095",
+        "piece_0107",
+        "piece_0119",
+        "piece_0131",
+        "piece_0143",
+        "piece_0155",
+        "piece_0167",
+        "piece_0179",
+        "piece_0191",
+        "piece_0203"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0023",
+          "piece_0035",
+          "piece_0047",
+          "piece_0059",
+          "piece_0071",
+          "piece_0083",
+          "piece_0095",
+          "piece_0107",
+          "piece_0119",
+          "piece_0131",
+          "piece_0143",
+          "piece_0155",
+          "piece_0167",
+          "piece_0179",
+          "piece_0191",
+          "piece_0203"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/a2179afbf8.png"
+    },
+    {
+      "id": "28a0b69d6b",
+      "label": "Arm mounting rod (optional)",
+      "category": "Standard components",
+      "count": 2,
+      "nodes": [
+        "piece_0211",
+        "piece_0212"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0211",
+          "piece_0212"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/28a0b69d6b.png"
+    },
+    {
+      "id": "43652f0e7d",
+      "label": "Bearing \u00b7 4 \u00d7 8 \u00d7 3",
+      "category": "Standard components",
+      "count": 49,
+      "nodes": [
+        "piece_0025",
+        "piece_0037",
+        "piece_0049",
+        "piece_0061",
+        "piece_0073",
+        "piece_0085",
+        "piece_0097",
+        "piece_0109",
+        "piece_0121",
+        "piece_0133",
+        "piece_0145",
+        "piece_0157",
+        "piece_0169",
+        "piece_0181",
+        "piece_0193",
+        "piece_0205",
+        "piece_0243",
+        "piece_0303",
+        "piece_0304",
+        "piece_0307",
+        "piece_0308",
+        "piece_0312",
+        "piece_0313",
+        "piece_0319",
+        "piece_0320",
+        "piece_0323",
+        "piece_0324",
+        "piece_0328",
+        "piece_0329",
+        "piece_0335",
+        "piece_0336",
+        "piece_0339",
+        "piece_0340",
+        "piece_0344",
+        "piece_0345",
+        "piece_0351",
+        "piece_0352",
+        "piece_0355",
+        "piece_0356",
+        "piece_0360",
+        "piece_0361",
+        "piece_0376",
+        "piece_0377",
+        "piece_0383",
+        "piece_0384",
+        "piece_0386",
+        "piece_0389",
+        "piece_0392",
+        "piece_0393"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0025",
+          "piece_0037",
+          "piece_0049",
+          "piece_0061",
+          "piece_0073",
+          "piece_0085",
+          "piece_0097",
+          "piece_0109",
+          "piece_0121",
+          "piece_0133",
+          "piece_0145",
+          "piece_0157",
+          "piece_0169",
+          "piece_0181",
+          "piece_0193",
+          "piece_0205"
+        ],
+        "Wrist": [
+          "piece_0243"
+        ],
+        "Fingers": [
+          "piece_0303",
+          "piece_0304",
+          "piece_0307",
+          "piece_0308",
+          "piece_0312",
+          "piece_0313",
+          "piece_0319",
+          "piece_0320",
+          "piece_0323",
+          "piece_0324",
+          "piece_0328",
+          "piece_0329",
+          "piece_0335",
+          "piece_0336",
+          "piece_0339",
+          "piece_0340",
+          "piece_0344",
+          "piece_0345",
+          "piece_0351",
+          "piece_0352",
+          "piece_0355",
+          "piece_0356",
+          "piece_0360",
+          "piece_0361"
+        ],
+        "Thumb": [
+          "piece_0376",
+          "piece_0377",
+          "piece_0383",
+          "piece_0384",
+          "piece_0386",
+          "piece_0389",
+          "piece_0392",
+          "piece_0393"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/43652f0e7d.png"
+    },
+    {
+      "id": "2e2a34aa2d",
+      "label": "Bearing \u00b7 8 \u00d7 13 \u00d7 4",
+      "category": "Standard components",
+      "count": 2,
+      "nodes": [
+        "piece_0294",
+        "piece_0295"
+      ],
+      "areas": {
+        "Carpals": [
+          "piece_0294",
+          "piece_0295"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/2e2a34aa2d.png"
+    },
+    {
+      "id": "bc31b71d8b",
+      "label": "Hull magnet",
+      "category": "Standard components",
+      "count": 8,
+      "nodes": [
+        "piece_0363",
+        "piece_0364",
+        "piece_0365",
+        "piece_0366",
+        "piece_0368",
+        "piece_0369",
+        "piece_0370",
+        "piece_0371"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0363",
+          "piece_0364",
+          "piece_0365",
+          "piece_0366",
+          "piece_0368",
+          "piece_0369",
+          "piece_0370",
+          "piece_0371"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/bc31b71d8b.png"
+    },
+    {
+      "id": "938b8cdb6c",
+      "label": "M2 hex nut",
+      "category": "Standard components",
+      "count": 16,
+      "nodes": [
+        "piece_0016",
+        "piece_0028",
+        "piece_0040",
+        "piece_0052",
+        "piece_0064",
+        "piece_0076",
+        "piece_0088",
+        "piece_0100",
+        "piece_0112",
+        "piece_0124",
+        "piece_0136",
+        "piece_0148",
+        "piece_0160",
+        "piece_0172",
+        "piece_0184",
+        "piece_0196"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0016",
+          "piece_0028",
+          "piece_0040",
+          "piece_0052",
+          "piece_0064",
+          "piece_0076",
+          "piece_0088",
+          "piece_0100",
+          "piece_0112",
+          "piece_0124",
+          "piece_0136",
+          "piece_0148",
+          "piece_0160",
+          "piece_0172",
+          "piece_0184",
+          "piece_0196"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/938b8cdb6c.png"
+    },
+    {
+      "id": "b914b6e7d1",
+      "label": "M2 \u00d7 4 socket screw",
+      "category": "Standard components",
+      "count": 48,
+      "nodes": [
+        "piece_0021",
+        "piece_0022",
+        "piece_0027",
+        "piece_0033",
+        "piece_0034",
+        "piece_0039",
+        "piece_0045",
+        "piece_0046",
+        "piece_0051",
+        "piece_0057",
+        "piece_0058",
+        "piece_0063",
+        "piece_0069",
+        "piece_0070",
+        "piece_0075",
+        "piece_0081",
+        "piece_0082",
+        "piece_0087",
+        "piece_0093",
+        "piece_0094",
+        "piece_0099",
+        "piece_0105",
+        "piece_0106",
+        "piece_0111",
+        "piece_0117",
+        "piece_0118",
+        "piece_0123",
+        "piece_0129",
+        "piece_0130",
+        "piece_0135",
+        "piece_0141",
+        "piece_0142",
+        "piece_0147",
+        "piece_0153",
+        "piece_0154",
+        "piece_0159",
+        "piece_0165",
+        "piece_0166",
+        "piece_0171",
+        "piece_0177",
+        "piece_0178",
+        "piece_0183",
+        "piece_0189",
+        "piece_0190",
+        "piece_0195",
+        "piece_0201",
+        "piece_0202",
+        "piece_0207"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0021",
+          "piece_0022",
+          "piece_0027",
+          "piece_0033",
+          "piece_0034",
+          "piece_0039",
+          "piece_0045",
+          "piece_0046",
+          "piece_0051",
+          "piece_0057",
+          "piece_0058",
+          "piece_0063",
+          "piece_0069",
+          "piece_0070",
+          "piece_0075",
+          "piece_0081",
+          "piece_0082",
+          "piece_0087",
+          "piece_0093",
+          "piece_0094",
+          "piece_0099",
+          "piece_0105",
+          "piece_0106",
+          "piece_0111",
+          "piece_0117",
+          "piece_0118",
+          "piece_0123",
+          "piece_0129",
+          "piece_0130",
+          "piece_0135",
+          "piece_0141",
+          "piece_0142",
+          "piece_0147",
+          "piece_0153",
+          "piece_0154",
+          "piece_0159",
+          "piece_0165",
+          "piece_0166",
+          "piece_0171",
+          "piece_0177",
+          "piece_0178",
+          "piece_0183",
+          "piece_0189",
+          "piece_0190",
+          "piece_0195",
+          "piece_0201",
+          "piece_0202",
+          "piece_0207"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/b914b6e7d1.png"
+    },
+    {
+      "id": "d1b7310480",
+      "label": "M2 \u00d7 8 socket screw",
+      "category": "Standard components",
+      "count": 4,
+      "nodes": [
+        "piece_0237",
+        "piece_0238",
+        "piece_0239",
+        "piece_0240"
+      ],
+      "areas": {
+        "Wrist": [
+          "piece_0237",
+          "piece_0238",
+          "piece_0239",
+          "piece_0240"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/d1b7310480.png"
+    },
+    {
+      "id": "2d16844065",
+      "label": "M2.5 \u00d7 8 socket screw",
+      "category": "Standard components",
+      "count": 16,
+      "nodes": [
+        "piece_0026",
+        "piece_0038",
+        "piece_0050",
+        "piece_0062",
+        "piece_0074",
+        "piece_0086",
+        "piece_0098",
+        "piece_0110",
+        "piece_0122",
+        "piece_0134",
+        "piece_0146",
+        "piece_0158",
+        "piece_0170",
+        "piece_0182",
+        "piece_0194",
+        "piece_0206"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0026",
+          "piece_0038",
+          "piece_0050",
+          "piece_0062",
+          "piece_0074",
+          "piece_0086",
+          "piece_0098",
+          "piece_0110",
+          "piece_0122",
+          "piece_0134",
+          "piece_0146",
+          "piece_0158",
+          "piece_0170",
+          "piece_0182",
+          "piece_0194",
+          "piece_0206"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/2d16844065.png"
+    },
+    {
+      "id": "08f5283ed3",
+      "label": "M3 hex nut",
+      "category": "Standard components",
+      "count": 6,
+      "nodes": [
+        "piece_0004",
+        "piece_0005",
+        "piece_0006",
+        "piece_0007",
+        "piece_0008",
+        "piece_0009"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0004",
+          "piece_0005",
+          "piece_0006",
+          "piece_0007",
+          "piece_0008",
+          "piece_0009"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/08f5283ed3.png"
+    },
+    {
+      "id": "d3f520538b",
+      "label": "M3 \u00d7 12 socket screw",
+      "category": "Standard components",
+      "count": 2,
+      "nodes": [
+        "piece_0013",
+        "piece_0014"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0013",
+          "piece_0014"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/d3f520538b.png"
+    },
+    {
+      "id": "f1efd004fd",
+      "label": "M3 \u00d7 14 socket screw",
+      "category": "Standard components",
+      "count": 4,
+      "nodes": [
+        "piece_0226",
+        "piece_0227",
+        "piece_0228",
+        "piece_0229"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0226",
+          "piece_0227",
+          "piece_0228",
+          "piece_0229"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/f1efd004fd.png"
+    },
+    {
+      "id": "dd0a0791f1",
+      "label": "M4 hex nut",
+      "category": "Standard components",
+      "count": 3,
+      "nodes": [
+        "piece_0010",
+        "piece_0011",
+        "piece_0012"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0010",
+          "piece_0011",
+          "piece_0012"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/dd0a0791f1.png"
+    },
+    {
+      "id": "e4c33ea040",
+      "label": "M4 square nut",
+      "category": "Standard components",
+      "count": 2,
+      "nodes": [
+        "piece_0244",
+        "piece_0245"
+      ],
+      "areas": {
+        "Wrist": [
+          "piece_0244",
+          "piece_0245"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/e4c33ea040.png"
+    },
+    {
+      "id": "1c628876b9",
+      "label": "M4 washer",
+      "category": "Standard components",
+      "count": 2,
+      "nodes": [
+        "piece_0246",
+        "piece_0247"
+      ],
+      "areas": {
+        "Wrist": [
+          "piece_0246",
+          "piece_0247"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/1c628876b9.png"
+    },
+    {
+      "id": "483f2dd91e",
+      "label": "M4 \u00d7 10 socket screw",
+      "category": "Standard components",
+      "count": 3,
+      "nodes": [
+        "piece_0250",
+        "piece_0251",
+        "piece_0252"
+      ],
+      "areas": {
+        "Wrist": [
+          "piece_0250",
+          "piece_0251",
+          "piece_0252"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/483f2dd91e.png"
+    },
+    {
+      "id": "79361f7d71",
+      "label": "M4 \u00d7 20 socket screw",
+      "category": "Standard components",
+      "count": 2,
+      "nodes": [
+        "piece_0248",
+        "piece_0249"
+      ],
+      "areas": {
+        "Wrist": [
+          "piece_0248",
+          "piece_0249"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/79361f7d71.png"
+    },
+    {
+      "id": "a8270cf704",
+      "label": "Magnet \u00b7 5 \u00d7 3 mm",
+      "category": "Standard components",
+      "count": 8,
+      "nodes": [
+        "piece_0230",
+        "piece_0231",
+        "piece_0232",
+        "piece_0233",
+        "piece_0253",
+        "piece_0254",
+        "piece_0255",
+        "piece_0256"
+      ],
+      "areas": {
+        "Tower": [
+          "piece_0230",
+          "piece_0231",
+          "piece_0232",
+          "piece_0233"
+        ],
+        "Wrist": [
+          "piece_0253",
+          "piece_0254",
+          "piece_0255",
+          "piece_0256"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/a8270cf704.png"
+    },
+    {
+      "id": "410473b9c0",
+      "label": "Pin \u00b7 2 \u00d7 10",
+      "category": "Standard components",
+      "count": 2,
+      "nodes": [
+        "piece_0390",
+        "piece_0391"
+      ],
+      "areas": {
+        "Thumb": [
+          "piece_0390",
+          "piece_0391"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/410473b9c0.png"
+    },
+    {
+      "id": "bbbb180d24",
+      "label": "Pin \u00b7 2 \u00d7 30",
+      "category": "Standard components",
+      "count": 2,
+      "nodes": [
+        "piece_0374",
+        "piece_0375"
+      ],
+      "areas": {
+        "Thumb": [
+          "piece_0374",
+          "piece_0375"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/bbbb180d24.png"
+    },
+    {
+      "id": "4d55977bb5",
+      "label": "Pin \u00b7 2 \u00d7 6",
+      "category": "Standard components",
+      "count": 10,
+      "nodes": [
+        "piece_0299",
+        "piece_0300",
+        "piece_0315",
+        "piece_0316",
+        "piece_0331",
+        "piece_0332",
+        "piece_0347",
+        "piece_0348",
+        "piece_0379",
+        "piece_0381"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0299",
+          "piece_0300",
+          "piece_0315",
+          "piece_0316",
+          "piece_0331",
+          "piece_0332",
+          "piece_0347",
+          "piece_0348"
+        ],
+        "Thumb": [
+          "piece_0379",
+          "piece_0381"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/4d55977bb5.png"
+    },
+    {
+      "id": "a4ba641ca1",
+      "label": "Pin \u00b7 2 \u00d7 8",
+      "category": "Standard components",
+      "count": 13,
+      "nodes": [
+        "piece_0302",
+        "piece_0310",
+        "piece_0311",
+        "piece_0318",
+        "piece_0326",
+        "piece_0327",
+        "piece_0334",
+        "piece_0342",
+        "piece_0343",
+        "piece_0350",
+        "piece_0358",
+        "piece_0359",
+        "piece_0382"
+      ],
+      "areas": {
+        "Fingers": [
+          "piece_0302",
+          "piece_0310",
+          "piece_0311",
+          "piece_0318",
+          "piece_0326",
+          "piece_0327",
+          "piece_0334",
+          "piece_0342",
+          "piece_0343",
+          "piece_0350",
+          "piece_0358",
+          "piece_0359"
+        ],
+        "Thumb": [
+          "piece_0382"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/a4ba641ca1.png"
+    },
+    {
+      "id": "c0dd3a2ee5",
+      "label": "Pin \u00b7 3 \u00d7 50",
+      "category": "Standard components",
+      "count": 2,
+      "nodes": [
+        "piece_0292",
+        "piece_0293"
+      ],
+      "areas": {
+        "Carpals": [
+          "piece_0292",
+          "piece_0293"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/c0dd3a2ee5.png"
+    },
+    {
+      "id": "da8a9270c0",
+      "label": "Pin \u00b7 4 \u00d7 10",
+      "category": "Standard components",
+      "count": 1,
+      "nodes": [
+        "piece_0242"
+      ],
+      "areas": {
+        "Wrist": [
+          "piece_0242"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/da8a9270c0.png"
+    },
+    {
+      "id": "23667c6bcd",
+      "label": "Tendon paths",
+      "category": "Tendons",
+      "count": 32,
+      "nodes": [
+        "piece_0259",
+        "piece_0260",
+        "piece_0261",
+        "piece_0262",
+        "piece_0263",
+        "piece_0264",
+        "piece_0265",
+        "piece_0266",
+        "piece_0267",
+        "piece_0268",
+        "piece_0269",
+        "piece_0270",
+        "piece_0271",
+        "piece_0272",
+        "piece_0273",
+        "piece_0274",
+        "piece_0275",
+        "piece_0276",
+        "piece_0277",
+        "piece_0278",
+        "piece_0279",
+        "piece_0280",
+        "piece_0281",
+        "piece_0282",
+        "piece_0283",
+        "piece_0284",
+        "piece_0285",
+        "piece_0286",
+        "piece_0287",
+        "piece_0288",
+        "piece_0289",
+        "piece_0290"
+      ],
+      "areas": {
+        "Routing": [
+          "piece_0259",
+          "piece_0260",
+          "piece_0261",
+          "piece_0262",
+          "piece_0263",
+          "piece_0264",
+          "piece_0265",
+          "piece_0266",
+          "piece_0267",
+          "piece_0268",
+          "piece_0269",
+          "piece_0270",
+          "piece_0271",
+          "piece_0272",
+          "piece_0273",
+          "piece_0274",
+          "piece_0275",
+          "piece_0276",
+          "piece_0277",
+          "piece_0278",
+          "piece_0279",
+          "piece_0280",
+          "piece_0281",
+          "piece_0282",
+          "piece_0283",
+          "piece_0284",
+          "piece_0285",
+          "piece_0286",
+          "piece_0287",
+          "piece_0288",
+          "piece_0289",
+          "piece_0290"
+        ]
+      },
+      "thumbnail": "./assembly/parts/base-left-dynamixel/23667c6bcd.png"
+    }
+  ],
+  "bounds": [
+    [
+      -65.41230975603231,
+      -58.4750001,
+      -90.03127385948765
+    ],
+    [
+      62.976139731450935,
+      273.20068104977145,
+      57.00000009999492
+    ]
+  ],
+  "instanceCount": 395,
+  "duplicatesRemoved": 0,
+  "source": {
+    "file": "Base_Left.step",
+    "sha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
+  }
+}

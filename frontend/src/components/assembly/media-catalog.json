@@ -1,0 +1,1300 @@
+{
+  "8": {
+    "src": "./assembly/media/detail-008.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-008-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-008-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-008-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      }
+    ]
+  },
+  "10": {
+    "src": "./assembly/media/detail-010.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-010-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "11": {
+    "src": "./assembly/media/detail-011.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-011-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "14": {
+    "src": "./assembly/media/detail-014.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-014-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-014-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-014-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-014-4.png",
+        "caption": "Assembly detail 4",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-014-5.png",
+        "caption": "Assembly detail 5",
+        "side": null
+      }
+    ]
+  },
+  "15": {
+    "src": "./assembly/media/detail-015.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-015-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-015-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      }
+    ]
+  },
+  "17": {
+    "src": "./assembly/media/detail-017.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-017-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-017-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-017-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-017-4.png",
+        "caption": "Assembly detail 4",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-017-5.png",
+        "caption": "Assembly detail 5",
+        "side": null
+      }
+    ]
+  },
+  "19": {
+    "src": "./assembly/media/detail-019.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-019-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-019-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-019-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-019-4.png",
+        "caption": "Assembly detail 4",
+        "side": null
+      }
+    ]
+  },
+  "21": {
+    "src": "./assembly/media/detail-021.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-021-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-021-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-021-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      }
+    ]
+  },
+  "23": {
+    "src": "./assembly/media/detail-023.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-023-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "27": {
+    "src": "./assembly/media/detail-027.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-027-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-027-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-027-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      }
+    ]
+  },
+  "30": {
+    "src": "./assembly/media/detail-030.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-030-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-030-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-030-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-030-4.png",
+        "caption": "Assembly detail 4",
+        "side": null
+      }
+    ]
+  },
+  "32": {
+    "src": "./assembly/media/detail-032.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-032-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-032-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-032-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      }
+    ]
+  },
+  "34": {
+    "src": "./assembly/media/detail-034.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-034-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-034-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-034-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-034-4.png",
+        "caption": "Assembly detail 4",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-034-5.png",
+        "caption": "Assembly detail 5",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-034-6.png",
+        "caption": "Assembly detail 6",
+        "side": null
+      }
+    ]
+  },
+  "36": {
+    "src": "./assembly/media/detail-036.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-036-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-036-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-036-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-036-4.png",
+        "caption": "Assembly detail 4",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-036-5.png",
+        "caption": "Assembly detail 5",
+        "side": null
+      }
+    ]
+  },
+  "39": {
+    "src": "./assembly/media/detail-039.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-039-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-039-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      }
+    ]
+  },
+  "41": {
+    "src": "./assembly/media/detail-041.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-041-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-041-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-041-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-041-4.png",
+        "caption": "Assembly detail 4",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-041-5.png",
+        "caption": "Assembly detail 5",
+        "side": null
+      }
+    ]
+  },
+  "44": {
+    "src": "./assembly/media/detail-044.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-044-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-044-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      }
+    ]
+  },
+  "45": {
+    "src": "./assembly/media/detail-045.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-045-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "48": {
+    "src": "./assembly/media/detail-048.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-048-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "51": {
+    "src": "./assembly/media/detail-051.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-051-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-051-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      }
+    ]
+  },
+  "53": {
+    "src": "./assembly/media/detail-053.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-053-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-053-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-053-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-053-4.png",
+        "caption": "Assembly detail 4",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-053-5.png",
+        "caption": "Assembly detail 5",
+        "side": null
+      }
+    ]
+  },
+  "55": {
+    "src": "./assembly/media/detail-055.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-055-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-055-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-055-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      }
+    ]
+  },
+  "58": {
+    "src": "./assembly/media/detail-058.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-058-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-058-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      }
+    ]
+  },
+  "59": {
+    "src": "./assembly/media/detail-059.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-059-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "60": {
+    "src": "./assembly/media/detail-060.jpg",
+    "side": "right",
+    "panels": [
+      {
+        "src": "./assembly/media/panel-060-1.png",
+        "caption": "Assembly detail 1",
+        "side": "right"
+      },
+      {
+        "src": "./assembly/media/panel-060-2.png",
+        "caption": "Assembly detail 2",
+        "side": "right"
+      }
+    ]
+  },
+  "61": {
+    "src": "./assembly/media/detail-061.jpg",
+    "side": "left",
+    "panels": [
+      {
+        "src": "./assembly/media/panel-061-1.png",
+        "caption": "Assembly detail 1",
+        "side": "left"
+      },
+      {
+        "src": "./assembly/media/panel-061-2.png",
+        "caption": "Assembly detail 2",
+        "side": "left"
+      }
+    ]
+  },
+  "63": {
+    "src": "./assembly/media/detail-063.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-063-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-063-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-063-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      }
+    ]
+  },
+  "66": {
+    "src": "./assembly/media/detail-066.jpg",
+    "side": "right",
+    "panels": [
+      {
+        "src": "./assembly/media/panel-066-1.png",
+        "caption": "Assembly detail 1",
+        "side": "right"
+      },
+      {
+        "src": "./assembly/media/panel-066-2.png",
+        "caption": "Assembly detail 2",
+        "side": "right"
+      },
+      {
+        "src": "./assembly/media/panel-066-3.png",
+        "caption": "Assembly detail 3",
+        "side": "right"
+      }
+    ]
+  },
+  "67": {
+    "src": "./assembly/media/detail-067.jpg",
+    "side": "left",
+    "panels": [
+      {
+        "src": "./assembly/media/panel-067-1.png",
+        "caption": "Assembly detail 1",
+        "side": "left"
+      },
+      {
+        "src": "./assembly/media/panel-067-2.png",
+        "caption": "Assembly detail 2",
+        "side": "left"
+      },
+      {
+        "src": "./assembly/media/panel-067-3.png",
+        "caption": "Assembly detail 3",
+        "side": "left"
+      }
+    ]
+  },
+  "69": {
+    "src": "./assembly/media/detail-069.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-069-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-069-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      }
+    ]
+  },
+  "72": {
+    "src": "./assembly/media/detail-072.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-072-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "74": {
+    "src": "./assembly/media/detail-074.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-074-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-074-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-074-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-074-4.png",
+        "caption": "Assembly detail 4",
+        "side": null
+      }
+    ]
+  },
+  "76": {
+    "src": "./assembly/media/detail-076.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-076-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-076-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-076-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      }
+    ]
+  },
+  "79": {
+    "src": "./assembly/media/detail-079.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-079-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-079-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      }
+    ]
+  },
+  "81": {
+    "src": "./assembly/media/detail-081.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-081-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-081-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-081-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-081-4.png",
+        "caption": "Assembly detail 4",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-081-5.png",
+        "caption": "Assembly detail 5",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-081-6.png",
+        "caption": "Assembly detail 6",
+        "side": null
+      }
+    ]
+  },
+  "82": {
+    "src": "./assembly/media/detail-082.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-082-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-082-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      }
+    ]
+  },
+  "84": {
+    "src": "./assembly/media/detail-084.jpg",
+    "side": "right",
+    "panels": [
+      {
+        "src": "./assembly/media/mapping-right-1.jpg",
+        "caption": "Wrist channel numbering \u00b7 right hand",
+        "side": "right"
+      },
+      {
+        "src": "./assembly/media/mapping-right-2.jpg",
+        "caption": "Joint and palm-side mapping \u00b7 right hand",
+        "side": "right"
+      },
+      {
+        "src": "./assembly/media/mapping-right-3.jpg",
+        "caption": "Back-side spool mapping \u00b7 right hand",
+        "side": "right"
+      }
+    ]
+  },
+  "85": {
+    "src": "./assembly/media/detail-085.jpg",
+    "side": "left",
+    "panels": [
+      {
+        "src": "./assembly/media/mapping-left-1.jpg",
+        "caption": "Wrist channel numbering \u00b7 left hand",
+        "side": "left"
+      },
+      {
+        "src": "./assembly/media/mapping-left-2.jpg",
+        "caption": "Joint and palm-side mapping \u00b7 left hand",
+        "side": "left"
+      },
+      {
+        "src": "./assembly/media/mapping-left-3.jpg",
+        "caption": "Back-side spool mapping \u00b7 left hand",
+        "side": "left"
+      }
+    ]
+  },
+  "89": {
+    "src": "./assembly/media/detail-089.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-089-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "91": {
+    "src": "./assembly/media/detail-091.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-091-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-091-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      }
+    ]
+  },
+  "92": {
+    "src": "./assembly/media/detail-092.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-092-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-092-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-092-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      }
+    ]
+  },
+  "95": {
+    "src": "./assembly/media/detail-095.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-095-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "96": {
+    "src": "./assembly/media/detail-096.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-096-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-096-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-096-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      }
+    ]
+  },
+  "98": {
+    "src": "./assembly/media/detail-098.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-098-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-098-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      }
+    ]
+  },
+  "100": {
+    "src": "./assembly/media/detail-100.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-100-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "101": {
+    "src": "./assembly/media/detail-101.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-101-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "103": {
+    "src": "./assembly/media/detail-103.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-103-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "104": {
+    "src": "./assembly/media/detail-104.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-104-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "105": {
+    "src": "./assembly/media/detail-105.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-105-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "106": {
+    "src": "./assembly/media/detail-106.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-106-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-106-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      }
+    ]
+  },
+  "107": {
+    "src": "./assembly/media/detail-107.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-107-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "108": {
+    "src": "./assembly/media/detail-108.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-108-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-108-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-108-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-108-4.png",
+        "caption": "Assembly detail 4",
+        "side": null
+      }
+    ]
+  },
+  "109": {
+    "src": "./assembly/media/detail-109.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-109-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "110": {
+    "src": "./assembly/media/detail-110.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-110-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-110-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      }
+    ]
+  },
+  "111": {
+    "src": "./assembly/media/detail-111.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-111-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-111-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-111-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      }
+    ]
+  },
+  "114": {
+    "src": "./assembly/media/detail-114.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-114-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-114-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      }
+    ]
+  },
+  "116": {
+    "src": "./assembly/media/detail-116.jpg",
+    "side": "right",
+    "panels": [
+      {
+        "src": "./assembly/media/panel-116-1.png",
+        "caption": "Assembly detail 1",
+        "side": "right"
+      },
+      {
+        "src": "./assembly/media/panel-116-2.png",
+        "caption": "Assembly detail 2",
+        "side": "right"
+      }
+    ]
+  },
+  "118": {
+    "src": "./assembly/media/detail-118.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-118-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-118-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-118-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      }
+    ]
+  },
+  "121": {
+    "src": "./assembly/media/detail-121.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-121-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-121-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-121-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-121-4.png",
+        "caption": "Assembly detail 4",
+        "side": null
+      }
+    ]
+  },
+  "122": {
+    "src": "./assembly/media/detail-122.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-122-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "124": {
+    "src": "./assembly/media/detail-124.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-124-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-124-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      }
+    ]
+  },
+  "125": {
+    "src": "./assembly/media/detail-125.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-125-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-125-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      }
+    ]
+  },
+  "126": {
+    "src": "./assembly/media/detail-126.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-126-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-126-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      }
+    ]
+  },
+  "127": {
+    "src": "./assembly/media/detail-127.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-127-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "128": {
+    "src": "./assembly/media/detail-128.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-128-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "131": {
+    "src": "./assembly/media/detail-131.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-131-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "134": {
+    "src": "./assembly/media/detail-134.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-134-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "135": {
+    "src": "./assembly/media/detail-135.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-135-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "138": {
+    "src": "./assembly/media/detail-138.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-138-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-138-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-138-3.png",
+        "caption": "Assembly detail 3",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-138-4.png",
+        "caption": "Assembly detail 4",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-138-5.png",
+        "caption": "Assembly detail 5",
+        "side": null
+      }
+    ]
+  },
+  "140": {
+    "src": "./assembly/media/detail-140.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-140-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "151": {
+    "src": "./assembly/media/detail-151.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-151-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "152": {
+    "src": "./assembly/media/detail-152.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-152-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      }
+    ]
+  },
+  "156": {
+    "src": "./assembly/media/detail-156.jpg",
+    "side": null,
+    "panels": [
+      {
+        "src": "./assembly/media/panel-156-1.png",
+        "caption": "Assembly detail 1",
+        "side": null
+      },
+      {
+        "src": "./assembly/media/panel-156-2.png",
+        "caption": "Assembly detail 2",
+        "side": null
+      }
+    ]
+  }
+}

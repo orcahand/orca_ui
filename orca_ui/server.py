@@ -18,6 +18,7 @@ WEBUI_DIR = os.path.join(os.path.dirname(__file__), "webui")
 
 
 def create_app(settings: UiSettings) -> FastAPI:
+    from orca_ui.api.assembly import build_router as build_assembly_router
     from orca_ui.api.assets import build_router as build_assets_router
     from orca_ui.api.assets import mount_assets
     from orca_ui.api.rest import build_router as build_rest_router
@@ -46,6 +47,8 @@ def create_app(settings: UiSettings) -> FastAPI:
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
+        from orca_ui.assembly_assets import prepare_assembly_models
+        await asyncio.to_thread(prepare_assembly_models)
         service.start()
         telemetry.start()
         broadcaster = asyncio.create_task(hub.broadcaster())
@@ -69,6 +72,7 @@ def create_app(settings: UiSettings) -> FastAPI:
 
     app.include_router(build_rest_router(service))
     app.include_router(build_assets_router(service))
+    app.include_router(build_assembly_router())
     app.include_router(build_ws_router(service, hub))
     if teleop is not None:
         from orca_ui.api.teleop_ws import build_teleop_ws_router

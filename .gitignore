@@ -29,5 +29,11 @@ node_modules/
 # Where orca-dev remembers this machine's orca_core checkout
 .orca-dev.json
 
+# Assembly ZIP archives are tracked; full models are restored at UI startup.
+/frontend/public/assembly/parts/*/assembly.glb
+/orca_ui/webui/assembly/parts/*/assembly.glb
+/frontend/public/assembly/parts/*/.assembly-model.json
+/orca_ui/webui/assembly/parts/*/.assembly-model.json
+
 # Personal Claude Code instructions, never committed
 CLAUDE.local.md
