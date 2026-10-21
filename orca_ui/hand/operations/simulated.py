@@ -45,23 +45,24 @@ def _calibration_steps(config, joints: list[str] | None) -> list[dict]:
         steps.append({"wrist": "extend"})
     if joints is not None:
         wanted = set(joints)
-        steps = [
-            {j: d for j, d in step.items() if j in wanted}
-            for step in steps
-        ]
+        steps = [{j: d for j, d in step.items() if j in wanted} for step in steps]
         steps = [step for step in steps if step]
     return steps
 
 
-def simulate_calibration(ctx: OpContext, config, joints: list[str] | None,
-                         step_s: float, phase: str = "calibrating",
-                         detail_prefix: str = "") -> dict:
+def simulate_calibration(
+    ctx: OpContext,
+    config,
+    joints: list[str] | None,
+    step_s: float,
+    phase: str = "calibrating",
+    detail_prefix: str = "",
+) -> dict:
     """Lease-free simulated calibration body (shared with the sim wizard)."""
     steps = _calibration_steps(config, joints)
     total = len(steps)
     involved = sorted({j for step in steps for j in step})
-    ctx.set_phase(phase, progress=0.0,
-                  detail=f"{detail_prefix}{total} steps")
+    ctx.set_phase(phase, progress=0.0, detail=f"{detail_prefix}{total} steps")
     ctx.log(f"calibration started: {total} steps ({', '.join(involved)})")
 
     directions_seen: dict[str, set] = {}
@@ -79,6 +80,7 @@ def simulate_calibration(ctx: OpContext, config, joints: list[str] | None,
                 ctx.log(f"joint calibrated: {joint} (ratio 0.0500)")
         ctx.set_progress((index + 1) / max(total, 1))
     ctx.log("calibration complete")
+    _snapshot_mock(ctx, config, manual=False, partial=joints is not None)
     return {
         "steps_done": total,
         "joints_calibrated": calibrated,
@@ -86,7 +88,9 @@ def simulate_calibration(ctx: OpContext, config, joints: list[str] | None,
     }
 
 
-def simulate_manual_calibration(ctx: OpContext, config, joints: list[str] | None) -> dict:
+def simulate_manual_calibration(
+    ctx: OpContext, config, joints: list[str] | None
+) -> dict:
     """Simulated manual run: asks for every hardstop; the motor drifts while it waits."""
     import math
     import random
@@ -99,38 +103,97 @@ def simulate_manual_calibration(ctx: OpContext, config, joints: list[str] | None
     def read_deg(motors: list[int]) -> dict[int, float]:
         for m in motors:
             drift[m] = drift.get(m, 0.0) + random.uniform(-3, 6)
-        return {m: 180.0 + drift[m] + 10 * math.sin(time.monotonic() + m) for m in motors}
+        return {
+            m: 180.0 + drift[m] + 10 * math.sin(time.monotonic() + m) for m in motors
+        }
 
     motor_of = lambda joint: abs(config.joint_to_motor_map.get(joint, 0))  # noqa: E731
     capture = ManualCapture(ctx, plan, motor_of, read_deg)
     ctx.log(f"manual calibration started: {len(plan)} hardstops in {len(steps)} steps")
     recorded: dict[str, set] = {}
-    for step in steps:
+    index = 0
+    while index < len(steps):
+        step = steps[index]
         first = next(iter(step))
         motors = {j: motor_of(j) for j in step}
         drift.clear()
-        answer = capture.prompt({"joint": first, "direction": step[first], "motor": motors[first],
-                                 "joints": step, "motors": motors})
+        answer = capture.prompt(
+            {
+                "joint": first,
+                "direction": step[first],
+                "motor": motors[first],
+                "joints": step,
+                "motors": motors,
+                "step_index": index,
+                "can_back": index > 0,
+            }
+        )
+        if answer == "back":
+            index -= 1
+            capture.on_event(
+                {
+                    "event": "manual_capture_back",
+                    "index": index,
+                    "joints": dict(steps[index]),
+                }
+            )
+            ctx.log(f"back to step {index + 1}")
+            continue
+        index += 1
         for joint, direction in step.items():
             if answer == "record":
-                capture.on_event({"event": "limit_recorded", "joint": joint,
-                                  "limit": math.radians(read_deg([motors[joint]])[motors[joint]])})
+                capture.on_event(
+                    {
+                        "event": "limit_recorded",
+                        "joint": joint,
+                        "limit": math.radians(read_deg([motors[joint]])[motors[joint]]),
+                    }
+                )
                 recorded.setdefault(joint, set()).add(direction)
             else:
                 capture.on_event({"event": "manual_capture_skipped", "joint": joint})
-        ctx.log(f"{', '.join(step)} {step[first]}: {'recorded' if answer == 'record' else 'skipped'}")
+        ctx.log(
+            f"{', '.join(step)} {step[first]}: {'recorded' if answer == 'record' else 'skipped'}"
+        )
     ctx.log("manual calibration complete")
     calibrated = [j for j, d in recorded.items() if d == {"flex", "extend"}]
-    return {"steps_done": len(steps), "joints_calibrated": calibrated, "calibrated": True}
+    _snapshot_mock(ctx, config, manual=True, partial=joints is not None)
+    return {
+        "steps_done": len(steps),
+        "joints_calibrated": calibrated,
+        "calibrated": True,
+    }
 
 
-def simulate_tension(ctx: OpContext, move_motors: bool, step_s: float,
-                     detail_prefix: str = "", offset_deg: float | None = None) -> None:
+def _snapshot_mock(ctx: OpContext, config, manual: bool, partial: bool = False) -> None:
+    """The mock writes no calibration, so snapshot the model's shipped one — the
+    console exercises the same promote/activate path as on hardware."""
+    from orca_ui.hand import baselines
+
+    try:
+        name = baselines.snapshot_from_file(
+            config,
+            config.calibration_path,
+            source="manual" if manual else "auto",
+            hand_key=ctx.service.supervisor.hand_id,
+            partial=partial,
+        )
+        ctx.log(f"travel snapshot saved as {name}")
+    except Exception as e:
+        ctx.log(f"travel snapshot not saved: {e}")
+
+
+def simulate_tension(
+    ctx: OpContext,
+    move_motors: bool,
+    step_s: float,
+    detail_prefix: str = "",
+    offset_deg: float | None = None,
+) -> None:
     """Lease-free simulated tension body: winds, then parks in
     awaiting_input until released (queue path — nothing is blocked)."""
     if move_motors:
-        ctx.set_phase("winding",
-                      detail=f"{detail_prefix}pre-conditioning tendons")
+        ctx.set_phase("winding", detail=f"{detail_prefix}pre-conditioning tendons")
         ctx.log("winding tendons until the motors stall")
         for wind_pass in (1, 2):
             ctx.set_detail(f"{detail_prefix}winding pass {wind_pass}/2")
@@ -138,8 +201,9 @@ def simulate_tension(ctx: OpContext, move_motors: bool, step_s: float,
         ctx.set_phase("ramp", detail=f"{detail_prefix}releasing wind-in current")
         ctx.log("ramping current down before the hold")
         ctx.sleep(step_s)
-    ctx.set_phase("holding",
-                  detail=f"{detail_prefix}motors holding — tension the spools")
+    ctx.set_phase(
+        "holding", detail=f"{detail_prefix}motors holding — tension the spools"
+    )
     ctx.log("holding — tension the spools, then click Release")
     # The wizard's hold (no offset) only releases; the tension step can also pull more.
     options = [RELEASE] if offset_deg is None else [RELEASE, PULL_MORE]
@@ -150,8 +214,9 @@ def simulate_tension(ctx: OpContext, move_motors: bool, step_s: float,
         pulled += EXTRA_DEG
         ctx.set_extra({"pulled_deg": pulled})
         ctx.log(f"finger motors turned {pulled:g}° counterclockwise")
-    ctx.set_phase("released",
-                  detail=f"{detail_prefix}torque off, control mode restored")
+    ctx.set_phase(
+        "released", detail=f"{detail_prefix}torque off, control mode restored"
+    )
     ctx.log("hold released — torque off, control mode restored")
 
 
@@ -172,10 +237,15 @@ class SimulatedCalibrateOperation(Operation):
             ctx.set_phase("connecting", detail="opening motor-only connection")
             ctx.sleep(self.params["step_duration_s"])
             if self.params.get("manual"):
-                return simulate_manual_calibration(ctx, supervisor.config, self.params["joints"])
+                return simulate_manual_calibration(
+                    ctx, supervisor.config, self.params["joints"]
+                )
             return simulate_calibration(
-                ctx, supervisor.config, self.params["joints"],
-                self.params["step_duration_s"])
+                ctx,
+                supervisor.config,
+                self.params["joints"],
+                self.params["step_duration_s"],
+            )
         finally:
             supervisor.exit_maintenance()
 
@@ -196,10 +266,57 @@ class SimulatedTensionOperation(Operation):
         try:
             ctx.set_phase("connecting", detail="opening motor-only connection")
             ctx.sleep(self.params["step_duration_s"])
-            simulate_tension(ctx, self.params["move_motors"],
-                             self.params["step_duration_s"],
-                             offset_deg=self.params.get("offset_deg", DEFAULT_TENSION_OFFSET_DEG))
+            simulate_tension(
+                ctx,
+                self.params["move_motors"],
+                self.params["step_duration_s"],
+                offset_deg=self.params.get("offset_deg", DEFAULT_TENSION_OFFSET_DEG),
+            )
             hand_ops.record_hold_tension(supervisor.config)
             return {"released": True}
         finally:
             supervisor.exit_maintenance()
+
+
+def simulate_slack_test(ctx: OpContext, config, params: dict, progress) -> dict:
+    """Lease-free simulated slack test: every spool turns a little, the joints
+    named in ``params["unspool"]`` the whole half turn."""
+    import random
+
+    from orca_core.maintenance.slack_test import SlackTestSettings, SlackResult
+
+    settings = SlackTestSettings(**(params.get("settings") or {}))
+    joints = [j for j in config.joint_ids if j != "wrist" and j in config.joint_to_motor_map]
+    if params.get("joints") is not None:
+        joints = [j for j in joints if j in set(params["joints"])]
+    motors = [int(config.joint_to_motor_map[j]) for j in joints]
+    rng = random.Random(3)
+    slack = {j: rng.uniform(0.0, 3.0) for j in joints}
+    for j in params.get("unspool") or []:
+        slack[j] = settings.max_turn_deg
+    progress({"event": "slack_plan", "joints": joints, "motors": motors, "total": 2,
+              "start_deg": {j: 0.0 for j in joints}})
+    results = {j: SlackResult(j, m) for j, m in zip(joints, motors)}
+    step_s = params["step_duration_s"]
+    for direction in (1, -1):
+        sense = {j: "flex" if direction > 0 else "extend" for j in joints}
+        progress({"event": "slack_phase", "direction": direction, "senses": sense})
+        for k in range(1, 6):
+            ctx.check_stop()
+            progress({"event": "slack_sample", "direction": direction,
+                      "deg": {j: round(slack[j] * k / 5, 2) for j in joints}})
+            ctx.sleep(step_s / 5)
+        capped = {j: slack[j] >= settings.max_turn_deg - 5.0 for j in joints}
+        for j in joints:
+            r = results[j]
+            if direction > 0:
+                r.plus_deg, r.plus_capped, r.plus_sense = slack[j], capped[j], sense[j]
+            else:
+                r.minus_deg, r.minus_capped, r.minus_sense = slack[j] * 0.8, capped[j], sense[j]
+        progress({"event": "slack_phase_done", "direction": direction,
+                  "deg": {j: round(slack[j], 2) for j in joints}, "capped": capped})
+    out = [results[j].to_dict(settings) for j in joints]
+    import dataclasses
+
+    return {"joints": joints, "results": out, "blocked": any(r["status"] == "unspool" for r in out),
+            "settings": dataclasses.asdict(settings)}

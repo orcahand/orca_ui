@@ -466,6 +466,78 @@ header h1 {
   cursor: progress;
 }
 
+/* The native macOS popup centres on the selected item, so a long list opens
+   with its top half above the window. Opt into the customisable select where
+   the browser has it: the list then folds down from the control, in theme.
+   Elsewhere the rule is ignored and the native popup stays. */
+@supports (appearance: base-select) {
+  .model-select,
+  .model-select::picker(select) {
+    appearance: base-select;
+  }
+
+  .model-select::picker-icon {
+    content: '▾';
+    padding-left: 6px;
+    color: var(--dimmer);
+  }
+
+  .model-select::picker(select) {
+    top: anchor(bottom);
+    left: anchor(left);
+    margin: 2px 0 0;
+    min-width: anchor-size(width);
+    max-height: min(60vh, 420px);
+    overflow-y: auto;
+    background: var(--pop-bg);
+    color: var(--text);
+    border: 1px solid var(--panel-border-strong);
+    border-radius: 0;
+    box-shadow: 0 8px 24px var(--pop-shadow-color);
+    font-family: var(--font);
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    padding: 4px 0;
+  }
+
+  .model-select optgroup {
+    padding: 0;
+  }
+
+  .model-select optgroup::before {
+    display: block;
+    padding: 6px 10px 2px;
+    font-size: 9px;
+    color: var(--dimmer);
+    text-transform: uppercase;
+  }
+
+  .model-select option {
+    padding: 4px 10px;
+    cursor: pointer;
+  }
+
+  .model-select option::checkmark {
+    display: none;
+  }
+
+  .model-select option:hover,
+  .model-select option:focus-visible {
+    background: rgb(var(--accent-rgb) / 0.12);
+    color: var(--text-bright);
+    outline: none;
+  }
+
+  .model-select option:checked {
+    color: var(--accent);
+  }
+
+  .model-select option:disabled {
+    color: var(--dimmer);
+    cursor: default;
+  }
+}
+
 .model-pin {
   display: flex;
   align-items: center;
@@ -892,6 +964,51 @@ header h1 {
   color: var(--err);
   font-weight: 600;
   font-size: 11px;
+}
+
+/* --- Motor fault popup --- */
+
+.fault-popup {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  width: min(560px, calc(100% - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px solid rgb(var(--err-rgb) / 0.5);
+  box-shadow: 0 16px 48px var(--pop-shadow-color);
+  font-family: var(--font);
+}
+
+.fault-popup-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--err);
+}
+
+.fault-popup-headline {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.fault-popup-advice {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.fault-popup-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 /* --- Maintenance banner --- */
@@ -2348,6 +2465,10 @@ header h1 {
   grid-template-columns: 210px 1fr;
 }
 
+.gt-body.single {
+  grid-template-columns: 1fr;
+}
+
 .gt-steps {
   display: flex;
   flex-direction: column;
@@ -2558,9 +2679,26 @@ header h1 {
   --row-rgb: var(--ok-rgb);
 }
 
+/* Within tolerance, but an end was reached only once: sweep it again. */
+.gt-row.unconfirmed {
+  --row-rgb: var(--accent-rgb);
+}
+
+/* A tension probe found slack above tolerance: the sweep cannot pass it. */
+.gt-row.slack,
+.gt-todo-row.slack {
+  --row-rgb: var(--err-rgb);
+}
+
 .gt-row.unscored {
   --row-rgb: var(--overlay-rgb);
   opacity: 0.5;
+}
+
+.gt-row.fault,
+.gt-todo-row.fault {
+  --row-rgb: var(--err-rgb);
+  background: rgb(var(--err-rgb) / 0.1);
 }
 
 .gt-row-id {
@@ -2716,6 +2854,14 @@ header h1 {
   --tag-rgb: var(--warn-rgb);
 }
 
+.gt-spool-tag.unconfirmed {
+  --tag-rgb: var(--accent-rgb);
+}
+
+.gt-spool-tag.slack {
+  --tag-rgb: var(--err-rgb);
+}
+
 .gt-spool-tag.pass {
   --tag-rgb: var(--ok-rgb);
   opacity: 0.65;
@@ -2805,10 +2951,14 @@ header h1 {
   opacity: 0.9;
 }
 
-.gt-kept {
+.gt-again {
   font-style: normal;
   font-size: 8px;
-  color: var(--ok);
+  color: rgb(var(--row-rgb));
+}
+
+.slack-grid {
+  grid-template-columns: 100px repeat(4, minmax(48px, auto));
 }
 
 .gt-row.dim {
@@ -3279,3 +3429,1022 @@ header h1 {
   background: rgb(var(--warn-rgb) / 0.92);
   pointer-events: none;
 }
+
+/* ----- travel baselines (Setup → calibrate/tension settings) ----- */
+
+.flow-baselines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.flow-snapshot .btn {
+  margin-left: auto;
+}
+
+.setup-badge.manual {
+  color: var(--ok, #3cb371);
+  border-color: rgb(var(--ok-rgb, 60 179 113) / 0.4);
+  background: rgb(var(--ok-rgb, 60 179 113) / 0.08);
+}
+
+.setup-badge.auto {
+  color: var(--muted);
+  border-color: var(--panel-border-strong);
+  background: transparent;
+}
+
+/* ----- tension probe dialog ----- */
+
+.probe-table {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 10px;
+  font-size: 12px;
+  overflow-y: auto;
+}
+
+.probe-head,
+.probe-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 3px 6px;
+  white-space: nowrap;
+}
+
+.probe-head {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.probe-row.active {
+  background: rgb(var(--accent-rgb, 34 211 238) / 0.1);
+}
+
+.probe-joint {
+  font-weight: 600;
+}
+
+.probe-cell {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.probe-cell span:empty::before {
+  content: '·';
+}
+
+.probe-cell {
+  grid-template-columns: 110px 70px 1fr;
+}
+
+.probe-verdict {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.probe-verdict.none {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.probe-verdict.ok {
+  color: var(--ok, #3cb371);
+}
+
+.probe-verdict.under,
+.probe-verdict.slack {
+  color: var(--warn, #d9a21b);
+}
+
+.probe-verdict.over {
+  color: var(--danger, #e05252);
+}
+
+/* Plain measurement (ccc page): joint · slack · flex · extend, no verdicts. */
+.probe-head.plain,
+.probe-row.plain {
+  grid-template-columns: 120px 80px 1fr 1fr;
+}
+
+.probe-cell.plain {
+  grid-template-columns: 70px 1fr;
+}
+
+.probe-slack {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.probe-slack.none {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.probe-slack.slack {
+  color: var(--warn, #d9a21b);
+}
+
+.probe-flag {
+  margin-left: 6px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--warn, #d9a21b);
+}
+
+/* ----- travel check table ----- */
+
+.travel-grid {
+  display: grid;
+  grid-template-columns: 100px repeat(5, minmax(48px, auto));
+  gap: 2px 10px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.travel-head {
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.travel-joint {
+  font-weight: 600;
+}
+
+.travel-grid .off {
+  color: var(--warn);
+}
+
+.travel-grid.four {
+  grid-template-columns: 100px repeat(3, minmax(64px, auto));
+}
+
+/* ----- setup page variants: ccc (the committed page) and kai (the newer tooling) ----- */
+
+.setup-variants {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 10px;
+}
+
+.setup-variant {
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 4px 14px;
+  border: 1px solid var(--panel-border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.setup-variant.active {
+  color: var(--text-bright);
+  border-color: var(--panel-border-strong);
+  background: rgb(var(--accent-rgb) / 0.08);
+}
+
+/* Fraction scoring: passing on a kept score rather than this check's movement. */
+.gt-kept {
+  font-style: normal;
+  font-size: 8px;
+  color: var(--ok);
+}
+
+/* ----- slack test / tension sweep dialogs ----- */
+
+.probe-tower {
+  height: 240px;
+  margin-top: 10px;
+}
+
+.probe-tower .gt-tower {
+  height: 100%;
+}
+
+.probe-head.slack,
+.probe-row.slack {
+  grid-template-columns: 110px 44px 1fr 1fr 70px 80px;
+}
+
+.probe-head.sweep,
+.probe-row.sweep {
+  grid-template-columns: 110px 110px 1fr 1fr 120px;
+}
+
+.probe-row small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.probe-verdict.under,
+.probe-verdict.slack {
+  color: var(--warn, #d9a21b);
+}
+
+/* ----- calibrate step: slack test → calibrate → measure tension ----- */
+
+.calib-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.calib-step {
+  display: grid;
+  grid-template-columns: 22px minmax(120px, 160px) 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+}
+
+.calib-step.next {
+  border-color: rgb(var(--accent-rgb, 34 211 238) / 0.6);
+}
+
+.calib-step.warn {
+  border-color: rgb(var(--err-rgb) / 0.7);
+}
+
+.calib-step.done {
+  opacity: 0.85;
+}
+
+.calib-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-border-strong);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.calib-step.done .calib-step-num {
+  color: rgb(var(--ok-rgb));
+  border-color: rgb(var(--ok-rgb));
+}
+
+.calib-step.warn .calib-step-num {
+  color: rgb(var(--err-rgb));
+  border-color: rgb(var(--err-rgb));
+}
+
+.calib-step-title {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.calib-step-note {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.calib-step.warn .calib-step-note {
+  color: rgb(var(--err-rgb));
+}
+
+.calib-step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.probe-head.plain.ref,
+.probe-row.plain.ref {
+  grid-template-columns: 110px 150px 80px 1fr 1fr;
+}
+
+.probe-both {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 10px;
+}
+
+/* ----- measurement runs: status bar, live groups ----- */
+
+.run-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 10px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.run-progress-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgb(var(--overlay-rgb) / 0.08);
+  overflow: hidden;
+}
+
+.run-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.25s linear;
+}
+
+.run-progress-text {
+  white-space: nowrap;
+}
+
+.probe-live {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+}
+
+.probe-verdict.warn {
+  color: var(--warn, #d9a21b);
+}
+
+.probe-row.sweep .probe-verdict.under,
+.probe-row.sweep .probe-verdict.slack {
+  color: var(--danger, var(--err));
+}
+
+/* ----- setup workflow chart ----- */
+
+.workflow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 900px) {
+  .workflow {
+    grid-template-columns: 1fr;
+  }
+}
+
+.workflow-chart {
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+}
+
+.workflow-row {
+  display: contents;
+}
+
+.workflow-cell {
+  position: relative;
+  min-width: 0;
+}
+
+.workflow-box {
+  --box: var(--accent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: calc(100% - 14px);
+  padding: 8px 4px;
+  font-family: var(--font);
+  color: var(--text);
+  background: color-mix(in srgb, var(--box) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--box) 55%, transparent);
+  border-top: 3px solid var(--box);
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.workflow-box:hover {
+  background: color-mix(in srgb, var(--box) 18%, transparent);
+}
+
+.workflow-box.selected {
+  background: color-mix(in srgb, var(--box) 24%, transparent);
+  border-color: var(--box);
+  box-shadow: 0 0 0 1px var(--box);
+}
+
+.workflow-box.running {
+  animation: workflow-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes workflow-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px var(--box); }
+  50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--box) 40%, transparent); }
+}
+
+.workflow-num {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--box);
+}
+
+.workflow-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-bright);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.workflow-note {
+  font-size: 9px;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.workflow-arrow {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 14px;
+  transform: translateY(-50%);
+  text-align: center;
+  color: var(--dimmer);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.workflow-loop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0 7px 0 0;
+  margin-right: 14px;
+}
+
+.workflow-loop-line {
+  width: 100%;
+  height: 8px;
+  border: 1px dashed var(--dimmer);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+}
+
+.workflow-loop-text {
+  font-size: 9px;
+  color: var(--dim);
+}
+
+.workflow-detail {
+  --box: var(--panel-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-left: 3px solid var(--box);
+}
+
+.workflow-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.workflow-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--box);
+}
+
+.workflow-detail-note {
+  font-size: 10px;
+  color: var(--dim);
+}
+
+.workflow-detail-label {
+  margin-top: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.workflow-detail .setup-copy {
+  margin: 0;
+}
+
+.workflow-input,
+.workflow-text {
+  font-family: var(--font);
+  font-size: 11px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 3px;
+  padding: 3px 6px;
+}
+
+.workflow-input.title {
+  font-weight: 700;
+  width: 130px;
+}
+
+.workflow-input {
+  width: 150px;
+}
+
+.workflow-text {
+  width: 100%;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.workflow-color {
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--panel-border-strong);
+  background: none;
+  cursor: pointer;
+}
+
+/* ----- probe / tension check: faces with their spool lists, the to-tension list ----- */
+
+.probe-faces {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.probe-face-row {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.probe-face-view {
+  height: 230px;
+}
+
+.probe-face-view .gt-tower-face {
+  height: 100%;
+}
+
+.probe-spool-list {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.probe-spool-row {
+  display: grid;
+  grid-template-columns: 44px 110px 1fr 1fr 90px;
+  gap: 10px;
+  align-items: center;
+  padding: 3px 8px;
+  border-left: 2px solid transparent;
+}
+
+.probe-spool-row.head {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.probe-spool-row.active {
+  background: rgb(var(--accent-rgb) / 0.1);
+}
+
+.probe-spool-row.under {
+  border-left-color: var(--warn);
+}
+
+.probe-spool-row.over,
+.probe-spool-row.slack {
+  border-left-color: var(--err);
+}
+
+.probe-spool-row.ok {
+  border-left-color: var(--ok);
+}
+
+.probe-spool-row small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.probe-spool-joint {
+  font-weight: 600;
+}
+
+.probe-todo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+  padding-top: 10px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.probe-todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 420px;
+}
+
+.probe-todo-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.probe-todo-head .flow-field input {
+  width: 52px;
+}
+
+.probe-todo-note {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--dim);
+}
+
+.probe-todo-actions {
+  padding-top: 18px;
+}
+
+.probe-todo .gt-todo-row,
+.gt-todo-row.wide {
+  grid-template-columns: 34px 1fr 44px 60px;
+}
+
+.gt-spool-tag.motor {
+  padding: 1px 3px;
+  font-size: 8px;
+}
+
+/* ----- operation log, collapsed at the bottom ----- */
+
+.log-collapse {
+  margin-top: 12px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+}
+
+.log-collapse > summary {
+  padding: 6px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--dim);
+  cursor: pointer;
+  list-style: none;
+}
+
+.log-collapse > summary::before {
+  content: '▸ ';
+}
+
+.log-collapse[open] > summary::before {
+  content: '▾ ';
+}
+
+/* ----- workflow chart as an SVG flowchart ----- */
+
+.workflow-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--font);
+}
+
+.wf-arrow path {
+  fill: none;
+  stroke: var(--dimmer);
+  stroke-width: 1.6;
+}
+
+.wf-arrow.loop path {
+  stroke-dasharray: 5 4;
+}
+
+.wf-arrow text {
+  fill: var(--dim);
+  font-size: 10px;
+}
+
+#wf-head path {
+  fill: var(--dimmer);
+}
+
+.wf-box {
+  --box: var(--accent);
+  cursor: pointer;
+}
+
+.wf-box > rect:first-child {
+  fill: color-mix(in srgb, var(--box) 9%, var(--panel));
+  stroke: color-mix(in srgb, var(--box) 55%, transparent);
+  stroke-width: 1;
+}
+
+.wf-box:hover > rect:first-child {
+  fill: color-mix(in srgb, var(--box) 18%, var(--panel));
+}
+
+.wf-box.selected > rect:first-child {
+  stroke: var(--box);
+  stroke-width: 2;
+}
+
+.wf-box.running > rect:first-child {
+  animation: wf-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes wf-pulse {
+  0%, 100% { stroke: var(--box); stroke-width: 2; }
+  50% { stroke: color-mix(in srgb, var(--box) 40%, transparent); stroke-width: 5; }
+}
+
+.wf-bar {
+  fill: var(--box);
+}
+
+.wf-title {
+  fill: var(--text-bright);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.wf-note {
+  fill: var(--dim);
+  font-size: 10px;
+}
+
+.workflow-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--dim);
+}
+
+/* ----- tower faces from the rendered images ----- */
+
+.tower-image {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.tower-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.tower-spool {
+  --spool-rgb: var(--overlay-rgb);
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border: 2px solid rgb(var(--spool-rgb));
+  border-radius: 4px;
+  background: rgb(var(--spool-rgb) / 0.28);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-bright);
+  pointer-events: none;
+}
+
+.tower-spool.pass { --spool-rgb: var(--ok-rgb); }
+.tower-spool.partial { --spool-rgb: var(--warn-rgb); }
+.tower-spool.low, .tower-spool.slack, .tower-spool.fault { --spool-rgb: var(--err-rgb); }
+.tower-spool.unconfirmed { --spool-rgb: var(--accent-rgb); }
+.tower-spool.unscored { background: rgb(var(--overlay-rgb) / 0.08); border-color: rgb(var(--overlay-rgb) / 0.5); }
+
+.tower-spool b {
+  padding: 0 3px;
+  background: rgb(var(--spool-rgb) / 0.9);
+  color: #fff;
+  border-radius: 2px;
+}
+
+.tower-spool.unscored b {
+  background: rgb(var(--overlay-rgb) / 0.6);
+}
+
+.probe-spool-row.mark-pass { border-left-color: var(--ok); }
+.probe-spool-row.mark-partial { border-left-color: var(--warn); }
+.probe-spool-row.mark-low, .probe-spool-row.mark-slack, .probe-spool-row.mark-fault { border-left-color: var(--err); }
+
+/* ----- tension sweep curves ----- */
+
+.sweep-curves {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.sweep-curve {
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--panel-border);
+  border-left: 3px solid var(--panel-border);
+  background: var(--panel);
+}
+
+.sweep-curve.under { border-left-color: var(--warn); }
+.sweep-curve.over, .sweep-curve.slack { border-left-color: var(--err); }
+.sweep-curve.ok { border-left-color: var(--ok); }
+
+.sweep-curve figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.sweep-curve figcaption small {
+  color: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sweep-curve svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--font);
+}
+
+.sweep-axis {
+  stroke: var(--panel-border-strong);
+  stroke-width: 1;
+}
+
+.sweep-tick {
+  fill: var(--dim);
+  font-size: 9px;
+}
+
+.sweep-line {
+  fill: none;
+  stroke-width: 1.8;
+}
+
+.sweep-line.friction { stroke: var(--accent); }
+.sweep-line.static { stroke: var(--text); stroke-width: 1.2; }
+
+.sweep-ref {
+  fill: none;
+  stroke-width: 1.2;
+  stroke-dasharray: 4 3;
+}
+
+.sweep-ref.friction { stroke: var(--accent); opacity: 0.55; }
+.sweep-ref.static { stroke: var(--text); opacity: 0.45; }
+
+.sweep-stretch {
+  fill: rgb(var(--warn-rgb) / 0.14);
+}
+
+.sweep-stretch.above {
+  fill: rgb(var(--err-rgb) / 0.14);
+}
+
+/* ----- one joint's sweep curves over the whole dialog ----- */
+
+.gt-dialog {
+  position: relative;
+}
+
+.sweep-plot-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.sweep-plot-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.sweep-plot-body .sweep-curve {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sweep-plot-body .sweep-curve figcaption {
+  font-size: 13px;
+}
+
+.sweep-plot-body .sweep-curve svg {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.probe-spool-row.clickable {
+  cursor: pointer;
+}
+
+.probe-spool-row.clickable:hover {
+  background: rgb(var(--accent-rgb) / 0.08);
+}
+
+/* ----- ratchet step: pictures only on the left, the list to tension on the right ----- */
+
+.gt-dialog {
+  width: min(1400px, 100%);
+}
+
+.probe-face-row.pictures-only {
+  grid-template-columns: 1fr;
+}
+
+.probe-faces.pictures-only .probe-face-view {
+  height: 250px;
+}
+
+.gt-tension {
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+}
+
+.gt-todo-row.wide {
+  grid-template-columns: 40px 1fr 56px 90px;
+}
+
+.gt-todo-row > span {
+  white-space: nowrap;
+}
+
+.probe-verdict.low {
+  color: var(--err, #d4878a);
+}
+
+.probe-verdict.over {
+  color: var(--dim);
+}
+
+.probe-spool-row.mark-unscored .probe-verdict.over {
+  color: var(--dim);
+}
+
+.gt-todo-row.low {
+  --row-rgb: var(--err-rgb);
+}
+
+.sweep-curve.low { border-left-color: var(--err); }
+.sweep-curve.over { border-left-color: var(--panel-border-strong); }
