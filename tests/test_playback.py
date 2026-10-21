@@ -666,3 +666,35 @@ def test_run_in_refuses_an_absurd_cap_or_speed(client):
         "duration_s": 30, "max_current_ma": "lots"}}).status_code == 400
     assert client.post("/api/operation/run_in/start", json={"params": {
         "duration_s": 30, "speed": 7}}).status_code == 400
+
+class TestLoopCycleCount:
+    """Looping runs until stopped unless a count is asked for. It used to stop
+    at a hard-coded 1000 nobody requested, which ended an unattended run with
+    the hand still and nothing in the log to say why."""
+
+    def test_the_default_is_indefinite(self):
+        from orca_ui.hand.operations.player import DEFAULT_MAX_LOOP_CYCLES
+
+        assert DEFAULT_MAX_LOOP_CYCLES is None
+
+    def test_an_absent_or_blank_count_means_indefinite(self):
+        from orca_ui.hand.operations.player import _max_cycles
+
+        assert _max_cycles(None) is None
+        assert _max_cycles("") is None
+
+    def test_a_count_is_taken_as_given(self):
+        from orca_ui.hand.operations.player import _max_cycles
+
+        assert _max_cycles(1) == 1
+        assert _max_cycles("250") == 250
+
+    def test_a_nonsense_count_is_refused(self):
+        from orca_ui.hand.operations.player import _max_cycles
+        from orca_ui.hand.service import ServiceError
+
+        for bad in (0, -5):
+            with pytest.raises(ServiceError, match="at least 1"):
+                _max_cycles(bad)
+        with pytest.raises(ServiceError, match="whole number"):
+            _max_cycles("many")

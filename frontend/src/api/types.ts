@@ -155,6 +155,9 @@ export interface JointGains {
 export interface ControlState {
   torque_enabled: boolean
   max_current: number
+  // Fault-recovery thresholds, per motor. The thermal one is null when
+  // unlimited, which is the default.
+  fault_budgets?: FaultBudgets
   // The one gain set every loop joint shares, or null when they differ.
   gains: JointGains | null
   // Live gains per loop-controlled joint, read back from the controller.
@@ -507,7 +510,11 @@ export type HwErrorKind = 'thermal' | 'power' | 'load' | 'encoder' | 'unknown'
 export interface HwErrorInfo {
   flags: string[]
   kind: HwErrorKind
-  disabled: boolean // always true today; the motor will not move until reboot
+  // Whether this motor de-energized itself, read from its own stop mask.
+  // Not a property of the fault: the families ship almost disjoint masks, so
+  // the same condition stops one and not the other. null when the mask could
+  // not be read.
+  disabled: boolean | null
   needs_cooling: boolean // separate from kind: a motor can latch both
   temperature_c: number | null
   headline: string
@@ -528,6 +535,25 @@ export interface MotorFaultEntry {
   // Did this motor answer the last error sweep? null before the first one:
   // "not asked yet" is not "not answering".
   answering?: boolean | null
+  // What orca_core's fault policy has done about this motor. null before the
+  // first poll, or on a core that predates fault recovery.
+  recovery?: MotorRecovery | null
+}
+
+export interface MotorRecovery {
+  // Reboots after a fault that stopped the motor under load.
+  load_reboots: number
+  // Latches cleared after the motor cooled. Budgeted separately, and
+  // unlimited by default.
+  thermal_recoveries: number
+  // Waiting for this motor to cool before clearing its thermal latch.
+  cooling: boolean
+  // Left latched: it kept overloading, so recovering it again would only
+  // hide the mechanical cause.
+  given_up: boolean
+  thermal_given_up: boolean
+  // Every fault seen, including ones that did not stop the motor.
+  faults: number
 }
 
 // The servo's own position-PID and feedforward gains (X-series registers
@@ -854,4 +880,25 @@ export interface GuidedTensionExtra {
   // exclusion list with a reason per joint.
   absent_joints?: string[]
   excluded?: { joint: string; motor: number; reason: string }[]
+}
+
+// Per-motor shutdown threshold read from the motors (Temperature Limit).
+// Distinct from the family's rated operating temperature: the rating is a
+// datasheet figure, this is what actually turns the motor off.
+export type ShutdownTemps = Record<string, number>
+
+export interface FaultBudgets {
+  // Reboots of one motor before its repetition is called out prominently.
+  report_after_reboots: number
+  // Load reboots before the motor is left latched instead of recovered.
+  giveup_after_reboots: number
+  // Thermal recoveries before giving up; null means never.
+  thermal_giveup_after_reboots: number | null
+  // How far below its own limit a motor must cool before it drives again.
+  // The hardware's own hysteresis is about a degree, not enough to cool.
+  thermal_clear_margin_c: number
+  // One hot motor takes the whole hand off torque rather than only itself.
+  // On by default: the motors heat each other, so a motor between driving
+  // neighbours never gets back under the margin on its own.
+  thermal_hold_all: boolean
 }

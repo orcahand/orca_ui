@@ -426,14 +426,47 @@ def test_servo_writes_are_refused_on_a_family_without_the_registers(service, mon
     assert service._servo_gains == {} and service._servo_profiles == {}
 
 
-def test_reboot_needs_torque_off_and_reports_an_unanswered_read_back(service, monkeypatch):
-    service.enable_torque()
+def test_reboot_works_with_torque_on_and_puts_that_motor_back(service, monkeypatch):
+    """Torque is not a precondition: the fault policy reboots single motors on
+    an energized hand and restores their torque, so refusing to let a person
+    do the same was an arbitrary gate. The rebooted motor must not be left
+    dead in an otherwise live hand."""
     motor = service.supervisor.config.motor_ids[0]
-    with pytest.raises(ServiceError) as excinfo:
-        service.reboot_motor(motor)
-    assert excinfo.value.status_code == 409
+    client = service.session.hand.motor_client
+    monkeypatch.setattr(type(client), "reboot_motor", lambda self, mid: None,
+                        raising=False)
+    monkeypatch.setattr(type(client), "read_hardware_error", lambda self, mid: 0)
+    monkeypatch.setattr("orca_ui.hand.service.MOTOR_REBOOT_SETTLE_S", 0.0)
+
+    service.enable_torque()
+    enabled: list = []
+    monkeypatch.setattr(service.session.hand, "enable_torque",
+                        lambda ids=None: enabled.extend(ids or []))
+    assert service.reboot_motor(motor)["cleared"] is True
+    assert enabled == [motor], "its torque was not restored"
     service.disable_torque()
 
+
+def test_a_manual_reboot_clears_that_motors_reboot_count(service, monkeypatch):
+    """A motor left latched for exceeding its threshold would otherwise stay
+    abandoned for the whole session, however often someone fixes and
+    restarts it."""
+    motor = service.supervisor.config.motor_ids[0]
+    client = service.session.hand.motor_client
+    monkeypatch.setattr(type(client), "reboot_motor", lambda self, mid: None,
+                        raising=False)
+    monkeypatch.setattr(type(client), "read_hardware_error", lambda self, mid: 0)
+    monkeypatch.setattr("orca_ui.hand.service.MOTOR_REBOOT_SETTLE_S", 0.0)
+
+    hand = service.session.hand
+    cleared: list = []
+    monkeypatch.setattr(hand, "clear_fault_record", cleared.append)
+    service.reboot_motor(motor)
+    assert cleared == [motor]
+
+
+def test_reboot_reports_an_unanswered_read_back(service, monkeypatch):
+    motor = service.supervisor.config.motor_ids[0]
     client = service.session.hand.motor_client
     monkeypatch.setattr(type(client), "reboot_motor", lambda self, mid: None, raising=False)
     monkeypatch.setattr(type(client), "read_hardware_error", lambda self, mid: None)

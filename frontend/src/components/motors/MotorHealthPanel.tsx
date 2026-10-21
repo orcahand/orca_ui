@@ -6,7 +6,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../../api/rest'
-import type { MotorFaultEntry, MotorsFaults } from '../../api/types'
+import type {
+  FaultBudgets,
+  MotorFaultEntry,
+  MotorRecovery,
+  MotorsFaults,
+} from '../../api/types'
 import { useStreamFrame } from '../../hooks/useStreamFrame'
 import { useAppStore } from '../../state/appStore'
 import { Diagnosable } from '../common/Diagnosable'
@@ -192,6 +197,10 @@ export function MotorHealthPanel() {
   }, [joints])
 
   const [maxTemp, setMaxTemp] = useState<number>(DEFAULT_MAX_TEMP_C)
+  // What actually turns a motor off, read from the motors. null until the
+  // first telemetry payload carries it.
+  const [shutdownTemp, setShutdownTemp] = useState<number | null>(null)
+  const budgets = useAppStore((state) => state.control?.fault_budgets ?? null)
   const [bus, setBus] = useState<MotorsFaults['bus'] | null>(null)
   useStreamFrame((frames) => {
     const next = buildRows(
@@ -207,6 +216,13 @@ export function MotorHealthPanel() {
     }
     const rated = frames.motors.maxTempC
     if (rated !== null && rated !== maxTemp) setMaxTemp(rated)
+    const shutdown = frames.motors.shutdownTemps
+    if (shutdown && Object.keys(shutdown).length) {
+      const lowest = Math.min(...Object.values(shutdown))
+      if (Number.isFinite(lowest) && lowest !== shutdownTemp) {
+        setShutdownTemp(lowest)
+      }
+    }
   })
 
   // Per-motor issues, derived once: the table above the grid renders them,
@@ -222,13 +238,14 @@ export function MotorHealthPanel() {
           temp: row.temp,
           current: row.current,
           faults: row.faults,
-          maxTemp,
+          maxTemp: shutdownTemp ?? maxTemp,
           maxCurrent,
+          reportAfterReboots: budgets?.report_after_reboots ?? null,
         }),
       )
     }
     return map
-  }, [rows, jointOfMotor, maxTemp, maxCurrent])
+  }, [rows, jointOfMotor, maxTemp, shutdownTemp, maxCurrent, budgets])
 
   const allIssues = useMemo(
     () => sortIssues([...issuesByMotor.values()].flat()),
@@ -242,7 +259,15 @@ export function MotorHealthPanel() {
   )
 
   return (
-    <Panel title="Motor Health" toolbar={<MaxCurrentControl />}>
+    <Panel
+      title="Motor Health"
+      toolbar={
+        <span style={{ display: 'inline-flex', gap: 14, alignItems: 'center' }}>
+          <FaultBudgetsControl />
+          <MaxCurrentControl />
+        </span>
+      }
+    >
       {rows.length === 0 ? (
         <div style={{ fontSize: 10, color: 'var(--dimmer)' }}>
           no motor telemetry yet — appears at 1 Hz once motors are connected
@@ -251,7 +276,15 @@ export function MotorHealthPanel() {
         <>
         <MotorIssues issues={allIssues} />
         <div style={{ fontSize: 10, color: 'var(--dimmer)', marginBottom: 4 }}>
-          max operating temp: {maxTemp.toFixed(0)}°C
+          rated operating temp: {maxTemp.toFixed(0)}°C
+          {shutdownTemp !== null && (
+            <>
+              {' · '}
+              <span title="the motors' own Temperature Limit register — what actually de-energizes them. A motor runs past the rated figure above without stopping.">
+                shuts off at {shutdownTemp.toFixed(0)}°C
+              </span>
+            </>
+          )}
         </div>
         <table className="motor-table">
           <thead>
@@ -271,6 +304,9 @@ export function MotorHealthPanel() {
               <th title="is the motor actually following its commanded target?">
                 TRACK
               </th>
+              <th title="recoveries orca_core has performed on this motor: load reboots / thermal recoveries">
+                RECOV
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -283,6 +319,22 @@ export function MotorHealthPanel() {
                 issueToDiagnosis,
               )
               const hw = row.faults?.hw_error ?? null
+              const recovery = row.faults?.recovery ?? null
+              // Left latched on purpose: the system stopped recovering this
+              // motor because it kept faulting, so it is waiting on a person.
+              const abandoned = Boolean(
+                recovery?.given_up || recovery?.thermal_given_up,
+              )
+              // Past the report threshold: worth showing in the row, not just
+              // in a log line.
+              const reportedRepeat = Boolean(
+                budgets?.report_after_reboots &&
+                  recovery &&
+                  Math.max(
+                    recovery.load_reboots,
+                    recovery.thermal_recoveries,
+                  ) >= budgets.report_after_reboots,
+              )
               const faults = row.faults
               const tracking = faults?.tracking ?? null
               const idCell =
@@ -304,12 +356,13 @@ export function MotorHealthPanel() {
                 ) : (
                   row.id
                 )
-              const pct = tempPct(row.temp, maxTemp)
+              const limit = shutdownTemp ?? maxTemp
+              const pct = tempPct(row.temp, limit)
               return (
                 <tr key={row.id}>
                   <td>{idCell}</td>
                   <td className="motor-joint">{joint ?? '--'}</td>
-                  <td className={tempClass(row.temp, maxTemp)}>
+                  <td className={tempClass(row.temp, limit)}>
                     {row.temp === null ? '--' : row.temp.toFixed(1)}
                   </td>
                   <td
@@ -344,14 +397,41 @@ export function MotorHealthPanel() {
                     className={hw ? 'err' : ''}
                     title={
                       hw
-                        ? `${hw.headline}. ${hw.disabled_note} ${hw.advice}`
+                        ? abandoned
+                          ? `${hw.headline}. ${hw.advice} It has exceeded ` +
+                            'its reboot threshold, so the system stopped ' +
+                            'recovering it — you may be consistently ' +
+                            'overloading it. Reboot it here if you wish, or ' +
+                            'raise the threshold in the toolbar. A manual ' +
+                            'reboot restores its torque and starts the count ' +
+                            'again.'
+                          : `${hw.headline}. ${hw.advice}`
                         : 'no latched hardware error'
                     }
                   >
                     {hw ? (
                       <span className="fault-cell">
                         {HW_KIND_LABEL[hw.kind] ?? hw.kind.toUpperCase()}
-                        <RebootButton id={row.id} needsCooling={hw.needs_cooling} />
+                        {/* Recovery is automatic, so a reboot control only
+                            belongs here once the system has stopped doing it:
+                            a motor left latched for exceeding its threshold
+                            is the one case a human has to act on. Say so in
+                            the row rather than only in a tooltip. */}
+                        {abandoned && (
+                          <>
+                            <span style={{ color: 'var(--dim)' }}>
+                              {`reboot threshold exceeded (${
+                                recovery?.given_up
+                                  ? recovery.load_reboots
+                                  : (recovery?.thermal_recoveries ?? 0)
+                              }) — reboot it or raise the threshold`}
+                            </span>
+                            <RebootButton
+                              id={row.id}
+                              needsCooling={hw.needs_cooling}
+                            />
+                          </>
+                        )}
                       </span>
                     ) : (
                       '--'
@@ -380,6 +460,29 @@ export function MotorHealthPanel() {
                           ? `ok ·${tracking.stalls}`
                           : 'ok'
                         : `✗ ${tracking.deviation_deg?.toFixed(0) ?? '?'}° ${tracking.stall_s.toFixed(0)}s`}
+                  </td>
+                  <td
+                    className={
+                      abandoned
+                        ? 'bad'
+                        : recovery?.cooling
+                          ? 'warn'
+                          : reportedRepeat
+                            ? 'warn'
+                            : undefined
+                    }
+                    title={recoveryTitle(recovery, budgets)}
+                  >
+                    {recovery === null || recovery === undefined
+                      ? '--'
+                      : recovery.cooling
+                        ? 'cooling'
+                        : recovery.load_reboots === 0 &&
+                            recovery.thermal_recoveries === 0
+                          ? recovery.faults > 0
+                            ? `${recovery.faults} logged`
+                            : 'ok'
+                          : `${recovery.load_reboots} / ${recovery.thermal_recoveries}`}
                   </td>
                 </tr>
               )
@@ -423,5 +526,183 @@ export function MotorHealthPanel() {
         </>
       )}
     </Panel>
+  )
+}
+
+// What orca_core has done to a motor, spelled out: the counts alone do not
+// say whether it is still being recovered or has been given up on.
+function recoveryTitle(
+  recovery: MotorRecovery | null | undefined,
+  budgets: FaultBudgets | null,
+): string {
+  if (!recovery) {
+    return 'no recovery data yet — appears after the first fault poll'
+  }
+  if (recovery.given_up) {
+    return (
+      `left latched after ${recovery.load_reboots} load reboots: it kept ` +
+      'overloading, so recovering it again would only hide the mechanical cause'
+    )
+  }
+  if (recovery.thermal_given_up) {
+    return `left latched after ${recovery.thermal_recoveries} thermal recoveries`
+  }
+  if (recovery.cooling) {
+    return 'overheated and stopped — waiting for it to cool before the latch is cleared'
+  }
+  const budget = budgets?.giveup_after_reboots
+  return [
+    `${recovery.load_reboots} load reboot(s)` +
+      (budget ? ` of ${budget} before it is left latched` : ''),
+    `${recovery.thermal_recoveries} thermal recovery(s)`,
+    `${recovery.faults} fault(s) seen, including ones that did not stop the motor`,
+  ].join(' · ')
+}
+
+// Three thresholds, all per motor, all counting reboots. The thermal one is
+// unlimited by default: a motor that has cooled can work again, and the wait
+// is self-limiting because it does not come back until it has.
+function FaultBudgetsControl() {
+  const budgets = useAppStore((state) => state.control?.fault_budgets ?? null)
+  const setError = useAppStore((state) => state.setError)
+  const [busy, setBusy] = useState(false)
+
+  if (!budgets) return null
+
+  const send = (body: Parameters<typeof api.setFaultBudgets>[0]) => {
+    setBusy(true)
+    void api
+      .setFaultBudgets(body)
+      .then(() => setError(null))
+      .catch((e) => setError(String((e as Error).message ?? e)))
+      .finally(() => setBusy(false))
+  }
+
+  const field = (
+    label: string,
+    hint: string,
+    value: number,
+    key: 'report_after_reboots' | 'giveup_after_reboots',
+  ) => (
+    <label
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+      title={hint}
+    >
+      <span style={{ color: 'var(--dim)' }}>{label}</span>
+      <input
+        type="number"
+        min={1}
+        max={100}
+        value={value}
+        disabled={busy}
+        style={{ width: 42, fontSize: 10 }}
+        onChange={(e) => {
+          const next = parseInt(e.target.value, 10)
+          if (Number.isFinite(next) && next >= 1) send({ [key]: next })
+        }}
+      />
+    </label>
+  )
+
+  const thermal = budgets.thermal_giveup_after_reboots
+  const holdAll = budgets.thermal_hold_all
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 10,
+        fontSize: 10,
+      }}
+    >
+      {field(
+        'report at',
+        'reboots of one motor before its repetition is called out prominently',
+        budgets.report_after_reboots,
+        'report_after_reboots',
+      )}
+      {field(
+        'give up at',
+        'load reboots of one motor before it is left latched instead of ' +
+          'recovered — a joint that keeps stalling is a mechanical fault, and ' +
+          'recovering it again only hides the cause',
+        budgets.giveup_after_reboots,
+        'giveup_after_reboots',
+      )}
+      <label
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+        title={
+          'thermal recoveries before giving up. Blank means unlimited, the ' +
+          'default: a motor that has cooled can work again, and the wait is ' +
+          'self-limiting because it does not come back until it has cooled.'
+        }
+      >
+        <span style={{ color: 'var(--dim)' }}>thermal</span>
+        <input
+          type="number"
+          min={1}
+          max={100}
+          placeholder="∞"
+          value={thermal ?? ''}
+          disabled={busy}
+          style={{ width: 42, fontSize: 10 }}
+          onChange={(e) => {
+            if (e.target.value === '') {
+              send({ thermal_unlimited: true })
+              return
+            }
+            const next = parseInt(e.target.value, 10)
+            if (Number.isFinite(next) && next >= 1) {
+              send({ thermal_giveup_after_reboots: next })
+            }
+          }}
+        />
+      </label>
+      <label
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+        title={
+          'how far below its own limit a motor must cool before it drives ' +
+          'again. The servo brings itself back about a degree below the ' +
+          'limit, which is not enough to actually cool, so this margin is ' +
+          'held instead.'
+        }
+      >
+        <span style={{ color: 'var(--dim)' }}>cool by</span>
+        <input
+          type="number"
+          min={1}
+          max={60}
+          value={budgets.thermal_clear_margin_c}
+          disabled={busy}
+          style={{ width: 42, fontSize: 10 }}
+          onChange={(e) => {
+            const next = parseFloat(e.target.value)
+            if (Number.isFinite(next) && next >= 1) {
+              send({ thermal_clear_margin_c: next })
+            }
+          }}
+        />
+        <span style={{ color: 'var(--dim)' }}>°C</span>
+      </label>
+      <label
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+        title={
+          'hold the whole hand off while any motor cools. On by default: the ' +
+          'motors heat each other, so a motor between driving neighbours ' +
+          'reaches its limit and then never gets back under the margin, ' +
+          'because the heat is not its own. Untick to hold only the motor ' +
+          'that overheated, which is right where the motors are thermally ' +
+          'independent.'
+        }
+      >
+        <input
+          type="checkbox"
+          checked={holdAll}
+          disabled={busy}
+          onChange={(e) => send({ thermal_hold_all: e.target.checked })}
+        />
+        <span style={{ color: 'var(--dim)' }}>hold all while cooling</span>
+      </label>
+    </span>
   )
 }

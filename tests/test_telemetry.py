@@ -326,3 +326,70 @@ def test_a_dead_stream_is_not_suppressed_joint_by_joint():
     telemetry, _ = _build()
     telemetry._update_encoder_suppression(_health("no frames"))
     assert telemetry._enc_suppressed == {}
+
+
+class TestABusThatGoesQuietIsReported:
+    """A dying bus otherwise leaves no trace: stale reads are withheld rather
+    than published, so an overnight loss looks like a hand that stopped moving
+    for no recorded reason."""
+
+    def _sampler(self):
+        from orca_ui.hand.telemetry import TelemetryService
+
+        sampler = TelemetryService.__new__(TelemetryService)
+        sampler._stale_reads = 0
+        return sampler
+
+    def test_one_stale_read_says_nothing(self, caplog):
+        from orca_ui.hand.telemetry import STALE_READ_WARN_AFTER
+
+        sampler = self._sampler()
+        with caplog.at_level("WARNING", logger="orca_ui.hand.telemetry"):
+            sampler._note_read_failure("stale cache")
+        assert caplog.records == []
+        assert STALE_READ_WARN_AFTER > 1
+
+    def test_a_run_of_them_is_reported_once(self, caplog):
+        from orca_ui.hand.telemetry import STALE_READ_WARN_AFTER
+
+        sampler = self._sampler()
+        with caplog.at_level("WARNING", logger="orca_ui.hand.telemetry"):
+            for _ in range(STALE_READ_WARN_AFTER * 3):
+                sampler._note_read_failure("stale cache")
+        warnings = [r for r in caplog.records if "stopped answering" in r.message]
+        assert len(warnings) == 1, "reported once, not per tick"
+
+    def test_recovery_is_reported_only_if_the_loss_was(self, caplog):
+        from orca_ui.hand.telemetry import STALE_READ_WARN_AFTER
+
+        sampler = self._sampler()
+        with caplog.at_level("WARNING", logger="orca_ui.hand.telemetry"):
+            sampler._note_read_ok()
+            assert caplog.records == []
+
+            for _ in range(STALE_READ_WARN_AFTER):
+                sampler._note_read_failure("stale cache")
+            sampler._note_read_ok()
+        assert any("answering again" in r.message for r in caplog.records)
+        assert sampler._stale_reads == 0
+
+
+class TestTheFaultColumnDoesNotGoStale:
+    def test_a_reboot_drops_the_cached_cause(self):
+        """The error sweep is deferred while the hand is driven, so without
+        this the fault sits on the panel next to a motor that is already
+        working again. One still present comes back on the next sweep."""
+        from orca_ui.hand.telemetry import TelemetryService
+
+        sampler = TelemetryService.__new__(TelemetryService)
+        sampler._hw_errors = {3: ["overheating"], 4: ["overload"]}
+        sampler._hw_error_info = {3: {"kind": "thermal"}, 4: {"kind": "load"}}
+        sampler._hw_errors_warned = {3, 4}
+
+        sampler.forget_hw_error(3)
+
+        assert 3 not in sampler._hw_errors
+        assert 3 not in sampler._hw_error_info
+        assert 3 not in sampler._hw_errors_warned
+        # The other motor is untouched.
+        assert sampler._hw_errors[4] == ["overload"]

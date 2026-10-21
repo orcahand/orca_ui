@@ -19,12 +19,13 @@ dependencies = [
     # MCP server (orca_ui/mcp): agent access to the running backend.
     "mcp>=1.12,<2",
     "httpx>=0.27",
-    "orca-core>=0.9.0,<0.10",
+    "orca-core>=0.10.0,<0.11",
 ]
 
 [project.scripts]
 orca-ui = "orca_ui.cli:main"
 orca-ui-mcp = "orca_ui.mcp.cli:main"
+orca-dev = "orca_ui.core_source:main"
 
 [dependency-groups]
 dev = [

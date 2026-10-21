@@ -254,6 +254,20 @@ def build_router(service: HandService) -> APIRouter:
         guard(service.set_max_current, body.ma)
         return {"ok": True, "control": service.control_state()}
 
+    @router.post("/control/fault_budgets")
+    def control_fault_budgets(body: schemas.FaultBudgetsRequest):
+        changes = {key: value for key, value in (
+            ("report_after_reboots", body.report_after_reboots),
+            ("giveup_after_reboots", body.giveup_after_reboots),
+            ("thermal_giveup_after_reboots", body.thermal_giveup_after_reboots),
+            ("thermal_clear_margin_c", body.thermal_clear_margin_c),
+            ("thermal_hold_all", body.thermal_hold_all),
+        ) if value is not None}
+        if body.thermal_unlimited:
+            changes["thermal_giveup_after_reboots"] = None
+        guard(service.set_fault_budgets, **changes)
+        return {"ok": True, "control": service.control_state()}
+
     @router.post("/control/pose_source")
     def control_pose_source(body: schemas.PoseSourceRequest):
         return {"ok": True, "control": guard(service.set_pose_source, body.mode)}

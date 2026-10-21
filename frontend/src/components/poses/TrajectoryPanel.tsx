@@ -52,6 +52,10 @@ export function TrajectoryPanel({
   // controller does the travelling, the period just sets the rhythm.
   const [periods, setPeriods] = useState<Record<string, string>>({})
   const [settles, setSettles] = useState<Record<string, string>>({})
+  // Cycles to play when looping. Empty loops until stopped, which is the
+  // default: a loop that stops itself after a fixed count ends an unattended
+  // run with nothing to say why.
+  const [cycleCaps, setCycleCaps] = useState<Record<string, string>>({})
   const [editing, setEditing] = useState<string | null>(null)
   const [mode, setMode] = useState<
     'continuous' | 'waypoints' | 'motor_waypoints'
@@ -102,6 +106,12 @@ export function TrajectoryPanel({
       Number.isFinite(settleMs)
         ? Math.min(60000, Math.max(1, settleMs))
         : null
+    const cyclesRaw = cycleCaps[traj.name] ?? ''
+    const cyclesValue = parseInt(cyclesRaw, 10)
+    const cycles =
+      cyclesRaw !== '' && Number.isFinite(cyclesValue) && cyclesValue >= 1
+        ? cyclesValue
+        : null
     void api
       .operationStart('replay', {
         name: traj.name,
@@ -110,6 +120,7 @@ export function TrajectoryPanel({
         ...(interp !== null ? { interp_steps: interp } : {}),
         ...(period !== null ? { step_period_s: period } : {}),
         ...(settle !== null ? { max_settle_ms: settle } : {}),
+        ...(cycles !== null ? { max_cycles: cycles } : {}),
         ...(uncalibrated ? { allow_uncalibrated: true } : {}),
       })
       .catch(fail)
@@ -326,6 +337,33 @@ export function TrajectoryPanel({
                         />
                         loop
                       </label>
+                      {(loops[traj.name] ?? false) && (
+                        <label
+                          className="traj-settle"
+                          title={
+                            'cycles — how many times to play before stopping. ' +
+                            'Empty loops until you stop it, which is the ' +
+                            'default. A loop that ends on its own leaves an ' +
+                            'unattended run finished with nothing to say why.'
+                          }
+                        >
+                          cycles
+                          <input
+                            type="number"
+                            min={1}
+                            step={1}
+                            placeholder="∞"
+                            value={cycleCaps[traj.name] ?? ''}
+                            onChange={(e) =>
+                              setCycleCaps((prev) => ({
+                                ...prev,
+                                [traj.name]: e.target.value,
+                              }))
+                            }
+                            style={{ width: 56 }}
+                          />
+                        </label>
+                      )}
                       <button
                         className="btn btn-primary"
                         disabled={replayBlocked}
