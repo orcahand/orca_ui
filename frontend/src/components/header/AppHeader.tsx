@@ -1,5 +1,5 @@
 // Console header: brand lockup, model picker, status pill, the link controls
-// (disconnect / reconnect), the view tabs, and the E-stop hard right.
+// (disconnect / reconnect), the view tabs, what's-new, and the E-stop hard right.
 // Capability badges + Hz meters live in the Motors tab.
 
 import type { HandState } from '../../api/types'
@@ -11,6 +11,7 @@ import { HardwareVersionBadge } from './HardwareVersion'
 import { LinkControls } from './LinkControls'
 import { ModelPicker } from './ModelPicker'
 import { ThemeToggle } from './ThemeToggle'
+import { WhatsNewButton } from './WhatsNewButton'
 
 const STATE_CLASS: Record<HandState, string> = {
   connected: 'connected',
@@ -21,6 +22,10 @@ const STATE_CLASS: Record<HandState, string> = {
   maintenance: 'maintenance',
   disconnected: 'disconnected',
 }
+
+// Shown in place of the connection state while the bus is handed back after
+// an operation: "Detecting…" there reads as a hand that dropped out.
+const LEAVING_MAINTENANCE_LABEL = 'Leaving maintenance…'
 
 const STATE_LABEL: Record<HandState, string> = {
   connected: 'Connected',
@@ -61,10 +66,13 @@ export function AppHeader() {
   const state: HandState = !wsConnected
     ? 'disconnected'
     : (status?.state ?? 'detecting')
+  const leavingMaintenance = status?.leaving_maintenance ?? false
   // Defensive: a backend state this build doesn't know yet must still render
   // a legible pill, not a blank one.
   const pillClass: string = STATE_CLASS[state] ?? 'busy'
-  const pillLabel: string = STATE_LABEL[state] ?? state
+  const pillLabel: string = leavingMaintenance
+    ? LEAVING_MAINTENANCE_LABEL
+    : (STATE_LABEL[state] ?? state)
 
   return (
     <header>
@@ -100,6 +108,7 @@ export function AppHeader() {
           </button>
         ))}
       </nav>
+      <WhatsNewButton />
       <ThemeToggle />
       <EStopButton />
     </header>

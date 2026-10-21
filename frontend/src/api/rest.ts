@@ -5,6 +5,7 @@ import type {
   MotorConfigValues,
   MotorConfigWriteResult,
   BusBaudInfo,
+  ChangelogDoc,
   BusBaudResult,
   BoardsInfo,
   DemoEntry,
@@ -83,6 +84,9 @@ export const api = {
   status: () => request<StatusSnapshot>('/api/status'),
   handInfo: () => request<HandInfo>('/api/hand/info'),
   stats: () => request<Stats>('/api/stats'),
+  changelog: () => request<ChangelogDoc>('/api/changelog'),
+  changelogSeen: (dismissed: boolean) =>
+    post<ChangelogDoc>('/api/changelog/seen', { dismissed }),
   ports: () => request<PortInfo[]>('/api/ports'),
   taxelGeometry: () => request<TaxelGeometry>('/api/tactile/geometry'),
   // Re-arm the probes for declared hardware this session did not get. Keeps

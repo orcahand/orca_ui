@@ -51,6 +51,11 @@ class Capabilities:
 @dataclass(frozen=True)
 class StatusSnapshot:
     state: HandState
+    # True from the moment maintenance hands the bus back until a session is
+    # live again. The reconnect that follows is routine, not a fault, and a
+    # front-end that cannot tell the two apart makes a normal exit from
+    # calibration look like an unstable hand.
+    leaving_maintenance: bool
     capabilities: Capabilities | None
     torque_enabled: bool
     message: str
@@ -106,6 +111,7 @@ class StatusSnapshot:
             }
         return {
             "state": self.state.value,
+            "leaving_maintenance": self.leaving_maintenance,
             "capabilities": caps,
             "torque_enabled": self.torque_enabled,
             "message": self.message,

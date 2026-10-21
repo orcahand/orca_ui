@@ -31,3 +31,7 @@ node_modules/
 
 # Personal Claude Code instructions, never committed
 CLAUDE.local.md
+
+# The changelog dismissal: one indicator file, written when someone ticks
+# "do not show again". Created on demand, cleared on every write.
+.changelog/
