@@ -43,6 +43,11 @@ HW_ERROR_SWEEP_S = 10.0
 # While a motor is being held off to cool, the hold has to be re-asserted
 # faster than the hardware brings it back.
 FAULT_HOLD_POLL_S = 1.0
+# Consecutive failed or stale motor reads before the bus going quiet is
+# reported. Skipping a stale read is normal and must not shout; a bus that
+# has stopped answering is not, and left unreported it reads as a hand that
+# simply stopped moving for no recorded reason.
+STALE_READ_WARN_AFTER = 5
 
 # Bare motor mode reads position and current this often. There is no control
 # loop to starve and no tendon whose timing matters — the point of a bench is
@@ -292,6 +297,9 @@ class TelemetryService:
         # Per-motor shutdown threshold from the motors themselves; None until
         # read, {} when the family cannot report it.
         self._shutdown_temps: "dict[int, float] | None" = None
+        # Consecutive failed or stale motor reads, for reporting a bus that
+        # has gone quiet rather than silently withholding telemetry.
+        self._stale_reads = 0
         self._last_hw_error_sweep = 0.0
 
     def start(self) -> None:
@@ -362,10 +370,13 @@ class TelemetryService:
             currents = hand.get_motor_current(as_dict=True)
             if not getattr(hand, "last_read_ok", True):
                 logger.debug("bench telemetry read stale; skipping this tick")
+                self._note_read_failure("bench read returned a stale cache")
                 return
-        except Exception:
+        except Exception as error:
             logger.debug("bench telemetry read failed", exc_info=True)
+            self._note_read_failure(f"bench read raised {type(error).__name__}")
             return
+        self._note_read_ok()
         if now - self._last_bench_temp >= 1.0 / BENCH_TEMP_HZ:
             try:
                 self._motor_health["temps"] = {
@@ -710,6 +721,29 @@ class TelemetryService:
         self._hw_errors = found
         self._hw_error_info = classified
 
+    def _note_read_failure(self, reason: str) -> None:
+        """Count a failed or stale motor read, and report a persistent one.
+
+        A single stale read is ordinary and silent. A run of them means the
+        bus has stopped answering, which otherwise leaves no trace at all:
+        the reads are skipped rather than published, so an overnight loss
+        looks like a hand that stopped moving for no reason.
+        """
+        self._stale_reads = getattr(self, "_stale_reads", 0) + 1
+        if self._stale_reads != STALE_READ_WARN_AFTER:
+            return
+        message = (f"motor reads have failed {self._stale_reads} times in a "
+                   f"row ({reason}); the bus has stopped answering. Telemetry "
+                   "is being withheld rather than shown stale.")
+        logger.warning(message)
+        print(f"\033[93mWarning: {message}\033[0m")
+
+    def _note_read_ok(self) -> None:
+        """Clear the stale-read run, reporting a recovery that was announced."""
+        if getattr(self, "_stale_reads", 0) >= STALE_READ_WARN_AFTER:
+            logger.warning("motor reads are answering again")
+        self._stale_reads = 0
+
     def _drive_fault_policy(self, session) -> None:
         """Let orca_core act on what the motors are reporting.
 
@@ -860,11 +894,14 @@ class TelemetryService:
                 # publishing it would present a frozen value as a live one.
                 if not getattr(session.hand, "last_read_ok", True):
                     logger.debug("motor current read stale; skipping this publish")
+                    self._note_read_failure("current read returned a stale cache")
                     return
+                self._note_read_ok()
                 self._motor_health["currents"] = {
                     int(k): round(float(v), 1) for k, v in reading.items()}
-        except Exception:
+        except Exception as error:
             logger.debug("motor telemetry read failed", exc_info=True)
+            self._note_read_failure(f"current read raised {type(error).__name__}")
             return
         self._hub.publish(T.MOTORS_TELEMETRY,
                           self._motor_health_payload(session))
