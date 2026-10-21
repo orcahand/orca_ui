@@ -1,6 +1,8 @@
-// Step 1: tensioning. v2.1 hands get guided tensioning (scored, goes green
-// once every joint passes); v2.0 and unknown hands get the hold dialog. The
-// settings drawer can force either one. The dialogs live in TensionDialogs.
+// Step 1, in three parts: the slack test (no spool may run half a turn free),
+// the tension check against the reference hand, and the tensioning itself,
+// which opens on that check's ratchet list and then loops move → check →
+// ratchet until the check is green. v2.1 hands get guided tensioning; v2.0
+// and unknown hands get the hold dialog. The dialogs live in TensionDialogs.
 
 import { useEffect, useState } from 'react'
 import type { TensionProgress } from '../../api/types'
@@ -11,24 +13,31 @@ import {
   useOperationStore,
   useStartGate,
 } from '../../state/operationStore'
+import type { SetupVariant } from '../../state/setupVariant'
 import {
   formatHardwareVersion,
   DEFAULT_OFFSET_DEG,
   OFFSET_BOUNDS_DEG,
+  PROBE_REPEAT_CHOICES,
   useTensionFlow,
   useTensionMode,
   type TensionMode,
 } from '../../state/tensionFlow'
 import { FlowStep, type StepState } from './FlowStep'
-import { jointGroup, loadPassFractions } from './guidedSettings'
+import { jointGroup, loadPassFractions, loadPassSlack } from './guidedSettings'
 import { failToBanner, shortDate } from './setupUtils'
+import { BaselinePicker } from './TravelBaselines'
+import { ReferencePicker, useProbes } from './ProbeReference'
+import { CHECK_HINT, SLACK_HINT, startSlackTest, startTensionCheck } from './probeStart'
+import { SLACK_CURRENT_CHOICES } from '../../state/tensionFlow'
 
 const MODE_LABEL: Record<TensionMode, string> = {
   guided: 'guided',
   hold: 'hold & ratchet',
 }
 
-export function TensionStep({ state }: { state: StepState }) {
+export function TensionStep({ state, variant }: { state: StepState; variant: SetupVariant }) {
+  const kai = variant === 'kai'
   const gate = useStartGate('motors')
   const handInfo = useAppStore((s) => s.handInfo)
   const version = useAppStore((s) => s.status?.hardware_version ?? null)
@@ -49,6 +58,21 @@ export function TensionStep({ state }: { state: StepState }) {
   const [overrides, setOverrides] = useState<Partial<GuidedCurrents>>({})
   // Restart wipes the saved scores, so it takes a second click to confirm.
   const [confirmRestart, setConfirmRestart] = useState(false)
+  // The probe moves the fingers to neutral first unless told to hold in place.
+  const probeRepeats = useTensionFlow((s) => s.probeRepeats)
+  const setProbeRepeats = useTensionFlow((s) => s.setProbeRepeats)
+  const runNote = useTensionFlow((s) => s.runNote)
+  const setRunNote = useTensionFlow((s) => s.setRunNote)
+  const slackCurrentMa = useTensionFlow((s) => s.slackCurrentMa)
+  const setSlackCurrentMa = useTensionFlow((s) => s.setSlackCurrentMa)
+  const slackTest = handInfo?.slack_test ?? null
+  const slackBlock = slackTest?.block ?? null
+  const slackCount = slackTest ? Object.values(slackTest.results).filter((r) => r.status === 'slack').length : 0
+  const { state: probes } = useProbes()
+  const runningKind = operation && isOperationActive(operation) ? operation.kind : null
+  const slackState = slackBlock ? 'warn' : slackTest ? 'done' : 'next'
+  const checkState = slackBlock ? 'todo' : slackTest ? 'next' : 'todo'
+  const tensionState = slackBlock ? 'todo' : 'next'
   useEffect(() => {
     if (!confirmRestart) return
     const timer = window.setTimeout(() => setConfirmRestart(false), 4000)
@@ -70,7 +94,9 @@ export function TensionStep({ state }: { state: StepState }) {
     if (forced === 'guided' && natural === 'guided') setForced(null)
   }, [forced, natural, setForced])
   const guided = mode === 'guided' && handInfo?.guided_tension !== false
-  const progress = guided ? (handInfo?.tension_progress ?? null) : null
+  const progress = guided
+    ? ((kai ? handInfo?.tension_progress_slack : handInfo?.tension_progress) ?? null)
+    : null
   const last = handInfo?.last_tension ?? null
   const offsetValid = offsetDeg >= OFFSET_BOUNDS_DEG[0] && offsetDeg <= OFFSET_BOUNDS_DEG[1]
   const settingsValid =
@@ -83,14 +109,18 @@ export function TensionStep({ state }: { state: StepState }) {
       .operationStart('guided_tension', {
         ...currents,
         tension_offset_deg: offsetDeg,
-        pass_fractions: loadPassFractions(),
+        ...(kai
+          ? { scoring: 'slack', pass_slack_deg: loadPassSlack() }
+          : { scoring: 'fraction', pass_fractions: loadPassFractions() }),
         resume,
         any_hardware: !isV21,
+        // Open on the tension check and its ratchet list before any finger is moved.
+        check_first: true,
       })
       .catch(failToBanner)
 
   const chip = progress ? (
-    <ProgressChip progress={progress} />
+    <ProgressChip progress={progress} kai={kai} />
   ) : last ? (
     shortDate(last.completed_at)
   ) : undefined
@@ -142,6 +172,8 @@ export function TensionStep({ state }: { state: StepState }) {
           <span className="flow-unit">°</span>
         </label>
       </div>
+      {kai && guided && <BaselinePicker />}
+      {kai && <ReferencePicker />}
       {guided ? (
         <details className="flow-advanced">
           <summary className="flow-field">Advanced settings</summary>
@@ -194,38 +226,130 @@ export function TensionStep({ state }: { state: StepState }) {
           Return to session
         </button>
       ) : (
-        <div className="flow-actions">
-          <button
-            className="btn btn-primary"
-            disabled={blocked}
-            title={blockedReason}
-            onClick={() => (guided ? startGuided(true) : openHold(operation?.run_id ?? null))}
-          >
-            {guided && progress ? 'Resume' : 'Start'}
-          </button>
-          {guided && progress && (
-            <button
-              className={`btn ${confirmRestart ? 'btn-danger' : 'btn-secondary'}`}
-              disabled={blocked}
-              title="Forget the saved scores and check every joint again"
-              onClick={() => {
-                if (!confirmRestart) return setConfirmRestart(true)
-                setConfirmRestart(false)
-                startGuided(false)
-              }}
-            >
-              {confirmRestart ? 'Erase saved scores?' : 'Restart'}
-            </button>
-          )}
+        <div className="calib-steps">
+          <div className={`calib-step ${slackState}`}>
+            <span className="calib-step-num">{slackState === 'done' ? '✓' : slackState === 'warn' ? '!' : 'a'}</span>
+            <span>
+              <div className="calib-step-title">Slack test</div>
+              <div className="calib-step-note">
+                {slackBlock
+                  ? slackBlock
+                  : slackTest
+                    ? `passed ${shortDate(slackTest.recorded_at)} · ${slackCount ? `slack on ${slackCount}` : 'all taut'} at ${slackTest.current_ma ?? '?'} mA`
+                    : 'half a turn each way at low current; no spool may run free'}
+              </div>
+            </span>
+            <span className="calib-step-actions">
+              <label className="flow-field" title="The winding current: under what any tensioned joint needs to move">
+                <span>at</span>
+                <select value={slackCurrentMa} onChange={(e) => setSlackCurrentMa(Number(e.target.value))}>
+                  {SLACK_CURRENT_CHOICES.map((v) => (
+                    <option key={v} value={v}>
+                      {v} mA
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className={`btn ${slackState === 'done' ? 'btn-secondary' : 'btn-primary'}`}
+                disabled={gate.blocked}
+                title={gate.reason ?? SLACK_HINT}
+                onClick={() => void startSlackTest().catch(failToBanner)}
+              >
+                {runningKind === 'slack_test' ? 'Running…' : slackTest ? 'Slack test again' : 'Slack test'}
+              </button>
+            </span>
+          </div>
+          <div className={`calib-step ${checkState}`}>
+            <span className="calib-step-num">b</span>
+            <span>
+              <div className="calib-step-title">Tension check</div>
+              <div className="calib-step-note">
+                {probes?.reference
+                  ? `breakaway per tendon vs ${probes.reference}; under 80 % = ratchet`
+                  : 'no reference set: the check is saved but not scored'}
+              </div>
+            </span>
+            <span className="calib-step-actions">
+              <label className="flow-field" title="Passes over every tendon (one is enough between rounds)">
+                <span>passes</span>
+                <select value={probeRepeats} onChange={(e) => setProbeRepeats(Number(e.target.value))}>
+                  {PROBE_REPEAT_CHOICES.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flow-field" title="Saved with the next check or measurement, e.g. 'before clicks'">
+                <span>note</span>
+                <input type="text" value={runNote} placeholder="label this run" onChange={(e) => setRunNote(e.target.value)} />
+              </label>
+              <button
+                className="btn btn-secondary"
+                disabled={gate.blocked || !!slackBlock}
+                title={gate.reason ?? slackBlock ?? CHECK_HINT}
+                onClick={() => void startTensionCheck().catch(failToBanner)}
+              >
+                Tension check
+              </button>
+            </span>
+          </div>
+          <div className={`calib-step ${tensionState}`}>
+            <span className="calib-step-num">c</span>
+            <span>
+              <div className="calib-step-title">Tension</div>
+              <div className="calib-step-note">
+                {slackBlock
+                  ? 'pass the slack test first'
+                  : guided
+                    ? 'starts with the tension check and its ratchet list, then move → check → ratchet until green'
+                    : 'activate the current and ratchet every top spool until it clicks'}
+              </div>
+            </span>
+            <span className="calib-step-actions">
+              {guided && progress && (
+                <button
+                  className={`btn ${confirmRestart ? 'btn-danger' : 'btn-secondary'}`}
+                  disabled={blocked || !!slackBlock}
+                  title="Forget the saved scores and check every joint again"
+                  onClick={() => {
+                    if (!confirmRestart) return setConfirmRestart(true)
+                    setConfirmRestart(false)
+                    startGuided(false)
+                  }}
+                >
+                  {confirmRestart ? 'Erase saved scores?' : 'Restart'}
+                </button>
+              )}
+              <button
+                className="btn btn-primary"
+                disabled={blocked || !!slackBlock}
+                title={blockedReason ?? slackBlock ?? undefined}
+                onClick={() => (guided ? startGuided(true) : openHold(operation?.run_id ?? null))}
+              >
+                {guided && progress ? 'Continue' : 'Start'}
+              </button>
+            </span>
+          </div>
         </div>
       )}
     </FlowStep>
   )
 }
 
-function ProgressChip({ progress }: { progress: TensionProgress }) {
+function ProgressChip({ progress, kai }: { progress: TensionProgress; kai: boolean }) {
+  if (kai) {
+    const joints = Object.values(progress.scores ?? {})
+    const passed = joints.filter((s) => s.status === 'pass').length
+    return (
+      <span title={`last round: ${passed} of ${joints.length} joints within tolerance · ${progress.rounds} round${progress.rounds === 1 ? '' : 's'} so far`}>
+        {passed}/{joints.length}
+      </span>
+    )
+  }
   const passes = loadPassFractions()
-  const joints = Object.entries(progress.best)
+  const joints = Object.entries(progress.best ?? {})
   const passed = joints.filter(([joint, f]) => f >= passes[jointGroup(joint)]).length
   return (
     <span title={`${progress.rounds} round${progress.rounds === 1 ? '' : 's'}`}>

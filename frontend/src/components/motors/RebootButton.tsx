@@ -10,10 +10,14 @@ import { useAppStore } from '../../state/appStore'
 export function RebootButton({
   id,
   needsCooling,
+  label = 'reboot',
+  className = 'btn btn-secondary reboot-btn',
 }: {
   // Motor ids arrive as object keys, so callers carry them as strings.
   id: string
   needsCooling: boolean
+  label?: string
+  className?: string
 }) {
   const [busy, setBusy] = useState(false)
   const setError = useAppStore((s) => s.setError)
@@ -23,7 +27,7 @@ export function RebootButton({
   return (
     <button
       type="button"
-      className="btn btn-secondary reboot-btn"
+      className={className}
       disabled={busy || torqueOn}
       title={
         torqueOn
@@ -49,7 +53,7 @@ export function RebootButton({
           .finally(() => setBusy(false))
       }}
     >
-      {busy ? '…' : 'reboot'}
+      {busy ? '…' : label}
     </button>
   )
 }

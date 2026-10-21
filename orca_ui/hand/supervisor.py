@@ -956,6 +956,8 @@ class HandSupervisor(threading.Thread):
 
         logger.info("hand identifies as %s (was %s) — switching model",
                     detection.model_name, self.model_name)
+        # The pin belongs to the model's own config, not the one it replaces.
+        self._pinned_hardware_version = config.hardware_version
         self._install_config(config)
         return True
 
