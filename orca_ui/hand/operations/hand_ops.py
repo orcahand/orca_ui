@@ -176,49 +176,21 @@ def tension(
     )
 
 
-def tension_probe_supported() -> bool:
-    try:
-        import orca_core.maintenance.tension_probe  # noqa: F401
-    except ImportError:
-        return False
-    return True
+def hand_family(hand) -> str | None:
+    """The motor family of an open (maintenance) hand, from its motor client."""
+    client = getattr(hand, "motor_client", None)
+    family = getattr(type(client), "motor_type", None) if client is not None else None
+    return family if isinstance(family, str) else None
 
 
-def tension_probe(
-    hand,
-    *,
-    methods,
-    joints,
-    settings: dict,
-    progress_callback,
-    should_stop,
-    pose: str = "mid",
-    repeats: int = 1,
-    use_limits: bool = True,
-    parallel: bool = False,
-) -> dict:
-    """Blocking tension probe on the calling thread (see run_tension_probe)."""
-    from orca_core.maintenance.tension_probe import ProbeSettings, run_tension_probe
-
-    return run_tension_probe(
-        hand,
-        methods=methods,
-        joints=joints,
-        settings=ProbeSettings(**settings),
-        progress_callback=progress_callback,
-        should_stop=should_stop,
-        pose=pose,
-        repeats=repeats,
-        **({"use_limits": False} if not use_limits else {}),
-        **({"parallel": True} if parallel else {}),
-    )
-
-
-def probe_setting_defaults() -> dict:
-    from orca_core.maintenance.tension_probe import ProbeSettings
-    import dataclasses
-
-    return dataclasses.asdict(ProbeSettings())
+def current_ceiling(config, session) -> float | None:
+    """The hand's own current limit in mA, or None if nothing numeric is known."""
+    value = getattr(config, "max_current", None)
+    if isinstance(value, (int, float)) and value > 0:
+        return float(value)
+    client = getattr(getattr(session, "hand", None), "motor_client", None)
+    family_max = getattr(type(client), "max_current_ma", None) if client is not None else None
+    return float(family_max) if isinstance(family_max, (int, float)) and family_max > 0 else None
 
 
 def slack_test_supported() -> bool:
@@ -229,7 +201,7 @@ def slack_test_supported() -> bool:
     return True
 
 
-def slack_test(hand, *, joints, settings: dict, progress_callback, should_stop) -> dict:
+def slack_test(hand, *, joints, settings: dict, hold_callback, progress_callback, should_stop) -> dict:
     """Blocking slack test on the calling thread (see run_slack_test)."""
     from orca_core.maintenance.slack_test import SlackTestSettings, run_slack_test
 
@@ -237,6 +209,7 @@ def slack_test(hand, *, joints, settings: dict, progress_callback, should_stop) 
         hand,
         joints=joints,
         settings=SlackTestSettings(**settings),
+        hold_callback=hold_callback,
         progress_callback=progress_callback,
         should_stop=should_stop,
     )
@@ -304,18 +277,15 @@ def guided_tension(
     scoring: str | None = None,
     pass_fraction=None,
     pass_slack_deg=None,
-    probe_slack_deg: dict[str, float] | None = None,
     hand_key: str | None = None,
     resume: bool = True,
     any_hardware: bool = False,
-    check_callback=None,
-    check_first: bool = False,
+    forget=None,
 ) -> dict:
     """Blocking guided tensioning on the calling thread; prompts block on the operator.
 
     Settings left as None use orca_core's defaults; each may be a value or a
-    callable (see run_guided_tension). ``check_callback(hand)`` adds the
-    tension check between the score and the tension step."""
+    callable (see run_guided_tension)."""
     from orca_core.maintenance.guided_tension import run_guided_tension
 
     settings = {
@@ -327,9 +297,7 @@ def guided_tension(
             ("scoring", scoring),
             ("pass_fraction", pass_fraction),
             ("pass_slack_deg", pass_slack_deg),
-            ("probe_slack_deg", probe_slack_deg),
-            ("check_callback", check_callback),
-            ("check_first", check_first or None),
+            ("forget", forget),
         )
         if v is not None
     }

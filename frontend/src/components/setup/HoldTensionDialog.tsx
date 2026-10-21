@@ -10,7 +10,6 @@ import type { OperationSnapshot } from '../../api/types'
 import { isOperationActive, useStartGate } from '../../state/operationStore'
 import { EXTRA_DEG, PULL_MORE, useTensionFlow } from '../../state/tensionFlow'
 import { failToBanner } from './setupUtils'
-import { CHECK_HINT, startTensionCheck } from './probeStart'
 
 type HoldStep = 'activate' | 'ratchet' | 'done'
 
@@ -182,20 +181,9 @@ export function HoldTensionDialog({
                   {operation.state === 'error'
                     ? `${operation.error ?? 'the run ended with an error'} — torque is off.`
                     : released
-                      ? 'Motors released and torque is off. Run the tension check to see which spools still need the ratchet, then the slack test and the calibration in the Calibrate step.'
+                      ? 'Motors released and torque is off. Next: calibrate, then the tension sweep says which spools still need the ratchet.'
                       : 'Torque is off. Nothing was recorded.'}
                 </p>
-                {released && (
-                  <div className="gt-actions">
-                    <button
-                      className="btn btn-primary"
-                      title={CHECK_HINT}
-                      onClick={() => void startTensionCheck().catch(failToBanner)}
-                    >
-                      Tension check
-                    </button>
-                  </div>
-                )}
               </div>
             )}
             {primary && (

@@ -3,9 +3,10 @@
 // while each motor's current is recorded. The current along the travel splits
 // into friction (routing drag, which tension raises) and static load (the
 // preload of tendon and skin, what the ratchet changes); both are compared
-// with the reference sweep curve by curve. The tower marks the spools, the
-// list beside each face carries the numbers, and the charts show every joint
-// along its whole travel.
+// with the reference sweep curve by curve, and a joint below the reference
+// gets the ratchet clicks that bring it back (rounded so it never passes 110 %).
+// The tower marks the spools, the list beside each face carries the numbers,
+// and the charts show every joint along its whole travel.
 
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -15,16 +16,14 @@ import { isOperationActive } from '../../state/operationStore'
 import { failToBanner } from './setupUtils'
 import type { SpoolMark } from './TowerPreview'
 import { RunProgress } from './RunProgress'
-import { SweepCurve } from './SweepCurves'
+import { SweepCurve, verdictText } from './SweepCurves'
 import { TowerFaces } from './TowerFaces'
 import { useSweeps } from './sweepReference'
 
 const label = (joint: string) => joint.replace('_', ' ')
 const ma = (v: number | null | undefined) => (v == null ? '—' : `${Math.round(v)} mA`)
-const diff = (v: number | null | undefined) => (v == null ? '·' : `${v > 0 ? '+' : ''}${Math.round(v)} mA`)
 const deg = (v: number | null | undefined) => (v == null ? '—' : `${v.toFixed(1)}°`)
 const SPOOL: Record<SweepStatus, SpreadStatus> = { none: 'unscored', ok: 'pass', slack: 'slack', over: 'unscored', under: 'partial', low: 'low' }
-const WORD: Record<SweepStatus, string> = { none: '', ok: 'ok', slack: 'slack', over: 'tighter', under: 'tension', low: 'loose' }
 
 export function marksFromSweep(verdict: SweepVerdict | null, motors: Record<string, number>, joints: string[]): SpoolMark[] {
   return joints.map((joint) => {
@@ -36,7 +35,7 @@ export function marksFromSweep(verdict: SweepVerdict | null, motors: Record<stri
       motor: motors[joint] ?? 0,
       status: v ? SPOOL[status] : 'unscored',
       fraction: null,
-      tag: share != null ? `${share}%` : v?.friction_ma != null ? `${Math.round(v.friction_ma)} mA` : '…',
+      tag: v?.clicks ? `~${v.clicks} clk` : share != null ? `${share}%` : v?.friction_ma != null ? `${Math.round(v.friction_ma)} mA` : '…',
     }
   })
 }
@@ -68,9 +67,10 @@ export function TensionSweepDialog({ operation, onClose }: { operation: Operatio
   const setReference = () => void api.sweepReference(extra?.saved ?? null).then(refresh).catch(failToBanner)
   const entries = Object.entries(verdict?.joints ?? {})
   const under = entries.filter(([, v]) => v.status === 'under' || v.status === 'low').map(([j]) => j)
+  const toClick = entries.filter(([, v]) => (v.clicks ?? 0) > 0)
+  const totalClicks = toClick.reduce((n, [, v]) => n + (v.clicks ?? 0), 0)
   const over = entries.filter(([, v]) => v.status === 'over').map(([j]) => j)
   const slack = entries.filter(([, v]) => v.status === 'slack').map(([j]) => j)
-  const bands = verdict?.bands
   // The chart of one joint, over the whole dialog, opened from its row.
   const [plotJoint, setPlotJoint] = useState<string | null>(null)
   const plotted = plotJoint && verdict?.joints[plotJoint] ? plotJoint : null
@@ -132,9 +132,11 @@ export function TensionSweepDialog({ operation, onClose }: { operation: Operatio
               ) : done ? (
                 <h3 className="gt-heading">
                   {!refName
-                    ? 'Sweep complete · no reference set'
-                    : under.length
-                      ? `${under.length} tendon${under.length === 1 ? '' : 's'} still to tension`
+                    ? 'Sweep complete · no reference for this motor family'
+                    : toClick.length
+                      ? `${totalClicks} click${totalClicks === 1 ? '' : 's'} on ${toClick.length} spool${toClick.length === 1 ? '' : 's'} still to ratchet`
+                      : under.length
+                      ? `${under.length} tendon${under.length === 1 ? '' : 's'} a little low · under one click, leave them`
                       : slack.length
                         ? `Nothing to tension · ${slack.map((j) => `${label(j)} slack`).join(', ')}`
                         : `Every tendon at or above 90 % of the reference${over.length ? ` · ${over.length} tighter (grey)` : ''}`}
@@ -169,8 +171,8 @@ export function TensionSweepDialog({ operation, onClose }: { operation: Operatio
               <TowerFaces
                 marks={marksFromSweep(verdict, motors, joints)}
                 joints={joints}
-                head={['friction', 'static', refName ? 'vs reference' : '']}
-                columns="1fr 1fr 180px"
+                head={['friction', 'static', refName ? 'vs reference' : '', 'clicks']}
+                columns="1fr 1fr 150px 50px"
                 activeJoints={activeJoints}
                 onSelect={verdict ? (joint) => setPlotJoint(joint) : undefined}
                 row={(joint) => {
@@ -185,26 +187,21 @@ export function TensionSweepDialog({ operation, onClose }: { operation: Operatio
                       {v?.ref_static_ma != null && <small> / {Math.round(v.ref_static_ma)}</small>}
                     </span>,
                     <span key="v" className={`probe-verdict ${v?.status ?? 'none'}`} title={v ? stretchText(v) : undefined}>
-                      {v && v.status !== 'none'
-                        ? `${WORD[v.status]}${v.share != null ? ` ${Math.round(v.share * 100)} %` : ` ${diff(v.friction_diff_ma)}`}`
-                        : '·'}
+                      {v && v.status !== 'none' ? verdictText(v) : '·'}
+                    </span>,
+                    <span key="c" title="ratchet clicks still needed: only below 40 % of the reference, rounded so the joint never passes 110 %">
+                      {v?.clicks ? `~${v.clicks}` : v && v.status !== 'none' ? '—' : '·'}
                     </span>,
                   ]
                 }}
               />
             )}
             {verdict && joints.length > 0 && (
-              <p className="setup-copy dim">Click a joint for its curves along the travel.</p>
+              <p className="setup-copy dim">
+                Differences of up to 60 % from the reference can come from the hands being different rather than the
+                tension. Clicks are only suggested below 40 %; a joint that needs no click is well tensioned.
+              </p>
             )}
-            <p className="setup-copy dim">
-              Friction is the drag along the travel, (I flex − I extend) / 2; static load is the preload of tendon and skin,
-              (I flex + I extend) / 2, both in flex-positive milliamps per {bands ? Math.round(100 / bands.bins) : 5} % of the
-              travel{repeats > 1 ? `, averaged over ${repeats} passes` : ''}. Dashed: the reference hand. The verdict is the
-              mean friction as a share of the reference's: 90–110 % green, 70–90 % yellow (ratchet it), under 70 % red
-              (loose), over 110 % grey (tighter, left alone); a dead band {bands?.slack_deg ?? 8}° wider than the
-              reference's is slack. Click a joint for its curves; stretches departing by more than {bands?.tol_ma ?? 8} mA
-              are shaded there.
-            </p>
           </section>
         </div>
         {plotted && verdict && (
@@ -223,15 +220,7 @@ export function TensionSweepDialog({ operation, onClose }: { operation: Operatio
               </button>
             </header>
             <div className="sweep-plot-body">
-              <SweepCurve joint={plotted} v={verdict.joints[plotted]} />
-              <p className="setup-copy dim">
-                Friction (solid, accent) is (I flex − I extend) / 2 at each step of the travel; static load (thin) is
-                (I flex + I extend) / 2. Dashed: the reference hand. Shaded: where this hand departs from the reference by
-                more than the tolerance{verdict.joints[plotted].tol_ma != null ? ` (${verdict.joints[plotted].tol_ma} mA)` : ''}.
-                {verdict.joints[plotted].stretches.length
-                  ? ` ${stretchText(verdict.joints[plotted])}.`
-                  : ' No stretch departs.'}
-              </p>
+              <SweepCurve joint={plotted} v={verdict.joints[plotted]} legend />
             </div>
           </div>
         )}

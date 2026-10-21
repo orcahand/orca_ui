@@ -1,11 +1,11 @@
-"""Named motor-travel baselines for one hand (``travel_baselines.yaml``).
+"""Named motor-travel baselines (the ``travel_baselines`` section of setup.yaml).
 
 orca_core keeps a single ``calibration.yaml`` per hand, so each calibration
 overwrites the last. This module snapshots every run beside it and lets the
 operator promote one snapshot to a named ground truth (``GT_01`` ...) that
 guided tensioning scores against instead of the shared v2.1 baseline.
 
-File layout, beside the hand's calibration.yaml::
+Section layout::
 
     active: GT_01
     snapshots:
@@ -23,19 +23,14 @@ File layout, beside the hand's calibration.yaml::
 from __future__ import annotations
 
 import math
-import os
 import re
 from datetime import datetime, timezone
 
-from orca_core.utils.utils import read_yaml, write_yaml_atomic
+from orca_core.maintenance.setup_file import read_section, write_section
 
-BASELINES_FILE = "travel_baselines.yaml"
+SECTION = "travel_baselines"
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$")
 SOURCES = ("manual", "auto", "import")
-
-
-def baselines_path(config) -> str:
-    return os.path.join(os.path.dirname(config.calibration_path), BASELINES_FILE)
 
 
 def _now() -> str:
@@ -43,7 +38,7 @@ def _now() -> str:
 
 
 def _load(config) -> dict:
-    data = read_yaml(baselines_path(config)) or {}
+    data = read_section(config, SECTION, legacy="travel_baselines.yaml") or {}
     if not isinstance(data, dict):
         data = {}
     data.setdefault("active", None)
@@ -53,7 +48,7 @@ def _load(config) -> dict:
 
 
 def _save(config, data: dict) -> None:
-    write_yaml_atomic(baselines_path(config), data)
+    write_section(config, SECTION, data)
 
 
 def travel_from_calibration(config, calibration) -> dict[str, float]:

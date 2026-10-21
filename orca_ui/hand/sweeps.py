@@ -1,4 +1,4 @@
-"""Named tension sweeps for one hand (``tension_sweeps.yaml``).
+"""Named tension sweeps (the ``tension_sweeps`` section of setup.yaml).
 
 Each run of the tension sweep (the current every motor draws walking its joint
 limit to limit and back) is saved under a name such as ``GT_sweep_00`` beside
@@ -10,13 +10,14 @@ than the reference and where a dead band after the reversal shows slack.
 
 from __future__ import annotations
 
-import os
 import re
 from datetime import datetime, timezone
 
-from orca_core.utils.utils import read_yaml, write_yaml_atomic
+from orca_core.maintenance.setup_file import read_section, write_section
 
-SWEEPS_FILE = "tension_sweeps.yaml"
+from orca_ui.hand import reference as shipped_reference
+
+SECTION = "tension_sweeps"
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$")
 DEFAULT_PREFIX = "GT_sweep_"
 # Scoring is by curves along the travel, not by one number: from the out-and-
@@ -31,11 +32,12 @@ TOL_MA = 8.0
 TOL_SHARE = 0.15
 # A departure shorter than this many bins (10 % of the travel) is noise, not a stretch.
 MIN_STRETCH_BINS = 2
-# The joint's status comes from its mean friction as a share of the reference's,
-# the same bands as the tension check: 90-110 % ok, 70-90 % under (yellow),
-# below 70 % low (red), above 110 % over (grey, tighter, left alone). A
-# reference under FLOOR_MA of friction has no usable share: then within TOL_MA is ok.
-LOW = 0.7
+# The joint's status comes from its mean friction as a share of the reference's:
+# 90-110 % ok, below 90 % under (yellow, no click: the hand can explain it),
+# below LOW low (red: the clicks start there), above 110 % over (grey,
+# tighter, left alone). A reference under FLOOR_MA of friction has no usable
+# share: then within TOL_MA is ok, and below it is under, never a click.
+LOW = shipped_reference.CLICK_BELOW_SHARE
 UNDER = 0.9
 OVER = 1.1
 FLOOR_MA = 15.0
@@ -44,12 +46,8 @@ RANK = {"none": 0, "over": 1, "ok": 2, "under": 3, "slack": 4, "low": 5}
 SLACK_DEG = 8.0
 
 
-def sweeps_path(config) -> str:
-    return os.path.join(os.path.dirname(config.calibration_path), SWEEPS_FILE)
-
-
 def _load(config) -> dict:
-    data = read_yaml(sweeps_path(config)) or {}
+    data = read_section(config, SECTION, legacy="tension_sweeps.yaml") or {}
     if not isinstance(data, dict):
         data = {}
     data.setdefault("sweeps", {})
@@ -100,7 +98,7 @@ def save(
         "note": note,
         **report,
     }
-    write_yaml_atomic(sweeps_path(config), data)
+    write_section(config, SECTION, data)
     return name
 
 
@@ -109,15 +107,19 @@ def set_reference(config, name: str | None) -> None:
     if name is not None and name not in data["sweeps"]:
         raise KeyError(f"no sweep dataset named {name!r}")
     data["reference"] = name
-    write_yaml_atomic(sweeps_path(config), data)
+    write_section(config, SECTION, data)
 
 
-def reference(config) -> tuple[str, dict] | None:
+def reference(config, family: str | None) -> tuple[str, dict] | None:
+    """(name, dataset) the hand's sweeps are scored against: the saved sweep
+    marked as reference, else the shipped one for the motor ``family`` (a
+    dataset that carries ``curves`` instead of ``results``)."""
     data = _load(config)
     name = data.get("reference")
     if name and name in data["sweeps"]:
         return name, data["sweeps"][name]
-    return None
+    shipped = shipped_reference.sweep(config, family)
+    return (shipped["name"], shipped) if shipped else None
 
 
 def for_hand(config, hand_key: str | None) -> list[tuple[str, dict]]:
@@ -225,12 +227,12 @@ def compare(results: list[dict], ref: dict | None) -> dict:
     static and friction curves (mine and the reference's), their mean
     difference in mA, the stretches of the travel that depart, the friction
     ``share`` of the reference, and a status by that share: ``ok`` (90-110 %),
-    ``under`` (70-90 %), ``low`` (below 70 %), ``over`` (above 110 %, tighter,
+    ``under`` (below 90 %), ``low`` (below 40 %, where clicks start), ``over`` (above 110 %, tighter,
     left alone), ``slack`` (dead band wider by SLACK_DEG), or ``none`` without
     a reference.
     """
     mine = curves(results)
-    theirs = curves(ref.get("results") or []) if ref else {}
+    theirs = (ref.get("curves") or curves(ref.get("results") or [])) if ref else {}
     joints: dict[str, dict] = {}
     for joint, curve in mine.items():
         static, friction = decompose(curve)
@@ -266,7 +268,7 @@ def compare(results: list[dict], ref: dict | None) -> dict:
                 share = mine_f / ref_f
             else:
                 # Too little friction in the reference for a share: judge the difference.
-                share = 1.0 if abs(mine_f - ref_f) <= TOL_MA else (LOW - 0.01 if mine_f < ref_f else OVER + 0.01)
+                share = 1.0 if abs(mine_f - ref_f) <= TOL_MA else (UNDER - 0.01 if mine_f < ref_f else OVER + 0.01)
             out["share"] = round(share, 3)
             if share < LOW:
                 out["status"] = "low"
@@ -278,12 +280,28 @@ def compare(results: list[dict], ref: dict | None) -> dict:
                 out["status"] = "slack"
             else:
                 out["status"] = "ok"
+            out["clicks"] = _clicks(joint, out["status"], share, curve["deadband_deg"], ref_db)
         joints[joint] = out
     return {"joints": joints, "bands": {"tol_ma": TOL_MA, "tol_share": TOL_SHARE, "bins": BINS, "slack_deg": SLACK_DEG,
                                         "low": LOW, "under": UNDER, "over": OVER}}
 
 
-def state(config) -> dict:
+def _clicks(joint: str, status: str, share: float, deadband: dict, ref_deadband: dict) -> int | None:
+    """Ratchet clicks the joint still needs: from the friction share when it is
+    under, from the extra dead band when only that is wide, 0 otherwise."""
+    if status in ("low", "under"):
+        return shipped_reference.clicks_for_share(share, joint)
+    if status == "slack":
+        extra = max(
+            (deadband[k] - ref_deadband[k] for k in SENSES
+             if deadband.get(k) is not None and ref_deadband.get(k) is not None),
+            default=0.0,
+        )
+        return shipped_reference.clicks_for_slack(extra, joint)
+    return 0
+
+
+def state(config, family: str | None) -> dict:
     data = _load(config)
     # Curves are large; the listing carries the levels, the full dataset is read by name.
     return {
@@ -291,7 +309,8 @@ def state(config) -> dict:
             n: {k: v for k, v in s.items() if k != "results"} | {"levels": levels(s.get("results") or [])}
             for n, s in sorted(data["sweeps"].items(), key=lambda kv: kv[1].get("recorded_at", ""), reverse=True)
         },
-        "reference": data["reference"] if data["reference"] in data["sweeps"] else None,
+        "reference": (reference(config, family) or (None,))[0],
+        "reference_shipped": data["reference"] not in data["sweeps"],
         "next_name": next_name(config),
     }
 

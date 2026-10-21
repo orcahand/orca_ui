@@ -23,7 +23,6 @@ const OPERATION_LABELS: Record<string, string> = {
   wizard: 'full setup',
   guided_tension: 'guided tensioning',
   slack_test: 'slack test',
-  tension_probe: 'breakaway probe',
   tension_sweep: 'tension sweep',
   run_in: 'run-in',
 }

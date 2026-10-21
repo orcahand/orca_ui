@@ -12,7 +12,6 @@ const PORTS=[
  {id:'usb',name:'USB-C data',boxes:[[898,285,155,190]],text:'Connect the computer with a USB-C data cable when the setup step asks for it.'},
  {id:'power',name:'12 V input',boxes:[[710,500,225,330]],text:'Connect the specified 12 V supply here. Keep the board switch off while changing any connections.'},
  {id:'switch',name:'Power switch',boxes:[[495,520,220,305]],text:'Set the rocker to 0 (off) before adding or removing cables. I is the on position.'},
- {id:'probe',name:'Programming pads',boxes:[[814,174,98,75]],text:'The six small gold pads are the Tag-Connect programming contact. They are used when flashing a new board.'},
 ] as const
 
 export function BoardIdentification({build}:{build:Build}){

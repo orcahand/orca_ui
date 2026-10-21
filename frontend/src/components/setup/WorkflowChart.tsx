@@ -21,7 +21,6 @@ import {
 const STEP_OF_OPERATION: Record<string, string> = {
   tension: 'ratchet',
   guided_tension: 'move',
-  tension_probe: 'check',
   slack_test: 'slack',
   calibrate: 'calibrate',
   tension_sweep: 'measure',
@@ -29,13 +28,15 @@ const STEP_OF_OPERATION: Record<string, string> = {
 }
 
 // Chart geometry in SVG units.
-const BOX_W = 170
+const BOX_W = 200
 const BOX_H = 54
-const COL = 230
+// Wide enough between boxes for an arrow's label.
+const COL = 300
 const ROW = 118
 const PAD_X = 20
-const PAD_Y = 22
-const COLS = 4
+// Room above the first row for a loop's label.
+const PAD_Y = 36
+const COLS = 3
 const ROWS = 3
 const WIDTH = PAD_X * 2 + (COLS - 1) * COL + BOX_W
 const HEIGHT = PAD_Y * 2 + (ROWS - 1) * ROW + BOX_H
@@ -52,12 +53,9 @@ export function WorkflowChart() {
   const operation = useOperationStore((s) => s.operation)
   const runningKey =
     operation && (operation.state === 'running' || operation.state === 'awaiting_input')
-      ? (operation.kind === 'guided_tension' &&
-        ['check', 'check_pose'].includes(String((operation.extra as { step?: string } | null)?.step))
-          ? 'check'
-          : operation.kind === 'guided_tension' && (operation.extra as { step?: string } | null)?.step === 'tension'
-            ? (operation.params?.ratchet_joints ? 'again' : 'ratchet')
-            : STEP_OF_OPERATION[operation.kind]) ?? null
+      ? (operation.kind === 'guided_tension' && (operation.extra as { step?: string } | null)?.step === 'tension'
+          ? (operation.params?.ratchet_joints ? 'again' : 'ratchet')
+          : STEP_OF_OPERATION[operation.kind]) ?? null
       : null
   const current = selected ? (steps.find((s) => s.key === selected) ?? null) : null
   const byKey = Object.fromEntries(steps.map((s) => [s.key, s]))
@@ -80,6 +78,7 @@ export function WorkflowChart() {
     let d = ''
     let lx = 0
     let ly = 0
+    let anchor: 'start' | 'middle' = 'middle'
     if (a.kind === 'next') {
       const y = from.y + BOX_H / 2
       d = `M ${from.x + BOX_W} ${y} L ${to.x - 6} ${y}`
@@ -95,6 +94,7 @@ export function WorkflowChart() {
         : `M ${x1} ${from.y + BOX_H} L ${x1} ${yMid} L ${x2} ${yMid} L ${x2} ${to.y - 6}`
       lx = sameCol ? x1 + 8 : (x1 + x2) / 2
       ly = sameCol ? yMid + 4 : yMid - 6
+      anchor = sameCol ? 'start' : 'middle'
     } else {
       // Loop back along the top edge when on one row, along the bottom when it climbs.
       const sameRow = from.y === to.y
@@ -118,7 +118,7 @@ export function WorkflowChart() {
       <g key={i} className={`wf-arrow ${a.kind}`}>
         <path d={d} markerEnd="url(#wf-head)" />
         {a.label && (
-          <text x={lx} y={ly} textAnchor="middle">
+          <text x={lx} y={ly} textAnchor={anchor}>
             {a.label}
           </text>
         )}

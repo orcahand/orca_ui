@@ -1,8 +1,8 @@
 // Step 2, in three parts: the calibration itself, automatic or by hand (the
-// whole hand, or a subset picked in the settings drawer), the tension
-// measurement that compares the hand with the reference sweep, and, when that
-// flags a tendon, tensioning those motors again before calibrating and
-// measuring once more. The slack test the calibration needs lives in the
+// whole hand, or a subset picked in the settings drawer), the tension sweep
+// that compares the hand with the reference and counts the ratchet clicks
+// still missing, and, when it lists any, tensioning those motors again before
+// calibrating and sweeping once more. The slack test the calibration needs lives in the
 // Tension step; a failed one still blocks calibrating here. Per-joint
 // readiness shows as a row of dots, the joint name on hover.
 
@@ -18,9 +18,9 @@ import {
 import { FlowProgress, FlowRunning, FlowStep, type StepState } from './FlowStep'
 import { failToBanner } from './setupUtils'
 import { CalibrationRecords, SnapshotPromoter, TravelCheck, SlackEstimate } from './TravelBaselines'
-import { PROBE_HINT, SWEEP_HINT, startGuidedTension, startTensionProbe, startTensionSweep } from './probeStart'
+import { SWEEP_HINT, startGuidedTension, startTensionSweep } from './probeStart'
 import type { SetupVariant } from '../../state/setupVariant'
-import { SWEEP_REPEAT_CHOICES, useTensionFlow, type ProbePose } from '../../state/tensionFlow'
+import { SWEEP_REPEAT_CHOICES, useTensionFlow } from '../../state/tensionFlow'
 import { shortDate } from './setupUtils'
 
 const GROUP_ORDER = ['wrist', 'thumb', 'index', 'middle', 'ring', 'pinky']
@@ -127,19 +127,17 @@ export function CalibrateStep({ state, variant }: { state: StepState; variant: S
   const slackTest = handInfo?.slack_test ?? null
   const slackBlock = slackTest?.block ?? null
   const sweep = handInfo?.tension_sweep ?? null
-  const probePose = useTensionFlow((s) => s.probePose)
-  const setProbePose = useTensionFlow((s) => s.setProbePose)
   const sweepRepeats = useTensionFlow((s) => s.sweepRepeats)
   const setSweepRepeats = useTensionFlow((s) => s.setSweepRepeats)
   const runNote = useTensionFlow((s) => s.runNote)
   const setRunNote = useTensionFlow((s) => s.setRunNote)
   const calibState = slackBlock ? 'warn' : calibrated ? 'done' : 'next'
   const sweepState = sweep?.latest ? 'done' : calibrated ? 'next' : 'todo'
-  // Tendons the newest measurement found looser than the reference, with their
-  // friction as a share of the reference's (what the ratchet list shows).
+  // Tendons the newest sweep says need clicks, with their friction as a share
+  // of the reference's and the click count.
   const loose = Object.entries(sweep?.verdict ?? {})
-    .filter(([, v]) => v.status === 'under' || v.status === 'low')
-    .map(([joint, v]) => [joint, v.share != null ? Math.round(v.share * 100) : null] as const)
+    .filter(([, v]) => (v.clicks ?? 0) > 0)
+    .map(([joint, v]) => [joint, { pct: v.share != null ? Math.round(v.share * 100) : null, clicks: v.clicks ?? null }] as const)
   const againState = loose.length ? 'next' : sweep?.latest ? 'done' : 'todo'
   const tensionAgain = () =>
     void startGuidedTension({ ratchet_joints: Object.fromEntries(loose), start_at: 'tension' }).catch(failToBanner)
@@ -257,28 +255,6 @@ export function CalibrateStep({ state, variant }: { state: StepState; variant: S
           </label>
         )}
       </div>
-      <div className="flow-row">
-        <button
-          className="btn btn-secondary"
-          disabled={gate.blocked}
-          title={gate.reason ?? PROBE_HINT}
-          onClick={() => void startTensionProbe().catch(failToBanner)}
-        >
-          Breakaway probe
-        </button>
-        <label
-          className="flow-field"
-          title="Where the probe starts: mid-range keeps every joint clear of its limits, so no side is skipped"
-        >
-          <span>from</span>
-          <select value={probePose} onChange={(e) => setProbePose(e.target.value as ProbePose)}>
-            <option value="mid">mid-range</option>
-            <option value="neutral">neutral pose</option>
-            <option value="hold">where it stands</option>
-          </select>
-        </label>
-        <span className="flow-detail">the current each tendon needs to start moving, saved as GT_tension_NN</span>
-      </div>
       <CalibrationRecords />
       {kai && (
         <>
@@ -348,9 +324,9 @@ export function CalibrateStep({ state, variant }: { state: StepState; variant: S
               <div className="calib-step-title">Tension sweep</div>
               <div className="calib-step-note">
                 {sweep?.latest
-                  ? `${sweep.latest}${sweep.latest_at ? ` · ${shortDate(sweep.latest_at)}` : ''}${sweep.reference ? ` · vs ${sweep.reference}` : ' · no reference set'}`
+                  ? `${sweep.latest}${sweep.latest_at ? ` · ${shortDate(sweep.latest_at)}` : ''}${sweep.reference ? ` · vs ${sweep.reference}` : ' · no reference for this motor family'}`
                   : calibrated
-                    ? `friction and static load along every joint's travel, vs the reference curves${sweep?.reference ? ` (${sweep.reference})` : ''}`
+                    ? `friction along every joint's travel vs the reference curves${sweep?.reference ? ` (${sweep.reference})` : ''}; counts the clicks still missing`
                     : 'needs a calibrated hand'}
               </div>
             </span>
@@ -385,9 +361,9 @@ export function CalibrateStep({ state, variant }: { state: StepState; variant: S
               <div className="calib-step-title">Tension again</div>
               <div className="calib-step-note">
                 {loose.length
-                  ? `${loose.map(([j, pct]) => `${j.replace('_', ' ')}${pct != null ? ` ${pct} %` : ''}`).join(', ')} · ratchet, then calibrate and sweep again`
+                  ? `${loose.map(([j, r]) => `${j.replace('_', ' ')}${r.clicks ? ` ~${r.clicks} click${r.clicks === 1 ? '' : 's'}` : r.pct != null ? ` ${r.pct} %` : ''}`).join(', ')} · ratchet, then calibrate and sweep again`
                   : sweep?.latest && sweep.reference
-                    ? 'every tendon within the band — go on to Run'
+                    ? 'no clicks needed — go on to Run'
                     : 'only if the measurement flags a tendon'}
               </div>
             </span>

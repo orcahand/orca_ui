@@ -14,11 +14,12 @@ export const PASS_GROUPS: { key: PassGroup; label: string; hint: string }[] = [
   { key: 'pip', label: 'PIPs', hint: 'PIPs + thumb dip' },
 ]
 export const PASS_BOUNDS_PCT = [10, 100] as const
-export const DEFAULT_PASS: PassFractions = { ap: 0.85, mcp: 0.85, pip: 0.85 }
+export const DEFAULT_PASS: PassFractions = { ap: 0.8, mcp: 0.8, pip: 0.8 }
 export const PASS_BOUNDS_DEG = [0.5, 30] as const
 export const DEFAULT_PASS_SLACK: PassSlack = { ap: 3, mcp: 5, pip: 5 }
 
-const PASS_KEY = 'orca.guidedTension.passFractions'
+// The pass is 80 % of the reference hand's travel.
+const PASS_KEY = 'orca.guidedTension.passFractions.v2'
 const SLACK_KEY = 'orca.guidedTension.passSlackDeg'
 
 // Mirrors joint_group() in orca_ui/hand/operations/guided_tension.py.

@@ -16,45 +16,33 @@ export interface WorkflowStep {
   todo: string
 }
 
-export const WORKFLOW_VERSION = 2
+export const WORKFLOW_VERSION = 4
 export const WORKFLOW_KEY = `orca.setup.workflow.v${WORKFLOW_VERSION}`
 
 export const DEFAULT_WORKFLOW: WorkflowStep[] = [
   {
     key: 'slack',
     title: 'Slack test',
-    note: 'half a turn each way',
+    note: 'hold each joint',
     color: '#64748b',
     what:
-      'Every finger motor winds up to half a turn in each direction at a current too low to move a tensioned joint. The degrees a spool turns before it stalls are its slack.',
+      'You hold one joint at a time so it cannot move while its motor winds each way at low current. Everything the spool turns before the tendons go taut is slack, shown in motor degrees and as ratchet clicks.',
     why:
-      'A spool that completes the half turn has nothing holding it: tensioning and calibrating would unspool the tendon. The hand is blocked until it passes; everything else starts from a passed slack test.',
+      'A joint with more than half a turn of slack would unspool its tendon when calibrated, so the hand is blocked until it passes. The click counts say how much the ratchet has to take up before the tendons are even taut.',
     todo:
-      'Passed (no spool ran the half turn): move on to the tension check. A spool that completed the half turn has no tension left to ratchet against: unmount that top spool and reattach it with more inherent tension in the system, as the assembly manual describes, then run the slack test again.',
-  },
-  {
-    key: 'check',
-    title: 'Tension check',
-    note: 'pose, then probe',
-    color: '#a78bfa',
-    what:
-      'Torque off, you bring the hand to the mid-range pose shown. Then the joints of one group ramp their motor current together until they move, both directions, each motor driven back in between. One pass, compared with the reference hand.',
-    why:
-      'Runs without a calibration, so it fits between rounds. 90–110 % of the reference is green, 70–90 % yellow (ratchet it), under 70 % red (loose), over 110 % grey: tighter than the reference and left alone. The exact check is the sweep after calibration.',
-    todo:
-      'Green on every tendon: go on to calibrate. Yellow and red tendons: press Continue to tensioning and ratchet them by the clicks listed. Grey tendons are tighter than the reference; leave them, the sweep after calibration decides.',
+      'Passed: go on to tensioning, the clicks shown are the minimum per joint. Failed: ratchet out the clicks listed, or unmount the top spool and reattach it with more inherent tension as the assembly manual describes, then test again.',
   },
   {
     key: 'ratchet',
     title: 'Ratchet',
-    note: 'the listed spools, x clicks',
+    note: 'the listed spools, ~x clicks',
     color: '#f59e0b',
     what:
-      'The motors turn counterclockwise and hold at the tension current. The dialog lists the tendons the check found loose, loosest first, with the clicks each needs; you turn those top spools and press Done.',
+      'The motors turn counterclockwise and hold at the tension current. The dialog lists the joints still short of their travel, each with the clicks that missing travel needs, rounded down.',
     why:
-      'Ratcheting only what the check flagged, by a known number of clicks, keeps the hand from being over-tensioned joint by joint.',
+      'Rounding down keeps every round a little loose. Clicks only ever add tension, so it is safer to stop short and let the sweep after calibration count the last ones.',
     todo:
-      'Hulls off. Turn the listed top spools clockwise by the clicks shown, stop as soon as the tendon feels firm, then press Done. The fingers get moved next.',
+      'Hulls off. Turn the listed top spools clockwise by the clicks shown, stop early if a tendon feels firm, then press Done. The fingers get moved next.',
   },
   {
     key: 'move',
@@ -62,11 +50,11 @@ export const DEFAULT_WORKFLOW: WorkflowStep[] = [
     note: 'range check, finger by finger',
     color: '#22d3ee',
     what:
-      'One finger at a time: the motors hold a pose, you drive the finger through its whole range by hand, the console scores how far each spool followed. Then the tension check and the ratchet again, until the check is green.',
+      'One finger at a time: the motors hold a pose, you drive the finger through its whole range by hand, and the console scores how much of the expected motor travel each spool followed.',
     why:
-      'Moving the fingers seats the tendons after the ratchet; the score and the next check show what the clicks changed.',
+      'A spool that follows only part of the travel still has slack: the missing travel, in motor degrees, is what the next ratchet round takes up.',
     todo:
-      'Pose the finger like the model, press Continue, drive it by hand through its whole range to both ends, then Next. After the last finger the tension check runs again.',
+      'Pose the finger like the model, press Continue, drive it by hand to both ends, then Next. Joints short of their target go back to the ratchet; when every joint passes, calibrate.',
   },
   {
     key: 'calibrate',
@@ -76,33 +64,31 @@ export const DEFAULT_WORKFLOW: WorkflowStep[] = [
     what:
       'Automatic: the motors drive every joint to both hard stops and record the motor positions there. Manual: torque off, you hold each joint on its stops and press Enter.',
     why:
-      'Tensioning changes the tendon lengths, so the limits must be measured after it. Everything that follows runs between these limits.',
+      'Tensioning changes the tendon lengths, so the limits must be measured after it. The sweep runs between these limits.',
     todo:
-      'Keep clear while the motors drive to the stops (automatic). For a manual calibration hold each joint on its stops by hand and press Enter per step. Then measure the tension.',
+      'Keep clear while the motors drive to the stops (automatic). For a manual calibration hold each joint on its stops by hand and press Enter per step. Then run the tension sweep.',
   },
   {
     key: 'measure',
     title: 'Tension sweep',
-    note: 'limit to limit, current recorded',
+    note: 'limit to limit, clicks counted',
     color: '#0ea5e9',
     what:
-      'Collision-free groups of joints are driven slowly from one calibrated limit to the other and back while each motor current is recorded, the thumb parked away from the fingers. The mean over the middle of the travel is the tendon load, compared with the reference sweep per joint and side.',
+      'The joints of one kind are driven slowly from one calibrated limit to the other and back while each motor current is recorded. The friction along the travel is compared with the reference hand, and a joint below 40 % of it gets the clicks that bring it back, at about 60 % of the reference per click.',
     why:
-      'This is the exact tension measurement: more than 20 % off the reference is red, 10 to 20 % yellow, closer green. A tendon still low goes back to the ratchet, then calibrate and measure again.',
+      'This is the only tension measurement: friction while moving rises with tension and is not swamped by the gearbox. Differences up to 60 % can be the hand rather than the tension, so only joints below 40 % get clicks, rounded so they never go past 110 % of the reference. No click needed means well tensioned.',
     todo:
-      'Keep clear of the hand. All green: go on to Run. A tendon low or under: press Tension again, ratchet it, then calibrate and measure once more.',
+      'Keep clear of the hand. Nothing listed: go on to Run. Joints listed: press Tension again, ratchet them by the clicks shown, then calibrate and sweep once more.',
   },
   {
     key: 'again',
     title: 'Tension again',
-    note: 'only if flagged',
+    note: 'only the listed clicks',
     color: '#f59e0b',
-    what:
-      'Guided tensioning opens at the ratchet step with the tendons the measurement found low. After the clicks the hand is calibrated and measured once more.',
+    what: 'Guided tensioning opens at the ratchet step with the joints the sweep listed and the clicks each needs.',
     why:
-      'The measurement is only valid between fresh limits, so every ratchet after a calibration needs a new calibration and a new measurement.',
-    todo:
-      'Ratchet the listed spools by the clicks shown, press Done, then calibrate again and measure again.',
+      'Each click shifts the spool against the motor, so the limits and the sweep are only valid after a fresh calibration.',
+    todo: 'Ratchet the listed spools by the clicks shown, press Done, then calibrate and sweep again.',
   },
   {
     key: 'run',
@@ -116,35 +102,33 @@ export const DEFAULT_WORKFLOW: WorkflowStep[] = [
   },
 ]
 
-// Where each box sits on the chart (column, row): the tensioning loop on the
-// first row, the calibration loop on the second, Run at the end.
+// Where each box sits on the chart (column, row): tensioning on the first row,
+// the calibration loop on the second, Run at its end.
 export const WORKFLOW_LAYOUT: Record<string, [col: number, row: number]> = {
   slack: [0, 0],
-  check: [1, 0],
-  ratchet: [2, 0],
-  move: [3, 0],
-  calibrate: [1, 1],
-  measure: [2, 1],
-  run: [3, 1],
-  again: [2, 2],
+  ratchet: [1, 0],
+  move: [2, 0],
+  calibrate: [0, 1],
+  measure: [1, 1],
+  run: [2, 1],
+  again: [1, 2],
 }
 // Arrows: from → to, with the condition on the arrow.
 export const WORKFLOW_ARROWS: { from: string; to: string; label?: string; kind: 'next' | 'loop' | 'down' }[] = [
-  { from: 'slack', to: 'check', label: 'passed', kind: 'next' },
-  { from: 'check', to: 'ratchet', label: 'yellow tendons', kind: 'next' },
+  { from: 'slack', to: 'ratchet', label: 'passed', kind: 'next' },
   { from: 'ratchet', to: 'move', kind: 'next' },
-  { from: 'move', to: 'check', label: 'check again', kind: 'loop' },
-  { from: 'check', to: 'calibrate', label: 'all green', kind: 'down' },
+  { from: 'move', to: 'ratchet', label: 'joints short', kind: 'loop' },
+  { from: 'move', to: 'calibrate', label: 'every joint passed', kind: 'down' },
   { from: 'calibrate', to: 'measure', kind: 'next' },
-  { from: 'measure', to: 'run', label: 'all green', kind: 'next' },
-  { from: 'measure', to: 'again', label: 'a tendon low', kind: 'down' },
-  { from: 'again', to: 'calibrate', label: 'calibrate and measure again', kind: 'loop' },
+  { from: 'measure', to: 'run', label: 'no clicks left', kind: 'next' },
+  { from: 'measure', to: 'again', label: 'clicks listed', kind: 'down' },
+  { from: 'again', to: 'calibrate', label: 'calibrate and sweep again', kind: 'loop' },
 ]
 
 // Steps that loop back, with what ends the loop.
 export const WORKFLOW_LOOPS: { from: string; to: string; label: string }[] = [
-  { from: 'move', to: 'check', label: 'until the check is green' },
-  { from: 'again', to: 'calibrate', label: 'calibrate and measure again' },
+  { from: 'move', to: 'ratchet', label: 'until every joint passes' },
+  { from: 'again', to: 'calibrate', label: 'calibrate and sweep again' },
 ]
 
 export function loadWorkflow(): WorkflowStep[] {

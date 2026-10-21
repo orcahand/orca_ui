@@ -1,17 +1,16 @@
-"""Slack test operation: wind every finger motor half a turn each way at a
-current too low to move a tensioned joint, and read the slack off how far each
-one got.
+"""Slack test operation: the operator holds one finger joint at a time while
+its motor winds each way at low current; the free rotation is the slack.
 
-Runs orca_core's run_slack_test under the maintenance lease. The report is
-kept beside the hand's calibration (slack_tests.yaml); a motor that completed
-the half turn blocks calibration until the hand is tensioned and tested again.
-Live angles stream through the snapshot ``extra`` (SlackTestExtra).
+Runs orca_core's run_slack_test under the maintenance lease, asking for each
+joint through ``ctx.wait_input`` (hold, then Test or Skip). The report is kept
+in the hand's setup.yaml (slack_tests); a joint with more than half
+a turn of slack blocks calibration until the hand is tensioned and tested
+again. Live angles stream through the snapshot ``extra`` (SlackTestExtra).
 """
 
 from __future__ import annotations
 
 import logging
-import random
 import threading
 import time
 
@@ -22,10 +21,15 @@ logger = logging.getLogger(__name__)
 
 PUBLISH_PERIOD_S = 0.1
 SETTING_BOUNDS = {
-    "current_ma": (5.0, 100.0),
-    "max_turn_deg": (30.0, 180.0),
-    "slack_tolerance_deg": (0.0, 90.0),
+    "current_ma": (20.0, 150.0),
+    "max_free_deg": (30.0, 180.0),
 }
+HOLD_TEST = "Test"
+HOLD_SKIP = "Skip"
+
+
+def hold_prompt(joint: str) -> str:
+    return f"Hold {joint.replace('_', ' ')} still so the joint cannot move, then test"
 
 
 def validate_slack_params(service, params: dict) -> dict:
@@ -68,9 +72,10 @@ class _Presenter:
         self._last = 0.0
         self.extra: dict = {
             "step": "starting",
+            "joint": None,
             "direction": None,
             "joints": [],
-            "live": {},
+            "live": None,
             "results": {},
             "blocked": False,
         }
@@ -80,7 +85,16 @@ class _Presenter:
         if not force and now - self._last < PUBLISH_PERIOD_S:
             return
         self._last = now
-        self._ctx.set_extra({**self.extra, "live": dict(self.extra["live"]), "results": dict(self.extra["results"])})
+        self._ctx.set_extra({**self.extra, "results": dict(self.extra["results"])})
+
+    def hold(self, joint: str) -> bool:
+        """Park on the hold prompt for ``joint``; False when the operator skips it."""
+        with self._lock:
+            self.extra.update(step="hold", joint=joint, direction=None, live=None)
+            self._publish()
+        self._ctx.set_phase("hold", detail=f"torque off — hold {joint.replace('_', ' ')}")
+        answer = self._ctx.wait_input(hold_prompt(joint), [HOLD_TEST, HOLD_SKIP])
+        return answer != HOLD_SKIP
 
     def progress(self, event: dict) -> None:
         kind = event.get("event")
@@ -91,31 +105,29 @@ class _Presenter:
                     j: {"motor": m, "plus_deg": None, "minus_deg": None, "status": None}
                     for j, m in zip(event["joints"], event["motors"])
                 }
-                self._ctx.log(f"slack test on {len(event['joints'])} motors, both directions")
+                self._ctx.log(f"slack test on {len(event['joints'])} joints, one at a time, joint held")
                 self._publish()
+            elif kind == "slack_joint":
+                total = len(self.extra["joints"]) or 1
+                self._ctx.set_progress(event["index"] / total)
             elif kind == "slack_phase":
-                self.extra.update(direction=event["direction"], live={})
+                self.extra.update(step="testing", joint=event["joint"], direction=event["direction"], live=0.0)
                 self._ctx.set_phase(
                     "testing",
-                    progress=0.0 if event["direction"] > 0 else 0.5,
-                    detail=f"winding {'positive' if event['direction'] > 0 else 'negative'} at low current",
+                    detail=f"{event['joint'].replace('_', ' ')}: winding toward {event['sense']}",
                 )
                 self._publish()
             elif kind == "slack_sample":
-                self.extra["live"] = dict(event["deg"])
+                self.extra["live"] = event["deg"]
                 self._publish(force=False)
-            elif kind == "slack_phase_done":
-                key = "plus_deg" if event["direction"] > 0 else "minus_deg"
-                for joint, deg in event["deg"].items():
-                    row = self.extra["results"].setdefault(joint, {})
-                    row[key] = deg
-                    row[key.replace("_deg", "_capped")] = bool(event["capped"].get(joint))
-                capped = [j for j, c in event["capped"].items() if c]
-                moved = [f"{j} {d:.0f}°" for j, d in event["deg"].items() if d >= 1.0 and j not in capped]
+            elif kind == "slack_joint_done":
+                r = event["result"]
+                self.extra["results"][r["joint"]] = _row(r, self._ctx.service.supervisor.config)
+                self.extra.update(direction=None, live=None)
                 self._ctx.log(
-                    f"{'positive' if event['direction'] > 0 else 'negative'}: "
-                    + (", ".join(moved) if moved else "nothing turned")
-                    + (f"; half a turn on {', '.join(capped)}" if capped else "")
+                    f"{r['joint']}: skipped" if r["status"] == "skipped"
+                    else f"{r['joint']}: {r['total_deg']:.0f}° free ({r['plus_deg']:.0f} + {r['minus_deg']:.0f})"
+                    + (" — too slack" if r["status"] == "fail" else "")
                 )
                 self._publish()
             elif kind == "cleanup_failed":
@@ -124,20 +136,33 @@ class _Presenter:
     def finish(self, report: dict, saved: str | None) -> None:
         with self._lock:
             for r in report["results"]:
-                self.extra["results"][r["joint"]] = {
-                    "motor": r["motor_id"],
-                    "plus_deg": r["plus_deg"],
-                    "minus_deg": r["minus_deg"],
-                    "plus_capped": r["plus_capped"],
-                    "minus_capped": r["minus_capped"],
-                    "plus_sense": r["plus_sense"],
-                    "minus_sense": r["minus_sense"],
-                    "total_deg": r["total_deg"],
-                    "status": r["status"],
-                }
-            self.extra.update(step="done", direction=None, live={}, blocked=report["blocked"],
-                              settings=report["settings"], saved=saved)
+                self.extra["results"][r["joint"]] = _row(r, self._ctx.service.supervisor.config)
+            self.extra.update(step="done", joint=None, direction=None, live=None, blocked=report["blocked"],
+                              settings=report["settings"], saved=saved, deg_per_click=_deg_per_click())
             self._publish()
+
+
+def _row(r: dict, config) -> dict:
+    from orca_ui.hand import reference
+
+    skipped = r["status"] == "skipped"
+    return {
+        "clicks": None if skipped else reference.clicks_for_slack(r["total_deg"], r["joint"]),
+        "ref_deg": reference.slack(config, None).get(r["joint"]),
+        "motor": r["motor_id"],
+        "plus_deg": r["plus_deg"],
+        "minus_deg": r["minus_deg"],
+        "plus_sense": r["plus_sense"],
+        "minus_sense": r["minus_sense"],
+        "total_deg": r["total_deg"],
+        "status": r["status"],
+    }
+
+
+def _deg_per_click() -> float | None:
+    from orca_ui.hand import reference
+
+    return reference.deg_per_click()
 
 
 def _save(ctx: OpContext, config, report: dict, family: str | None) -> str | None:
@@ -166,8 +191,7 @@ class SlackTestOperation(Operation):
         return validate_slack_params(service, params)
 
     def run(self, ctx: OpContext) -> dict:
-        from orca_ui.hand.operations.tension_probe import hand_family
-
+        
         supervisor = ctx.service.supervisor
         ctx.set_phase("acquiring", detail="taking the hand into maintenance")
         lease = supervisor.enter_maintenance(self.kind)
@@ -181,11 +205,12 @@ class SlackTestOperation(Operation):
                 motor_port=lease.presence.motor_port if lease.presence else None,
             )
             self._hand = hand
-            family = hand_family(hand)
+            family = hand_ops.hand_family(hand)
             report = hand_ops.slack_test(
                 hand,
                 joints=self.params.get("joints"),
                 settings=self.params.get("settings") or {},
+                hold_callback=presenter.hold,
                 progress_callback=presenter.progress,
                 should_stop=ctx.stop_event.is_set,
             )
@@ -206,8 +231,8 @@ class SlackTestOperation(Operation):
 
 
 class SimulatedSlackTestOperation(Operation):
-    """Plays the real event sequence with a synthetic slack per spool; a joint
-    named in ``params["unspool"]`` turns the whole half turn."""
+    """Plays the real event sequence, hold prompts included, with a synthetic
+    slack per spool; a joint named in ``params["unspool"]`` turns past half a turn."""
 
     kind = "slack_test"
 
@@ -231,7 +256,7 @@ class SimulatedSlackTestOperation(Operation):
         try:
             ctx.set_phase("connecting", detail="opening motor-only connection")
             ctx.sleep(self.params["step_duration_s"])
-            report = simulate_slack_test(ctx, supervisor.config, self.params, presenter.progress)
+            report = simulate_slack_test(ctx, supervisor.config, self.params, presenter.hold, presenter.progress)
             saved = _save(ctx, supervisor.config, report, None)
             presenter.finish(report, saved)
             ctx.set_phase("released", detail="torque off, control mode restored")

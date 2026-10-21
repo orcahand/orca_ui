@@ -278,12 +278,13 @@ class SimulatedTensionOperation(Operation):
             supervisor.exit_maintenance()
 
 
-def simulate_slack_test(ctx: OpContext, config, params: dict, progress) -> dict:
-    """Lease-free simulated slack test: every spool turns a little, the joints
-    named in ``params["unspool"]`` the whole half turn."""
+def simulate_slack_test(ctx: OpContext, config, params: dict, hold, progress) -> dict:
+    """Lease-free simulated slack test: each joint is held on prompt and turns a
+    few degrees, the joints named in ``params["unspool"]`` past half a turn."""
+    import dataclasses
     import random
 
-    from orca_core.maintenance.slack_test import SlackTestSettings, SlackResult
+    from orca_core.maintenance.slack_test import FAIL, SlackResult, SlackTestSettings
 
     settings = SlackTestSettings(**(params.get("settings") or {}))
     joints = [j for j in config.joint_ids if j != "wrist" and j in config.joint_to_motor_map]
@@ -291,32 +292,32 @@ def simulate_slack_test(ctx: OpContext, config, params: dict, progress) -> dict:
         joints = [j for j in joints if j in set(params["joints"])]
     motors = [int(config.joint_to_motor_map[j]) for j in joints]
     rng = random.Random(3)
-    slack = {j: rng.uniform(0.0, 3.0) for j in joints}
+    slack = {j: rng.uniform(0.0, 6.0) for j in joints}
     for j in params.get("unspool") or []:
-        slack[j] = settings.max_turn_deg
-    progress({"event": "slack_plan", "joints": joints, "motors": motors, "total": 2,
-              "start_deg": {j: 0.0 for j in joints}})
-    results = {j: SlackResult(j, m) for j, m in zip(joints, motors)}
+        slack[j] = settings.max_free_deg
+    progress({"event": "slack_plan", "joints": joints, "motors": motors})
     step_s = params["step_duration_s"]
-    for direction in (1, -1):
-        sense = {j: "flex" if direction > 0 else "extend" for j in joints}
-        progress({"event": "slack_phase", "direction": direction, "senses": sense})
-        for k in range(1, 6):
-            ctx.check_stop()
-            progress({"event": "slack_sample", "direction": direction,
-                      "deg": {j: round(slack[j] * k / 5, 2) for j in joints}})
-            ctx.sleep(step_s / 5)
-        capped = {j: slack[j] >= settings.max_turn_deg - 5.0 for j in joints}
-        for j in joints:
-            r = results[j]
-            if direction > 0:
-                r.plus_deg, r.plus_capped, r.plus_sense = slack[j], capped[j], sense[j]
-            else:
-                r.minus_deg, r.minus_capped, r.minus_sense = slack[j] * 0.8, capped[j], sense[j]
-        progress({"event": "slack_phase_done", "direction": direction,
-                  "deg": {j: round(slack[j], 2) for j in joints}, "capped": capped})
-    out = [results[j].to_dict(settings) for j in joints]
-    import dataclasses
-
-    return {"joints": joints, "results": out, "blocked": any(r["status"] == "unspool" for r in out),
+    out = []
+    for n, (j, m) in enumerate(zip(joints, motors)):
+        r = SlackResult(j, m)
+        progress({"event": "slack_joint", "joint": j, "motor": m, "index": n})
+        if not hold(j):
+            r.skipped = True
+        else:
+            for direction, sense in ((1, "flex"), (-1, "extend")):
+                progress({"event": "slack_phase", "joint": j, "direction": direction, "sense": sense})
+                for k in range(1, 4):
+                    ctx.check_stop()
+                    progress({"event": "slack_sample", "joint": j, "direction": direction,
+                              "deg": round(slack[j] * k / 3, 2)})
+                    ctx.sleep(step_s / 6)
+                # Like the real test, never wind past the half turn in total.
+                budget = settings.max_free_deg + 5.0 - r.plus_deg
+                if direction > 0:
+                    r.plus_deg, r.plus_sense = min(slack[j], budget), sense
+                else:
+                    r.minus_deg, r.minus_sense = min(slack[j] * 0.8, budget), sense
+        out.append(r.to_dict(settings))
+        progress({"event": "slack_joint_done", "result": out[-1]})
+    return {"joints": joints, "results": out, "blocked": any(r["status"] == FAIL for r in out),
             "settings": dataclasses.asdict(settings)}

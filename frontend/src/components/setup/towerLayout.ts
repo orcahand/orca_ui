@@ -34,7 +34,7 @@ export function spoolJoint(side: 'left' | 'right', pos: string): string {
 }
 
 export const FACE_LABEL: Record<TowerFace, string> = {
-  F: 'Front · palm side',
+  F: 'Front',
   B: 'Back',
 }
 

@@ -230,8 +230,8 @@ class BaselinePromoteRequest(BaseModel):
     activate: bool = True
 
 
-class ProbeReferenceRequest(BaseModel):
-    """Which saved probe dataset later probes are compared against; null clears."""
+class SweepReferenceRequest(BaseModel):
+    """Which saved sweep later sweeps are compared against; null falls back to the shipped one."""
 
     name: Optional[str] = Field(default=None, max_length=40)
 
