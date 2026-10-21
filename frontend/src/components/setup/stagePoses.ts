@@ -13,7 +13,6 @@ export type TowardThumb = Record<string, AbductionEnd>
 
 const DEG2RAD = Math.PI / 180
 const SPREAD_FINGERS = ['index', 'middle', 'ring', 'pinky'] as const
-const BENT_DEG = 45
 const THUMB_OUT_JOINTS = ['thumb_cmc', 'thumb_abd']
 
 const clamp = (deg: number, rom: [number, number]) => Math.min(rom[1], Math.max(rom[0], deg))
@@ -79,7 +78,8 @@ export function thumbOut(robot: URDFRobot, joints: JointInfo[]): TowardThumb {
 
 // Fingers parked toward / away from the thumb, per stage key.
 const PARKED: Record<string, { toward: string[]; away: string[] }> = {
-  thumb_index: { toward: [], away: ['middle', 'ring', 'pinky'] },
+  thumb: { toward: [], away: ['index', 'middle', 'ring', 'pinky'] },
+  index: { toward: [], away: ['middle', 'ring', 'pinky'] },
   middle: { toward: ['index'], away: ['ring', 'pinky'] },
   ring: { toward: ['index', 'middle'], away: ['pinky'] },
   pinky: { toward: ['index', 'middle', 'ring'], away: [] },
@@ -96,14 +96,12 @@ export function stagePose(
     const finger = fingerOf(joint.id)
     if (joint.id === 'wrist') pose[joint.id] = joint.neutral
     else if (!parked) pose[joint.id] = mid(joint.rom)
-    else if (finger === 'thumb' && stageKey !== 'thumb_index') {
+    else if (finger === 'thumb' && stageKey !== 'thumb') {
       pose[joint.id] = THUMB_OUT_JOINTS.includes(joint.id)
         ? joint.rom[toward[joint.id] ?? 1]
         : clamp(0, joint.rom)
     } else if (finger === 'thumb') pose[joint.id] = mid(joint.rom)
-    else if (stageKey === 'thumb_index' && finger === 'index') {
-      pose[joint.id] = joint.id.endsWith('_abd') ? mid(joint.rom) : clamp(BENT_DEG, joint.rom)
-    } else if (parked.toward.includes(finger) || parked.away.includes(finger)) {
+    else if (parked.toward.includes(finger) || parked.away.includes(finger)) {
       const end = toward[finger] ?? 1
       pose[joint.id] = joint.id.endsWith('_abd')
         ? joint.rom[parked.toward.includes(finger) ? end : ((1 - end) as AbductionEnd)]

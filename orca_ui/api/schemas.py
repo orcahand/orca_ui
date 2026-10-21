@@ -184,8 +184,9 @@ class TrajectoryToMotorRequest(BaseModel):
     """Translate a joint waypoint recording to motor space; ``save_as``
     names the copy (default: <name>_motor)."""
 
-    save_as: Optional[str] = Field(default=None, max_length=64,
-                                   pattern=r"^[A-Za-z0-9_\-]+$")
+    save_as: Optional[str] = Field(
+        default=None, max_length=64, pattern=r"^[A-Za-z0-9_\-]+$"
+    )
 
 
 class TrajectoryUpdateRequest(BaseModel):
@@ -194,10 +195,9 @@ class TrajectoryUpdateRequest(BaseModel):
     instead of overwriting."""
 
     waypoints: list[list[float]]
-    save_as: Optional[str] = Field(default=None, max_length=64,
-                                   pattern=r"^[A-Za-z0-9_\-]+$")
-
-
+    save_as: Optional[str] = Field(
+        default=None, max_length=64, pattern=r"^[A-Za-z0-9_\-]+$"
+    )
 
 
 class BenchPacingRequest(BaseModel):
@@ -219,3 +219,24 @@ class BusBaudRequest(BaseModel):
     """A new rate for every motor on the bus."""
 
     baud_rate: int
+
+
+class BaselinePromoteRequest(BaseModel):
+    """Name a calibration snapshot as a travel baseline (GT_01, ...)."""
+
+    snapshot: str = Field(max_length=80)
+    name: str = Field(max_length=40, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.\-]*$")
+    note: Optional[str] = Field(default=None, max_length=200)
+    activate: bool = True
+
+
+class ProbeReferenceRequest(BaseModel):
+    """Which saved probe dataset later probes are compared against; null clears."""
+
+    name: Optional[str] = Field(default=None, max_length=40)
+
+
+class BaselineActivateRequest(BaseModel):
+    """Which baseline guided tensioning scores against; null = the shared v2.1 block."""
+
+    name: Optional[str] = Field(default=None, max_length=40)
