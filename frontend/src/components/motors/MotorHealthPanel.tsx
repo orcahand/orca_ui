@@ -240,11 +240,12 @@ export function MotorHealthPanel() {
           faults: row.faults,
           maxTemp: shutdownTemp ?? maxTemp,
           maxCurrent,
+          reportAfterReboots: budgets?.report_after_reboots ?? null,
         }),
       )
     }
     return map
-  }, [rows, jointOfMotor, maxTemp, shutdownTemp, maxCurrent])
+  }, [rows, jointOfMotor, maxTemp, shutdownTemp, maxCurrent, budgets])
 
   const allIssues = useMemo(
     () => sortIssues([...issuesByMotor.values()].flat()),
@@ -323,6 +324,16 @@ export function MotorHealthPanel() {
               // motor because it kept faulting, so it is waiting on a person.
               const abandoned = Boolean(
                 recovery?.given_up || recovery?.thermal_given_up,
+              )
+              // Past the report threshold: worth showing in the row, not just
+              // in a log line.
+              const reportedRepeat = Boolean(
+                budgets?.report_after_reboots &&
+                  recovery &&
+                  Math.max(
+                    recovery.load_reboots,
+                    recovery.thermal_recoveries,
+                  ) >= budgets.report_after_reboots,
               )
               const faults = row.faults
               const tracking = faults?.tracking ?? null
@@ -451,8 +462,15 @@ export function MotorHealthPanel() {
                         : `✗ ${tracking.deviation_deg?.toFixed(0) ?? '?'}° ${tracking.stall_s.toFixed(0)}s`}
                   </td>
                   <td
-                    className={recovery?.given_up || recovery?.thermal_given_up
-                      ? 'bad' : recovery?.cooling ? 'warn' : undefined}
+                    className={
+                      abandoned
+                        ? 'bad'
+                        : recovery?.cooling
+                          ? 'warn'
+                          : reportedRepeat
+                            ? 'warn'
+                            : undefined
+                    }
                     title={recoveryTitle(recovery, budgets)}
                   >
                     {recovery === null || recovery === undefined
