@@ -5,7 +5,6 @@ bumping the version without telling users what changed fails here.
 """
 
 import re
-import tomllib
 from pathlib import Path
 
 import pytest
@@ -19,23 +18,23 @@ from orca_ui.settings import UiSettings
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
-def pyproject() -> dict:
-    with open(PROJECT_ROOT / "pyproject.toml", "rb") as fh:
-        return tomllib.load(fh)
+# Read by hand rather than parsed: tomllib is 3.11+ and this package supports
+# 3.10, and both values live on one unambiguous line each.
+def pyproject() -> str:
+    return (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
 
 def declared_version() -> str:
-    return pyproject()["project"]["version"]
+    found = re.findall(r'(?m)^version\s*=\s*"([^"]+)"', pyproject())
+    assert len(found) == 1, f"expected one project version, found {found}"
+    return found[0]
 
 
 def pinned_core_floor() -> str:
     """The lower bound of the orca-core requirement, e.g. "0.10.1"."""
-    for requirement in pyproject()["project"]["dependencies"]:
-        if requirement.replace("_", "-").startswith("orca-core"):
-            floor = re.search(r">=\s*([0-9][0-9.]*)", requirement)
-            assert floor, f"orca-core requirement has no lower bound: {requirement}"
-            return floor.group(1)
-    raise AssertionError("orca-core is not in the dependencies")
+    floor = re.search(r'"orca[-_]core\s*>=\s*([0-9][0-9.]*)', pyproject())
+    assert floor, "the orca-core requirement has no lower bound"
+    return floor.group(1)
 
 
 class TestTheDocument:
