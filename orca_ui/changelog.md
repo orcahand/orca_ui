@@ -77,29 +77,27 @@ Core: 0.10.1
 
 ## Features
 
-### Automatic recovery from motor faults
+### Detailed motor tuning
 
-### Reboot thresholds you can set per hand
+- Tune each PID gain and motion profile factor of your joints from the default to your heart's desire. 
 
-### Overload and thermal recoveries counted separately
+- Setting either velocity or acceleration limits to zero disables that respective section of the profile, uncapping velocity or acceleration respectively.
 
-### Overheating motors stand down and come back on their own
+### Fault and error handling.
 
-### A cooling margin, and holding the hand off while one motor cools
+- The UI will automatically log, notify, and handle errors you may see reported by your motors in a systematic manner.
 
-### Supply and wiring faults in red on every tab
+- A motor overheating will by default zero all torque commanded to all motors until the temperature has decreased by 10 Celsius from the motor's limit. A motor that latches due to an overload of torque or current will be automatically rebooted and logged. If a motor keeps overloading it will stop rebooting, by default, after the fifth time. 
 
-### Per-motor recovery counts in Motor health
+- Voltage input and or electrical shock errors experienced by any motor will pop up immediately on your UI and encourage you to cut power to the hand immediately. 
 
-### Rebooting one motor without disarming the hand
+- Consult the motor tab to identify which motors are faulting and any other configurable error handling settings you may wish to change from their defaults.
 
-### Pose loops that run until you stop them
+### Reworked setup tab
 
-### Calibration drives at the hand's own current limit
+- Hardware 2.1.x hands now support the *Guided Tensioning* option that will minimize slack accumulation in the tendons. The older tensioning variant can be selected if one so wishes in the options for the tensioning tab. 
 
-### Per-joint calibration current recorded and compared against the last run
-
-### This changelog, and the What's new button
+- After your hand has been tensioned simply utilize the automatic calibration script and then use the *Run-in* option to stress test your hand to validate successful tensioning all from the same setup panel.
 
 ## Bugfixes
 
@@ -122,3 +120,5 @@ Core: 0.10.1
 ### A short ping reply no longer crashes the liveness check
 
 ### Motion waits no longer time out just short of the target
+
+### Accidentally introduced cycle limit of 1000 has been removed.
