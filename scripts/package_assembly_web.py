@@ -4,7 +4,7 @@
 
 Builds frontend/vite.assembly.config.ts and places the guide under OUT_DIR/SLUG/
 so it is reachable only by its link; the site root serves nothing. Clips no
-step references are left out. The four assembly GLBs exceed the host's
+step references are left out, and so are the Touch assets. The assembly GLBs exceed the host's
 deployment size, so they are not copied: vercel.json rewrites their paths to
 MODELS_BASE/<key>/assembly.glb (upload them with --extract-models first).
 The slug is the secret: pass it in, never commit it (this repo is public).
@@ -20,8 +20,9 @@ from zipfile import ZipFile
 
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = ROOT / "frontend"
-KEYS = [f"{version}-{side}-dynamixel" for version in ("base", "touch")
-        for side in ("left", "right")]
+# The public guide is Base only (the web build locks the version); Touch is
+# still work in progress, so none of its models or media ship.
+KEYS = [f"base-{side}-dynamixel" for side in ("left", "right")]
 
 
 def main():
@@ -51,6 +52,11 @@ def main():
             clip.unlink()
     for key in KEYS:
         (site / "assembly" / "parts" / key / "assembly.glb").unlink(missing_ok=True)
+    for touch in [*(site / "assembly" / "parts").glob("touch-*"),
+                  site / "assembly" / "touch"]:
+        if touch.is_dir():
+            dropped += sum(p.stat().st_size for p in touch.rglob("*") if p.is_file())
+            shutil.rmtree(touch)
 
     base = args.models_base.rstrip("/")
     (args.out / "vercel.json").write_text(json.dumps({
@@ -77,7 +83,7 @@ def main():
 
     size = sum(p.stat().st_size for p in args.out.rglob("*") if p.is_file())
     print(f"Staged {size / 1e6:.0f} MB at {args.out} "
-          f"(dropped {dropped / 1e6:.0f} MB of unreferenced clips)")
+          f"(dropped {dropped / 1e6:.0f} MB of unreferenced clips and Touch assets)")
 
 
 if __name__ == "__main__":
