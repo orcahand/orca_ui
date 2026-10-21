@@ -300,6 +300,9 @@ class TelemetryService:
         # Consecutive failed or stale motor reads, for reporting a bus that
         # has gone quiet rather than silently withholding telemetry.
         self._stale_reads = 0
+        # Consecutive fault-poll exceptions. Reported, not swallowed: a crash
+        # here means nothing is recovering motors.
+        self._fault_poll_failures = 0
         self._last_hw_error_sweep = 0.0
 
     def start(self) -> None:
@@ -784,8 +787,18 @@ class TelemetryService:
         try:
             actions = poll(config) if config is not None else poll()
         except Exception:
-            logger.debug("fault poll failed", exc_info=True)
+            # Not debug: this is the code that recovers motors, and a crash
+            # in it means nothing is being recovered. Swallowing it silently
+            # makes a hand that stops look like a mystery rather than a bug.
+            self._fault_poll_failures = getattr(
+                self, "_fault_poll_failures", 0) + 1
+            if self._fault_poll_failures in (1, 10, 100):
+                logger.warning(
+                    "fault handling raised (%d time(s)); motors are not being "
+                    "recovered while this persists",
+                    self._fault_poll_failures, exc_info=True)
             return
+        self._fault_poll_failures = 0
         for action in actions:
             if action.prominent:
                 message = f"motor {action.motor_id} {action.reason}"

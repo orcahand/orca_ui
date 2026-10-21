@@ -890,4 +890,11 @@ export interface FaultBudgets {
   giveup_after_reboots: number
   // Thermal recoveries before giving up; null means never.
   thermal_giveup_after_reboots: number | null
+  // How far below its own limit a motor must cool before it drives again.
+  // The hardware's own hysteresis is about a degree, not enough to cool.
+  thermal_clear_margin_c: number
+  // One hot motor takes the whole hand off torque rather than only itself.
+  // On by default: the motors heat each other, so a motor between driving
+  // neighbours never gets back under the margin on its own.
+  thermal_hold_all: boolean
 }

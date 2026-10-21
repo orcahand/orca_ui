@@ -555,6 +555,7 @@ function FaultBudgetsControl() {
   )
 
   const thermal = budgets.thermal_giveup_after_reboots
+  const holdAll = budgets.thermal_hold_all
   return (
     <span
       style={{
@@ -606,6 +607,51 @@ function FaultBudgetsControl() {
             }
           }}
         />
+      </label>
+      <label
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+        title={
+          'how far below its own limit a motor must cool before it drives ' +
+          'again. The servo brings itself back about a degree below the ' +
+          'limit, which is not enough to actually cool, so this margin is ' +
+          'held instead.'
+        }
+      >
+        <span style={{ color: 'var(--dim)' }}>cool by</span>
+        <input
+          type="number"
+          min={1}
+          max={60}
+          value={budgets.thermal_clear_margin_c}
+          disabled={busy}
+          style={{ width: 42, fontSize: 10 }}
+          onChange={(e) => {
+            const next = parseFloat(e.target.value)
+            if (Number.isFinite(next) && next >= 1) {
+              send({ thermal_clear_margin_c: next })
+            }
+          }}
+        />
+        <span style={{ color: 'var(--dim)' }}>°C</span>
+      </label>
+      <label
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+        title={
+          'hold the whole hand off while any motor cools. On by default: the ' +
+          'motors heat each other, so a motor between driving neighbours ' +
+          'reaches its limit and then never gets back under the margin, ' +
+          'because the heat is not its own. Untick to hold only the motor ' +
+          'that overheated, which is right where the motors are thermally ' +
+          'independent.'
+        }
+      >
+        <input
+          type="checkbox"
+          checked={holdAll}
+          disabled={busy}
+          onChange={(e) => send({ thermal_hold_all: e.target.checked })}
+        />
+        <span style={{ color: 'var(--dim)' }}>hold all while cooling</span>
       </label>
     </span>
   )

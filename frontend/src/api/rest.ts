@@ -190,6 +190,8 @@ export const api = {
     giveup_after_reboots?: number
     thermal_giveup_after_reboots?: number
     thermal_unlimited?: boolean
+    thermal_clear_margin_c?: number
+    thermal_hold_all?: boolean
   }) => post('/api/control/fault_budgets', body),
   setPoseSource: (mode: PoseSource) =>
     post<{ control: ControlState }>('/api/control/pose_source', { mode }),

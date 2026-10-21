@@ -260,6 +260,8 @@ def build_router(service: HandService) -> APIRouter:
             ("report_after_reboots", body.report_after_reboots),
             ("giveup_after_reboots", body.giveup_after_reboots),
             ("thermal_giveup_after_reboots", body.thermal_giveup_after_reboots),
+            ("thermal_clear_margin_c", body.thermal_clear_margin_c),
+            ("thermal_hold_all", body.thermal_hold_all),
         ) if value is not None}
         if body.thermal_unlimited:
             changes["thermal_giveup_after_reboots"] = None

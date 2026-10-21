@@ -242,6 +242,14 @@ class HandService:
             "report_after_reboots": 3,
             "giveup_after_reboots": 5,
             "thermal_giveup_after_reboots": None,
+            # How far below its own limit a motor must cool before it drives
+            # again. The hardware's own hysteresis is about a degree, which
+            # is not enough to actually cool.
+            "thermal_clear_margin_c": 10.0,
+            # One hot motor takes the whole hand off torque. On by default:
+            # the motors heat each other, so a motor between driving
+            # neighbours never gets back under the margin on its own.
+            "thermal_hold_all": True,
         }
         # What config.yaml asked for — the value "default" restores to, kept
         # separately because set_max_current overwrites the live one.
@@ -1132,6 +1140,14 @@ class HandService:
                                status_code=422)
         with self._state_lock:
             for key, value in changes.items():
+                if key == "thermal_hold_all":
+                    self._fault_budgets[key] = bool(value)
+                    continue
+                if key == "thermal_clear_margin_c":
+                    # A zero margin means the hardware's own hysteresis, which
+                    # is the chatter this exists to stop.
+                    self._fault_budgets[key] = max(1.0, float(value))
+                    continue
                 if value is None:
                     # Only the thermal budget may be unlimited; a load budget
                     # of None would recover a broken joint forever.

@@ -70,6 +70,9 @@ class FaultBudgetsRequest(BaseModel):
     thermal_giveup_after_reboots: Optional[int] = Field(default=None, ge=1,
                                                         le=100)
     thermal_unlimited: bool = False
+    thermal_clear_margin_c: Optional[float] = Field(default=None, ge=1, le=60)
+    # One hot motor takes the whole hand off torque, rather than only itself.
+    thermal_hold_all: Optional[bool] = None
 
 
 class ServoGainsRequest(BaseModel):
