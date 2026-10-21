@@ -71,11 +71,13 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
   const checkKey=(i:number)=>step.id==='p45'?`p45:finger:${i}`:`${step.id}:${i}`
   const allChecked = step.id === 'motor-check' ? Array.from({length:17},(_,i)=>`motor-check:${i+1}`).every(k=>progress.checks.includes(k)) : step.id === 'p83' ? progress.tendons.length === 32 : ['p123','p126'].includes(step.id) ? progress.checks.filter(k=>k.startsWith(`${step.id}:tendon:`)).length===32 : checklist.every((_,i) => progress.checks.includes(checkKey(i)))
   const percent = Math.round(completed / required.length * 100)
+  // The web build scrolls the document, the console dialog scrolls <main>.
+  function scrollToTop() { (WEB_GUIDE ? window : main.current)?.scrollTo({ top: 0, behavior: 'instant' }) }
   function go(id: string) {
     setQuery('')
     setProgress(p => ({ ...p, current: id, views: STEPS.find(s=>s.id===id)?.hint&&!step.hint ? {...p.views,'hint:return':step.id} : p.views }))
     setNavOpen(false)
-    main.current?.scrollTo({ top: 0, behavior: 'instant' })
+    scrollToTop()
     requestAnimationFrame(() => heading.current?.focus({ preventScroll: true }))
   }
   function changeBuild(value: Partial<Build>) { setProgress(p=>changeBuildProgress(p,value)) }
@@ -111,7 +113,7 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
         <label className="assembly-search"><span className="assembly-sr-only">Search assembly instructions</span><input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Find a part or step…" /></label>
         </>}/>
         <div className="assembly-save-status" role="status">{saveStatus}</div>
-        {resetting ? <div className="assembly-reset"><p><GuideText variant field="prose/AssemblyGuide.tsx/a5868c5fbc" text={"Clear assembly progress for a new build?"} label="Guide text"/></p><button onClick={() => { setProgress(EMPTY_PROGRESS); setResetting(false); main.current?.scrollTo(0,0) }}>Clear progress</button><button onClick={() => setResetting(false)}>Cancel</button></div> : <button className="assembly-text-button" onClick={() => setResetting(true)}>Start a new build</button>}
+        {resetting ? <div className="assembly-reset"><p><GuideText variant field="prose/AssemblyGuide.tsx/a5868c5fbc" text={"Clear assembly progress for a new build?"} label="Guide text"/></p><button onClick={() => { setProgress(EMPTY_PROGRESS); setResetting(false); scrollToTop() }}>Clear progress</button><button onClick={() => setResetting(false)}>Cancel</button></div> : <button className="assembly-text-button" onClick={() => setResetting(true)}>Start a new build</button>}
       </aside>
       <main ref={main} className="assembly-main">
         <button className="assembly-sidebar-chevron" aria-label={sidebarCollapsed?'Expand chapters':'Collapse chapters'} title={sidebarCollapsed?'Expand chapters':'Collapse chapters'} aria-expanded={!sidebarCollapsed} aria-controls="assembly-navigation" onClick={()=>setSidebarCollapsed(!sidebarCollapsed)}>{sidebarCollapsed?'›':'‹'}</button>
