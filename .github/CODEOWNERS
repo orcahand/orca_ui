@@ -1,0 +1,3 @@
+# assembly-guide: PRs need one approval from ops/admin (the people who may
+# push to this branch directly). Branch protection enforces it.
+* @orcahand/orca-admins @fabricenoelbourquin @javid-orca
