@@ -1,6 +1,6 @@
 # ORCA assembly guide — handover
 
-Updated: 21 October 2026. Intended for the next Astra/Codex instance and human maintainers.
+Updated: 22 October 2026. Intended for the next Astra/Codex instance and human maintainers.
 
 ## Start here
 
@@ -9,6 +9,34 @@ The assembly guide is implemented in this checkout. Open **Setup → Open assemb
 The goal is a self-contained guide that makes building the hand straightforward without needing to consult the teaching PDF or ask for missing instructions. The current version is substantial and reviewable, but some mechanical specifications and procedures remain unresolved. Do not describe it as a physically validated, independently complete assembly manual yet.
 
 Read this document first, then [the assembly implementation notes](frontend/src/components/assembly/README.md), [DEVELOPMENT.md](DEVELOPMENT.md) and [CLAUDE.md](CLAUDE.md). The assembly README contains detailed historical development notes; some early statements are superseded. In particular, its opening statement that the guide never starts a hand operation predates the explicitly enabled connected-hand test described below.
+
+## Index tendon and skin sequence · 22 October
+
+Base-only follow-up in `orca_ui_merge` / `merge/assembly-calibration`:
+
+- Applied all five text edits from `~/Downloads/orca-assembly-edits (1).json`
+  (carpal cleanup, carpal/wrist PTFE insertion and DP loop tucking), with minor
+  spelling/spacing cleanup. The export contains no background edits.
+- Removed the carpal cleanup still image. The exported short-screw-head tool
+  is listed under Tools, without an invented screw dimension.
+- Tendon preparation highlights one additional single knot over **each** Ashley
+  stopper and includes the reinforcement animation beside that instruction.
+- DP preparation has three instructions. The former standalone tucking text and
+  figure are removed; tucking is included in instruction 2. Instructions 1 and 2
+  and their images sit side by side on desktop and stack on narrow screens.
+- Index parts lists identify I-DP, I-PP and I-AP; thumbnail matching retains the
+  corresponding index parts and skins.
+- PP preparation fits bearings only. DP skin fitting is in Join DP and PP;
+  PP skin fitting starts Join PP and AP, explicitly passing all four tendons
+  through the skin before the AP. Both joining steps include the matching skin
+  in Parts and a skin-fitting model. The standalone Fit and seat the skins step
+  is removed, with saved locations redirected to Join PP and AP.
+- Touch content is unchanged. The thumb retains its existing skin sequence.
+
+Validated the production build and isolated browser walkthrough: exported text,
+removed media, desktop/mobile DP layout, knot emphasis, part thumbnails,
+skin-fitting models and removed-step redirect. Touch content snapshot comparison
+passes for both sides and motor types. Browser draft storage is preserved.
 
 ## Base guide cleanup and exported edits · 21 October
 

@@ -63,7 +63,7 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
   const copy = instructions(step, build)
   const stepFigures = figures(step, build)
   const warning = note(step, build)
-  const tools = stepTools(step)
+  const tools = build.version==='base'&&step.id==='p18'?['Short screw head']:stepTools(step)
   const parts = partsOnly(kit(step,build))
   const equipment = buildTools()
   const checklist = step.id === 'p139' ? FINAL_CHECKS : step.id === 'p45' ? FINGER_CHECKS : []
@@ -134,17 +134,20 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
         {!['p1','p6','p23'].includes(step.id) && <div className="assembly-guided-content">
           {warning && <div className="assembly-note"><p><GuideText field={`${step.id}/note`} text={warning} label="Step note"/></p></div>}
 
-          <ol className="assembly-guided-instructions">{copy.map((instruction,i) => {
+          <ol className={`assembly-guided-instructions ${build.version==='base'&&step.id==='p29'?'assembly-dp-preparation':''}`}>{copy.map((instruction,i) => {
             const images=stepFigures.filter(f=>(f.instruction??1)===i+1)
             const command=commands(step,build).filter((_,n)=>i===(step.id==='p150'?(n===0?0:2):step.id==='p154'?1:0))
-            return <li key={`${step.id}:${i}`} value={i+1}>
+            return <li key={`${step.id}:${i}`} value={i+1} className={build.version==='base'&&step.id==='p26'&&i===2?'assembly-knot-emphasis':undefined}>
               {build.version==='base'&&step.id==='p37'&&i===1&&<KnotReinforcement count={1}/>}
               <p className="assembly-guided-text"><span aria-hidden="true">{i+1}</span><GuideText field={`${step.id}/instruction/${i}`} text={instruction} label={`Instruction ${i+1}`}/></p>
               {command.map(text=><Command key={text} command={text}/>)}
               {images.length>0&&<MediaGallery key={`${step.id}-${build.side}-${build.motor}-${build.version}-${i}`} items={images} focused={-1} saved={progress.views[step.id]} onSelect={src=>setProgress(p=>({...p,views:{...p.views,[step.id]:src}}))}/>}
               {step.id==='p139'&&i===0&&checklist.length > 0 && <section className="assembly-work-checklist"><h3><GuideText variant field="prose/AssemblyGuide.tsx/3d29c4c3a3" text={String(step.id === 'p139' ? 'Final assembly checklist' : 'Finger movement checklist')} label="Section heading"/></h3>{checklist.map((label,i) => <label key={label}><input type="checkbox" checked={progress.checks.includes(checkKey(i))} onChange={() => toggleCheck(checkKey(i))} /><span><GuideText field={`${step.id}/check/${i}`} text={label} label={`Checklist item ${i+1}`}/></span></label>)}</section>}
         {i===1&&step.id==='motor-check'&&<MotorCheck build={build} selected={Number(progress.views['motor-check:selected']??1)} onSelect={id=>setProgress(p=>({...p,views:{...p.views,'motor-check:selected':String(id)}}))} checked={Array.from({length:17},(_,i)=>i+1).filter(id=>progress.checks.includes(`motor-check:${id}`))} onCheck={id=>toggleCheck(`motor-check:${id}`)}/>}
-        {i===(DETAIL_AT[step.id]??copy.length-1)&&CAD_DETAILS[step.id]&&step.id!=='p46'&&!(build.motor==='feetech'&&CAD_DETAILS[step.id].motorSpecific)&&<CadDetail key={step.id} build={build} step={step.id}/>}
+        {i===(build.version==='base'&&step.id==='pp-ready'?0:DETAIL_AT[step.id]??copy.length-1)&&CAD_DETAILS[step.id]&&step.id!=='p46'&&!(build.motor==='feetech'&&CAD_DETAILS[step.id].motorSpecific)&&<CadDetail key={step.id} build={build} step={step.id}/>}
+        {build.version==='base'&&step.id==='p26'&&i===2&&<KnotReinforcement count={1}/>}
+        {build.version==='base'&&step.id==='p33'&&i===3&&<CadDetail build={build} step="index-dp-skin"/>}
+        {build.version==='base'&&step.id==='p42'&&i===0&&<CadDetail build={build} step="index-pp-skin"/>}
         {i===0&&step.id==='p115'&&<MotorChain build={build}/>}
         {i===0&&step.id==='p101'&&<BoardIdentification build={build}/>}
         {build.version!=='base'&&i===1&&['p37','p49','p56'].includes(step.id)&&<KnotReinforcement count={step.id==='p37'?1:3}/>}
@@ -162,8 +165,8 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
         {i===0&&step.id === 'p80' && <RoutingInspection build={build}/>}
         {i===(step.id==='p35'?1:2)&&['p35','p45'].includes(step.id) && <FingerMotion build={build} wholeIndex={step.id==='p35'}/>}
 
-        {i===(MOTION_AT[step.id]??copy.length-1)&&ASSEMBLY_MOTIONS[step.id] && step.id!=='p93' && !(build.motor==='feetech'&&ASSEMBLY_MOTIONS[step.id].motorSpecific) && <ThreadingAnimation key={`motion:${step.id}`} kind={step.animation??'straight'} build={build} step={step.id} />}
-        {i===INSPECTION_AT[step.id]&&<JointInspection build={build} step={step.id}/>}
+        {i===(build.version==='base'&&step.id==='p42'?1:MOTION_AT[step.id]??copy.length-1)&&ASSEMBLY_MOTIONS[step.id] && step.id!=='p93' && !(build.motor==='feetech'&&ASSEMBLY_MOTIONS[step.id].motorSpecific) && <ThreadingAnimation key={`motion:${step.id}`} kind={step.animation??'straight'} build={build} step={step.id} />}
+        {i===(build.version==='base'&&step.id==='p42'?3:INSPECTION_AT[step.id])&&<JointInspection build={build} step={step.id}/>}
         {i===(step.id==='p83'?1:3)&&['p83','p123','p126'].includes(step.id)&&<DriveExplorer key={`drive:${step.id}`} build={build} stage={step.id==='p83'?'wrist':step.id==='p123'?'bottom':'top'} checked={step.id==='p83'?progress.tendons:progress.checks.filter(k=>k.startsWith(`${step.id}:tendon:`)).map(k=>Number(k.split(':').at(-1)))} onCheck={i=>setProgress(p=>step.id==='p83'?({...p,tendons:p.tendons.includes(i)?p.tendons.filter(n=>n!==i):[...p.tendons,i],done:p.done.filter(id=>id!==step.id)}):({...p,checks:p.checks.includes(`${step.id}:tendon:${i}`)?p.checks.filter(k=>k!==`${step.id}:tendon:${i}`):[...p.checks,`${step.id}:tendon:${i}`],done:p.done.filter(id=>id!==step.id)}))}/>}
 
             </li>
