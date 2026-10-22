@@ -10,7 +10,7 @@ const normalize=(s:string)=>s.toLowerCase().replace(/(?<=\d)\s*[×x]\s*(?=\d)/g,
 // Match the kit's named components to the same inventory thumbnails as the explorer.
 export function stepPartImages(text:string,build:Build,step:string):Image[] {
   const inventory=build.version==='touch'?(build.side==='left'?touchLeft:touchRight):(build.side==='left'?baseLeft:baseRight)
-  const stock=supplies(build),t=normalize(text),found:Image[]=[]
+  const stock=supplies(build),t=normalize(text).replace(/\bi-(?=dp\b|pp\b|ap\b)/g,''),found:Image[]=[]
   const thumb=step.startsWith('thumb-')||['p46','p49','p54','p56','p59','p62','p68'].includes(step)||/thumb/.test(t)
   const allFingers=/5 ap|five|four|4 assembled|middle, ring|index, middle/.test(t)||['p13','p15','p45'].includes(step)
   const fingerMatches=(label:string)=>allFingers?(!step.startsWith('p45')||!label.startsWith('index')&&!label.startsWith('thumb')):label.startsWith(thumb?'thumb':'index')

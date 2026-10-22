@@ -4,6 +4,8 @@ import type {Bundle} from './cadAssets'
 import type {Build} from './buildContent'
 export type CadDetail={title:string;fixed:string[];moving:string[];caption:string;motorSpecific?:boolean}
 export const CAD_DETAILS:Record<string,CadDetail>={
+ 'index-dp-skin':{title:'Fit the I-DP skin',fixed:['Index DP','Index PP'],moving:['Index DP skin'],caption:'Slide the skin over the fingertip and seat it clear of the DP–PP joint.'},
+ 'index-pp-skin':{title:'Fit the I-PP skin',fixed:['Index DP','Index DP skin','Index PP'],moving:['Index PP skin'],caption:'Pass the four tendon ends through the skin before fitting it onto PP and threading the AP.'},
  'finishing-pp':{title:'Seat the finger skins',fixed:['Index DP','Index PP','Index AP','Index PP skin'],moving:['Index DP skin'],caption:'The PP skin is already fitted. Seat the DP skin where used, then check clearance at both joints.'},
  'pp-ready':{title:'Prepare the PP skin and bearings',fixed:['Index PP'],moving:['Index PP skin','Bearing · 4 × 8 × 3','Bearing · 4 × 8 × 2'],caption:'Slide the PP skin from the open base toward the fingertip, then press both PP bearings into their pockets with your fingers.'},
  'thumb-parts':{title:'Thumb parts · DP, PP, AP and TP',fixed:['Thumb DP','Thumb PP','Thumb AP','Thumb TP'],moving:[],caption:'Identify the four thumb segments before preparation.'},
@@ -21,13 +23,14 @@ export const CAD_DETAILS:Record<string,CadDetail>={
 }
 export function cadDetailSpec(build:Build,step:string):CadDetail {
  const spec=CAD_DETAILS[step]
+ if(build.version==='base'&&step==='pp-ready')return {...spec,title:'Fit the PP bearings',moving:spec.moving.filter(label=>!label.includes('skin')),caption:'Press both PP bearings into their pockets with your fingers.'}
  if(build.version!=='touch')return spec
  if(['pp-ready','thumb-pp-ready'].includes(step))return {...spec,title:'Fit the PP bearings',moving:spec.moving.filter(label=>!label.includes('skin')),caption:'Press both PP bearings into their pockets. Leave all skins off until the cables are connected.'}
  if(step==='thumb-test')return {...spec,fixed:spec.fixed.filter(label=>!label.includes('skin'))}
  return spec
 }
 export function cadDetailScene(bundle:Bundle,build:Build,step:string){
- const skinStep=['pp-ready','finishing-pp','thumb-pp-ready','thumb-skins'].includes(step),finger=step.startsWith('thumb-')?'Thumb':'Index'
+ const skinStep=['pp-ready','finishing-pp','index-dp-skin','index-pp-skin','thumb-pp-ready','thumb-skins'].includes(step),finger=step.startsWith('thumb-')?'Thumb':'Index'
  const spec=cadDetailSpec(build,step),pieces=cadPieces(bundle,build),group=new THREE.Group()
  const fixed=pieces.filter(p=>spec.fixed.includes(p.part.label)||(skinStep&&!['pp-ready','thumb-pp-ready'].includes(step)&&p.part.label.startsWith('Bearing')&&(p.owner===`${finger} DP`||['finishing-pp','thumb-skins'].includes(step)&&[`${finger} PP`,`${finger} AP`].includes(p.owner??'')))),center=new THREE.Box3();fixed.forEach(p=>center.union(p.bounds));const anchor=center.isEmpty()?new THREE.Vector3():center.getCenter(new THREE.Vector3())
  const screws=pieces.filter(p=>p.part.label==='M3 × 14 socket screw')

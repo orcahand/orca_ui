@@ -355,3 +355,8 @@
 .assembly-app[data-version=base] :is(.assembly-chapter-button.active,.assembly-step-links button.active,.assembly-chapter-button:hover,.assembly-step-links button:hover,button[aria-selected=true],button[aria-pressed=true],.assembly-tendon-grid label:has(:checked)) { background:var(--assembly-image-bg); color:#203e30; }
 .assembly-app[data-version=base] .assembly-primary { background:var(--assembly-image-bg); color:#203e30; }
 .assembly-setup-continuation { margin:28px 0; }
+.assembly-dp-preparation { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; }
+.assembly-dp-preparation>li:nth-child(n+3) { grid-column:1/-1; }
+@media(min-width:701px) { .assembly-dp-preparation>li:nth-child(-n+2) { display:grid; grid-template-rows:subgrid; grid-row:span 2; row-gap:0; } }
+.assembly-app .assembly-knot-emphasis>.assembly-guided-text { padding:16px; border-left:4px solid var(--accent); border-radius:6px; background:var(--assembly-image-bg); font-weight:700; }
+@media(max-width:700px) { .assembly-dp-preparation { grid-template-columns:minmax(0,1fr); } }
