@@ -564,12 +564,15 @@ class HandService:
                 continue  # rebuilt below from the live session
             entries.append(dict(board.as_dict(), held_by_console=False))
         if own:
+            identity = self.supervisor.identity
             entries.append(
                 {
                     "device": status.ports.get("motor") or sorted(own)[0],
                     "kind": "oh_board",
                     "side": status.side or None,
-                    "hand_id": None,
+                    "hand_id": identity and identity.hand_id,
+                    "serial": identity and identity.serial,
+                    "board_id": identity and identity.board_id,
                     "model_name": status.model,
                     "ports": sorted(own),
                     "busy": False,
