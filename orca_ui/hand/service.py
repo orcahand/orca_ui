@@ -514,10 +514,11 @@ class HandService:
     def hand_ids(self) -> dict:
         """The hand menu: what auto resolves to, what is chosen, what is known.
 
-        ``from_board`` is the name the hardware gives — the serial it was
-        provisioned with, else its board id — which the supervisor already
-        resolves. ``auto`` falls back to the first name this machine knows,
-        which is all there is for a hand with no board.
+        ``known`` is only the names somebody gave: a serial or a board id is
+        detected, not chosen, so offering it would invite picking the hand you
+        already have. ``from_board`` is what the hardware reports — the serial
+        it was provisioned with, else its board id — which the supervisor
+        already resolves, and which ``auto`` prefers over any chosen name.
         """
         # A core older than the hand register has no hands to offer; the
         # picker then renders nothing, the way it does in mock mode.
@@ -528,7 +529,7 @@ class HandService:
                     "from_board": None, "in_use": None, "available": False}
 
         from_board = self.supervisor.hand_id
-        known = hand_ids.known_ids()
+        known = hand_ids.assigned_ids()
         session = self.session
         hand = session.hand if session is not None else None
         return {
@@ -553,7 +554,7 @@ class HandService:
             raise ServiceError(
                 f"{name!r} cannot be a hand id: 1-20 characters of "
                 "[0-9A-Za-z._-], at least one alphanumeric", status_code=400)
-        if name is not None and name not in hand_ids.known_ids():
+        if name is not None and name not in hand_ids.assigned_ids():
             raise ServiceError(f"this machine knows no hand called {name!r}",
                                status_code=404)
         self._hand_id_choice = name

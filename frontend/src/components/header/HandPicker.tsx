@@ -2,10 +2,13 @@
 //
 // A hand's calibration is filed under the hand, so the console has to know
 // which one is in front of it. A board names itself — the serial it was
-// provisioned with, else its board id — and auto takes that. A hand with no
-// board cannot name itself, and nothing can tell one board-less hand from
-// another, so the name is the operator's to give: auto then falls back to the
-// first name this machine knows, and the rest are here to pick from.
+// provisioned with, else its board id — and auto takes that, so there is
+// nothing to pick for a hand that has one.
+//
+// The menu is for hands that cannot name themselves. Nothing can tell one
+// board-less hand from another, so the names are the operator's to give, and
+// only those are listed: a serial or a board id is detected, and offering it
+// would invite picking the hand you already have.
 //
 // Adding is how a second board-less hand gets told apart from the first.
 // Deleting throws away the calibration filed under that name, so it asks
@@ -106,7 +109,6 @@ export function HandPicker() {
         {info.known.map((name) => (
           <option key={name} value={name}>
             {name}
-            {name === info.from_board ? ' — from the board' : ''}
           </option>
         ))}
         <option value={ADD}>add a hand…</option>

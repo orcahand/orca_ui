@@ -41,12 +41,18 @@ class TestTheMenu:
         assert body["known"] == []
         assert body["selected"] is None
 
-    def test_names_this_machine_knows_are_listed(self, client):
+    def test_names_somebody_gave_are_listed(self, client):
         hand_ids.add_id("bench-left", client.calibrations)
         hand_ids.add_id("bench-right", client.calibrations)
         assert client.get("/api/hands").json()["known"] == ["bench-left", "bench-right"]
 
-    def test_auto_falls_back_to_the_first_name_known(self, client):
+    def test_a_serial_or_board_id_is_not_offered(self, client):
+        """Detected, not chosen: offering it invites picking the hand you have."""
+        (client.calibrations / "ser-0001.yaml").write_text("calibrated: true\n")
+        (client.calibrations / "0123456789ABCDEF.bin").write_bytes(b"")
+        assert client.get("/api/hands").json()["known"] == []
+
+    def test_auto_falls_back_to_the_first_name_given(self, client):
         """With no board to ask, the first is the only stable default."""
         hand_ids.add_id("zeta", client.calibrations)
         hand_ids.add_id("alpha", client.calibrations)

@@ -921,6 +921,7 @@ export interface ChangelogDoc {
 
 /** The hand menu: which hand this is, and which ones this machine knows. */
 export interface HandIdsInfo {
+  /** Only names somebody gave: a serial or board id is detected, not chosen. */
   known: string[]
   /** What auto resolves to: the board's name, else the first known id. */
   auto: string | null
