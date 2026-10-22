@@ -41,7 +41,7 @@ from orca_core.hardware.sensing.serial_discovery import (
     oh_board_ports,
 )
 
-from orca_ui.hand.boards import detect_pinned_board
+from orca_core.hand_factory import detect_pinned_board
 from orca_ui.hand.detection import (
     HardwarePresence,
     names_a_hand,
@@ -696,8 +696,11 @@ class HandSupervisor(threading.Thread):
                 presence = presence_from_detection(self.config, detection)
         detection = getattr(presence, "detection", None)
         identity = getattr(detection, "identity", None)
-        if identity is not None and identity.hand_id:
-            self._hand_id = identity.hand_id
+        if detection is not None:
+            # Always the hand this session is driving. Keeping the last id seen
+            # would give a board-less hand the identity of whichever board was
+            # plugged in before it, and file its calibration under that hand.
+            self._hand_id = identity.hand_id if identity is not None else None
         if identity is not None and self._board_pinned:
             # Kept so a later probe can start from it once the pinned CDC is held.
             self._pinned_identity = identity

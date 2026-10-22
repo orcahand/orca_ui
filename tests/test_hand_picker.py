@@ -6,6 +6,7 @@ one board-less hand from another, so the operator says — and can add a name, o
 forget one along with the calibration filed under it.
 """
 
+import dataclasses
 import time
 
 import pytest
@@ -134,3 +135,88 @@ class TestForgetting:
         client.post("/api/hands/select", json={"name": "doomed"})
         assert client.post("/api/hands/delete",
                            json={"name": "doomed"}).json()["selected"] is None
+
+
+class TestAddingAHandPicksIt:
+    """A name is made for the hand plugged in now.
+
+    Leaving the choice on auto after adding one would resolve to whichever
+    name sorts first -- which, on a bench with two board-less hands, is the
+    other one, and would file this hand's calibration under it.
+    """
+
+    def test_the_new_name_is_the_one_in_force(self, client):
+        hand_ids.add_id("alpha", client.calibrations)
+        body = client.post("/api/hands/add", json={"name": "zeta"}).json()
+        assert body["selected"] == "zeta"
+        assert body["in_use"] == "zeta"
+        assert body["auto"] == "alpha"
+
+    def test_forgetting_the_chosen_one_hands_the_choice_back(self, client):
+        client.post("/api/hands/add", json={"name": "zeta"})
+        body = client.post("/api/hands/delete", json={"name": "zeta"}).json()
+        assert body["selected"] is None
+
+
+class TestWhichBoardTheIdComesFrom:
+    """The session's own hand, never the machine.
+
+    With two hands plugged in, the console can be driving a board-less one
+    while an OH board sits on another port. Reporting that board's id here
+    would offer another hand's calibration as this one's default.
+    """
+
+    def test_a_board_less_session_reports_no_board(self, client):
+        """The mock hand has no board, so nothing may be claimed for it."""
+        body = client.get("/api/hands").json()
+        assert body["from_board"] is None
+
+    def test_a_stale_machine_wide_id_is_not_used_for_a_named_hand(self, client,
+                                                                 monkeypatch):
+        service = client.app.state.service
+        monkeypatch.setattr(type(service.supervisor), "hand_id",
+                            property(lambda self: "ser-0001"))
+        body = client.get("/api/hands").json()
+        assert body["from_board"] is None, "took the machine's id, not the hand's"
+        assert body["auto"] != "ser-0001"
+
+
+class TestAutoIsActuallyInForce:
+    """What the picker shows is what a calibration is filed under.
+
+    A board-less hand on auto used to be left unnamed: the menu showed the
+    first name this machine knows while the hand itself had none, so a
+    calibration run wrote to the model directory instead of that hand's file.
+    """
+
+    def test_a_board_less_hand_on_auto_is_named_after_it(self, client, monkeypatch):
+        """Driven as a real session: mock mode deliberately opts out below."""
+        hand_ids.add_id("alpha", client.calibrations)
+        service = client.app.state.service
+        monkeypatch.setattr(service, "settings",
+                            dataclasses.replace(service.settings, mock=False))
+        service._session_ready(service.session)
+        body = client.get("/api/hands").json()
+        assert body["auto"] == "alpha"
+        assert body["in_use"] == "alpha", "shown as alpha but not in force"
+
+    def test_a_mock_hand_is_never_handed_a_real_hand_s_calibration(self, client):
+        """It synthesises its own, and that one never reaches disk either.
+
+        Naming it would load whatever this machine last calibrated, which is
+        another hand's calibration in a session that has no hand at all.
+        """
+        hand_ids.add_id("alpha", client.calibrations)
+        service = client.app.state.service
+        service._session_ready(service.session)
+        assert service.session.hand.hand_id is None
+
+    def test_with_nothing_registered_there_is_nothing_to_be(self, client):
+        body = client.get("/api/hands").json()
+        assert body["auto"] is None and body["in_use"] is None
+
+    def test_a_choice_still_beats_auto(self, client):
+        hand_ids.add_id("alpha", client.calibrations)
+        hand_ids.add_id("zeta", client.calibrations)
+        body = client.post("/api/hands/select", json={"name": "zeta"}).json()
+        assert body["auto"] == "alpha" and body["in_use"] == "zeta"

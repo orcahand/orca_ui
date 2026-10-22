@@ -460,7 +460,7 @@ class HandService:
         """
         if self.settings.mock:
             return {"boards": [], "selected": None, "available": False}
-        from orca_ui.hand.boards import scan_boards
+        from orca_core.hand_factory import scan_boards
 
         status = self.supervisor.status()
         own = {port for port in status.ports.values()
@@ -528,16 +528,20 @@ class HandService:
             return {"known": [], "auto": None, "selected": None,
                     "from_board": None, "in_use": None, "available": False}
 
-        from_board = self.supervisor.hand_id
-        known = hand_ids.assigned_ids()
         session = self.session
         hand = session.hand if session is not None else None
+        # Ask the connected hand, not the machine: the supervisor's id is
+        # whatever board it last saw, which on a bench with two hands is not
+        # necessarily the one this session is driving.
+        from_board = (hand.board_hand_id if hand is not None
+                      else self.supervisor.hand_id)
+        known = hand_ids.assigned_ids()
         return {
             "known": known,
             "auto": hand_ids.auto_id(from_board, None),
             "selected": self._hand_id_choice,
             "from_board": from_board,
-            "in_use": getattr(hand, "_hand_id", None) if hand is not None else None,
+            "in_use": hand.hand_id if hand is not None else None,
             "available": True,
         }
 
@@ -561,11 +565,19 @@ class HandService:
         session = self.session
         hand = session.hand if session is not None else None
         if hand is not None:
-            hand._hand_id = name or self.hand_ids()["auto"]
+            # Core owns what naming a hand means: it also loads that hand's
+            # calibration and points writes at its file. Passing None asks core
+            # for auto, which resolves it the same way this view reports it.
+            hand.set_hand_id(name)
         return self.hand_ids()
 
     def add_hand_id(self, name: str) -> dict:
-        """Register a name, so a second board-less hand can be told apart."""
+        """Register a name, so a second board-less hand can be told apart.
+
+        The new name is selected as well: it was made for the hand plugged in
+        now, and leaving the choice on auto would resolve to whichever name
+        sorts first -- another hand's.
+        """
         hand_ids = self._hand_register()
 
         try:
@@ -574,7 +586,7 @@ class HandService:
             raise ServiceError(str(e), status_code=400)
         except OSError as e:
             raise ServiceError(f"could not add that hand: {e}", status_code=500)
-        return self.hand_ids()
+        return self.select_hand_id(name)
 
     def delete_hand_id(self, name: str) -> dict:
         """Forget a name and the calibration filed under it.
@@ -788,6 +800,20 @@ class HandService:
                     self._max_current = _current_or_none(hand_config.max_current)
             self._config_gains = config_gains
         self._publish_control_state()
+        # Not in mock mode: a mock hand synthesises its own calibration and
+        # must never be handed a real one, the same way its calibration never
+        # reaches disk.
+        if session.hand is not None and not self.settings.mock:
+            # Name the hand this session is driving, every connect. A chosen
+            # name has to survive the reconnect; with none chosen, core resolves
+            # auto the same way this view reports it, so what the picker shows
+            # is what a calibration is filed under -- a board-less hand left
+            # unnamed would write to the model directory instead.
+            try:
+                session.hand.set_hand_id(self._hand_id_choice)
+            except Exception as exc:
+                logger.warning("could not settle which hand this is (%s): %s",
+                               self._hand_id_choice or "auto", exc)
         if session.caps.motors:
             self._apply_default_profile(session)
         if session.caps.tactile:

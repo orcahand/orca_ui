@@ -71,7 +71,7 @@ def test_a_held_pin_is_re_detected_from_its_known_identity(monkeypatch):
     sensing port that was busy at connect is found from the board's identity."""
     from orca_core.hardware.sensing.serial_discovery import OrcaBoardInfo
 
-    from orca_ui.hand import boards
+    from orca_core import hand_factory as boards
 
     pin, mate = "/dev/cu.usbmodemAAA1", "/dev/cu.usbmodemAAA3"
     motor = OrcaBoardInfo(role="motor", side="right", hw_version=21, fw_version=2,
@@ -98,7 +98,7 @@ def test_a_pinned_console_starts_on_the_pinned_boards_model_not_another_hands(mo
     from types import SimpleNamespace
 
     from orca_ui import cli
-    from orca_ui.hand import boards
+    from orca_core import hand_factory as boards
 
     asked = []
     monkeypatch.setattr(boards, "detect_pinned_board",
