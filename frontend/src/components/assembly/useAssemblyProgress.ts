@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { PROGRESS_KEY, readProgress, validateProgress, type Progress } from './progress'
+import { PROGRESS_KEY, dropLinkBuild, readProgress, validateProgress, type Progress } from './progress'
 import { WEB_GUIDE } from './webMode'
 
 // Serialize writes across popup mounts so an older save cannot finish last.
@@ -21,7 +21,7 @@ export function useAssemblyProgress() {
   const generation=useRef(0)
   useEffect(()=>{
     let active=true
-    if(WEB_GUIDE) {setReady(true);return}
+    if(WEB_GUIDE) {dropLinkBuild();setReady(true);return}
     // Flush a previous popup's last save before restoring its state.
     writes.catch(()=>{}).then(()=>fetch('/api/assembly/progress',{signal:AbortSignal.timeout(4000)})).then(async response=>{
       if(!response.ok) throw new Error('Load failed')

@@ -14,9 +14,31 @@ export type Progress = {
 }
 export const EMPTY_PROGRESS: Progress = { current: STEPS[0].id, done: [], tendons: [], checks: [], views: {'guide:revision':'assembly-v5','guide:feedback':'oct15-v1','guide:layout':'oct16-v1','guide:finger-layout':'parts-first-v1','guide:thumb-layout':'parts-first-v1','guide:thumb-cables':'oct18-v1'}, build: { side: 'right', motor: 'dynamixel', version: 'base', audience: 'external' } }
 export function readProgress(): Progress {
+  let progress: Progress
   try {
-    return validateProgress(JSON.parse(localStorage.getItem(PROGRESS_KEY) ?? 'null'))
-  } catch { return structuredClone(EMPTY_PROGRESS) }
+    progress = validateProgress(JSON.parse(localStorage.getItem(PROGRESS_KEY) ?? 'null'))
+  } catch { progress = structuredClone(EMPTY_PROGRESS) }
+  return Object.keys(LINK_BUILD).length ? changeBuildProgress(progress, LINK_BUILD) : progress
+}
+// A link can name the build: the QR on a kit's label sheet opens the guide set to that
+// kit, ?side=l|r&motor=dx|ft (left/right, dynamixel/feetech also read). Read once when
+// the page loads; useAssemblyProgress then takes it off the address, so a later change
+// in the Hand or Motors picker survives a reload.
+export function buildFromLink(search: string): Partial<Build> {
+  const q = new URLSearchParams(search), out: Partial<Build> = {}
+  const side = (q.get('side') ?? '').toLowerCase(), motor = (q.get('motor') ?? '').toLowerCase()
+  if (side === 'l' || side === 'left') out.side = 'left'
+  else if (side === 'r' || side === 'right') out.side = 'right'
+  if (motor === 'dx' || motor === 'dynamixel') out.motor = 'dynamixel'
+  else if (motor === 'ft' || motor === 'feetech') out.motor = 'feetech'
+  return out
+}
+export const LINK_BUILD: Partial<Build> = WEB_GUIDE && typeof window !== 'undefined' ? buildFromLink(window.location.search) : {}
+export function dropLinkBuild() {
+  const url = new URL(window.location.href)
+  if (!url.searchParams.has('side') && !url.searchParams.has('motor')) return
+  url.searchParams.delete('side'); url.searchParams.delete('motor')
+  window.history.replaceState(window.history.state, '', url)
 }
 export function validateProgress(data: unknown): Progress {
   try {
