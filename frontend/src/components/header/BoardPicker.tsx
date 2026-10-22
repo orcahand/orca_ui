@@ -34,7 +34,11 @@ function optionLabel(board: BoardEntry): string {
     : board.busy
       ? ' — in use'
       : ''
-  return `${shortDevice(board.device)} — ${what}${state}`
+  const ids =
+    board.kind === 'oh_board' && !board.busy
+      ? ` — S/N ${board.serial ?? 'none'}, board ${board.board_id ?? 'unknown'}`
+      : ''
+  return `${shortDevice(board.device)} — ${what}${ids}${state}`
 }
 
 export function BoardPicker() {

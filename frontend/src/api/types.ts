@@ -95,6 +95,8 @@ export interface BoardEntry {
   kind: 'oh_board' | 'motor_adapter'
   side: 'left' | 'right' | null
   hand_id: string | null
+  serial: string | null // null until the hand is provisioned
+  board_id: string | null
   // Model the board's provisioned config declares; null when it doesn't.
   model_name: string | null
   ports: string[]
