@@ -1,3 +1,4 @@
 # assembly-guide: PRs need one approval from ops/admin (the people who may
-# push to this branch directly). Branch protection enforces it.
-* @orcahand/orca-admins @fabricenoelbourquin @javid-orca
+# push to this branch directly). Branch protection enforces it. The
+# orca-admins team is secret, so its members are listed by name; keep in step.
+* @Kai-ste @clemens-chr @orca-mrv @nhulsi @wim-wende @wimwende @fabricenoelbourquin @javid-orca
