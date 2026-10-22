@@ -210,6 +210,9 @@ class HandService:
         self._bench_period_s = BENCH_DWELL_S
         self._bench_thread: threading.Thread | None = None
         self._bench_stop = threading.Event()
+        # Which hand the operator says this is, when no board can say. Session
+        # only: auto resolves again next launch, by design for now.
+        self._hand_id_choice: str | None = None
         self._tactile_mode = "combined"
         self._control_source = ControlSource.MANUAL
         self._control_owner_label = ControlSource.MANUAL.value
@@ -490,6 +493,105 @@ class HandService:
         except (HandBusyError, ModelSelectError) as e:
             raise ServiceError(str(e), status_code=409)
         return self.boards()
+
+    # ----- which hand this is ------------------------------------------
+    #
+    # A hand's calibration is filed under the hand, so the console has to know
+    # which one is in front of it. A board names itself; a hand with no board
+    # cannot, and nothing can tell one board-less hand from another, so the
+    # name is the operator's to give. orca_core.hand_ids keeps the register.
+
+    def _hand_register(self):
+        """orca_core's hand register, or a clear refusal on a core without it."""
+        try:
+            from orca_core import hand_ids
+        except ImportError:
+            raise ServiceError(
+                "this orca_core is too old to keep hands by name; upgrade it",
+                status_code=409)
+        return hand_ids
+
+    def hand_ids(self) -> dict:
+        """The hand menu: what auto resolves to, what is chosen, what is known.
+
+        ``from_board`` is the name the hardware gives — the serial it was
+        provisioned with, else its board id — which the supervisor already
+        resolves. ``auto`` falls back to the first name this machine knows,
+        which is all there is for a hand with no board.
+        """
+        # A core older than the hand register has no hands to offer; the
+        # picker then renders nothing, the way it does in mock mode.
+        try:
+            from orca_core import hand_ids
+        except ImportError:
+            return {"known": [], "auto": None, "selected": None,
+                    "from_board": None, "in_use": None, "available": False}
+
+        from_board = self.supervisor.hand_id
+        known = hand_ids.known_ids()
+        session = self.session
+        hand = session.hand if session is not None else None
+        return {
+            "known": known,
+            "auto": hand_ids.auto_id(from_board, None),
+            "selected": self._hand_id_choice,
+            "from_board": from_board,
+            "in_use": getattr(hand, "_hand_id", None) if hand is not None else None,
+            "available": True,
+        }
+
+    def select_hand_id(self, name: str | None) -> dict:
+        """Choose which hand this is, or (``None``) hand it back to auto.
+
+        Not remembered between launches: auto resolves again next time. The
+        choice reaches the connected hand immediately, so what it reads and
+        writes follows without a reconnect.
+        """
+        hand_ids = self._hand_register()
+
+        if name is not None and not hand_ids.valid_id(name):
+            raise ServiceError(
+                f"{name!r} cannot be a hand id: 1-20 characters of "
+                "[0-9A-Za-z._-], at least one alphanumeric", status_code=400)
+        if name is not None and name not in hand_ids.known_ids():
+            raise ServiceError(f"this machine knows no hand called {name!r}",
+                               status_code=404)
+        self._hand_id_choice = name
+        session = self.session
+        hand = session.hand if session is not None else None
+        if hand is not None:
+            hand._hand_id = name or self.hand_ids()["auto"]
+        return self.hand_ids()
+
+    def add_hand_id(self, name: str) -> dict:
+        """Register a name, so a second board-less hand can be told apart."""
+        hand_ids = self._hand_register()
+
+        try:
+            hand_ids.add_id(name)
+        except hand_ids.HandIdError as e:
+            raise ServiceError(str(e), status_code=400)
+        except OSError as e:
+            raise ServiceError(f"could not add that hand: {e}", status_code=500)
+        return self.hand_ids()
+
+    def delete_hand_id(self, name: str) -> dict:
+        """Forget a name and the calibration filed under it.
+
+        The caller confirms first: this throws away a calibration, which only
+        calibrating that hand again can replace.
+        """
+        hand_ids = self._hand_register()
+
+        try:
+            hand_ids.delete_id(name)
+        except hand_ids.HandIdError as e:
+            raise ServiceError(str(e), status_code=404)
+        except OSError as e:
+            raise ServiceError(f"could not delete that hand: {e}", status_code=500)
+        if self._hand_id_choice == name:
+            self._hand_id_choice = None
+        return self.hand_ids()
 
     def set_hardware_version(self, version: int | None) -> dict:
         """Pin the hardware version in config.yaml (``None`` = auto) and

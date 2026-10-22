@@ -13,6 +13,18 @@ class JointTargets(BaseModel):
     angles: dict[str, float]
 
 
+class HandIdRequest(BaseModel):
+    """Which hand this is. ``None`` hands the choice back to auto."""
+
+    name: Optional[str] = None
+
+
+class HandIdNameRequest(BaseModel):
+    """A hand id to add, or to forget."""
+
+    name: str
+
+
 class ChangelogSeenRequest(BaseModel):
     """Whether this release's notes should stay shut until the next one."""
 

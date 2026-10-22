@@ -97,6 +97,22 @@ def build_router(service: HandService) -> APIRouter:
         """
         return guard(service.select_board, body.device)
 
+    @router.get("/hands")
+    def hands():
+        return guard(service.hand_ids)
+
+    @router.post("/hands/select")
+    def hands_select(body: schemas.HandIdRequest):
+        return guard(service.select_hand_id, body.name)
+
+    @router.post("/hands/add")
+    def hands_add(body: schemas.HandIdNameRequest):
+        return guard(service.add_hand_id, body.name)
+
+    @router.post("/hands/delete")
+    def hands_delete(body: schemas.HandIdNameRequest):
+        return guard(service.delete_hand_id, body.name)
+
     @router.post("/hardware_version")
     def hardware_version(body: schemas.HardwareVersionRequest):
         """Pin the hand's hardware version in its config.yaml, or (null) back
