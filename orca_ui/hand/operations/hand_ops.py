@@ -40,7 +40,8 @@ def request_stop(hand) -> None:
 
 
 def build_maintenance_hand(config, stop_event: threading.Event,
-                           retry_s: float = 2.0, motor_port: str | None = None):
+                           retry_s: float = 2.0, motor_port: str | None = None,
+                           hand_id_choice: str | None = None):
     """Fresh motor-only OrcaHand for a maintenance operation.
 
     Built from the supervisor's config, so the hardware version in force (and
@@ -48,6 +49,12 @@ def build_maintenance_hand(config, stop_event: threading.Event,
     plain class — never the feedback subclass, whose joint loop refuses to
     calibrate. Port-open is retried briefly to absorb the OS serial release
     latency after the supervisor closed the session.
+
+    ``hand_id_choice`` is the name picked in the console, or None for auto. It
+    has to be put on this hand too: a board names itself at connect, but a
+    name a user gave lives only on the session's hand, and an operation that
+    persists -- a calibration above all -- would file its result in the model
+    directory instead of under the hand.
     """
     import copy
 
@@ -67,6 +74,7 @@ def build_maintenance_hand(config, stop_event: threading.Event,
         except Exception as e:
             ok, last_message = False, str(e)
         if ok:
+            hand.set_hand_id(hand_id_choice)
             return hand
         if stop_event.is_set():
             raise RuntimeError("stopped while connecting")

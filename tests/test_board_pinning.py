@@ -25,16 +25,24 @@ def test_a_maintenance_hand_connects_on_the_leased_port(monkeypatch):
     class FakeHand:
         def __init__(self, config):
             self.config = config
+            self.named = "unset"
 
         def connect(self, interactive=False):
             return True, "ok"
 
+        def set_hand_id(self, name):
+            self.named = name
+
     monkeypatch.setattr(orca_core, "OrcaHand", FakeHand)
     supervisor_config = SimpleNamespace(port="auto")
     hand = hand_ops.build_maintenance_hand(supervisor_config, threading.Event(),
-                                           motor_port="/dev/cu.usbmodemPINNED")
+                                           motor_port="/dev/cu.usbmodemPINNED",
+                                           hand_id_choice="bench-left")
     assert hand.config.port == "/dev/cu.usbmodemPINNED"
     assert supervisor_config.port == "auto"
+    # Without this the operation's own hand is nameless, and anything it
+    # persists lands in the model directory instead of under the hand.
+    assert hand.named == "bench-left"
 
 
 def test_a_pinned_board_never_falls_back_to_another_hand(monkeypatch):

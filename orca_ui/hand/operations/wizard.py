@@ -60,7 +60,8 @@ class WizardOperation(Operation):
             ctx.set_phase("connecting", detail="opening motor-only connection")
             hand = hand_ops.build_maintenance_hand(
                 supervisor.config, ctx.stop_event,
-                motor_port=lease.presence.motor_port if lease.presence else None)
+                motor_port=lease.presence.motor_port if lease.presence else None,
+                hand_id_choice=ctx.service.hand_id_choice)
             self._hand = hand
             apply_calibration_current(hand, ctx.service.max_current, ctx)
             try:

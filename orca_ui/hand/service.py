@@ -213,6 +213,9 @@ class HandService:
         # Which hand the operator says this is, when no board can say. Session
         # only: auto resolves again next launch, by design for now.
         self._hand_id_choice: str | None = None
+        # The board the choice was made against, so a name picked for one hand
+        # does not follow the console onto another.
+        self._hand_id_choice_board: str | None = None
         self._tactile_mode = "combined"
         self._control_source = ControlSource.MANUAL
         self._control_owner_label = ControlSource.MANUAL.value
@@ -545,6 +548,15 @@ class HandService:
             "available": True,
         }
 
+    @property
+    def hand_id_choice(self) -> str | None:
+        """The name picked in the picker, or None for auto.
+
+        What an operation puts on the hand it builds for itself: core resolves
+        None the same way this console reports auto.
+        """
+        return self._hand_id_choice
+
     def select_hand_id(self, name: str | None) -> dict:
         """Choose which hand this is, or (``None``) hand it back to auto.
 
@@ -561,9 +573,10 @@ class HandService:
         if name is not None and name not in hand_ids.assigned_ids():
             raise ServiceError(f"this machine knows no hand called {name!r}",
                                status_code=404)
-        self._hand_id_choice = name
         session = self.session
         hand = session.hand if session is not None else None
+        self._hand_id_choice = name
+        self._hand_id_choice_board = hand.board_hand_id if hand is not None else None
         if hand is not None:
             # Core owns what naming a hand means: it also loads that hand's
             # calibration and points writes at its file. Passing None asks core
@@ -604,6 +617,7 @@ class HandService:
             raise ServiceError(f"could not delete that hand: {e}", status_code=500)
         if self._hand_id_choice == name:
             self._hand_id_choice = None
+            self._hand_id_choice_board = None
         return self.hand_ids()
 
     def set_hardware_version(self, version: int | None) -> dict:
@@ -803,6 +817,15 @@ class HandService:
         # Not in mock mode: a mock hand synthesises its own calibration and
         # must never be handed a real one, the same way its calibration never
         # reaches disk.
+        if (self._hand_id_choice is not None
+                and session.hand is not None
+                and session.hand.board_hand_id != self._hand_id_choice_board):
+            # A different hand is on the bus than the one that name was picked
+            # for. Keeping it would file this hand's calibration under another.
+            logger.info("hand %s was picked for a different hand; back to auto",
+                        self._hand_id_choice)
+            self._hand_id_choice = None
+            self._hand_id_choice_board = None
         if session.hand is not None and not self.settings.mock:
             # Name the hand this session is driving, every connect. A chosen
             # name has to survive the reconnect; with none chosen, core resolves

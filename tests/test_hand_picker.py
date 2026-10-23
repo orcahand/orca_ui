@@ -220,3 +220,42 @@ class TestAutoIsActuallyInForce:
         hand_ids.add_id("zeta", client.calibrations)
         body = client.post("/api/hands/select", json={"name": "zeta"}).json()
         assert body["auto"] == "alpha" and body["in_use"] == "zeta"
+
+
+class TestAPickDoesNotFollowOntoAnotherHand:
+    """A name is picked for the hand in front of you, not for the console.
+
+    With two hands on one bench, a name chosen for the board-less one would
+    otherwise still be in force after switching to a hand that names itself --
+    and that hand's calibration would be filed under the other one's name.
+    """
+
+    def test_a_pick_is_dropped_when_a_different_hand_appears(self, client,
+                                                             monkeypatch):
+        hand_ids.add_id("bench-left", client.calibrations)
+        client.post("/api/hands/select", json={"name": "bench-left"})
+        assert client.get("/api/hands").json()["selected"] == "bench-left"
+
+        service = client.app.state.service
+        hand = service.session.hand
+        monkeypatch.setattr(service, "settings",
+                            dataclasses.replace(service.settings, mock=False))
+        # The next session is a hand that names itself: another hand entirely.
+        monkeypatch.setattr(type(hand), "board_hand_id",
+                            property(lambda self: "ser-0001"))
+        service._session_ready(service.session)
+
+        assert client.get("/api/hands").json()["selected"] is None
+
+    def test_a_pick_survives_a_reconnect_of_the_same_hand(self, client,
+                                                          monkeypatch):
+        hand_ids.add_id("bench-left", client.calibrations)
+        hand_ids.add_id("bench-right", client.calibrations)
+        client.post("/api/hands/select", json={"name": "bench-right"})
+        service = client.app.state.service
+        monkeypatch.setattr(service, "settings",
+                            dataclasses.replace(service.settings, mock=False))
+        service._session_ready(service.session)
+        body = client.get("/api/hands").json()
+        assert body["selected"] == "bench-right"
+        assert body["in_use"] == "bench-right"
