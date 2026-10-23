@@ -474,6 +474,9 @@ class HandService:
                 "active_sensors": list(tactile_config.active_sensors),
                 "num_taxels": dict(tactile_config.num_taxels),
             }
+        fingertips = session.fingertip_identities() if session else None
+        if fingertips is not None:
+            info["fingertips"] = fingertips
         return info
 
     def models(self) -> dict:
@@ -564,12 +567,15 @@ class HandService:
                 continue  # rebuilt below from the live session
             entries.append(dict(board.as_dict(), held_by_console=False))
         if own:
+            identity = self.supervisor.identity
             entries.append(
                 {
                     "device": status.ports.get("motor") or sorted(own)[0],
                     "kind": "oh_board",
                     "side": status.side or None,
-                    "hand_id": None,
+                    "hand_id": identity and identity.hand_id,
+                    "serial": identity and identity.serial,
+                    "board_id": identity and identity.board_id,
                     "model_name": status.model,
                     "ports": sorted(own),
                     "busy": False,

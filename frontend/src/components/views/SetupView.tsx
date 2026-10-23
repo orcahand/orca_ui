@@ -1,20 +1,26 @@
-// Setup tab: tension → calibrate → run. Each step can run on its own; the
-// flow only marks which one is next. Cross-tab control of a running operation
-// lives in the TransportBar. The flowchart under the steps spells the loop
-// out; the operation log sits collapsed at the bottom.
+// Setup tab: tension → calibrate → run, plus fingertip numbering under
+// Advanced. Each step can run on its own; the flow only marks which one is
+// next. Cross-tab control of a running operation lives in the TransportBar.
+// The flowchart under the steps spells the loop out; the operation log sits
+// collapsed at the bottom.
 
+import { useState } from 'react'
 import { AssemblyCard } from '../assembly/AssemblyCard'
 import { useAppStore } from '../../state/appStore'
-import { useOperationStore } from '../../state/operationStore'
+import { isOperationActive, useOperationStore } from '../../state/operationStore'
 import { useSetupVariant } from '../../state/setupVariant'
 import { HardwareVersionPrompt } from '../header/HardwareVersion'
 import { CalibrateStep } from '../setup/CalibrateStep'
+import { FingertipMismatches, FingertipNumbering } from '../setup/FingertipNumbering'
 import type { StepState } from '../setup/FlowStep'
 import { OperationLogPane } from '../setup/OperationLogPane'
 import { RunInStep } from '../setup/RunInStep'
 import { readRunInDone, runInCompleted } from '../setup/setupUtils'
 import { TensionStep } from '../setup/TensionStep'
 import { WorkflowChart } from '../setup/WorkflowChart'
+
+// Remembered across reloads and the view remounting when the hand reconnects.
+const ADVANCED_KEY = 'orca-ui.setup-advanced'
 
 export function SetupView() {
   const handInfo = useAppStore((s) => s.handInfo)
@@ -45,6 +51,14 @@ export function SetupView() {
   const encodersOff =
     calibrated && caps !== null && Boolean(caps.declared.encoders) && !caps.encoders
 
+  // Only hands that carry fingertips get numbering; capabilities are blank
+  // while the numbering op holds the hand in maintenance, so keep it then.
+  const numbering = operation?.kind === 'number_fingertip' && isOperationActive(operation)
+  const tactileHand = Boolean(caps?.declared.tactile ?? caps?.tactile) || numbering
+  const [advancedOpen, setAdvancedOpen] = useState(
+    () => numbering || localStorage.getItem(ADVANCED_KEY) === 'true',
+  )
+
   return (
     <>
       <AssemblyCard />
@@ -56,6 +70,7 @@ export function SetupView() {
           ⚠ joint sensing off · reconnect
         </div>
       )}
+      <FingertipMismatches mismatches={handInfo?.fingertips?.mismatches} />
       <HardwareVersionPrompt />
       <div className="flow">
         <TensionStep state={tension} variant={variant} />
@@ -64,6 +79,20 @@ export function SetupView() {
         <span className="flow-arrow" aria-hidden="true">›</span>
         <RunInStep state={runIn} calibrated={calibrated} />
       </div>
+      {tactileHand && (
+        <details
+          className="flow-advanced setup-advanced"
+          open={advancedOpen}
+          onToggle={(e) => {
+            const open = e.currentTarget.open
+            localStorage.setItem(ADVANCED_KEY, String(open))
+            setAdvancedOpen(open)
+          }}
+        >
+          <summary>Advanced</summary>
+          <FingertipNumbering />
+        </details>
+      )}
       <WorkflowChart />
       <details className="log-collapse">
         <summary>Operation log</summary>

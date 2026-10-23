@@ -7,6 +7,7 @@ import type { Finger, TaxelGeometry } from '../../api/types'
 import { FINGERS } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
 import { Panel } from '../common/Panel'
+import { FingertipMismatches } from '../setup/FingertipNumbering'
 import { FingerTaxelSvg } from './FingerTaxelSvg'
 import { ForceDial } from './ForceDial'
 import { TaxelControls } from './TaxelControls'
@@ -14,6 +15,7 @@ import { TaxelControls } from './TaxelControls'
 export function TactilePanel() {
   const [geometry, setGeometry] = useState<TaxelGeometry | null>(null)
   const control = useAppStore((s) => s.control)
+  const mismatches = useAppStore((s) => s.handInfo?.fingertips?.mismatches)
   const mode = control?.tactile_mode ?? 'combined'
 
   useEffect(() => {
@@ -25,6 +27,7 @@ export function TactilePanel() {
 
   return (
     <Panel title="Tactile Sensors" toolbar={<TaxelControls />}>
+      <FingertipMismatches mismatches={mismatches} />
       {showTaxels && geometry && (
         <div className="taxels-container">
           {FINGERS.map((finger: Finger) => {

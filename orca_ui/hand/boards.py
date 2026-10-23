@@ -55,6 +55,8 @@ class BoardEntry:
     kind: str  # "oh_board" | "motor_adapter"
     side: Optional[str]
     hand_id: Optional[str]
+    serial: Optional[str]  # assigned when the hand is provisioned
+    board_id: Optional[str]  # MCU-derived, fixed per board
     model_name: Optional[str]  # from the provisioned CFG code, when declared
     ports: tuple[str, ...]
     busy: bool
@@ -65,6 +67,8 @@ class BoardEntry:
             "kind": self.kind,
             "side": self.side,
             "hand_id": self.hand_id,
+            "serial": self.serial,
+            "board_id": self.board_id,
             "model_name": self.model_name,
             "ports": list(self.ports),
             "busy": self.busy,
@@ -125,17 +129,18 @@ def scan_boards() -> list[BoardEntry]:
         ports = tuple(p for p in (group["motor"], group["sensor"]) if p)
         entries.append(BoardEntry(
             device=device, kind="oh_board", side=info.side,
-            hand_id=info.hand_id, model_name=_declared_model(info),
+            hand_id=info.hand_id, serial=info.serial,
+            board_id=info.board_id, model_name=_declared_model(info),
             ports=ports, busy=False))
     for port in sorted(unanswered):
         entries.append(BoardEntry(
-            device=port, kind="oh_board", side=None, hand_id=None,
+            device=port, kind="oh_board", side=None, hand_id=None, serial=None, board_id=None,
             model_name=None, ports=(port,), busy=port_in_use(port)))
     for port in _classic_motor_ports():
         if port in candidates:
             continue
         entries.append(BoardEntry(
-            device=port, kind="motor_adapter", side=None, hand_id=None,
+            device=port, kind="motor_adapter", side=None, hand_id=None, serial=None, board_id=None,
             model_name=None, ports=(port,), busy=port_in_use(port)))
     entries.sort(key=lambda entry: entry.device)
     return entries
