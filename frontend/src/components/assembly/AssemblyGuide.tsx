@@ -30,7 +30,8 @@ import { TouchScrewGuide } from './TouchScrewGuide'
 import {StepMedia} from './StepMedia'
 import {StepSupplies} from './StepSupplies'
 import { ThreadingAnimation } from './ThreadingAnimation'
-import { EMPTY_PROGRESS, changeBuildProgress } from './progress'
+import { EMPTY_PROGRESS, changeBuildProgress, flashingMethod } from './progress'
+import { SHOW_INTERNAL_EDITION, SHOW_TOUCH, editionBuild } from './editions'
 import { useAssemblyProgress } from './useAssemblyProgress'
 import { buildSteps, commands, FINAL_CHECKS, figures, GLOSSARY, instructions, kit, note, type Build, type Figure } from './buildContent'
 import './assembly.css'
@@ -42,7 +43,8 @@ const DETAIL_AT:Record<string,number>={'pp-ready':1,'thumb-pp-ready':1,'finishin
 const PartsExplorer = lazy(() => import('./PartsExplorer').then(m=>({default:m.PartsExplorer})))
 export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void; safetyControl?: ReactNode }) {
   const {progress,setProgress,ready,saveStatus} = useAssemblyProgress()
-  const editing=useGuideEditing([progress.build.version,progress.build.side,progress.build.motor,progress.build.audience].join('/'))
+  const build = editionBuild(progress.build)
+  const editing=useGuideEditing([build.version,build.side,build.motor,build.audience].join('/'))
   const [query, setQuery] = useState('')
   const [navOpen, setNavOpen] = useState(false)
   const [sidebarCollapsed,setSidebarCollapsed] = useState(false)
@@ -50,7 +52,8 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
   const [glossary, setGlossary] = useState(false)
   const heading = useRef<HTMLHeadingElement>(null)
   const main = useRef<HTMLElement>(null)
-  const STEPS = buildSteps(progress.build)
+  const method = flashingMethod(progress)
+  const STEPS = buildSteps(build, method)
   const step = STEPS.find(s => s.id === progress.current) ?? STEPS[0]
   const index = STEPS.indexOf(step)
   const required = STEPS.filter(s=>!s.hint&&s.id!=='p1')
@@ -59,7 +62,6 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
   const next = STEPS.slice(index+1).find(s=>!s.hint)
   const resume = required.find(s=>s.id===progress.views['hint:return']) ?? previous ?? required[0]
   const done = progress.done.includes(step.id)
-  const build = progress.build
   const copy = instructions(step, build)
   const stepFigures = figures(step, build)
   const warning = note(step, build)
@@ -78,6 +80,9 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
     requestAnimationFrame(() => heading.current?.focus({ preventScroll: true }))
   }
   function changeBuild(value: Partial<Build>) { setProgress(p=>changeBuildProgress(p,value)) }
+  function chooseFlashing(next: 'console'|'firmware') {
+    setProgress(p=>({...p,views:{...p.views,'flashing:method':next},current:step.chapter.startsWith('Flashing')?(next==='console'?(['p110','p154'].includes(step.id)?'p110':'p105'):(['p110','p154'].includes(step.id)?'p154':'p150')):p.current}))
+  }
   function toggleDone() {
     if (!done && !allChecked) return
     setProgress(p => ({ ...p, done: done ? p.done.filter(id => id !== step.id) : [...p.done, step.id] }))
@@ -122,8 +127,10 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
         {step.id === 'p1' && <div className="assembly-step-meta assembly-config-chips">
           <label><span className="assembly-sr-only">Hand</span><select aria-label="Hand" value={build.side} onChange={e=>changeBuild({side:e.target.value as Build['side']})}><option value="right">Right hand</option><option value="left">Left hand</option></select></label>
           <label><span className="assembly-sr-only">Motors</span><select aria-label="Motors" value={build.motor} onChange={e=>changeBuild({motor:e.target.value as Build['motor']})}><option value="dynamixel">Dynamixel</option><option value="feetech">FeeTech</option></select></label>
-          <label><span className="assembly-sr-only">Version</span><select aria-label="Version" value={build.version} onChange={e=>changeBuild({version:e.target.value as Build['version']})}><option value="base">Base</option><option value="touch">Touch</option><option value="full">Full</option></select></label>
+          <label><span className="assembly-sr-only">Version</span><select aria-label="Version" value={build.version} onChange={e=>changeBuild({version:e.target.value as Build['version']})}><option value="base">Base</option>{SHOW_TOUCH&&<option value="touch">Touch</option>}<option value="full">Full</option></select></label>
+          {SHOW_INTERNAL_EDITION&&<label><span className="assembly-sr-only">Guide edition</span><select aria-label="Guide edition" value={build.audience} onChange={e=>changeBuild({audience:e.target.value as Build['audience']})}><option value="internal">Internal</option><option value="external">External</option></select></label>}
           </div>}
+        {build.audience==='internal'&&step.chapter.startsWith('Flashing')&&<section className="assembly-flashing-choice"><h3><GuideText variant field="prose/AssemblyGuide.tsx/1c73a2d7fd" text={"Choose one flashing method"} label="Section heading"/></h3><div className="assembly-clip-tabs"><button aria-pressed={method==='console'} onClick={()=>chooseFlashing('console')}>ORCA Console</button><button aria-pressed={method==='firmware'} onClick={()=>chooseFlashing('firmware')}>orca_firmware · terminal</button></div></section>}
         {step.id === 'p1' && <><Suspense fallback={<p>{"Loading your hand…"}</p>}><PartsExplorer build={build}/></Suspense>{build.version==='touch'&&<p className="assembly-muted"><GuideText variant field="prose/AssemblyGuide.tsx/750d98ce89" text={"Build the fingers and thumb with all skins off. Connect and mount their Touch sensors next, then fit the PP skins before building the hand and tower. Connect the sensor cable tails to the connector board later. Touch uses sensors instead of DP skins."} label="Guide text"/></p>}{build.version==='full'&&<p className="assembly-note"><GuideText variant field="prose/AssemblyGuide.tsx/d6745dd89a" text={"Full-specific sensor installation and harness routing still need a verified procedure before closing the hand."} label="Guide text"/></p>}</>}
         {step.id==='p1'&&<section className="assembly-tool-overview"><h3><GuideText variant field="prose/AssemblyGuide.tsx/f7fe31ffad" text={"Tools"} label="Section heading"/></h3><div className="assembly-tool-columns"><div><h4><GuideText variant field="prose/AssemblyGuide.tsx/5e36900b3e" text={"At the bench"} label="Section heading"/></h4><ul>{equipment.assembly.map((item,i)=><li key={i}><GuideText field={`equipment/assembly/${i}`} text={item} label={`Tool ${i+1}`}/></li>)}</ul></div><div><h4><GuideText variant field="prose/AssemblyGuide.tsx/fb93ba8114" text={"Setup and electronics"} label="Section heading"/></h4><ul>{equipment.setup.map((item,i)=><li key={i}><GuideText field={`equipment/setup/${i}`} text={item} label={`Tool ${i+1}`}/></li>)}</ul></div></div></section>}
         <StepMedia key={`${step.id}-${build.motor}`} step={step.id} build={build}>
@@ -141,6 +148,7 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
               {build.version==='base'&&step.id==='p37'&&i===1&&<KnotReinforcement count={1}/>}
               <p className="assembly-guided-text"><span aria-hidden="true">{i+1}</span><GuideText field={`${step.id}/instruction/${i}`} text={instruction} label={`Instruction ${i+1}`}/></p>
               {command.map(text=><Command key={text} command={text}/>)}
+              {['p105','p110'].includes(step.id)&&i===0&&<a className="assembly-inline-resource" href="https://orca-console-169809101000.europe-west6.run.app" target="_blank" rel="noreferrer">Open ORCA Console flashing tool ↗</a>}
               {images.length>0&&<MediaGallery key={`${step.id}-${build.side}-${build.motor}-${build.version}-${i}`} items={images} focused={-1} saved={progress.views[step.id]} onSelect={src=>setProgress(p=>({...p,views:{...p.views,[step.id]:src}}))}/>}
               {step.id==='p139'&&i===0&&checklist.length > 0 && <section className="assembly-work-checklist"><h3><GuideText variant field="prose/AssemblyGuide.tsx/3d29c4c3a3" text={String(step.id === 'p139' ? 'Final assembly checklist' : 'Finger movement checklist')} label="Section heading"/></h3>{checklist.map((label,i) => <label key={label}><input type="checkbox" checked={progress.checks.includes(checkKey(i))} onChange={() => toggleCheck(checkKey(i))} /><span><GuideText field={`${step.id}/check/${i}`} text={label} label={`Checklist item ${i+1}`}/></span></label>)}</section>}
         {i===1&&step.id==='motor-check'&&<MotorCheck build={build} selected={Number(progress.views['motor-check:selected']??1)} onSelect={id=>setProgress(p=>({...p,views:{...p.views,'motor-check:selected':String(id)}}))} checked={Array.from({length:17},(_,i)=>i+1).filter(id=>progress.checks.includes(`motor-check:${id}`))} onCheck={id=>toggleCheck(`motor-check:${id}`)}/>}

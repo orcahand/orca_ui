@@ -282,8 +282,8 @@ export const note = stepNote
 export type FlashingMethod = 'console' | 'firmware'
 const DP_PIN_INSTRUCTION='Add the upper Ø2×6 mm pin. Keep the two DP tendons between the upper and lower pins, ensure that the DP flexor tendon is more in the middle of the part and press the pin fully into its seat. Gently pull each DP end to check that it runs freely.'
 export const BASE_STEP_REDIRECTS:Record<string,string>={'thumb-tendons':'thumb-parts','finishing-pp':'p42',p141:'p139','motor-check':'p139'}
-export function buildSteps(build: Build): AssemblyStep[] {
-  const selected = STEPS.filter(s => !s.chapter.startsWith('Flashing') && !(build.version==='base'&&BASE_STEP_REDIRECTS[s.id]) && !(build.version==='touch'&&['finishing-pp','thumb-skins'].includes(s.id)) && !s.id.startsWith('touch-')).map(s => {
+export function buildSteps(build: Build, method?: FlashingMethod): AssemblyStep[] {
+  const selected = STEPS.filter(s => !(s.chapter.startsWith('Flashing') && (build.audience==='external' || (build.version==='base'&&['p110','p154'].includes(s.id)) || (method==='firmware'&&['p105','p110'].includes(s.id)) || (method!=='firmware'&&['p150','p154'].includes(s.id)))) && !(build.version==='base'&&BASE_STEP_REDIRECTS[s.id]) && !(build.version==='touch'&&['finishing-pp','thumb-skins'].includes(s.id)) && !s.id.startsWith('touch-')).map(s => {
     if(build.version==='base'){
       if(s.id==='pp-ready')return {...s,title:'Fit the PP bearings',check:'Both PP bearings are seated.'}
       if(s.id==='p31')return {...s,title:'Prepare the printed parts for the index'}

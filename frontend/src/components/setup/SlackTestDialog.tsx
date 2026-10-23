@@ -116,6 +116,15 @@ export function SlackTestDialog({ operation, onClose }: { operation: OperationSn
                     keep holding until the next joint is shown.
                   </p>
                   <div className="gt-actions">
+                    {extra?.can_back && (
+                      <button
+                        className="btn btn-secondary"
+                        title="Discard the previous joint's result and test it again"
+                        onClick={() => answer('Back')}
+                      >
+                        Back
+                      </button>
+                    )}
                     <button className="btn btn-secondary" onClick={() => answer('Skip')}>
                       Skip
                     </button>
