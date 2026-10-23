@@ -3345,6 +3345,64 @@ header h1 {
 .flow-advanced[open] > summary::before {
   content: "▾ ";
 }
+
+.setup-advanced {
+  margin-bottom: 12px;
+}
+
+.setup-advanced > summary {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.fingertip-numbering {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 600px;
+  margin-top: 8px;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+}
+
+.fingertip-hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.fingertip-label {
+  min-width: 72px;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.fingertip-numbering .finger-chip:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.fingertip-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  font-size: 12px;
+  border: 1px solid rgb(var(--accent-rgb) / 0.55);
+}
+
+.fingertip-result {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.fingertip-result .flow-info {
+  margin-bottom: 0;
+}
 .gt-confirm {
   display: flex;
   gap: 10px;

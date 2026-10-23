@@ -95,6 +95,8 @@ export interface BoardEntry {
   kind: 'oh_board' | 'motor_adapter'
   side: 'left' | 'right' | null
   hand_id: string | null
+  serial: string | null // null until the hand is provisioned
+  board_id: string | null
   // Model the board's provisioned config declares; null when it doesn't.
   model_name: string | null
   ports: string[]
@@ -272,6 +274,9 @@ export interface HandInfo {
     groups: Record<'abd' | 'mcp' | 'pip', number> | null
     max: number | null
   } | null
+  // Fingertip model per slot and slots holding another finger's model; absent
+  // when the connector-board firmware doesn't report fingertip identities.
+  fingertips?: FingertipIdentities
   // Guided tensioning currents (mA) for this hand's motor family.
   guided_tension_defaults?: {
     motor_type: string | null
@@ -606,6 +611,31 @@ export interface ManualCalibrationExtra {
   position_deg: Record<string, number>
   start_deg: Record<string, number>
   captured: { joint: string; direction: CaptureDirection | null; outcome: 'recorded' | 'skipped'; position_deg: number | null }[]
+}
+
+// ----- fingertip numbering (orca_ui/hand/operations/fingertips.py) ----------
+
+export interface FingertipIdentities {
+  identities: Partial<Record<Finger, string>>
+  mismatches: Partial<Record<Finger, [expected: string, found: string]>>
+}
+
+export interface FoundFingertip {
+  module: number
+  finger: Finger | 'spare' | null // the slot this module number feeds
+  part: string | null // fingertip model, when the board read it
+  fits: number[] // modules whose finger takes this model
+}
+
+export interface FingertipExtra {
+  finger: Finger | 'spare' | null // the chosen target; null for a plain read
+  target_module: number | null
+  current_module: number | null // the fingertip being renumbered
+  result: string | null // scan result: scan_ok | no_sensor | multiple | bus_error
+  found: FoundFingertip[]
+  garbled_modules: number[] // numbers two fingertips seem to share
+  targeted: boolean // the board can renumber one of several fingertips
+  verified: boolean | null
 }
 
 // ----- configure_chain operation extra (orca_ui/hand/operations/chain.py) ----

@@ -168,6 +168,7 @@ class HandSupervisor(threading.Thread):
         # The connected hand's serial (or board id) from its last detection;
         # None in mock mode and for boards that report no identity.
         self._hand_id: str | None = None
+        self._identity = None  # the full OrcaBoardInfo behind _hand_id
         # The hardware version the board last reported; None with no board.
         self._board_hardware_version: int | None = None
         # What config.yaml pins (None = auto); a fresh load is still the pin.
@@ -214,6 +215,10 @@ class HandSupervisor(threading.Thread):
     @property
     def hand_id(self) -> str | None:
         return self._hand_id
+
+    @property
+    def identity(self):
+        return self._identity
 
     @property
     def board_hardware_version(self) -> int | None:
@@ -689,6 +694,7 @@ class HandSupervisor(threading.Thread):
         identity = getattr(detection, "identity", None)
         if identity is not None and identity.hand_id:
             self._hand_id = identity.hand_id
+            self._identity = identity
         if identity is not None and self._board_pinned:
             # Kept so a later probe can start from it once the pinned CDC is held.
             self._pinned_identity = identity
