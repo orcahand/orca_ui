@@ -284,7 +284,7 @@ def simulate_slack_test(ctx: OpContext, config, params: dict, hold, progress) ->
     import dataclasses
     import random
 
-    from orca_core.maintenance.slack_test import FAIL, SlackResult, SlackTestSettings
+    from orca_core.maintenance.slack_test import FAIL, HOLD_BACK, SlackResult, SlackTestSettings
 
     settings = SlackTestSettings(**(params.get("settings") or {}))
     joints = [j for j in config.joint_ids if j != "wrist" and j in config.joint_to_motor_map]
@@ -298,10 +298,20 @@ def simulate_slack_test(ctx: OpContext, config, params: dict, hold, progress) ->
     progress({"event": "slack_plan", "joints": joints, "motors": motors})
     step_s = params["step_duration_s"]
     out = []
-    for n, (j, m) in enumerate(zip(joints, motors)):
+    n = 0
+    while n < len(joints):
+        j, m = joints[n], motors[n]
         r = SlackResult(j, m)
         progress({"event": "slack_joint", "joint": j, "motor": m, "index": n})
-        if not hold(j):
+        answer = hold(j)
+        if answer == HOLD_BACK:
+            if n > 0:
+                n -= 1
+                out.pop()
+                progress({"event": "slack_joint_back", "joint": joints[n]})
+            continue
+        n += 1
+        if not answer:
             r.skipped = True
         else:
             for direction, sense in ((1, "flex"), (-1, "extend")):

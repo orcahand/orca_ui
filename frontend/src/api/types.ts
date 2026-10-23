@@ -327,6 +327,8 @@ export interface SlackTestExtra {
   live: number | null
   results: Record<string, SlackJoint>
   blocked: boolean
+  // The hold prompt offers Back: discard the previous joint's result and test it again.
+  can_back?: boolean
   settings?: Record<string, number>
   saved?: string | null
   deg_per_click?: number | null

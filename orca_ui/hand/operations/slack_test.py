@@ -2,7 +2,8 @@
 its motor winds each way at low current; the free rotation is the slack.
 
 Runs orca_core's run_slack_test under the maintenance lease, asking for each
-joint through ``ctx.wait_input`` (hold, then Test or Skip). The report is kept
+joint through ``ctx.wait_input`` (hold, then Test, Skip, or Back to test the
+previous joint again). The report is kept
 in the hand's setup.yaml (slack_tests); a joint with more than half
 a turn of slack blocks calibration until the hand is tensioned and tested
 again. Live angles stream through the snapshot ``extra`` (SlackTestExtra).
@@ -26,6 +27,7 @@ SETTING_BOUNDS = {
 }
 HOLD_TEST = "Test"
 HOLD_SKIP = "Skip"
+HOLD_BACK = "Back"
 
 
 def hold_prompt(joint: str) -> str:
@@ -78,6 +80,7 @@ class _Presenter:
             "live": None,
             "results": {},
             "blocked": False,
+            "can_back": False,
         }
 
     def _publish(self, force: bool = True) -> None:
@@ -87,14 +90,19 @@ class _Presenter:
         self._last = now
         self._ctx.set_extra({**self.extra, "results": dict(self.extra["results"])})
 
-    def hold(self, joint: str) -> bool:
-        """Park on the hold prompt for ``joint``; False when the operator skips it."""
+    def hold(self, joint: str) -> bool | str:
+        """Park on the hold prompt for ``joint``; False when the operator skips
+        it, orca_core's HOLD_BACK to test the previous joint again."""
+        from orca_core.maintenance.slack_test import HOLD_BACK as CORE_BACK
+
         with self._lock:
-            self.extra.update(step="hold", joint=joint, direction=None, live=None)
+            can_back = self.extra["joints"].index(joint) > 0
+            self.extra.update(step="hold", joint=joint, direction=None, live=None, can_back=can_back)
             self._publish()
         self._ctx.set_phase("hold", detail=f"torque off — hold {joint.replace('_', ' ')}")
-        answer = self._ctx.wait_input(hold_prompt(joint), [HOLD_TEST, HOLD_SKIP])
-        return answer != HOLD_SKIP
+        options = [HOLD_TEST, HOLD_SKIP] + ([HOLD_BACK] if can_back else [])
+        answer = self._ctx.wait_input(hold_prompt(joint), options)
+        return {HOLD_SKIP: False, HOLD_BACK: CORE_BACK}.get(answer, True)
 
     def progress(self, event: dict) -> None:
         kind = event.get("event")
@@ -129,6 +137,14 @@ class _Presenter:
                     else f"{r['joint']}: {r['total_deg']:.0f}° free ({r['plus_deg']:.0f} + {r['minus_deg']:.0f})"
                     + (" — too slack" if r["status"] == "fail" else "")
                 )
+                self._publish()
+            elif kind == "slack_joint_back":
+                joint = event["joint"]
+                self.extra["results"][joint] = {
+                    **self.extra["results"][joint],
+                    "plus_deg": None, "minus_deg": None, "total_deg": None, "clicks": None, "status": None,
+                }
+                self._ctx.log(f"{joint}: back — testing it again")
                 self._publish()
             elif kind == "cleanup_failed":
                 self._ctx.log(f"cleanup failed: {event.get('error')}")
