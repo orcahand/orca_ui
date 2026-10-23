@@ -137,7 +137,7 @@ def resolve_config_path(args: argparse.Namespace) -> tuple[str, bool]:
             if getattr(args, "board", None):
                 # Pinned to one board: ask that board alone. The global probe
                 # would answer with whatever other hand is attached.
-                from orca_ui.hand.boards import detect_pinned_board
+                from orca_core.hand_factory import detect_pinned_board
                 detection = detect_pinned_board(args.board)
                 if detection is None:
                     raise RuntimeError(f"nothing answered on {args.board}")

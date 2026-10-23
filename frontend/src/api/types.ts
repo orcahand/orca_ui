@@ -918,3 +918,19 @@ export interface ChangelogDoc {
   dismissed: boolean
   markdown: string
 }
+
+/** The hand menu: which hand this is, and which ones this machine knows. */
+export interface HandIdsInfo {
+  /** Only names somebody gave: a serial or board id is detected, not chosen. */
+  known: string[]
+  /** What auto resolves to: the board's name, else the first known id. */
+  auto: string | null
+  /** A manual choice, or null while auto is in force. Not remembered. */
+  selected: string | null
+  /** The name the hardware gives, if it can give one. */
+  from_board: string | null
+  /** What the connected hand is actually filing its settings under. */
+  in_use: string | null
+  /** False on an orca_core too old to keep hands by name. */
+  available: boolean
+}

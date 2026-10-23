@@ -7,6 +7,7 @@ import type { ViewName } from '../../state/appStore'
 import { useAppStore } from '../../state/appStore'
 import { BoardPicker } from './BoardPicker'
 import { EStopButton } from './EStopButton'
+import { HandPicker } from './HandPicker'
 import { HardwareVersionBadge } from './HardwareVersion'
 import { LinkControls } from './LinkControls'
 import { ModelPicker } from './ModelPicker'
@@ -81,6 +82,7 @@ export function AppHeader() {
         <span className="brand-sub">HAND CONSOLE</span>
       </h1>
       <ModelPicker />
+      <HandPicker />
       <HardwareVersionBadge />
       <BoardPicker />
       {handInfo?.core?.development && (

@@ -10,6 +10,7 @@ import type {
   BoardsInfo,
   DemoEntry,
   DirectMotorSnapshot,
+  HandIdsInfo,
   HandInfo,
   ModelMetadata,
   MotorModelInfo,
@@ -103,6 +104,11 @@ export const api = {
   selectBoard: (device: string | null) =>
     post<BoardsInfo>('/api/board/select', { device }),
   // Pins hardware_version in the hand's config.yaml; null = take the board's.
+  hands: () => request<HandIdsInfo>('/api/hands'),
+  selectHand: (name: string | null) =>
+    post<HandIdsInfo>('/api/hands/select', { name }),
+  addHand: (name: string) => post<HandIdsInfo>('/api/hands/add', { name }),
+  deleteHand: (name: string) => post<HandIdsInfo>('/api/hands/delete', { name }),
   setHardwareVersion: (version: number | null) =>
     post<StatusSnapshot>('/api/hardware_version', { version }),
   // Clears a latched hardware error. The motor returns with torque off.

@@ -210,6 +210,12 @@ class HandService:
         self._bench_period_s = BENCH_DWELL_S
         self._bench_thread: threading.Thread | None = None
         self._bench_stop = threading.Event()
+        # Which hand the operator says this is, when no board can say. Session
+        # only: auto resolves again next launch, by design for now.
+        self._hand_id_choice: str | None = None
+        # The board the choice was made against, so a name picked for one hand
+        # does not follow the console onto another.
+        self._hand_id_choice_board: str | None = None
         self._tactile_mode = "combined"
         self._control_source = ControlSource.MANUAL
         self._control_owner_label = ControlSource.MANUAL.value
@@ -457,7 +463,7 @@ class HandService:
         """
         if self.settings.mock:
             return {"boards": [], "selected": None, "available": False}
-        from orca_ui.hand.boards import scan_boards
+        from orca_core.hand_factory import scan_boards
 
         status = self.supervisor.status()
         own = {port for port in status.ports.values()
@@ -490,6 +496,129 @@ class HandService:
         except (HandBusyError, ModelSelectError) as e:
             raise ServiceError(str(e), status_code=409)
         return self.boards()
+
+    # ----- which hand this is ------------------------------------------
+    #
+    # A hand's calibration is filed under the hand, so the console has to know
+    # which one is in front of it. A board names itself; a hand with no board
+    # cannot, and nothing can tell one board-less hand from another, so the
+    # name is the operator's to give. orca_core.hand_ids keeps the register.
+
+    def _hand_register(self):
+        """orca_core's hand register, or a clear refusal on a core without it."""
+        try:
+            from orca_core import hand_ids
+        except ImportError:
+            raise ServiceError(
+                "this orca_core is too old to keep hands by name; upgrade it",
+                status_code=409)
+        return hand_ids
+
+    def hand_ids(self) -> dict:
+        """The hand menu: what auto resolves to, what is chosen, what is known.
+
+        ``known`` is only the names somebody gave: a serial or a board id is
+        detected, not chosen, so offering it would invite picking the hand you
+        already have. ``from_board`` is what the hardware reports — the serial
+        it was provisioned with, else its board id — which the supervisor
+        already resolves, and which ``auto`` prefers over any chosen name.
+        """
+        # A core older than the hand register has no hands to offer; the
+        # picker then renders nothing, the way it does in mock mode.
+        try:
+            from orca_core import hand_ids
+        except ImportError:
+            return {"known": [], "auto": None, "selected": None,
+                    "from_board": None, "in_use": None, "available": False}
+
+        session = self.session
+        hand = session.hand if session is not None else None
+        # Ask the connected hand, not the machine: the supervisor's id is
+        # whatever board it last saw, which on a bench with two hands is not
+        # necessarily the one this session is driving.
+        from_board = (hand.board_hand_id if hand is not None
+                      else self.supervisor.hand_id)
+        known = hand_ids.assigned_ids()
+        return {
+            "known": known,
+            "auto": hand_ids.auto_id(from_board, None),
+            "selected": self._hand_id_choice,
+            "from_board": from_board,
+            "in_use": hand.hand_id if hand is not None else None,
+            "available": True,
+        }
+
+    @property
+    def hand_id_choice(self) -> str | None:
+        """The name picked in the picker, or None for auto.
+
+        What an operation puts on the hand it builds for itself: core resolves
+        None the same way this console reports auto.
+        """
+        return self._hand_id_choice
+
+    def select_hand_id(self, name: str | None) -> dict:
+        """Choose which hand this is, or (``None``) hand it back to auto.
+
+        Not remembered between launches: auto resolves again next time. The
+        choice reaches the connected hand immediately, so what it reads and
+        writes follows without a reconnect.
+        """
+        hand_ids = self._hand_register()
+
+        if name is not None and not hand_ids.valid_id(name):
+            raise ServiceError(
+                f"{name!r} cannot be a hand id: 1-20 characters of "
+                "[0-9A-Za-z._-], at least one alphanumeric", status_code=400)
+        if name is not None and name not in hand_ids.assigned_ids():
+            raise ServiceError(f"this machine knows no hand called {name!r}",
+                               status_code=404)
+        session = self.session
+        hand = session.hand if session is not None else None
+        self._hand_id_choice = name
+        self._hand_id_choice_board = hand.board_hand_id if hand is not None else None
+        if hand is not None:
+            # Core owns what naming a hand means: it also loads that hand's
+            # calibration and points writes at its file. Passing None asks core
+            # for auto, which resolves it the same way this view reports it.
+            hand.set_hand_id(name)
+        return self.hand_ids()
+
+    def add_hand_id(self, name: str) -> dict:
+        """Register a name, so a second board-less hand can be told apart.
+
+        The new name is selected as well: it was made for the hand plugged in
+        now, and leaving the choice on auto would resolve to whichever name
+        sorts first -- another hand's.
+        """
+        hand_ids = self._hand_register()
+
+        try:
+            hand_ids.add_id(name)
+        except hand_ids.HandIdError as e:
+            raise ServiceError(str(e), status_code=400)
+        except OSError as e:
+            raise ServiceError(f"could not add that hand: {e}", status_code=500)
+        return self.select_hand_id(name)
+
+    def delete_hand_id(self, name: str) -> dict:
+        """Forget a name and the calibration filed under it.
+
+        The caller confirms first: this throws away a calibration, which only
+        calibrating that hand again can replace.
+        """
+        hand_ids = self._hand_register()
+
+        try:
+            hand_ids.delete_id(name)
+        except hand_ids.HandIdError as e:
+            raise ServiceError(str(e), status_code=404)
+        except OSError as e:
+            raise ServiceError(f"could not delete that hand: {e}", status_code=500)
+        if self._hand_id_choice == name:
+            self._hand_id_choice = None
+            self._hand_id_choice_board = None
+        return self.hand_ids()
 
     def set_hardware_version(self, version: int | None) -> dict:
         """Pin the hardware version in config.yaml (``None`` = auto) and
@@ -685,6 +814,29 @@ class HandService:
                     self._max_current = _current_or_none(hand_config.max_current)
             self._config_gains = config_gains
         self._publish_control_state()
+        # Not in mock mode: a mock hand synthesises its own calibration and
+        # must never be handed a real one, the same way its calibration never
+        # reaches disk.
+        if (self._hand_id_choice is not None
+                and session.hand is not None
+                and session.hand.board_hand_id != self._hand_id_choice_board):
+            # A different hand is on the bus than the one that name was picked
+            # for. Keeping it would file this hand's calibration under another.
+            logger.info("hand %s was picked for a different hand; back to auto",
+                        self._hand_id_choice)
+            self._hand_id_choice = None
+            self._hand_id_choice_board = None
+        if session.hand is not None and not self.settings.mock:
+            # Name the hand this session is driving, every connect. A chosen
+            # name has to survive the reconnect; with none chosen, core resolves
+            # auto the same way this view reports it, so what the picker shows
+            # is what a calibration is filed under -- a board-less hand left
+            # unnamed would write to the model directory instead.
+            try:
+                session.hand.set_hand_id(self._hand_id_choice)
+            except Exception as exc:
+                logger.warning("could not settle which hand this is (%s): %s",
+                               self._hand_id_choice or "auto", exc)
         if session.caps.motors:
             self._apply_default_profile(session)
         if session.caps.tactile:
