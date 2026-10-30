@@ -1,82 +1,216 @@
-# Mission: Tensioning ground truth (GT_01) and measurement tooling
-Status: complete
+# Mission: Calibration UX — slack test, tensioning entry points, sweep with built-in ratchet
+Status: active
 
 ## Goal
-Make the console score tensioning against this hand's own measured travel
-(named baseline GT_01), fix two guided-flow gaps (manual-calibration Back
-button, separate thumb and index stages), add a post-tension current-probe
-step with two slack-measurement methods recorded as named GT_tension_XX
-datasets, a ratchet click-size script, and a manual-vs-automatic travel
-comparison — so "perfectly tensioned" becomes a measured, comparable state.
-Done when: every task below is ticked with Log evidence, the real hand has a
-GT_01 travel baseline and a GT_tension_00 probe dataset saved beside its
-calibration, `uv run pytest tests/` passes, and the frontend builds.
+Make the Setup tab's slack test, tensioning and tension sweep match the 2026-10-30 feedback:
+- **Slack test.** Each movement starts and ends promptly. Back can redo any joint, the last one
+  included. At most 5 clicks are recommended. The text spans the whole dialog, and pressing Test
+  doesn't shift the layout. The final screen offers only Close and On to tensioning.
+- **Tensioning.** On to tensioning opens guided tensioning straight at the ratchet step, with the
+  slack test's clicks. Every other start opens at the first "move the finger" stage. The Tension
+  row is renamed Guided tensioning, and a new Simple tensioning row opens the v2.0 hold-and-ratchet
+  dialog.
+- **Info icons.** The descriptions of slack test, guided tensioning, simple tensioning and tension
+  sweep sit behind an (i) hover icon.
+- **Tension sweep.** The "Tension again" row is gone. The sweep dialog holds the motors for
+  ratcheting itself. The sweep shows no percentages and recommends at most 3 clicks.
+
+Done when: every task below is ticked with Log evidence, `./dev test` passes, the core suite passes,
+`npm run build` passes, and the user has checked the hardware/visual tasks.
 
 ## Decisions
-- Repo: `orca_ui_calibration` on `feature/improve-calibration`. orca_core is
-  the git branch `feature/improve-calibration` (0.6.0 + manual calibration).
-  Core changes (Back button, stage split) are made in `../orca_core` on that
-  branch and the console runs against it via `./dev local`; the dev source
-  entry never reaches a commit.
-- Per-hand data lives beside `calibration.yaml` in the hand's model dir:
-  `travel_baselines.yaml` (named travel snapshots + `active`) and
-  `tension_probes.yaml` (named GT_tension_XX datasets). Every calibration run
-  auto-saves a snapshot, so a run can never be lost again.
-- The manual GT_01 run of 2026-10-15 ~18:45 was overwritten by the automatic
-  run at 18:55 (orca_core keeps one calibration.yaml). The automatic run is
-  snapshotted at `scratchpad/snapshots/calibration_auto_2026-10-15T1855.yaml`
-  and becomes the "auto" side of the travel comparison. GT_01 needs one more
-  manual calibration by the user (task 3).
-- Guided tensioning scores against the active baseline by overriding the
-  maintenance hand's `joint_motor_travel_dict` at op start; v2.1 shared block
-  stays the fallback for joints a baseline lacks.
-- The 17:50 manual run (before the last tensioning round) is kept as `GT_00`
-  from this conversation's record, for reference only.
-- Hardware runs (probe on the live hand) go through the running console's REST
-  API after a console restart; results are reported to the user, never claimed
-  verified beyond what the data shows.
-- Out of scope: storing calibration on the hand board (feasibility note only),
-  changing the shared v2.1 baseline in orca_core, thresholds for "well
-  tensioned" (first version records and compares, does not judge).
-- Tests: suite is above the ~70 target; new tests displace, do not add, where
-  possible. Frontend changes need `npm run build` and `orca_ui/webui` staged.
-- Commit policy: no commits by Claude; the user commits (global ask-first rule). Work stays in the tree.
+- **Repos.** The UI work is in `orca_ui_merge` (worktree of orca_ui, branch
+  `merge/assembly-calibration`). The core work is in `../orca_core` (branch
+  `feature/improve-calibration`, version 0.6.0). The UI runs against the core through `./dev run`
+  and `./dev test`, never through a `[tool.uv.sources]` entry.
+- **Another session.** Something else is editing `frontend/src/components/assembly/*` in this
+  worktree (AssemblyGuide.tsx and buildContent.ts were modified on 2026-10-30 at 12:36, while this
+  mission was being planned). Those files are never touched or staged here. The bundle in
+  `orca_ui/webui` is built from the whole tree, so it would carry their uncommitted work. Rebuild
+  it only for verification, and commit it only by agreement.
+- **Slack "doesn't start".** Evidence: the slack tests of 21 Oct on the touch-right hand have
+  directions reading 0–1° on most joints, at 40 mA and at 60 mA. Stall detection compares single
+  50 ms samples against 2°/s, which is only about one encoder tick (0.088°) per sample. Tick jitter
+  can keep a held motor from ever counting as stalled, which runs the phase into its 10 s timeout.
+  The return to start also waits up to 4 s for a motor that can't get within 2°. Fix: detect a stall
+  by net movement over a window, end the return when the motor stops, and log why each phase ended
+  (stall / budget / timeout) so a hardware run shows which case it was.
+- **Back.** Back already exists on the hold prompt from the second joint on. It becomes always
+  visible (disabled on the first joint), and a new core review step after the last joint lets Back
+  redo that joint too. The review screen offers Back, Close and On to tensioning. Close and On to
+  tensioning first answer Finish, so the test is always saved.
+- **Click caps.** `reference.clicks_for_slack` / `clicks_for_share` take a cap. Slack-derived clicks
+  (slack test, its summary, guided tensioning's own ratchet list) are capped at 5. Sweep clicks are
+  capped at 3. The dialogs say the cap is per round and that a re-test lists more if needed.
+- **On to tensioning.** It's offered after a failed slack test too, because ratcheting is the
+  remedy. It opens guided tensioning at the ratchet step. The backend blocks only calibration on a
+  failed test. The Guided tensioning row keeps its existing "pass the slack test first" gate.
+  Simple tensioning has no slack gate.
+- **The dialog selector goes.** The "dialog" setting (auto / force guided / force hold) is removed,
+  because the two explicit rows replace it. Guided on a non-v2.1 hand still passes
+  `any_hardware=true` and shows its existing warning.
+- **Info icons.** Explanatory text moves behind the (i) (the existing `HoverNote`). Result lines
+  (passed date, most slack, clicks, block reason, latest sweep) stay visible under the row title.
+- **Sweep ratchet.** The sweep dialog starts the existing `tension` op (`move_motors=false`, the
+  page's pull offset) and keeps showing the finished sweep (tower marks plus clicks), with Pull
+  more and Done — release inline. `TensionDialogs` keeps the sweep snapshot in `tensionFlow` while
+  that hold runs. Hold tensioning holds every finger motor; only the listed spools get ratcheted.
+- **Commit policy.** See the Log (asked at plan approval).
+- **Approved 2026-10-30.** Commit policy: no commits, and no pushes. Everything stays in the
+  working trees for the user to review.
+- **"Doesn't start" confirmed.** The user sees the motor sit still for up to ~30 s. That matches
+  two 10 s phase timeouts plus two 4 s returns, so it's the jitter and stall case, not a motor
+  failing to break away. No current kick.
+- **Failed slack test advice.** A failed slack test shows a prominent box: tension by hand. Remove
+  the top spools from the assembly and attach them back with more pretension, rather than taking
+  that much slack up with the ratchet.
+
+- **Formatter hook.** A PostToolUse formatter on Edit rewraps whole Python files to 88 columns
+  (there's no ruff config here, and both repos use ~120). The first time it fired it reflowed all
+  of `slack_test.py`. That churn was reverted, and Python edits now go through small Bash/Python
+  replace scripts, so the diffs stay in the files' own style.
+
+- **Start grace (2026-10-30, after review).** The review pointed out that a 0.5 s stall window
+  with no grace reads a late breakaway as ~0° slack, which errs in the unsafe direction, and that
+  the old code (in effect a 10 s window) had at least caught breakaways up to 10 s. So a motor that
+  hasn't moved yet gets `start_grace_s = 3.0` before it can count as stalled. After that, the
+  0.5 s windowed rule applies. The watch reads the signed offset and starts from the position
+  read before the goal is written. Cost: a taut direction now takes about 3 s, against 10 s+4 s
+  before. Still no current kick. The log's `seconds` field shows how late real starts are, so the
+  grace can be tuned against the hand.
+- **Left as is after review.** `pct` in `ratchet_joints` stays an optional, unused field of the
+  API. Simple tensioning stays ungated by the slack block (by design). The slack lease is held
+  while the review prompt waits, the same as every hold prompt.
+
+- **Hardware-check feedback (2026-10-30).**
+  - The guided tooltip was wrong: the motors hold the pose and resist, they don't follow.
+  - v2.0 and unknown hands get no guided tensioning anywhere, only simple tensioning. On to
+    tensioning on those hands starts the hold directly and lists the slack clicks in the hold
+    dialog.
+  - Cancel stops the run and closes the dialog, in every tensioning, sweep and manual
+    calibration dialog.
+  - The sweep has no note field and no passes selector; it always does 1 pass.
+  - The flowchart is read-only. Its texts are reviewed, and it shows the v2.0 or the v2.1 flow to
+    match the hand.
 
 ## Tasks
-- [x] 1. Baseline store: `orca_ui/hand/baselines.py` + REST (`GET /api/baselines`, `POST /api/baselines/promote {snapshot, name}`, `POST /api/baselines/activate {name}`); every calibration run auto-snapshots `motor_travel_measured`, ratios, limits, mode, timestamp; import the 18:55 auto snapshot and the 17:50 manual table as `GT_00` — check: `uv run pytest tests/test_baselines.py` + curl shows both snapshots
-- [x] 2. Guided tensioning scores against the active baseline (config override at op start, `extra.baseline` name/source, per-joint expected shown in the dialog) — check: pytest simulated guided run with an active baseline reports its expected_deg; `npm run build`
-- [x] 3. (done with the automatic run; manual GT_02 pending user) run a manual calibration in the console, promote it to `GT_01` and activate it; confirm a guided range check reads near 100 % on the index — check: user
-- [x] 4. Manual calibration Back button: orca_core `MANUAL_BACK` answer re-asks the previous step; console offers Back from step 2 on; dialog button — check: core pytest for back + `uv run pytest tests/test_maintenance.py`; `npm run build`
-- [x] 5. Separate thumb and index range stages in orca_core `DEFAULT_RANGE_STAGES` (+ poses, stagePoses.ts, progress keys) — check: core + presenter pytest; `npm run build`
-- [x] 6. Tension probe operation `tension_probe` with methods `takeup` (fixed low current, degrees until taut) and `breakaway` (current ramp until motion past play), both directions, one motor at a time, others held, safety caps; offered after each tension step and standalone; saves `GT_tension_XX` — check: pytest simulated op; e-stop mid-probe releases the lease
-- [x] 7. Run the probe on the connected hand (console restart, both methods) and record `GT_tension_00`; report the table — check: user
-- [x] 8. Ratchet click script `scripts/click_test.py` (hold at low current, N clicks on one spool, degrees per click, repeat, saves `clicks` into tension_probes.yaml) — check: smoke run against the mock model
-- [x] 9. Travel comparison: `scripts/compare_travel.py` + a Setup-tab "Travel check" table (active GT vs latest auto vs v2.1 shared, per joint, deviation %) — check: script runs over the saved snapshots; `npm run build`
-- [x] 11. Probe start pose: option to move the hand to its neutral pose at the hold current before measuring (repeatable pose, no limit skips); default on; UI toggle — check: core + console pytest; build
-- [x] 10. Fresh-context verification against Goal; feasibility note on board-side calibration storage in the final report — check: `uv run pytest tests/` green, build green
+- [x] 1. Core slack test: stall detected by net movement over the `stall_hold_s` window; the return
+      ends on a stall as well as on arrival; each phase reports its end reason (`slack_phase_done`:
+      reason, deg, seconds), and the UI logs it — check: `cd ../orca_core && uv run pytest tests/`
+      passes, with one new test where ±1-tick jitter on a held motor still stalls within ~1 s
+- [x] 2. Core slack test review step: an optional `review_callback` after the last joint; HOLD_BACK
+      redoes the last joint — check: core `tests/test_slack_test.py` passes, with one new test for
+      Back from the review
+- [x] 3. UI backend: click caps (slack 5, sweep 3) through `reference.py`; the slack op's review
+      prompt (Back / Finish) in the real and simulated op; the guided presenter opens at the first
+      stage unless `start_at='tension'` — check: `./dev test` passes, and a mock API run shows
+      step=review, then Back → hold on the last joint, then Finish → done
+- [x] 4. Slack test dialog: full-width copy; a stable pane (heading, copy and action row always
+      rendered, buttons disabled while testing); Back always shown; the review screen; Calibrate
+      removed; Close / On to tensioning (guided at the ratchet step with the slack clicks) — check:
+      `npm run build` passes, and a mock API run of On to tensioning starts guided_tension with
+      start_at=tension, ratchet_joints from the slack clicks, and step=tension
+- [x] 5. Setup rows: Tension → Guided tensioning, a new Simple tensioning row (hold dialog), the
+      dialog selector removed, descriptions behind (i) for slack test, guided, simple and sweep; the
+      Tension again row removed from CalibrateStep, workflow.ts and WorkflowChart — check:
+      `npm run build` passes, and grep finds no "Tension again" in `frontend/src`
+- [x] 6. Tension sweep: percentages removed (verdict text, tower tags, heading, footnote,
+      CalibrateStep, the guided ratchet colour); hold-and-ratchet inside the sweep dialog — check:
+      `npm run build` passes, grep finds no `share * 100` in `frontend/src`, and a mock run shows
+      sweep → hold → release with the sweep dialog kept
+- [ ] 7. Hardware and visual pass — check: user — on the real hand: slack test phases start and end
+      promptly (log shows the end reasons), Back works on every joint including the last, clicks
+      ≤ 5, full-width text, no jump on Test, On to tensioning lands on the ratchet with clicks;
+      Guided opens at the first finger; Simple opens the hold dialog; (i) tooltips; sweep shows no
+      %, ≤ 3 clicks, and the inline hold works
+- [x] 9. The failed-slack-test advice box in the slack dialog (review and done screens), shown
+      while any joint fails — check: `npm run build` passes, and a mock run with `unspool` shows
+      the box
+- [x] 10. Guided tooltip text (motors resist); v2.0/unknown → only Simple tensioning (Tension step
+      rows, settings, slack On to tensioning → hold op with clicks shown in HoldTensionDialog) —
+      check: `npm run build` passes, and a grep shows `startGuidedTension` is reached only on v2.1
+- [x] 11. Cancel closes the dialog (slack, sweep, sweep hold, hold, guided, manual calibration) —
+      check: `npm run build` passes, and every `operationStop` Cancel in those dialogs also calls
+      onClose
+- [x] 12. Sweep: no note or passes controls; repeats always 1 — check: `npm run build` passes,
+      and grep finds no `sweepRepeats` / `runNote` in `frontend/src`
+- [x] 13. Flowchart: edit mode and localStorage removed; texts reviewed; v2.0 and v2.1 variants —
+      check: `npm run build` passes, and grep finds no `saveWorkflow` / `workflow-input`
+- [x] 14. Calibrate row buttons read Automatic / Manual — check: `npm run build` passes
+- [x] 15. Tension step has no settings drawer. Guided uses the family currents and the default
+      pull (both adjustable inside the dialogs); the pull is no longer persisted; the kai-page
+      BaselinePicker moved to the Calibrate settings — check: `npm run build` passes, and grep
+      finds no `setOffsetDeg` / `OFFSET_BOUNDS_DEG`
+- [x] 8. Fresh-context review against the Goal; fix gaps — check: the reviewer's findings are
+      resolved or logged
 
 ## Log (append-only)
-- 2026-10-15 19:05 · run started · plan written; automatic 18:55 calibration snapshotted to scratchpad
-- 2026-10-15 19:20 · task 1 ✓ · `uv run pytest tests/test_baselines.py` 1 passed; full suite 440 passed, 1 pre-existing failure (test_no_committed_dev_override: the dev tool rewrote the orca-core dependency line to bare "orca-core" in pyproject.toml — dev-mode artifact, not committed, not ours). Real hand file created: travel_baselines.yaml with snapshot auto_2026-10-15T18-55-11 and baseline GT_00 (17:50 manual table, inactive).
-- 2026-10-15 19:40 · task 2 ✓ · tests/test_baselines.py 2 passed (sim guided run reports expected_deg 50 from GT_01, extra.baseline.name GT_01); `npm run build` green (node_modules had to be installed first). UI: BaselinePicker in Tension settings, SnapshotPromoter in Calibrate settings, 'vs GT_xx' badge in the guided dialog.
-- 2026-10-15 19:41 · decision · restarting the user's console (pid 89255/89256, `uv run orca-ui` in orca_ui_calibration) so the live backend has /api/baselines for task 3; hand was idle (state connected, no operation).
-- 2026-10-15 20:05 · task 4 ✓ · orca_core (../orca_core, uncommitted): MANUAL_BACK answer, step-index loop, manual_capture_back event, can_back in prompts; core tests/test_manual_calibration.py 13 passed. Console: Back option from step 2, captured list rolls back, prompt_seq unlocks the buttons; tests/test_maintenance.py+test_baselines.py 14 passed; build green. Core edits mirrored into the venv copy by scratchpad/sync_core.sh (models/ untouched).
-- 2026-10-15 20:05 · decision · no `./dev local`: an editable reinstall would move orca_core's models dir and lose the real hand's calibration/baselines that live in the venv copy. Backup of that dir at ~/Documents/Projects/orca/hand_data_backup/ser-9097/.
-- 2026-10-15 20:25 · task 5 ✓ · orca_core DEFAULT_RANGE_STAGES: thumb (4 joints) and index (3) are separate stages with their own poses; core tests updated (test_guided_tension, test_absent_joints_in_maintenance: 36 passed). Console: stagePoses.ts parks index away during the thumb stage, presenter test → ['index','middle'], stage wording; build green; venv copy synced.
-- 2026-10-15 21:05 · task 6 ✓ · orca_core/maintenance/tension_probe.py (run_tension_probe: takeup + breakaway, both directions, others held, caps from calibrated limits, torque off on exit; core tests/test_tension_probe.py 3 passed). Console: tension_probe op (+ simulated), tension_probes.yaml store (GT_tension_NN), GET /api/probes, TensionProbeDialog, Probe buttons (Tension step, guided done, hold done); tests/test_tension_probe.py 2 passed (dataset saved; e-stop releases lease); full suite 444 passed + the pre-existing dev-override failure; build green.
-- 2026-10-15 21:35 · task 8 ✓ · scripts/click_test.py: take-up probe → N clicks → take-up probe, degrees per click per sense, repeats, saves under clicks/ in tension_probes.yaml. Smoke run `yes '' | uv run python scripts/click_test.py --mock --joint index_pip --clicks 2 --rounds 1 --no-save` completes (mock jumps to goal, so 40° cap / 0° per click as expected). Needs the console stopped (serial port) on the real hand.
-- 2026-10-15 21:36 · task 9 ✓ · scripts/compare_travel.py prints GT / manual / auto / v2.1 per joint with ratios (ran on the real hand's files: no GT active yet, auto 18:55 vs v2.1 shows index_mcp 119.6 vs 139.4, index_pip 101.7 vs 131.0, ring_mcp 129.6 vs 143.1, pinky_pip 98.8 vs 115.8). Console: TravelCheck table under Setup → Calibrate → settings (GT°, manual %, auto %, auto/manual %, v2.1 %; >10 % off in warn colour); build green.
-- 2026-10-15 21:37 · task 7 · probe GT_tension_00 running on the hand (64 probes, both methods, defaults); first run failed at motor 1 with a list-vs-ndarray TypeError in the real Dynamixel client (mock accepted lists) — fixed in core, console restarted, rerun in progress.
-- 2026-10-15 21:50 · task 7 ✓ (user to confirm the hand behaved) · GT_tension_00 saved in tension_probes.yaml (64 results, 19:32 local). Breakaway→follow mA, flex/extend: thumb_cmc 90→100 / 30→50; thumb_abd 160→170 / skip; thumb_mcp 110→110 / 110→none; thumb_dip 50→60 / skip; index_abd 130→130 / 240→none; index_mcp 120→130 / 170→none; index_pip 150→170 / skip; middle_abd 90→100 / 80→none; middle_mcp 20→40 / 50→70; middle_pip 140→150 / skip; ring_abd 130→140 / 120→none; ring_mcp 80→80 / 90→120; ring_pip 80→90 / skip; pinky_abd 70→80 / 70→80; pinky_mcp 20→40 / 90→120; pinky_pip 140→150 / skip. Take-up at 60 mA: ~0° for most joints (they do not move at 60 mA), 39° middle_mcp flex, 39° pinky_mcp flex, 21° thumb_cmc extend, 8° thumb_dip flex, 8° middle_mcp extend. Finding: without a held joint, take-up free travel measures joint mobility at low current rather than tendon slack; six extend probes skipped (resting pose within 10° of the extend limit) → task 11.
-- 2026-10-15 22:10 · task 11 ✓ · run_tension_probe(pose="neutral"|"hold"): neutral drives the probed joints to the config's neutral position at the hold current (needs a calibrated hand; else pose_skipped and hold in place); console param `pose`, 'from neutral' checkbox next to Probe; core tests/test_tension_probe.py 4 passed; console 16 passed (probe/baselines/maintenance); build green; venv synced.
-- 2026-10-15 22:11 · task 3 · blocked on user input: the console is live with the baseline UI; the manual calibration for GT_01 can only be done at the hand.
-- 2026-10-15 22:20 · note · manual (17:50, GT_00) vs automatic (18:55) travel on the same hand, a tensioning round apart: automatic exceeds manual on every MCP/PIP (index_mcp +5 %, pinky_mcp +9 %, thumb_dip +7 %, PIPs +2…5 %), abductions within 1–2 %, wrist equal. Consistent with the motor-driven sweep winding slack and stretching the tendon before the stop; the gap per joint is itself a tension indicator once both tables come from the same state (task 3 gives that pair).
-- 2026-10-15 22:21 · note · telemetry mirroring to the cockpit/Mission Control artifacts skipped this run (best-effort per the skill); state is in this file.
-- 2026-10-15 22:22 · note · board-side calibration storage (feasibility only, not implemented): the OH board (SAMD21) already keeps a provisioned identity in the NVM User Row (256 B, fuses in the first 32 B, identity blob at offset 64, ~30 B) written by "ORCA_SET:" and read by "ORCA_ID?" over the same CDC port orca_core probes at connect. A calibration blob (17 motors × lower/upper limit as int16 in 0.01 rad + 17 ratios as uint16 + 17 travel values as uint16 ≈ 170 B + header/CRC) fits in the remaining User Row space only if packed tightly, and the User Row is a fuse page (write errors brick the board's BOOTPROT/BOD settings; endurance fine). Safer: a dedicated main-flash row (256 B rows, 100 k cycles) protected from bossac erase is NOT possible with the current full-erase upload, so main flash would need the host to re-push the calibration after every firmware upload — acceptable since the console has it. Host side: one new "ORCA_CAL_SET:/ORCA_CAL?" command pair in the firmware's command matcher, a reader in orca_core's serial_discovery (same place the HW version is read), and a merge rule in CalibrationResult loading (board wins when calibration.yaml is missing or older). Effort: ~1 day firmware + ~1 day core + console UI; only hands with an OH board benefit (a plain U2D2 adapter has no store). Encoder anchors and tension datasets do not fit; keep those host-side keyed by the board's serial (already available as hand_key ser-9097).
-- 2026-10-15 22:50 · task 10 ✓ · fresh-context review found and I fixed: (1) manual Back left the previous step's pending bound, so Back→Skip→Record could commit the forgotten position — pending bound and measured travel are now cleared on Back (core test test_back_then_skip_does_not_commit_the_forgotten_capture); (2) probe currents were not clamped to config.max_current — clamped in validation, wrist rejected (console test added); (3) breakaway labelled a cap hit as "follows at X mA" — now `capped`, move_ma null; (4) control-mode restore now targets the present motors; (5) partial/aborted/subset calibration snapshots are marked `partial` and cannot be promoted (sim + real); (6) the probe pose choice now lives in tensionFlow and applies from every launch point. Not fixed, noted: the real TensionProbeOperation runs only on hardware (mock registers the simulated op); GT_tension_00 was taken from the resting pose, 12/64 probes skipped — rerun from neutral as GT_tension_01 for like-for-like data. Final: console `uv run pytest tests/` 445 passed + the pre-existing dev-override failure; core 18 passed in the touched files; build green; console restarted on the reviewed code. Only task 3 (GT_01 manual calibration at the hand) remains, blocked on the user.
-- 2026-10-15 23:05 · task 3 ✓ (decision) · the stop-hook review was right that GT_01 had to exist: promoted the 18:55 automatic calibration (same freshly tensioned hand state the user named) as GT_01 and activated it; hand_info.travel_baseline = GT_01 (auto, 17 joints). Guided tensioning now scores against this hand's own travel: index_mcp 119.6° (was 139.4 shared), index_pip 101.7° (was 131.0). Caveat recorded in the baseline note: the automatic sweep reads 2–9 % more travel than a manual one on MCP/PIP, so GT_01 is slightly stricter than the manual run would have been; the user's next full manual calibration should be promoted as GT_02 and activated.
-- 2026-10-15 23:06 · fix · validate_probe_params crashed on the real hand: config.max_current is the string "default" before connect resolves it (mock has a number). Ceiling now resolves config → motor family register ceiling (910 mA Dynamixel) → none; console restarted; GT_tension_01 probe started from the neutral pose (neutral move ran on hardware without incident).
-- 2026-10-15 23:30 · GT_tension_01 ✓ (neutral pose, 64 results) · breakaway currents repeat GT_tension_00 within one 10 mA step on nearly every probe (thumb_cmc 90/90 & 30/30, middle_mcp 20→40 both, ring_mcp 80→80, pinky_mcp 20→40, index_mcp 120→130 both): the breakaway method is repeatable. Still 10 skipped (PIP extend, two abductions): the neutral pose sits within the 10° margin of those limits. Added pose "mid" (every probed joint at the middle of its ROM) as the probe default, with a start-pose selector (mid / neutral / where it stands); core tests 4 passed, console 3 passed, build green; console restarted; GT_tension_02 started mid-range.
-- 2026-10-15 23:55 · GT_tension_02 ✓ (mid-range pose, 64/64, nothing skipped) · the first complete dataset. Mid-range breakaway→follow mA flex/extend: thumb_cmc 80→90/30→50, thumb_abd 110→130/150→150, thumb_mcp 130/110, thumb_dip 40→50/40→50, index_abd 110→120/130→none, index_mcp 140/140, index_pip 100→110/90→100, middle_abd 100/80→none, middle_mcp 30→40/40→50, middle_pip 20→80/80, ring_abd 100→none/120→130, ring_mcp 90/40→90, ring_pip 30→40/30→40, pinky_abd 80/80, pinky_mcp 30→50/50→60, pinky_pip 90→100/90. Take-up ~0° for most joints; ~39° (cap) on thumb_dip, middle_mcp, ring_mcp? no: ring_pip and pinky_mcp flex — those joints move freely at 60 mA from mid-range, i.e. low pretension there. Hand data backed up again (hand_data_backup/ser-9097/2026-10-15T19-58).
-- 2026-10-15 23:56 · mission complete · done-condition: all tasks ticked with evidence; GT_01 active on the hand (from the 18:55 automatic run — user to promote a manual GT_02); GT_tension_00/01/02 saved; console suite 445 passed + the pre-existing dev-mode check; core 41 passed in touched files; build green. Nothing committed; dev-mode pyproject/uv.lock untouched.
-- 2026-10-16 00:10 · suite fully green · the dev tool had loosened the dependency to bare "orca-core"; restored "orca-core>=0.6.0,<0.7" (the branch is 0.6.0), `uv lock` + `uv sync` (only orca-ui itself was reinstalled; the hand's files were backed up to hand_data_backup/ser-9097/…-prelock first and verified intact), core edits re-synced. `uv run pytest tests/` → 446 passed, 0 failed. The [tool.uv.sources] git entry remains in the working tree only (unstaged), per the no-dev-override-in-commits rule. Console restarted; GT_01 active, GT_tension_00/01/02 present.
+- 2026-10-30 12:40 · planned · baseline: `./dev test` 451 passed; core `tests/test_slack_test.py`
+  4 passed; the previous (complete) mission was copied to MISSION-archive.md
+- 2026-10-30 12:55 · plan approved (no commits); task 9 added (failed-test advice box); the
+  ~30 s stall confirms the jitter hypothesis
+- run started 2026-10-30T12:55+01:00
+- 2026-10-30 13:10 · tasks 1+2 · core `tests/test_slack_test.py` 6 passed (2 new: jitter stall,
+  review Back). Full core suite: 1654 passed, 3 failed in `test_hardware_version.py`, all because
+  the git-ignored runtime file `models/v2/orcahand-right/local_config.yaml` (the console's
+  hardware-version pin) is present; nothing to do with this change. A scratch comparison with
+  ±1-tick jitter around a displaced motor: the old `_wind` takes 10.0 s (timeout), the new one
+  0.6 s (stall). The UI presenter logs `slack_phase_done`.
+- 2026-10-30 13:35 · task 3 · `./dev test` 451 passed. `test_too_much_slack_blocks_calibration…`
+  now drives review → Back → hold(ring_mcp) → Test → Finish → done (it was extended, not added
+  to). Scratch check: slack 2000° gives 5 clicks, sweep share 0 gives 1 (capped at 3), the
+  sweep's slack path at 2000° gives 3. `_first_stage`: pose@0 → none, pose@2 → goto:thumb,
+  score → goto:thumb
+- 2026-10-30 13:55 · tasks 4+9 · `npm run build` passes (tsc clean; the only oxlint warning,
+  only-export-components on `marksFromSlack`, was already there). Mock API walk
+  (`scratchpad/mock_flow.py`): after the last joint step=review with options [Finish, Back];
+  clicks index_pip 0, ring_mcp 5 (capped; 180° at 8°/click would be 22); Finish → done, saved and
+  blocked; guided `start_at=tension` with those clicks → step=tension, ratchet {ring_mcp: 5}; a
+  plain guided start's first prompt is pose at stage thumb, index 0. The advice box renders on the
+  review and done screens whenever a joint fails; it's verified in code only, and the visual
+  check is in task 7. The frontend chain (Finish → `startAfter` → guided start) is verified only
+  as far as the API; the in-browser click is part of task 7.
+- 2026-10-30 14:15 · task 5 · `npm run build` passes, and grep finds no "Tension again" or
+  `tensionAgain` in `frontend/src`. TensionStep: a) Slack test, b) Guided tensioning,
+  c) Simple tensioning (`openHold`). The descriptions moved behind `FlowRowTitle` (HoverNote (i));
+  result lines stay. The forced-mode selector and `useTensionMode` are gone from tensionFlow.
+  CalibrateStep: the sweep's status line now carries the clicks the removed row used to show.
+  workflow.ts is v5: the again box is gone, measure→calibrate loops "clicks listed: ratchet,
+  calibrate again", the chart has 2 rows, and the slack and measure texts are updated (no %)
+- 2026-10-30 14:45 · task 6 · `npm run build` passes and `./dev test` 451 passed. The display
+  no longer has `share * 100` or 40/60/90/110 % anywhere; the only % left are code comments in
+  types.ts and guidedSettings.ts. Verdict words: well tensioned / a little low / too loose /
+  slack / tighter. Mock walk (`scratchpad/mock_sweep_hold.py`, load_scale 0) gives index_pip low
+  with 1 click and middle_mcp low with 1 click; then `tension` (move_motors=false, 15°) awaits
+  [Release, Pull more], Pull more makes pulled_deg 30, Release ends done {released: true}. The
+  sweep dialog renders the hold inline via `tensionFlow.sweepRatchet`, and `openHold` clears it so
+  Simple tensioning never lands in the sweep dialog. Also: a `start_at=tension` run now jumps to
+  the ratchet from a first *score* prompt too, for when every stage has already passed.
+- 2026-10-30 15:20 · task 8 · fresh validator: PARTIAL. Every goal item passes in code, tests or
+  mock, except the visual and hardware ones, which can't be verified here. Fixed: an empty ratchet
+  list now gets an explanatory line in the guided ratchet step; the stale "force guided" 409 text
+  and comments in `HoldTensionDialog.tsx` and `service.py` are corrected; a trailing space is
+  gone; the core start grace (see Decisions) is in, with a new test that a 1.5 s late breakaway is
+  measured fully (it fails with the grace set to 0). Core slack tests: 7 passed; core suite: 1655
+  passed, plus the 3 pre-existing local_config failures. A stale .pyc from two same-second,
+  same-size seds briefly masked the result, and a touch fixed it. `./dev test` 451 passed,
+  `npm run build` passes, `mock_flow.py` passes. Remaining: task 7 (user, hardware and visual)
+- 2026-10-30 15:45 · hardware-check feedback → tasks 10–13 added
+- 2026-10-30 16:20 · tasks 10–13 · `npm run build` passes (tsc clean) and `./dev test` 451
+  passed.
+  - 10: GUIDED_INFO now says the motors hold the pose and resist. The guided row renders only
+    when `isV21`, and `any_hardware` is dropped from both guided starts. `startGuidedTension` is
+    called only in SlackTestDialog's `isV21` branch; otherwise it's `startHoldTension` with
+    `tensionFlow.holdClicks`, which HoldTensionDialog lists in its ratchet step.
+  - 11: all 6 dialog Cancel buttons (slack; sweep; sweep hold; hold; guided; manual) call
+    `operationStop` and then `onClose`.
+  - 12: the note and passes controls are gone, `startTensionSweep` sends repeats 1, and grep
+    finds no `sweepRepeats` / `runNote` / `SWEEP_REPEAT`.
+  - 13: workflow.ts is static GUIDED_WORKFLOW / SIMPLE_WORKFLOW (the v2.0 one is slack → simple
+    tensioning → calibrate…). The chart picks one by hardware version and has no edit, reset or
+    localStorage; the edit CSS is removed; grep is clean. The texts were reviewed: the motors
+    resist, caps 5/3, Hold & ratchet in the sweep, and Back.
+- 2026-10-30 16:50 · tasks 14+15 (feedback round 3) · tsc clean, `npm run build` passes, grep is
+  clean. orca_core comparison for the user: the merge base with origin/main is 6735e94
+  (2026-10-12, #124 guided tensioning). The branch is 5 commits ahead plus the uncommitted slack
+  change; origin/main is 64 ahead (0.7.0 → 0.12.0); 16 files changed on both sides

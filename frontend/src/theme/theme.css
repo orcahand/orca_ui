@@ -4036,41 +4036,6 @@ header h1 {
   margin: 0;
 }
 
-.workflow-input,
-.workflow-text {
-  font-family: var(--font);
-  font-size: 11px;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--panel-border-strong);
-  border-radius: 3px;
-  padding: 3px 6px;
-}
-
-.workflow-input.title {
-  font-weight: 700;
-  width: 130px;
-}
-
-.workflow-input {
-  width: 150px;
-}
-
-.workflow-text {
-  width: 100%;
-  resize: vertical;
-  line-height: 1.5;
-}
-
-.workflow-color {
-  width: 26px;
-  height: 22px;
-  padding: 0;
-  border: 1px solid var(--panel-border-strong);
-  background: none;
-  cursor: pointer;
-}
-
 /* ----- probe / tension check: faces with their spool lists, the to-tension list ----- */
 
 .probe-faces {
@@ -4557,8 +4522,27 @@ header h1 {
   gap: 12px;
 }
 
-.gt-tension .setup-copy {
+.gt-tension .setup-copy,
+.gt-slack .setup-copy {
   max-width: none;
+}
+
+/* The hold and testing texts stack in one cell; the hidden one keeps the height. */
+.slack-copy {
+  display: grid;
+}
+
+.slack-copy > .setup-copy {
+  grid-area: 1 / 1;
+  margin: 0;
+}
+
+.slack-copy-off {
+  visibility: hidden;
+}
+
+.slack-advice b {
+  color: var(--text);
 }
 
 .probe-faces.pictures-only {

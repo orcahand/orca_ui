@@ -271,7 +271,14 @@ export function GuidedTensionDialog({
               <button className="btn btn-secondary" title="Keeps the run going" onClick={onClose}>
                 Hide
               </button>
-              <button className="btn btn-secondary" onClick={() => void api.operationStop().catch(fail)}>
+              <button
+                className="btn btn-secondary"
+                title="Stop the run and close"
+                onClick={() => {
+                  void api.operationStop().catch(fail)
+                  onClose()
+                }}
+              >
                 Cancel
               </button>
             </>
@@ -510,14 +517,14 @@ function StepContent({
         </div>
       )
     case 'tension': {
-      // From the sweep the run was opened with, or from this round's score;
+      // From the slack test the run was opened with, or from this round's score;
       // each listed spool carries its clicks on the tower.
       const motorOf = Object.fromEntries(motors.map((m) => [m.joint, m.motor]))
       const marks = extra.ratchet
         ? Object.entries(extra.ratchet).map(([joint, r]) => ({
             joint,
             motor: motorOf[joint] ?? 0,
-            status: ((r.pct ?? 0) < 70 ? 'low' : 'partial') as SpreadStatus,
+            status: (r.clicks ? 'low' : 'partial') as SpreadStatus,
             fraction: null,
             tag: r.clicks ? clicksText(r.clicks) : 'under 1 click',
           }))
@@ -543,6 +550,8 @@ function StepContent({
               purpose: stay a little loose here — the tension sweep after calibration counts the last clicks.
               {extra.deg_per_click == null &&
                 ' The degrees one click takes up are not set yet, so the spools show the missing travel instead.'}
+              {extra.ratchet && Object.keys(extra.ratchet).length === 0 &&
+                ' The slack test lists no clicks: every spool is within one click. Check that each tendon feels firm, then press Done.'}
             </p>
           </div>
           <ErrorBoundary label="The tower preview" fallback={previewUnavailable}>

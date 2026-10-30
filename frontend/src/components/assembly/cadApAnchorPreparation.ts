@@ -49,7 +49,7 @@ export function cadApAnchorPreparation(bundle:Bundle,build:Build,phase:ApAnchorP
   const offset=front.clone().multiplyScalar(2)
   line([from.clone().add(offset),end.clone().add(offset)],.045,'#b16d23')
   for(const p of [from,end])line([p.clone().add(offset).addScaledVector(front,-.5),p.clone().add(offset).addScaledVector(front,.5)],.045,'#b16d23')
-  labels.push({text:'Reinforced stopper',point:knot})
+  labels.push({text:`Ashley stopper + ${thumb?3:1} single ${thumb?'knots':'knot'}`,point:knot})
   labels.push({text:'Tail · 5 mm',point:from.clone().lerp(end,.5).add(offset)})
  }
  if(seated){
@@ -64,7 +64,7 @@ export function cadApAnchorPreparation(bundle:Bundle,build:Build,phase:ApAnchorP
    if(phase==='settle')line([exit,exit.clone().addScaledVector(up,12)])
    else line(pose.tail.map(p=>new THREE.Vector3().fromArray(p)))
    if(i===0){
-    labels.push({text:'Reinforced stopper',point:knot.group.position.clone()})
+    labels.push({text:`Ashley stopper + ${thumb?3:1} single ${thumb?'knots':'knot'}`,point:knot.group.position.clone()})
     labels.push({text:phase==='settle'?'Untrimmed working end':'Tucked tail',point:phase==='settle'?exit.clone().addScaledVector(up,10):new THREE.Vector3().fromArray(pose.tail[Math.floor(pose.tail.length/2)])})
    }else labels.push({text:'Second stopper',point:knot.group.position.clone()})
   })

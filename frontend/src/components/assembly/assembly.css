@@ -551,3 +551,29 @@
 .assembly-model-photos > .assembly-row { margin-bottom: 8px; }
 .assembly-inline-photo { margin: 0; }
 .assembly-inline-photo img { display: block; width: 100%; max-height: 560px; object-fit: contain; border-radius: 10px; }
+
+.assembly-visual-slot{margin:18px 0;padding:16px;border:1px solid var(--assembly-border,#d6dfd9);border-radius:16px;min-width:0}
+.assembly-visual-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.assembly-visual-toolbar .assembly-clip-tabs{margin:0}
+.assembly-visual-slot .assembly-motion,.assembly-visual-slot .assembly-cad-detail{border:0;padding:0;margin:0}
+.assembly-visual-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:16px}
+.assembly-visual-gallery figure{margin:0;min-width:0}
+.assembly-visual-gallery button{border:0;background:transparent;padding:0;width:100%;cursor:zoom-in}
+.assembly-visual-gallery img{width:100%;height:300px;object-fit:contain;border-radius:12px}
+.assembly-visual-gallery figcaption{margin-top:8px}
+.assembly-visual-lightbox{width:min(1200px,95vw)}
+.assembly-visual-lightbox>img{display:block;max-width:100%;max-height:75vh;object-fit:contain;margin:auto}
+.assembly-app[data-version=base] .assembly-motion-lesson>.assembly-row h3,
+.assembly-app[data-version=base] .assembly-cad-detail>.assembly-row h3{display:none}
+.assembly-app[data-version=base] .assembly-motion-lesson>.assembly-row,
+.assembly-app[data-version=base] .assembly-cad-detail>.assembly-row{justify-content:flex-end}
+.assembly-app[data-version=base] .assembly-motion-lesson .assembly-model-controls-frame{padding:12px}
+.assembly-app[data-version=base] .assembly-panel-caption{display:none}
+.assembly-contents-scroll{overflow-anchor:none;scroll-behavior:auto}
+@media(max-width:640px){.assembly-visual-slot{padding:12px}.assembly-visual-gallery img{height:240px}.assembly-visual-toolbar{gap:4px}}
+
+.assembly-app[data-version=base] .assembly-finger-movements>h3,
+.assembly-app[data-version=base] .assembly-finger-movements>p:first-of-type{display:none}
+.assembly-finger-movements>.assembly-movement-views.has-pair-reference{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)}
+.assembly-movement-views>*{min-width:0;max-width:100%}
+@media(max-width:800px){.assembly-finger-movements>.assembly-movement-views.has-pair-reference{grid-template-columns:minmax(0,1fr)}}

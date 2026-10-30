@@ -1,28 +1,6 @@
 [
   {
     "key": "base-right-dynamixel",
-    "file": "panel-051-1",
-    "step": "p49",
-    "labels": [
-      "Tendon",
-      "Working end · 20 cm"
-    ],
-    "meshes": 85744,
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-039-1",
-    "step": "p37",
-    "labels": [
-      "Tendon",
-      "Working end · 20 cm"
-    ],
-    "meshes": 59694,
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
-  },
-  {
-    "key": "base-right-dynamixel",
     "file": "panel-096-1",
     "step": "p93",
     "labels": [
@@ -657,14 +635,6 @@
   },
   {
     "key": "base-right-dynamixel",
-    "file": "panel-122-1",
-    "step": "p122",
-    "labels": [],
-    "meshes": 795405,
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
-  },
-  {
-    "key": "base-right-dynamixel",
     "file": "panel-091-1",
     "step": "p122",
     "labels": [
@@ -687,14 +657,6 @@
   },
   {
     "key": "base-right-dynamixel",
-    "file": "panel-092-3",
-    "step": "p122",
-    "labels": [],
-    "meshes": 795405,
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
-  },
-  {
-    "key": "base-right-dynamixel",
     "file": "panel-134-1",
     "step": "p132",
     "labels": [
@@ -702,28 +664,6 @@
     ],
     "meshes": 4090,
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-051-1",
-    "step": "p49",
-    "labels": [
-      "Tendon",
-      "Working end · 20 cm"
-    ],
-    "meshes": 85069,
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-039-1",
-    "step": "p37",
-    "labels": [
-      "Tendon",
-      "Working end · 20 cm"
-    ],
-    "meshes": 59964,
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
   },
   {
     "key": "base-left-dynamixel",
@@ -1361,14 +1301,6 @@
   },
   {
     "key": "base-left-dynamixel",
-    "file": "panel-122-1",
-    "step": "p122",
-    "labels": [],
-    "meshes": 795405,
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
-  },
-  {
-    "key": "base-left-dynamixel",
     "file": "panel-091-1",
     "step": "p122",
     "labels": [
@@ -1387,14 +1319,6 @@
       "M2 × 8 socket screw"
     ],
     "meshes": 175604,
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-092-3",
-    "step": "p122",
-    "labels": [],
-    "meshes": 795405,
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
   },
   {
@@ -2827,27 +2751,6 @@
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
   },
   {
-    "key": "base-right-dynamixel",
-    "file": "panel-030-4",
-    "step": "p29",
-    "labels": [
-      "Bearing · 4 × 8 × 3"
-    ],
-    "meshes": 19633,
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-034-3",
-    "step": "prepare-pp",
-    "labels": [
-      "Pin · 2 × 8",
-      "Pin · 2 × 6"
-    ],
-    "meshes": 25564,
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
-  },
-  {
     "key": "base-left-dynamixel",
     "file": "panel-089-1",
     "step": "p89",
@@ -2856,27 +2759,6 @@
       "Carpal pulley · hand side"
     ],
     "meshes": 493847,
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-030-4",
-    "step": "p29",
-    "labels": [
-      "Bearing · 4 × 8 × 3"
-    ],
-    "meshes": 19593,
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-034-3",
-    "step": "prepare-pp",
-    "labels": [
-      "Pin · 2 × 8",
-      "Pin · 2 × 6"
-    ],
-    "meshes": 25546,
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
   },
   {
@@ -2967,30 +2849,6 @@
     "meshes": 90833
   },
   {
-    "key": "base-right-dynamixel",
-    "file": "panel-034-4",
-    "step": "p33",
-    "labels": [],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 89997
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-034-5",
-    "step": "p33",
-    "labels": [],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 89997
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-034-6",
-    "step": "p33",
-    "labels": [],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 89997
-  },
-  {
     "key": "base-left-dynamixel",
     "file": "panel-036-1",
     "step": "p35",
@@ -3012,30 +2870,6 @@
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 90775
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-034-4",
-    "step": "p33",
-    "labels": [],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 89939
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-034-5",
-    "step": "p33",
-    "labels": [],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 89939
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-034-6",
-    "step": "p33",
-    "labels": [],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 89939
   },
   {
     "key": "touch-right-dynamixel",
@@ -3436,14 +3270,6 @@
     "height": 1400
   },
   {
-    "key": "base-right-dynamixel",
-    "file": "panel-063-3",
-    "step": "p62",
-    "labels": [],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 303710
-  },
-  {
     "key": "base-left-dynamixel",
     "file": "route-p59-entry",
     "step": "p59",
@@ -3618,14 +3444,6 @@
     ],
     "width": 1800,
     "height": 1400
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-063-3",
-    "step": "p62",
-    "labels": [],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 302359
   },
   {
     "key": "touch-right-dynamixel",
@@ -4412,248 +4230,6 @@
     "meshes": 1094360
   },
   {
-    "key": "base-right-dynamixel",
-    "file": "panel-058-1",
-    "step": "p56",
-    "labels": [
-      "Working end · 20 cm",
-      "TP anchor housing"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 57508
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-058-2",
-    "step": "p56",
-    "labels": [
-      "Ashley stopper + 3 single knots",
-      "TP anchor housing"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 216356
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-051-2",
-    "step": "p49",
-    "labels": [
-      "Ashley stopper + 3 single knots",
-      "Knot housing"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 161968
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-053-3",
-    "step": "p49",
-    "labels": [
-      "Reinforced stopper",
-      "Tail · 5 mm"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 167728,
-    "instruction": 3,
-    "caption": "Pull the settled stopper out, then trim 5 mm after the knot"
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-039-2",
-    "step": "p37",
-    "labels": [
-      "Ashley stopper + single knot",
-      "Knot housing"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 89070
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-041-3",
-    "step": "p37",
-    "labels": [
-      "Reinforced stopper",
-      "Tail · 5 mm"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 94830
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-034-1",
-    "step": "prepare-pp",
-    "labels": [
-      "Ashley stopper + single knot",
-      "Knot housing"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 155510
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-034-2",
-    "step": "prepare-pp",
-    "labels": [
-      "Knot housing"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 91958
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-030-1",
-    "step": "p29",
-    "labels": [
-      "Ashley stopper + single knot",
-      "Knot housing"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 130753
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-030-2",
-    "step": "p29",
-    "labels": [
-      "Reinforced stoppers",
-      "Connecting loop"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 72145
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-030-3",
-    "step": "p29",
-    "labels": [
-      "Knot housing"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 67201
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-058-1",
-    "step": "p56",
-    "labels": [
-      "Working end · 20 cm",
-      "TP anchor housing"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 57070
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-058-2",
-    "step": "p56",
-    "labels": [
-      "Ashley stopper + 3 single knots",
-      "TP anchor housing"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 215918
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-051-2",
-    "step": "p49",
-    "labels": [
-      "Ashley stopper + 3 single knots",
-      "Knot housing"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 161293
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-053-3",
-    "step": "p49",
-    "labels": [
-      "Reinforced stopper",
-      "Tail · 5 mm"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 167053,
-    "instruction": 3,
-    "caption": "Pull the settled stopper out, then trim 5 mm after the knot"
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-039-2",
-    "step": "p37",
-    "labels": [
-      "Ashley stopper + single knot",
-      "Knot housing"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 89340
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-041-3",
-    "step": "p37",
-    "labels": [
-      "Reinforced stopper",
-      "Tail · 5 mm"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 95100
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-034-1",
-    "step": "prepare-pp",
-    "labels": [
-      "Ashley stopper + single knot",
-      "Knot housing"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 157410
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-034-2",
-    "step": "prepare-pp",
-    "labels": [
-      "Knot housing"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 93858
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-030-1",
-    "step": "p29",
-    "labels": [
-      "Ashley stopper + single knot",
-      "Knot housing"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 130713
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-030-2",
-    "step": "p29",
-    "labels": [
-      "Reinforced stoppers",
-      "Connecting loop"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 72105
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-030-3",
-    "step": "p29",
-    "labels": [
-      "Knot housing"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 67161
-  },
-  {
     "key": "touch-right-dynamixel",
     "file": "panel-058-1",
     "step": "p56",
@@ -4896,38 +4472,6 @@
     "meshes": 81642
   },
   {
-    "key": "base-right-dynamixel",
-    "file": "panel-092-1",
-    "step": "p122",
-    "labels": [],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 744471
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-092-2",
-    "step": "p122",
-    "labels": [],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 744471
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-092-1",
-    "step": "p122",
-    "labels": [],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 744471
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-092-2",
-    "step": "p122",
-    "labels": [],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 744471
-  },
-  {
     "key": "touch-right-dynamixel",
     "file": "panel-092-1",
     "step": "p122",
@@ -4958,28 +4502,6 @@
     "labels": [],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 744471
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-063-1",
-    "step": "p62",
-    "labels": [
-      "Guide pin 1 · 2 × 30",
-      "Guide pin 2 · 2 × 30"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 250780
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-063-1",
-    "step": "p62",
-    "labels": [
-      "Guide pin 1 · 2 × 30",
-      "Guide pin 2 · 2 × 30"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 249619
   },
   {
     "key": "touch-right-dynamixel",
@@ -5002,28 +4524,6 @@
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 264860
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-063-2",
-    "step": "p62",
-    "labels": [
-      "Bearing 1 · 4 × 8 × 3",
-      "Bearing 2 · 4 × 8 × 3"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 254812
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-063-2",
-    "step": "p62",
-    "labels": [
-      "Bearing 1 · 4 × 8 × 3",
-      "Bearing 2 · 4 × 8 × 3"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 253651
   },
   {
     "key": "touch-right-dynamixel",
@@ -6532,18 +6032,6 @@
     "meshes": 2141189
   },
   {
-    "key": "base-right-dynamixel",
-    "file": "panel-124-2",
-    "step": "p123",
-    "labels": [
-      "Anchor channel",
-      "8 cm",
-      "Working end"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 67872
-  },
-  {
     "key": "base-left-dynamixel",
     "file": "panel-124-1",
     "step": "p123",
@@ -6554,18 +6042,6 @@
     ],
     "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
     "meshes": 2141189
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-124-2",
-    "step": "p123",
-    "labels": [
-      "Anchor channel",
-      "8 cm",
-      "Working end"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 67872
   },
   {
     "key": "touch-right-dynamixel",
@@ -6750,106 +6226,6 @@
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 40430
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-053-1",
-    "step": "p49",
-    "labels": [
-      "Reinforced stopper",
-      "Untrimmed working end"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 160096,
-    "caption": "Pull the long tendon firmly to settle the thumb stopper in its housing",
-    "instruction": 3
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-053-5",
-    "step": "p49",
-    "labels": [
-      "Reinforced stopper",
-      "Tucked tail",
-      "Second stopper"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 254944,
-    "caption": "Reseat and tuck the entire tail inside; repeat for the second thumb anchor",
-    "instruction": 3
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-041-1",
-    "step": "p37",
-    "labels": [
-      "Reinforced stopper",
-      "Untrimmed working end"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 87150
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-041-5",
-    "step": "p37",
-    "labels": [
-      "Reinforced stopper",
-      "Tucked tail",
-      "Second stopper"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 131694
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-053-1",
-    "step": "p49",
-    "labels": [
-      "Reinforced stopper",
-      "Untrimmed working end"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 159421,
-    "caption": "Pull the long tendon firmly to settle the thumb stopper in its housing",
-    "instruction": 3
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-053-5",
-    "step": "p49",
-    "labels": [
-      "Reinforced stopper",
-      "Tucked tail",
-      "Second stopper"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 254269,
-    "caption": "Reseat and tuck the entire tail inside; repeat for the second thumb anchor",
-    "instruction": 3
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-041-1",
-    "step": "p37",
-    "labels": [
-      "Reinforced stopper",
-      "Untrimmed working end"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 87420
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-041-5",
-    "step": "p37",
-    "labels": [
-      "Reinforced stopper",
-      "Tucked tail",
-      "Second stopper"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 131964
   },
   {
     "key": "touch-right-dynamixel",
@@ -6996,38 +6372,6 @@
     "meshes": 106864
   },
   {
-    "key": "base-right-dynamixel",
-    "file": "panel-125-1",
-    "step": "p123",
-    "labels": [],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 90832
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-125-2",
-    "step": "p123",
-    "labels": [],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 96592
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-125-1",
-    "step": "p123",
-    "labels": [],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 90832
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-125-2",
-    "step": "p123",
-    "labels": [],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 96592
-  },
-  {
     "key": "touch-right-dynamixel",
     "file": "panel-125-1",
     "step": "p123",
@@ -7382,38 +6726,6 @@
     ],
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332",
     "meshes": 37542
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-126-1",
-    "step": "p126",
-    "labels": [],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 193444
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-126-2",
-    "step": "p126",
-    "labels": [],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 193444
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-126-1",
-    "step": "p126",
-    "labels": [],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 193444
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-126-2",
-    "step": "p126",
-    "labels": [],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 193444
   },
   {
     "key": "touch-right-dynamixel",
@@ -7481,44 +6793,6 @@
   },
   {
     "key": "base-right-dynamixel",
-    "file": "thumb-dp-feed",
-    "labels": [
-      "Ashley stopper + single knot",
-      "Knot housing"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 98560,
-    "step": "thumb-dp",
-    "caption": "Thumb DP · feed both free ends through the knot housing",
-    "instruction": 1
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "thumb-dp-seat",
-    "labels": [
-      "Reinforced stoppers",
-      "Connecting loop"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 39952,
-    "step": "thumb-dp",
-    "caption": "Thumb DP · seat the reinforced stoppers and tuck the connecting loop",
-    "instruction": 2
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "thumb-dp-tuck",
-    "labels": [
-      "Knot housing"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 35008,
-    "step": "thumb-dp",
-    "caption": "Thumb DP · keep the loop inside the housing and both ends free",
-    "instruction": 2
-  },
-  {
-    "key": "base-right-dynamixel",
     "file": "thumb-pp-part",
     "labels": [],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
@@ -7526,44 +6800,6 @@
     "step": "thumb-pp",
     "caption": "Thumb PP · keep the cable channel accessible while threading",
     "instruction": 1
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "thumb-dp-feed",
-    "labels": [
-      "Ashley stopper + single knot",
-      "Knot housing"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 98554,
-    "step": "thumb-dp",
-    "caption": "Thumb DP · feed both free ends through the knot housing",
-    "instruction": 1
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "thumb-dp-seat",
-    "labels": [
-      "Reinforced stoppers",
-      "Connecting loop"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 39946,
-    "step": "thumb-dp",
-    "caption": "Thumb DP · seat the reinforced stoppers and tuck the connecting loop",
-    "instruction": 2
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "thumb-dp-tuck",
-    "labels": [
-      "Knot housing"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 35002,
-    "step": "thumb-dp",
-    "caption": "Thumb DP · keep the loop inside the housing and both ends free",
-    "instruction": 2
   },
   {
     "key": "base-left-dynamixel",
@@ -7670,5 +6906,743 @@
     "step": "thumb-pp",
     "caption": "Thumb PP · keep the cable channel accessible while threading",
     "instruction": 1
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "thumb-dp-feed",
+    "step": "thumb-dp",
+    "labels": [
+      "Ashley stopper + single knot",
+      "Knot housing"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 98560
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "thumb-dp-seat",
+    "step": "thumb-dp",
+    "labels": [
+      "Ashley stoppers + 1 single knot each",
+      "Connecting loop"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 39952
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "thumb-dp-tuck",
+    "step": "thumb-dp",
+    "labels": [
+      "Knot housing"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 35008
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-063-1",
+    "step": "p62",
+    "labels": [
+      "Guide pin 1 · 2 × 30",
+      "Guide pin 2 · 2 × 30"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 250780
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-063-2",
+    "step": "p62",
+    "labels": [
+      "TP bearing 1 · 4 × 8 × 3",
+      "TP bearing 2 · 4 × 8 × 3"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 258844
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-092-1",
+    "step": "p122",
+    "labels": [],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 1966757
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-092-2",
+    "step": "p122",
+    "labels": [],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 1966757
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-058-1",
+    "step": "p56",
+    "labels": [
+      "Working end · 20 cm",
+      "TP anchor housing"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 57508
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-058-2",
+    "step": "p56",
+    "labels": [
+      "Ashley stopper + 3 single knots",
+      "TP anchor housing"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 216356
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-051-1",
+    "step": "p49",
+    "labels": [
+      "Tendon",
+      "Working end · 20 cm"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 85744
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-051-2",
+    "step": "p49",
+    "labels": [
+      "Ashley stopper + 3 single knots",
+      "Knot housing"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 161968
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-053-1",
+    "step": "p49",
+    "labels": [
+      "Ashley stopper + 3 single knots",
+      "Untrimmed working end"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 160096
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-053-3",
+    "step": "p49",
+    "labels": [
+      "Ashley stopper + 3 single knots",
+      "Tail · 5 mm"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 167728
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-053-5",
+    "step": "p49",
+    "labels": [
+      "Ashley stopper + 3 single knots",
+      "Tucked tail",
+      "Second stopper"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 254944
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-039-1",
+    "step": "p37",
+    "labels": [
+      "Tendon",
+      "Working end · 20 cm"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 59694
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-039-2",
+    "step": "p37",
+    "labels": [
+      "Ashley stopper + single knot",
+      "Knot housing"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 89070
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-041-1",
+    "step": "p37",
+    "labels": [
+      "Ashley stopper + 1 single knot",
+      "Untrimmed working end"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 87150
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-041-3",
+    "step": "p37",
+    "labels": [
+      "Ashley stopper + 1 single knot",
+      "Tail · 5 mm"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 94830
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-041-5",
+    "step": "p37",
+    "labels": [
+      "Ashley stopper + 1 single knot",
+      "Tucked tail",
+      "Second stopper"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 131694
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-034-1",
+    "step": "prepare-pp",
+    "labels": [
+      "Ashley stopper + single knot",
+      "Knot housing"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 155510
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-034-2",
+    "step": "prepare-pp",
+    "labels": [
+      "Knot housing"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 91958
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-030-1",
+    "step": "p29",
+    "labels": [
+      "Ashley stopper + single knot",
+      "Knot housing"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 130753
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-030-2",
+    "step": "p29",
+    "labels": [
+      "Ashley stoppers + 1 single knot each",
+      "Connecting loop"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 72145
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-030-3",
+    "step": "p29",
+    "labels": [
+      "Knot housing"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 67201
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-030-4",
+    "step": "p29",
+    "labels": [
+      "Bearing · 4 × 8 × 3"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 19633
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-034-3",
+    "step": "prepare-pp",
+    "labels": [
+      "Pin · 2 × 8"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 24730
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-034-4",
+    "step": "p33",
+    "labels": [],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 94029
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-034-5",
+    "step": "p33",
+    "labels": [],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 94029
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-034-6",
+    "step": "p33",
+    "labels": [],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 94029
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-063-3",
+    "step": "p62",
+    "labels": [],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 303710
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-122-1",
+    "step": "p122",
+    "labels": [],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 2017691
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-092-3",
+    "step": "p122",
+    "labels": [],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 2017691
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-125-2",
+    "step": "p123",
+    "labels": [],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 96592
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-126-1",
+    "step": "p126",
+    "labels": [],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 193444
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-126-2",
+    "step": "p126",
+    "labels": [],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 193444
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "thumb-dp-feed",
+    "step": "thumb-dp",
+    "labels": [
+      "Ashley stopper + single knot",
+      "Knot housing"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 98554
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "thumb-dp-seat",
+    "step": "thumb-dp",
+    "labels": [
+      "Ashley stoppers + 1 single knot each",
+      "Connecting loop"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 39946
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "thumb-dp-tuck",
+    "step": "thumb-dp",
+    "labels": [
+      "Knot housing"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 35002
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-063-1",
+    "step": "p62",
+    "labels": [
+      "Guide pin 1 · 2 × 30",
+      "Guide pin 2 · 2 × 30"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 249619
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-063-2",
+    "step": "p62",
+    "labels": [
+      "TP bearing 1 · 4 × 8 × 3",
+      "TP bearing 2 · 4 × 8 × 3"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 257683
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-092-1",
+    "step": "p122",
+    "labels": [],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 1966757
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-092-2",
+    "step": "p122",
+    "labels": [],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 1966757
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-058-1",
+    "step": "p56",
+    "labels": [
+      "Working end · 20 cm",
+      "TP anchor housing"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 57070
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-058-2",
+    "step": "p56",
+    "labels": [
+      "Ashley stopper + 3 single knots",
+      "TP anchor housing"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 215918
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-051-1",
+    "step": "p49",
+    "labels": [
+      "Tendon",
+      "Working end · 20 cm"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 85069
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-051-2",
+    "step": "p49",
+    "labels": [
+      "Ashley stopper + 3 single knots",
+      "Knot housing"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 161293
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-053-1",
+    "step": "p49",
+    "labels": [
+      "Ashley stopper + 3 single knots",
+      "Untrimmed working end"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 159421
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-053-3",
+    "step": "p49",
+    "labels": [
+      "Ashley stopper + 3 single knots",
+      "Tail · 5 mm"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 167053
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-053-5",
+    "step": "p49",
+    "labels": [
+      "Ashley stopper + 3 single knots",
+      "Tucked tail",
+      "Second stopper"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 254269
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-039-1",
+    "step": "p37",
+    "labels": [
+      "Tendon",
+      "Working end · 20 cm"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 59964
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-039-2",
+    "step": "p37",
+    "labels": [
+      "Ashley stopper + single knot",
+      "Knot housing"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 89340
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-041-1",
+    "step": "p37",
+    "labels": [
+      "Ashley stopper + 1 single knot",
+      "Untrimmed working end"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 87420
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-041-3",
+    "step": "p37",
+    "labels": [
+      "Ashley stopper + 1 single knot",
+      "Tail · 5 mm"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 95100
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-041-5",
+    "step": "p37",
+    "labels": [
+      "Ashley stopper + 1 single knot",
+      "Tucked tail",
+      "Second stopper"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 131964
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-034-1",
+    "step": "prepare-pp",
+    "labels": [
+      "Ashley stopper + single knot",
+      "Knot housing"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 157410
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-034-2",
+    "step": "prepare-pp",
+    "labels": [
+      "Knot housing"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 93858
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-030-1",
+    "step": "p29",
+    "labels": [
+      "Ashley stopper + single knot",
+      "Knot housing"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 130713
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-030-2",
+    "step": "p29",
+    "labels": [
+      "Ashley stoppers + 1 single knot each",
+      "Connecting loop"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 72105
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-030-3",
+    "step": "p29",
+    "labels": [
+      "Knot housing"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 67161
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-030-4",
+    "step": "p29",
+    "labels": [
+      "Bearing · 4 × 8 × 3"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 19593
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-034-3",
+    "step": "prepare-pp",
+    "labels": [
+      "Pin · 2 × 8"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 24710
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-034-4",
+    "step": "p33",
+    "labels": [],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 93971
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-034-5",
+    "step": "p33",
+    "labels": [],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 93971
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-034-6",
+    "step": "p33",
+    "labels": [],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 93971
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-063-3",
+    "step": "p62",
+    "labels": [],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 302359
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-122-1",
+    "step": "p122",
+    "labels": [],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 2017691
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-092-3",
+    "step": "p122",
+    "labels": [],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 2017691
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-125-2",
+    "step": "p123",
+    "labels": [],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 96592
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-126-1",
+    "step": "p126",
+    "labels": [],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 193444
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-126-2",
+    "step": "p126",
+    "labels": [],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 193444
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-124-2",
+    "step": "p123",
+    "labels": [
+      "Anchor channel",
+      "For 3 turns + knot",
+      "Working end"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 67872
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-125-1",
+    "step": "p123",
+    "labels": [],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 86356
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-124-2",
+    "step": "p123",
+    "labels": [
+      "Anchor channel",
+      "For 3 turns + knot",
+      "Working end"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 67872
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-125-1",
+    "step": "p123",
+    "labels": [],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 86356
   }
 ]

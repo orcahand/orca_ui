@@ -278,9 +278,10 @@ class SimulatedTensionOperation(Operation):
             supervisor.exit_maintenance()
 
 
-def simulate_slack_test(ctx: OpContext, config, params: dict, hold, progress) -> dict:
+def simulate_slack_test(ctx: OpContext, config, params: dict, hold, progress, review=None) -> dict:
     """Lease-free simulated slack test: each joint is held on prompt and turns a
-    few degrees, the joints named in ``params["unspool"]`` past half a turn."""
+    few degrees, the joints named in ``params["unspool"]`` past half a turn;
+    ``review`` after the last joint can send the test back to it."""
     import dataclasses
     import random
 
@@ -299,7 +300,14 @@ def simulate_slack_test(ctx: OpContext, config, params: dict, hold, progress) ->
     step_s = params["step_duration_s"]
     out = []
     n = 0
-    while n < len(joints):
+    while True:
+        if n == len(joints):
+            if review is None or review() != HOLD_BACK:
+                break
+            n -= 1
+            out.pop()
+            progress({"event": "slack_joint_back", "joint": joints[n]})
+            continue
         j, m = joints[n], motors[n]
         r = SlackResult(j, m)
         progress({"event": "slack_joint", "joint": j, "motor": m, "index": n})

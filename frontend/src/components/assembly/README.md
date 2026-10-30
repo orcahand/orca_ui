@@ -1,5 +1,18 @@
 # Assembly workspace
 
+## Base motor setup · 30 October 2026
+
+Base steps `p98`, `p112` and `p115` include cable preparation, OH board and
+computer setup, configuration commands, descending motor IDs and chain wiring.
+FeeTech uses the three cable types and power-off connection sequence from the
+supplement linked in `Assembly Instructions-2.pdf` (downloaded 30 October).
+Terminal prompts were checked against the local `configure_motor_chain.py`;
+the expandable ID table uses `driveMap.ts` and was checked against both Base
+core configurations. Touch remains hidden; Touch/Full content is unchanged.
+No tensioning/calibration workflow or hardware code was changed. Validation:
+production build, targeted lint and isolated desktop/mobile browser checks for
+both motor families and hand sides; no physical motor configuration was run.
+
 ## Model distribution
 
 The four complete Base/Touch assembly GLBs are distributed in
@@ -763,3 +776,30 @@ Unresolved assembly information:
 - Review the completed hand after sensor installation, then continue to
   tensioning in Setup.
   Stable step IDs preserve saved progress while navigation follows this order.
+
+## Base guide review, 30 October
+
+- `baseGuideReview.ts` applies the latest downloaded text edits and the Base
+  preparation, bearing-fitting and spool sequence. Ten 2 m DP/PP tendons are
+  prepared together; AP/TP stock is prepared separately. Retired bearing steps
+  redirect to the joining steps. The editor remains enabled and Touch stays
+  hidden in the build selector.
+- `AssemblyVisualSlot` combines interactive models, rendered reference images
+  and original photographs with gallery enlargement. The sidebar reveals the
+  active row only when it falls outside the visible navigation area.
+- `FingerPreparation` shows the complete finger kit, including skins, hardware
+  and schematic prepared/unprepared tendon stock. Middle, ring and pinky share
+  the selectable preparation viewer.
+- FeeTech uses the Base Dynamixel assembled reference. Its exploded overview
+  substitutes renders of the FeeTech adapter, frame and tower and omits the
+  Dynamixel connector PCBs. CableHolder-A/B appear only in the exploded parts
+  overview and their installation step. The supplied STLs match `orca_files`;
+  `scripts/render_assembly_supplies.mjs` reproduces their preview images.
+- Base joining scenes fit PP bearings at the joining stage; the thumb TP detail
+  identifies the outer TP bearings. Later tower scenes retain installed motors.
+  Spool animations tie and seat the stopper before winding, with matching copy
+  for three taut turns. These are assembly illustrations, not hardware tests.
+- Validation covers left/right Base media references, interactive tab/gallery
+  behavior, finger selection, mobile overflow, complete finger kits, installed
+  tower motors and knot seating before winding. Tensioning/calibration source
+  and backend processes are outside this change.

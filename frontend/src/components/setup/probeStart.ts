@@ -2,9 +2,9 @@
 // is still reconnecting for a moment, so the start is retried until it takes.
 
 import { api } from '../../api/rest'
-import { useAppStore } from '../../state/appStore'
+import { isOperationActive, useOperationStore } from '../../state/operationStore'
 import { useSetupVariant } from '../../state/setupVariant'
-import { isV21Family, useTensionFlow } from '../../state/tensionFlow'
+import { DEFAULT_OFFSET_DEG, useTensionFlow } from '../../state/tensionFlow'
 import { loadPassFractions, loadPassSlack } from './guidedSettings'
 
 export const SLACK_HINT =
@@ -19,23 +19,37 @@ export async function startSlackTest(params: Record<string, unknown> = {}): Prom
   return startWhenConnected('slack_test', { current_ma: slackCurrentMa, ...params })
 }
 
+// One pass limit to limit and back per joint.
 export async function startTensionSweep(params: Record<string, unknown> = {}): Promise<void> {
-  const { sweepRepeats, runNote } = useTensionFlow.getState()
-  return startWhenConnected('tension_sweep', { repeats: sweepRepeats, ...(runNote ? { note: runNote } : {}), ...params })
+  return startWhenConnected('tension_sweep', { repeats: 1, ...params })
 }
 
-// Guided tensioning with the page's scoring; the currents come from the hand's
-// family defaults unless the Tension step passed its own.
+// Every finger motor turned the default pull counterclockwise and held while the
+// operator ratchets (the hold dialog's run, without winding first).
+export async function startHoldTension(): Promise<void> {
+  return startWhenConnected('tension', { move_motors: false, offset_deg: DEFAULT_OFFSET_DEG })
+}
+
+// Guided tensioning (v2.1 hands) with the page's scoring; the currents come
+// from the hand's family defaults unless the Tension step passed its own.
 export async function startGuidedTension(params: Record<string, unknown> = {}): Promise<void> {
   const kai = useSetupVariant.getState().variant === 'kai'
-  const { offsetDeg } = useTensionFlow.getState()
   return startWhenConnected('guided_tension', {
-    tension_offset_deg: offsetDeg,
+    tension_offset_deg: DEFAULT_OFFSET_DEG,
     ...(kai ? { scoring: 'slack', pass_slack_deg: loadPassSlack() } : { scoring: 'fraction', pass_fractions: loadPassFractions() }),
     resume: true,
-    any_hardware: !isV21Family(useAppStore.getState().status?.hardware_version),
     ...params,
   })
+}
+
+// Start the next operation once the run `runId` has ended (it was just told to finish).
+export async function startAfter(runId: string, start: () => Promise<void>): Promise<void> {
+  for (let i = 0; i < 300; i++) {
+    const op = useOperationStore.getState().operation
+    if (!op || op.run_id !== runId || !isOperationActive(op)) return start()
+    await sleep(100)
+  }
+  throw new Error('the previous run did not finish')
 }
 
 async function startWhenConnected(kind: string, params: Record<string, unknown>): Promise<void> {

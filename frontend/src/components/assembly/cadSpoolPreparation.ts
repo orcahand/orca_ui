@@ -46,7 +46,7 @@ export function cadSpoolPreparation(bundle:Bundle,build:Build,phase:'overview'|'
   const across=new THREE.Vector3(-axis.y,axis.x,0).normalize(),offset=across.clone().multiplyScalar(-5)
   line([exit.clone().add(offset),end.clone().add(offset)],.07,'#285b45')
   for(const point of[exit,end])line([point.clone().add(offset).addScaledVector(across,-1),point.clone().add(offset).addScaledVector(across,1)],.07,'#285b45')
-  labels.push({text:'Anchor channel',point:channel[Math.floor(channel.length/2)].clone()},{text:'8 cm',point:exit.clone().lerp(end,.5).add(offset)},{text:'Working end',point:end.clone()})
+  labels.push({text:'Anchor channel',point:channel[Math.floor(channel.length/2)].clone()},{text:build.version==='base'?'For 3 turns + knot':'8 cm',point:exit.clone().lerp(end,.5).add(offset)},{text:'Working end',point:end.clone()})
   direction=new THREE.Vector3(0,0,1)
  }
  return {group,labels,direction,cordOutlines,dispose:()=>{disposePieces(pieces);extra.forEach(m=>{m.geometry.dispose();(m.material as THREE.Material).dispose()})}}

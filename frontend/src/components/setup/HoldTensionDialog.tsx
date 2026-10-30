@@ -1,14 +1,14 @@
-// Tensioning for hands without a travel baseline (v2.0, or forced): activate
+// Simple tensioning, the v2.0 protocol (the Tension step's third row): activate
 // the current so the motors hold every tendon taut, then ratchet the spools.
-// Nothing is scored. Shown for any running "tension" operation, wherever it
-// was started, so the same hand always gets the same steps.
+// Nothing is scored. Shown for any running "tension" operation not started
+// from the sweep dialog, so the same hand always gets the same steps.
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '../../api/rest'
 import type { OperationSnapshot } from '../../api/types'
 import { isOperationActive, useStartGate } from '../../state/operationStore'
-import { EXTRA_DEG, PULL_MORE, useTensionFlow } from '../../state/tensionFlow'
+import { DEFAULT_OFFSET_DEG, EXTRA_DEG, PULL_MORE, useTensionFlow } from '../../state/tensionFlow'
 import { failToBanner } from './setupUtils'
 
 type HoldStep = 'activate' | 'ratchet' | 'done'
@@ -29,7 +29,8 @@ export function HoldTensionDialog({
   const gate = useStartGate('motors')
   const wind = useTensionFlow((s) => s.wind)
   const setWind = useTensionFlow((s) => s.setWind)
-  const offsetDeg = useTensionFlow((s) => s.offsetDeg)
+  const holdClicks = useTensionFlow((s) => s.holdClicks)
+  const listed = Object.entries(holdClicks ?? {}).sort(([, a], [, b]) => b - a)
   const active = operation !== null && isOperationActive(operation)
   const holding = active && operation.state === 'awaiting_input'
   const runStep: HoldStep = operation === null ? 'activate' : active && holding ? 'ratchet' : active ? 'activate' : 'done'
@@ -41,7 +42,7 @@ export function HoldTensionDialog({
   const stepIndex = STEPS.findIndex((s) => s.key === step)
 
   const activate = () =>
-    void api.operationStart('tension', { move_motors: wind, offset_deg: offsetDeg }).catch(failToBanner)
+    void api.operationStart('tension', { move_motors: wind, offset_deg: DEFAULT_OFFSET_DEG }).catch(failToBanner)
   const release = () => void api.operationInput('Release').catch(failToBanner)
   const activateAgain = () => {
     setRestarting(true)
@@ -94,7 +95,14 @@ export function HoldTensionDialog({
           <span className="gt-title">Tensioning</span>
           <span className="gt-header-spacer" />
           {active ? (
-            <button className="btn btn-secondary" onClick={() => void api.operationStop().catch(failToBanner)}>
+            <button
+              className="btn btn-secondary"
+              title="Stop the run and close"
+              onClick={() => {
+                void api.operationStop().catch(failToBanner)
+                onClose()
+              }}
+            >
               Cancel
             </button>
           ) : (
@@ -134,9 +142,9 @@ export function HoldTensionDialog({
                 <p className="setup-copy">
                   {wind
                     ? `Activating the current first winds every finger to its hard stops and back ` +
-                      `(the tendons seat), then slowly turns the finger motors ${offsetDeg}° ` +
+                      `(the tendons seat), then slowly turns the finger motors ${DEFAULT_OFFSET_DEG}° ` +
                       `counterclockwise and holds there, loading the bottom spools.`
-                    : `Activating the current makes every finger motor slowly turn ${offsetDeg}° ` +
+                    : `Activating the current makes every finger motor slowly turn ${DEFAULT_OFFSET_DEG}° ` +
                       `counterclockwise and hold there, loading the bottom spools. The fingers are not ` +
                       `wound first.`}{' '}
                   Keep fingers clear of the hand while it takes up the slack.
@@ -170,6 +178,13 @@ export function HoldTensionDialog({
                   enough load on the bottom spools? Pull {EXTRA_DEG}° more. When every spool is
                   tight, release the motors.
                 </p>
+                {holdClicks && (
+                  <p className="setup-copy">
+                    {listed.length
+                      ? `The slack test lists ${listed.map(([j, n]) => `${j.replace('_', ' ')} ~${n} click${n === 1 ? '' : 's'}`).join(', ')}: turn those spools by that much first, stopping early if a tendon feels firm.`
+                      : 'The slack test lists no clicks: every spool is within one click.'}
+                  </p>
+                )}
               </div>
             )}
             {step === 'done' && operation && (

@@ -133,7 +133,14 @@ export function ManualCalibrationDialog({
               <button className="btn btn-secondary" title="Keeps the run going" onClick={onClose}>
                 Hide
               </button>
-              <button className="btn btn-secondary" onClick={() => void api.operationStop().catch(fail)}>
+              <button
+                className="btn btn-secondary"
+                title="Stop the run and close"
+                onClick={() => {
+                  void api.operationStop().catch(fail)
+                  onClose()
+                }}
+              >
                 Cancel
               </button>
             </>

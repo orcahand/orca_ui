@@ -11,6 +11,7 @@ export const CAD_DETAILS:Record<string,CadDetail>={
  'thumb-parts':{title:'Thumb parts · DP, PP, AP and TP',fixed:['Thumb DP','Thumb PP','Thumb AP','Thumb TP'],moving:[],caption:'Identify the four thumb segments before preparation.'},
  'thumb-dp':{title:'Thumb DP bearings',fixed:['Thumb DP'],moving:['Bearing · 4 × 8 × 3'],caption:'Seat the tendon first, then press a bearing into each side.'},
  'thumb-pp':{title:'Thumb PP guide pins',fixed:['Thumb PP'],moving:['Pin · 2 × 8','Pin · 2 × 6'],caption:'Fit the middle and lower guide pins. The upper pin goes in after DP and PP are joined.'},
+ 'thumb-pp-skin':{title:'Fit the thumb PP skin',fixed:['Thumb PP'],moving:['Thumb PP skin'],caption:'Slide the skin from the open base toward the fingertip; keep the tendon ends free.'},
  'thumb-pp-ready':{title:'Prepare the thumb PP skin and bearings',fixed:['Thumb PP'],moving:['Thumb PP skin','Bearing · 4 × 8 × 3','Bearing · 4 × 8 × 2'],caption:'Slide the PP skin on from the base, then seat both PP bearings.'},
  'thumb-tp-pins':{title:'Thumb TP guide pins',fixed:['Thumb TP'],moving:['Pin · 2 × 30'],caption:'Press both long pins fully into their shaft slots.'},
  'thumb-skins':{title:'Seat the thumb skins',fixed:['Thumb DP','Thumb PP','Thumb AP','Thumb TP','Thumb PP skin'],moving:['Thumb DP skin'],caption:'Seat the DP skin where used; the PP skin is already fitted.'},
@@ -30,7 +31,7 @@ export function cadDetailSpec(build:Build,step:string):CadDetail {
  return spec
 }
 export function cadDetailScene(bundle:Bundle,build:Build,step:string){
- const skinStep=['pp-ready','finishing-pp','index-dp-skin','index-pp-skin','thumb-pp-ready','thumb-skins'].includes(step),finger=step.startsWith('thumb-')?'Thumb':'Index'
+ const skinStep=['pp-ready','finishing-pp','index-dp-skin','index-pp-skin','thumb-pp-skin','thumb-pp-ready','thumb-skins'].includes(step),finger=step.startsWith('thumb-')?'Thumb':'Index'
  const spec=cadDetailSpec(build,step),pieces=cadPieces(bundle,build),group=new THREE.Group()
  const fixed=pieces.filter(p=>spec.fixed.includes(p.part.label)||(skinStep&&!['pp-ready','thumb-pp-ready'].includes(step)&&p.part.label.startsWith('Bearing')&&(p.owner===`${finger} DP`||['finishing-pp','thumb-skins'].includes(step)&&[`${finger} PP`,`${finger} AP`].includes(p.owner??'')))),center=new THREE.Box3();fixed.forEach(p=>center.union(p.bounds));const anchor=center.isEmpty()?new THREE.Vector3():center.getCenter(new THREE.Vector3())
  const screws=pieces.filter(p=>p.part.label==='M3 × 14 socket screw')
@@ -41,6 +42,7 @@ export function cadDetailScene(bundle:Bundle,build:Build,step:string){
  const lowerPin=pieces.filter(p=>p.part.label==='Pin · 2 × 6'&&inPp(p)).sort((a,b)=>b.center.distanceToSquared(thumbDp.center)-a.center.distanceToSquared(thumbDp.center))[0]
  const detailPart=(p:CadPiece)=>step==='thumb-dp'?p.owner==='Thumb DP':step==='thumb-pp'?(inPp(p)&&(p.part.label==='Pin · 2 × 8'||p===lowerPin)):step==='thumb-tp-pins'?thumbTp.bounds.clone().expandByScalar(1).containsPoint(p.center):true
  const moving=pieces.filter(p=>spec.moving.includes(p.part.label)&&detailPart(p)).filter(p=>!skinStep||(p.part.label.startsWith('Bearing')?p.owner===`${finger} PP`:p.part.label.includes('touch module')&&step==='finishing-pp'?nearest(pieces.filter(b=>/^(Index|Middle|Ring) DP$/.test(b.part.label)),p.center)?.part.label==='Index DP':true)).filter(p=>step!=='p127'||p.part.label!=='M3 hex nut'||screws.some(s=>s.center.distanceTo(p.center)<25))
+ if(build.version==='base'&&['p127','p129'].includes(step))fixed.push(...pieces.filter(p=>['Dynamixel XC330 motor','Dynamixel XC430 wrist motor','Bottom spool','Ratchet','Top spool / tensioner','Spool cover','Motor connector PCB'].includes(p.part.label)))
  const selected=step==='p139'?pieces.filter(p=>p.part.category!=='Tendons'&&!p.part.label.includes('(optional)')&&!(build.version==='touch'&&p.part.category==='Skins'&&/DP skin|Pinky touch skin/.test(p.part.label))):[...fixed,...moving]
  const offsets=new Map<CadPiece,THREE.Vector3>()
  for(const p of selected){group.add(p.object);if(!moving.includes(p))continue

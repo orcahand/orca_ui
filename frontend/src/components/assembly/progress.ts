@@ -56,6 +56,12 @@ export function validateProgress(data: unknown): Progress {
       if(['finishing-pp','thumb-skins'].includes(progress.current))progress.current='touch-skins'
       progress.done=progress.done.filter(id=>!['finishing-pp','thumb-skins'].includes(id))
     }
+    if(progress.build.version==='base'&&progress.views['guide:base-review']!=='oct30-v1'){
+      const changed=['p33','p42','p35','thumb-pp','p54','p62','p123','p126']
+      progress.done=progress.done.filter(id=>!changed.includes(id))
+      progress.checks=progress.checks.filter(key=>!changed.some(id=>key.startsWith(`${id}:`)))
+      progress.views['guide:base-review']='oct30-v1'
+    }
     // Preserve a finger's completed six-tendon check when loading earlier progress.
     FINGER_CHECKS.forEach((_,i)=>{if(Array.from({length:6},(_,j)=>`p45:movement:${i*6+j}`).every(key=>progress.checks.includes(key))&&!progress.checks.includes(`p45:finger:${i}`))progress.checks.push(`p45:finger:${i}`)})
     progress.checks=progress.checks.filter(key=>!key.startsWith('p45:movement:'))

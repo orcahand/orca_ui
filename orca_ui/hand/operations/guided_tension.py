@@ -182,8 +182,8 @@ def validate_guided_tension_params(service, params: dict) -> dict:
         raise ServiceError("start_at must be 'tension' or omitted", status_code=422)
     if start_at is not None:
         clean["start_at"] = start_at
-    # Tendons to ratchet from the sweep after calibration: per joint its
-    # friction as a percentage of the reference and the clicks the sweep counted.
+    # Tendons to ratchet the run opens with (from the slack test): per joint the
+    # clicks it needs and an optional friction percentage.
     ratchet = params.get("ratchet_joints")
     if ratchet is not None:
         known = set(config.joint_ids) - {"wrist"}
@@ -205,8 +205,8 @@ def validate_guided_tension_params(service, params: dict) -> dict:
             raise ServiceError("ratchet_joints values must be numbers", status_code=422)
     if not (getattr(config, "uses_motor_travel", True) or clean["any_hardware"]):
         raise ServiceError(
-            "guided tensioning needs v2.1 hardware — use the hold dialog, or "
-            "force guided in the tension settings",
+            "guided tensioning needs v2.1 hardware — use simple tensioning, or "
+            "start it with any_hardware",
             status_code=409,
         )
     clean["defaults"] = default_currents(
@@ -221,8 +221,10 @@ class _Presenter:
     def __init__(self, ctx: OpContext, currents: dict, on_prompt=None, start_at: str | None = None):
         self._ctx = ctx
         self._on_prompt = on_prompt
-        # "tension": the first pose prompt is answered with goto:tension by itself.
+        # "tension": the first prompt is answered with goto:tension by itself;
+        # otherwise a first prompt past the first stage jumps back to it.
         self._start_at = start_at
+        self._opening = True
         self._extra: dict = {
             "step": "pose",
             "round": 1,
@@ -360,15 +362,19 @@ class _Presenter:
         self._ctx.set_phase(action, detail=f"round {prompt.get('round', 1)}")
         if self._on_prompt is not None:
             self._on_prompt()
-        if self._start_at == "tension" and action == "pose" and GOTO_TENSION in prompt["options"]:
-            self._start_at = None
+        opening, self._opening = self._opening, False
+        start_at, self._start_at = self._start_at, None
+        if start_at == "tension" and action in ("pose", "score") and GOTO_TENSION in prompt["options"]:
             self._ctx.log("opened with a ratchet list: straight to the ratchet")
             return GOTO_TENSION
-        self._start_at = None
+        first = _first_stage(prompt) if opening and start_at is None else None
+        if first is not None:
+            self._ctx.log("opening at the first stage")
+            return first
         return self._ctx.wait_input(PROMPTS[action], list(prompt["options"]))
 
     def seed_ratchet(self, ratchet: dict) -> None:
-        """A ratchet list the run was opened with (from the sweep after calibration)."""
+        """A ratchet list the run was opened with (from the slack test)."""
         with self._lock:
             self._extra["ratchet"] = dict(ratchet)
             self._publish()
@@ -381,6 +387,19 @@ class _Presenter:
             self._extra["step"] = "done"
             self._extra["completed"] = completed
             self._publish()
+
+
+def _first_stage(prompt: dict) -> str | None:
+    """The goto answer that takes a run's first prompt to the first range stage,
+    or None when it is already there. Stage gotos are listed in stage order."""
+    if prompt["action"] == "pose" and prompt.get("stage_index", 0) == 0:
+        return None
+    if prompt["action"] not in ("pose", "score"):
+        return None
+    return next(
+        (o for o in prompt["options"] if o.startswith(GOTO) and o not in (GOTO_SCORE, GOTO_TENSION)),
+        None,
+    )
 
 
 class _LiveCurrents(Operation):

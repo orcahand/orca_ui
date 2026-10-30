@@ -322,8 +322,9 @@ export interface SlackJoint {
 }
 
 export interface SlackTestExtra {
-  // hold: waiting for the operator to hold `joint`; testing: winding it.
-  step: 'starting' | 'hold' | 'testing' | 'done'
+  // hold: waiting for the operator to hold `joint`; testing: winding it;
+  // review: every joint tested, waiting for Finish (or Back to the last joint).
+  step: 'starting' | 'hold' | 'testing' | 'review' | 'done'
   joint: string | null
   // Which way the joint's motor is winding right now; null between phases.
   direction: 1 | -1 | null
@@ -1177,7 +1178,7 @@ export interface GuidedTensionExtra {
   excluded?: { joint: string; motor: number; reason: string }[]
   // Motors latched right now, keyed by motor id.
   faults?: Record<string, OperationMotorFault>
-  // Tendons to ratchet when the run was opened from the tension sweep: their
-  // friction as a percentage of the reference and the clicks that need.
+  // Tendons to ratchet when the run was opened from the slack test, with the
+  // clicks each needs (pct is unused there).
   ratchet?: Record<string, { pct: number | null; clicks: number | null }>
 }
