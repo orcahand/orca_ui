@@ -25,7 +25,7 @@ export function explorerParts(parts:Part[]):Part[] {
       .map(area=>[area,area==='Fingers'?[...(part.areas.Fingers??[]),...(part.areas.Thumb??[])]:part.areas[area]])
   )})))
 }
-export type Supply = {id:string;label:string;quantity:string;areas:Area[];kind:'tube'|'cord'|'cable'|'equipment'|'hardware';note:string; partLabel?:string; optional?:boolean; image?:string; files?:{label:string;src:string}[]}
+export type Supply = {id:string;label:string;quantity:string;areas:Area[];kind:'tube'|'cord'|'cable'|'equipment'|'hardware';note:string; partLabel?:string; optional?:boolean; exploded?:boolean; replaces?:string; image?:string; files?:{label:string;src:string}[]}
 export function supplementalParts(part:Part,stock:Supply[],area?:string){return stock.filter(s=>s.partLabel===part.label&&(!area||s.areas.includes(area as Area)))}
 export function partQuantity(part:Part,stock:Supply[],area?:string){return (area?part.areas[area]?.length??0:part.count)+supplementalParts(part,stock,area).filter(s=>!s.optional).reduce((n,s)=>n+Number(s.quantity),0)}
 export function partQuantityLabel(part:Part,stock:Supply[],area?:string){
@@ -47,6 +47,7 @@ export function supplies(build:Build):Supply[] {
   }):[]
   const list:Supply[] = [
     ...touchScrews,
+    ...(build.version==='base'&&build.motor==='feetech'?([{id:'feetech-wrist-adapter',label:'FeeTech wrist motor adapter',area:'Wrist',replaces:'Wrist motor adapter'},{id:'feetech-wrist-frame',label:'FeeTech wrist frame',area:'Wrist',replaces:'Wrist frame'},{id:'feetech-motor-tower',label:'FeeTech motor tower',area:'Tower',replaces:'Motor tower'}] as const).map(p=>({id:p.id,label:p.label,replaces:p.replaces,quantity:'1',areas:[p.area],kind:'hardware' as const,exploded:true,note:'FeeTech-specific printed part.',image:`./assembly/supplies/${p.id}.png`,files:[{label:'STL',src:`./assembly/supplies/${p.id}.stl`}]})):[]),
     {id:`carpal-cover-${build.side}`,label:'Carpal cover',quantity:'1',areas:['Carpals'],kind:'hardware',note:'Separate printed carpal cover; omitted from the complete CAD assembly export.',image:`./assembly/supplies/carpal-cover-${build.side}.svg`,files:[{label:'STL',src:`./assembly/supplies/carpal-cover-${build.side}.stl`}]},
     {id:'cord-2m',label:'Tendon · 2m',quantity:'10',areas:['Fingers'],kind:'cord',note:'Ten 2 m lengths; the same tendons continue through carpals, wrist and tower.',image:'./assembly/supplies/cord.svg'},
     {id:'cord-75cm',label:'Tendon · 75cm',quantity:'12',areas:['Fingers'],kind:'cord',note:'Twelve 75 cm lengths; the same tendons continue through carpals, wrist and tower.',image:'./assembly/supplies/cord.svg'},
@@ -60,8 +61,8 @@ export function supplies(build:Build):Supply[] {
       {id:'motor-links',label:'3-pin column-link cables',quantity:'3',areas:['Tower'] as Area[],kind:'cable' as const,note:'Two bottom links (14 → 13 and 6 → 5) and one top link (10 → 9). The bottom links use 30–50 mm cables; match the top link to the routed assembly.'},
       {id:'wrist-lead',label:'3-pin wrist motor cable',quantity:'1',areas:['Tower'] as Area[],kind:'cable' as const,note:'From the last spool motor to the wrist motor. Check the required length against your routed assembly.'},
     ]:[{id:'feetech-harness',label:'FeeTech motor cable harness',quantity:'1 matching set',areas:['Tower'] as Area[],kind:'cable' as const,note:'Short neighbor links, long bottom links and the two thin-to-thick adapter leads shown in the motor wiring steps.'}]),
-    {id:'chain-a',label:'Motor-chain cable cover A',quantity:'2',areas:['Tower'],kind:'hardware',note:'Fit the A covers over the matching motor-chain cable paths.'},
-    {id:'chain-b',label:'Motor-chain cable cover B',quantity:'2',areas:['Tower'],kind:'hardware',note:'Fit the B covers over the matching motor-chain cable paths.'},
+    {id:'chain-a',exploded:build.version==='base',label:'Cable cover A · CableHolder-A',quantity:'2',areas:['Tower'],kind:'hardware',note:'Fit the A covers over the matching motor-chain cable paths.'},
+    {id:'chain-b',exploded:build.version==='base',label:'Cable cover B · CableHolder-B',quantity:'2',areas:['Tower'],kind:'hardware',note:'Fit the B covers over the matching motor-chain cable paths.'},
     {id:'board-cover',label:'OH board cable cover',quantity:'1',areas:['Tower'],kind:'hardware',note:'Fits over the routed board cables inside the rear hull.'},
     {id:'board-nuts',label:'M3 hex nut',partLabel:'M3 hex nut',quantity:'2',areas:['Tower'],kind:'hardware',note:'Includes 2 nuts for the rear-hull board mount.',image:'./assembly/parts/base-right-dynamixel/08f5283ed3.png'},
     {id:'board-screw',label:'M3 × 14 socket screw',partLabel:'M3 × 14 socket screw',quantity:'1',areas:['Tower'],kind:'hardware',note:'Includes 1 screw for the rear-hull board mount.',image:'./assembly/parts/base-right-dynamixel/f1efd004fd.png'},

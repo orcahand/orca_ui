@@ -4,7 +4,7 @@ import {ChannelCurve} from './channelStrands'
 import {ease,type CadPiece} from './cadScene'
 import {stopperGeometry} from './stopperGeometry'
 
-export function spoolWinding(spool:CadPiece,kind:'bottom'|'top'){
+export function spoolWinding(spool:CadPiece,kind:'bottom'|'top',anchorFirst=false){
  const data=paths[kind],group=new THREE.Group(),origin=new THREE.Vector3().fromArray(data.origin)
  const lead=data.lead.map(p=>new THREE.Vector3().fromArray(p))
  const channel=data.channel.map(p=>new THREE.Vector3().fromArray(p)),seatedTail=data.tail.map(p=>new THREE.Vector3().fromArray(p)),end=channel.at(-1)!
@@ -21,7 +21,7 @@ export function spoolWinding(spool:CadPiece,kind:'bottom'|'top'){
  const material=new THREE.MeshStandardMaterial({color:'#f7f8f4',roughness:.72}),strand=new THREE.Mesh(new THREE.BufferGeometry(),material),tail=new THREE.Mesh(new THREE.BufferGeometry(),material)
  strand.name='Spool tendon';tail.name='Knot tail';stopper.group.name='Ashley stopper';group.position.copy(spool.center);group.add(strand,stopper.group,tail)
  function update(position:number){
-  const wound=ease((position-.12)/.52),turns=Math.max(.025,wound*3),count=Math.ceil(turns*160),coil:THREE.Vector3[]=[]
+  const wound=anchorFirst?ease((position-.55)/.45):ease((position-.12)/.52),turns=Math.max(.025,wound*3),count=Math.ceil(turns*160),coil:THREE.Vector3[]=[]
   for(let i=0;i<=count;i++){
    const t=1-turns/3+(turns/3)*i/count,angle=data.theta+data.direction*(t-1)*Math.PI*6
    let axial=kind==='bottom'?t-.5:.5-t
@@ -33,8 +33,11 @@ export function spoolWinding(spool:CadPiece,kind:'bottom'|'top'){
    coil.push(origin.clone().add(new THREE.Vector3(data.radius*Math.cos(angle),data.radius*Math.sin(angle),axial)))
   }
   const tangent=coil[1].clone().sub(coil[0]).normalize(),incoming=coil[0].clone().addScaledVector(tangent,-22)
-  strand.geometry.dispose();strand.geometry=new THREE.TubeGeometry(new ChannelCurve([incoming,...coil,...lead.slice(1),...(position>.64?anchoredChannel:channel).slice(1)]),Math.max(800,coil.length+channel.length),.14,12,false)
-  const tuck=ease((position-.73)/.27),height=kind==='bottom'?.6:-.8,radius=Math.abs(height)/2,normal=new THREE.Vector3(0,0,Math.sign(height)),start=knotCenter.clone().addScaledVector(axis,.9)
+  const seat=anchorFirst?ease((position-.25)/.25):1,workingEnd=knotCenter.clone().addScaledVector(axis,18*(1-seat))
+  stopper.group.position.copy(workingEnd)
+  const anchorPath=anchorFirst?[...channel.slice(0,-1),workingEnd.clone().addScaledVector(axis,-.9)]:position>.64?anchoredChannel:channel
+  strand.geometry.dispose();strand.geometry=new THREE.TubeGeometry(new ChannelCurve([incoming,...coil,...lead.slice(1),...anchorPath.slice(1)]),Math.max(800,coil.length+channel.length),.14,12,false)
+  const tuck=anchorFirst?ease((position-.48)/.07):ease((position-.73)/.27),height=kind==='bottom'?.6:-.8,radius=Math.abs(height)/2,normal=new THREE.Vector3(0,0,Math.sign(height)),start=knotCenter.clone().addScaledVector(axis,.9)
   const fold=[start,...Array.from({length:41},(_,i)=>{
    const angle=i/40*Math.PI
    return knotCenter.clone().addScaledVector(axis,1.1+radius*Math.sin(angle)).addScaledVector(normal,radius*(1-Math.cos(angle)))
@@ -45,9 +48,9 @@ export function spoolWinding(spool:CadPiece,kind:'bottom'|'top'){
    if(length+span>=5){const endpoint=fold[i].clone();fold[i].copy(fold[i-1]).lerp(endpoint,(5-length)/span);fold.length=i+1;break}
    length+=span
   }
-  tail.geometry.dispose();tail.geometry=new THREE.TubeGeometry(new ChannelCurve(fold),240,.14,12,false)
+  tail.geometry.dispose();tail.geometry=new THREE.TubeGeometry(new ChannelCurve(anchorFirst?fold.map(p=>p.clone().addScaledVector(axis,18*(1-seat))):fold),240,.14,12,false)
   tail.geometry.setDrawRange(0,Math.floor(tuck*tail.geometry.index!.count/6)*6)
-  stopper.group.visible=position>.64;tail.visible=position>.73
+  stopper.group.visible=position>(anchorFirst?.22:.64);tail.visible=position>(anchorFirst?.48:.73)
   group.position.copy(spool.center).add(spool.object.position)
  }
  update(0)

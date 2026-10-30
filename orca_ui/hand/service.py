@@ -356,8 +356,8 @@ class HandService:
             "reference": ref[0] if ref else None,
             "latest": mine[0][0] if mine else None,
             "latest_at": latest.get("recorded_at") if latest else None,
-            # The newest sweep scored against the reference: what the Calibrate step
-            # offers to tension again.
+            # The newest sweep scored against the reference: the clicks the Calibrate
+            # step lists and the sweep dialog holds the motors for.
             "verdict": sweeps.compare(latest.get("results") or [], ref[1])["joints"] if latest and ref else None,
         }
 

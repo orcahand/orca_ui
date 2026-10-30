@@ -1,3 +1,7 @@
+import * as THREE from 'three'
+import {cadPieces,disposePieces} from './cadScene'
+import {channelStrands} from './channelStrands'
+import {apStrands} from './apStrands'
 import {useEffect,useMemo,useRef,useState} from 'react'
 import {Canvas,useFrame} from '@react-three/fiber'
 import {OrbitControls} from '@react-three/drei'
@@ -15,7 +19,18 @@ function Movement({bundle,build,finger,movement,playing,replay,isolated}:{bundle
   const id=motorId(`${code}-${segment}`,build)
   const scene=motorCheckScene(bundle,build,id,'hand',undefined,{owners:isolated?[`${name} DP`,`${name} PP`]:[`${name} DP`,`${name} PP`,`${name} AP`],bare:isolated,hideSensors:build.version==='touch',hideSkins:build.version==='touch'})
   const range=illustratedJointRange(build,testJoint(id,build),scene.axis);fitIllustratedRange(scene,range)
-  return {...scene,range}
+  if(build.version!=='base'||finger!=='index')return {...scene,range}
+  const pieces=cadPieces(bundle,build),dp=channelStrands(build,pieces),ap=apStrands(build,pieces,'Index')
+  const root=scene.view.children[0];root.add(dp.group,ap.group)
+  const downstream=['DP','PP','AP'].slice(0,['DP','PP','AP'].indexOf(segment)+1).map(part=>`Index ${part}`)
+  let previous=NaN
+  return {...scene,range,setAngle:(angle:number)=>{
+   scene.setAngle(angle);if(Math.abs(angle-previous)<.001)return;previous=angle
+   const rotation=new THREE.Quaternion().setFromAxisAngle(scene.axis,angle),offset=scene.pivot.clone().sub(scene.pivot.clone().applyQuaternion(rotation))
+   for(const part of pieces){part.object.quaternion.identity();part.object.position.set(0,0,0);if(downstream.includes(part.part.label)){part.object.quaternion.copy(rotation);part.object.position.copy(offset)}}
+   dp.update();ap.update(new THREE.Vector3(),0,[2,3,0,1,4,5][movement])
+   for(const group of [dp.group,ap.group])group.traverse(node=>{if(node instanceof THREE.Mesh){node.material.depthTest=false;node.renderOrder=12}})
+  },dispose:()=>{scene.dispose();dp.dispose();ap.dispose();disposePieces(pieces)}}
  },[bundle,build,finger,movement,isolated])
  useEffect(()=>{elapsed.current=0},[scene,replay])
  useEffect(()=>()=>scene.dispose(),[scene])

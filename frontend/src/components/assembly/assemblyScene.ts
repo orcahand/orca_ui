@@ -35,10 +35,10 @@ export function assemblyScene(bundle:Bundle,build:Build,step:string){
   if(step==='p123'||step==='p126'){
    const spool=picked.find(p=>p.part.label===(step==='p126'?'Spool cover':'Bottom spool'))!
    for(const p of included)fade(p,p===spool?1:.26)
-   winding=spoolWinding(spool,step==='p126'?'top':'bottom');group.add(winding.group)
+   winding=spoolWinding(spool,step==='p126'?'top':'bottom',build.version==='base');group.add(winding.group)
   }
  }else if(step==='p122'){
-  matching(['Motor tower','Wrist frame','Wrist motor adapter','Wrist pulley','Dynamixel XC430 wrist motor','GT2 belt · 142 mm','Carpal pulley','M4 × 10 socket screw','M4 hex nut','M2 × 8 socket screw','Pin · 4 × 10']).forEach(add)
+  matching(['Motor tower','Wrist frame','Wrist motor adapter','Wrist pulley',...(build.version==='base'?['Dynamixel XC330 motor','Bottom spool','Ratchet','Motor connector PCB']:[]),'Dynamixel XC430 wrist motor','GT2 belt · 142 mm','Carpal pulley','M4 × 10 socket screw','M4 hex nut','M2 × 8 socket screw','Pin · 4 × 10']).forEach(add)
   const pulley=matching(['Wrist pulley'])[0],bearing=nearest(matching(['Bearing · 4 × 8 × 3']),pulley.center);add(bearing)
   const wrist=matching(['Wrist frame'])[0],motor=matching(['Dynamixel XC430 wrist motor'])[0]
   const axial=pulley.center.clone().sub(motor.center).normalize()
@@ -51,7 +51,7 @@ export function assemblyScene(bundle:Bundle,build:Build,step:string){
    else if(label==='M4 × 10 socket screw'||label==='M4 hex nut'){
     const axis=p.axis.clone();if(axis.dot(p.center.clone().sub(wrist.center))<0)axis.negate()
     stage(p,axis.multiplyScalar(label.includes('nut')?10:24),label.includes('nut')?.65:.82,label.includes('nut')?.8:1)
-   }else if(label!=='Motor tower')stage(p,new THREE.Vector3(),0,1,true)
+   }else if(!['Motor tower','Dynamixel XC330 motor','Bottom spool','Ratchet','Motor connector PCB'].includes(label))stage(p,new THREE.Vector3(),0,1,true)
   }
  }else{
   let moving=matching(spec.moving),fixed=matching(spec.fixed)
@@ -125,14 +125,17 @@ export function assemblyScene(bundle:Bundle,build:Build,step:string){
   if(['p33','p42','p46','p54','p62','p64','p68','p89'].includes(step)){
    for(const p of all.filter(p=>p.part.label.startsWith('Bearing'))){
     if(step!=='p89'&&!p.owner)continue
-    const owner=p.owner?bodies.find(b=>b.part.label===p.owner):nearest(bodies,p.center);if(step==='p33'&&owner?.part.label==='Index PP')continue
+    const owner=p.owner?bodies.find(b=>b.part.label===p.owner):nearest(bodies,p.center);if(build.version!=='base'&&step==='p33'&&owner?.part.label==='Index PP')continue
     if(!owner||!included.has(owner)||p.center.distanceTo(owner.center)>43)continue
+    if(build.version==='base'&&step==='p46'&&owner.part.label==='Thumb PP')continue
     const axis=p.axis.clone();if(axis.dot(p.center.clone().sub(owner.center))<0)axis.negate()
-    if(fixed.includes(owner))stage(p,axis.multiplyScalar(14),['p42','p54'].includes(step)?.9:.72,step==='p89'?.84:1)
+    if(build.version==='base'&&step==='p54'&&owner.part.label==='Thumb PP')stage(p,axis.multiplyScalar(14),.62,.82)
+    else if(fixed.includes(owner))stage(p,axis.multiplyScalar(14),['p42','p54'].includes(step)?.9:step==='p33'?.8:.72,step==='p89'?.84:1)
     else {add(p);stage(p,direction.clone().multiplyScalar(gap),.25,.78)}
    }
   }
  }
+ if(build.version==='base'&&['p132','p135','p136'].includes(step))matching(['Dynamixel XC330 motor','Dynamixel XC430 wrist motor','Bottom spool','Ratchet','Top spool / tensioner','Spool cover','Motor connector PCB']).forEach(add)
  const bearingJoints:Record<string,string[]>={p33:['Index DP'],p42:['Index PP'],p46:['Thumb DP'],p54:['Thumb PP'],p62:['Thumb AP'],p64:['Index AP','Middle AP','Ring AP','Pinky AP'],p68:['Thumb TP'],p89:['Wrist']}
  const inspections=(bearingJoints[step]??[]).map(name=>{
   const bearings=all.filter(p=>p.part.label.startsWith('Bearing')&&(name==='Wrist'?p.part.label==='Bearing · 8 × 13 × 4':p.owner===name))
@@ -163,6 +166,7 @@ export function assemblyScene(bundle:Bundle,build:Build,step:string){
    for(const p of included)if(['Motor tower','Wrist frame'].includes(p.part.label)){fade(p,p.part.label==='Motor tower'?t:.12+.88*t);if(p.part.label==='Motor tower')p.object.visible=t>.01}
   }
   for(const s of stages){s.piece.object.position.copy(s.offset).multiplyScalar(1-ease((position-s.from)/(s.to-s.from)));if(s.carry)s.piece.object.position.y+=35*(1-ease((position-.5)/.3))}
+  if(build.version==='base'&&step==='p54')for(const p of selected.filter(p=>p.part.label.startsWith('Bearing')&&p.owner==='Thumb PP'))p.object.position.addScaledVector(direction,gap*(1-ease((position-.25)/.53)))
   if(step==='p99')for(const s of stages)if(s.piece.part.label==='M2 hex nut')s.piece.object.position.z+=30*Math.sign(s.piece.center.z)*(1-ease((position-.22)/.23))
   winding?.update(step==='p126'?Math.max(0,Math.min(1,(position-.18)/.47)):position)
   if(step==='p126'){

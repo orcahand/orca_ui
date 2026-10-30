@@ -11,15 +11,18 @@ const PAD = { l: 34, r: 8, t: 8, b: 18 }
 
 const label = (joint: string) => joint.replace('_', ' ')
 
-const WORD: Record<SweepStatus, string> = { none: '', ok: 'ok', slack: 'slack', over: 'tighter', under: 'tension', low: 'loose' }
+const WORD: Record<SweepStatus, string> = {
+  none: '',
+  ok: 'well tensioned',
+  slack: 'slack',
+  over: 'tighter',
+  under: 'a little low',
+  low: 'too loose',
+}
 
-// A joint's verdict as the sweep shows it: the word, then the friction share
-// of the reference (or the difference in mA where the reference is too low for a share).
+// A joint's verdict as the sweep shows it: a plain word; the colour says the rest.
 export function verdictText(v: SweepJointVerdict): string {
-  if (v.status === 'none') return ''
-  if (v.share != null) return `${WORD[v.status]} (${Math.round(v.share * 100)} %)`
-  const d = v.friction_diff_ma
-  return d == null ? WORD[v.status] : `${WORD[v.status]} (${d > 0 ? '+' : ''}${Math.round(d)} mA)`
+  return WORD[v.status]
 }
 
 // What each line and band of the chart is.

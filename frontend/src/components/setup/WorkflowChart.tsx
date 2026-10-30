@@ -1,25 +1,18 @@
 // The setup workflow as a flowchart under the step tiles: boxes on two rows
-// (the tensioning loop, then the calibration loop and Run), arrows with the
+// (the tensioning, then the calibration loop and Run), arrows with the
 // condition that takes you along each one, drawn as one SVG so the eye can
 // follow it. Clicking a box shows what happens in that step, why, and what to
 // do, in the panel on the right, which stays empty until a box is clicked.
-// Edit mode makes every title, note, colour and text editable in place; the
-// edits stay in this browser until "Reset".
+// A v2.1 hand gets the guided tensioning loop, any other hand simple tensioning.
 
 import { useState } from 'react'
+import { useAppStore } from '../../state/appStore'
 import { useOperationStore } from '../../state/operationStore'
-import {
-  DEFAULT_WORKFLOW,
-  loadWorkflow,
-  saveWorkflow,
-  WORKFLOW_ARROWS,
-  WORKFLOW_LAYOUT,
-  type WorkflowStep,
-} from './workflow'
+import { isV21Family, useTensionFlow } from '../../state/tensionFlow'
+import { GUIDED_WORKFLOW, SIMPLE_WORKFLOW, type Workflow, type WorkflowArrow } from './workflow'
 
 // Which step a running operation belongs to, so the chart lights it up.
 const STEP_OF_OPERATION: Record<string, string> = {
-  tension: 'ratchet',
   guided_tension: 'move',
   slack_test: 'slack',
   calibrate: 'calibrate',
@@ -37,44 +30,38 @@ const PAD_X = 20
 // Room above the first row for a loop's label.
 const PAD_Y = 36
 const COLS = 3
-const ROWS = 3
+const ROWS = 2
 const WIDTH = PAD_X * 2 + (COLS - 1) * COL + BOX_W
 const HEIGHT = PAD_Y * 2 + (ROWS - 1) * ROW + BOX_H
 
-function boxAt(key: string): { x: number; y: number } {
-  const [col, row] = WORKFLOW_LAYOUT[key] ?? [0, 0]
+function boxAt(workflow: Workflow, key: string): { x: number; y: number } {
+  const [col, row] = workflow.layout[key] ?? [0, 0]
   return { x: PAD_X + col * COL, y: PAD_Y + row * ROW }
 }
 
 export function WorkflowChart() {
-  const [steps, setSteps] = useState<WorkflowStep[]>(loadWorkflow)
+  const isV21 = isV21Family(useAppStore((s) => s.status?.hardware_version ?? null))
+  const workflow = isV21 ? GUIDED_WORKFLOW : SIMPLE_WORKFLOW
+  const steps = workflow.steps
   const [selected, setSelected] = useState<string | null>(null)
-  const [editing, setEditing] = useState(false)
   const operation = useOperationStore((s) => s.operation)
+  const sweepHold = useTensionFlow((s) => s.sweepRatchet !== null)
+  const tensionKey = sweepHold ? 'measure' : isV21 ? 'ratchet' : 'hold'
   const runningKey =
     operation && (operation.state === 'running' || operation.state === 'awaiting_input')
-      ? (operation.kind === 'guided_tension' && (operation.extra as { step?: string } | null)?.step === 'tension'
-          ? (operation.params?.ratchet_joints ? 'again' : 'ratchet')
-          : STEP_OF_OPERATION[operation.kind]) ?? null
+      ? operation.kind === 'tension'
+        ? tensionKey
+        : operation.kind === 'guided_tension' && (operation.extra as { step?: string } | null)?.step === 'tension'
+          ? 'ratchet'
+          : (STEP_OF_OPERATION[operation.kind] ?? null)
       : null
   const current = selected ? (steps.find((s) => s.key === selected) ?? null) : null
-  const byKey = Object.fromEntries(steps.map((s) => [s.key, s]))
-
-  const update = (key: string, patch: Partial<WorkflowStep>) => {
-    const next = steps.map((s) => (s.key === key ? { ...s, ...patch } : s))
-    setSteps(next)
-    saveWorkflow(next)
-  }
-  const reset = () => {
-    setSteps(DEFAULT_WORKFLOW)
-    saveWorkflow(null)
-  }
 
   // An arrow between two boxes: straight to the right, straight down, or a
   // loop that leaves the top of its box and comes back over the boxes between.
-  const arrow = (a: (typeof WORKFLOW_ARROWS)[number], i: number) => {
-    const from = boxAt(a.from)
-    const to = boxAt(a.to)
+  const arrow = (a: WorkflowArrow, i: number) => {
+    const from = boxAt(workflow, a.from)
+    const to = boxAt(workflow, a.to)
     let d = ''
     let lx = 0
     let ly = 0
@@ -135,9 +122,9 @@ export function WorkflowChart() {
               <path d="M 0 0 L 10 5 L 0 10 z" />
             </marker>
           </defs>
-          {WORKFLOW_ARROWS.map(arrow)}
+          {workflow.arrows.map(arrow)}
           {steps.map((s) => {
-            const { x, y } = boxAt(s.key)
+            const { x, y } = boxAt(workflow, s.key)
             const state = s.key === runningKey ? ' running' : s.key === current?.key ? ' selected' : ''
             return (
               <g
@@ -167,60 +154,14 @@ export function WorkflowChart() {
       </div>
       <aside className="workflow-detail" style={{ '--box': current?.color ?? 'var(--panel-border)' } as React.CSSProperties}>
         {!current ? (
-          <div className="workflow-empty">
-            <span>Click a step for what happens, why, and what to do.</span>
-            <span className="gt-header-spacer" />
-            <button type="button" className="setup-clear" onClick={() => setEditing((e) => !e)}>
-              {editing ? 'done' : 'edit'}
-            </button>
-            {editing && (
-              <button type="button" className="setup-clear" onClick={reset} title="Back to the built-in text and colours">
-                reset
-              </button>
-            )}
-          </div>
+          <div className="workflow-empty">Click a step for what happens, why, and what to do.</div>
         ) : (
           <>
             <div className="workflow-detail-head">
-              {editing ? (
-                <>
-                  <input
-                    className="workflow-input title"
-                    value={current.title}
-                    onChange={(e) => update(current.key, { title: e.target.value })}
-                    aria-label="step title"
-                  />
-                  <input
-                    className="workflow-input"
-                    value={current.note}
-                    onChange={(e) => update(current.key, { note: e.target.value })}
-                    aria-label="step note"
-                  />
-                  <input
-                    type="color"
-                    className="workflow-color"
-                    value={toHex(current.color)}
-                    onChange={(e) => update(current.key, { color: e.target.value })}
-                    aria-label="step colour"
-                    title="box colour"
-                  />
-                </>
-              ) : (
-                <>
-                  <span className="workflow-swatch" />
-                  <b>{current.title}</b>
-                  <span className="workflow-detail-note">{current.note}</span>
-                </>
-              )}
+              <span className="workflow-swatch" />
+              <b>{current.title}</b>
+              <span className="workflow-detail-note">{current.note}</span>
               <span className="gt-header-spacer" />
-              {editing && (
-                <button type="button" className="setup-clear" onClick={reset} title="Back to the built-in text and colours">
-                  reset
-                </button>
-              )}
-              <button type="button" className="setup-clear" onClick={() => setEditing((e) => !e)}>
-                {editing ? 'done' : 'edit'}
-              </button>
               <button type="button" className="gt-close" aria-label="Close" onClick={() => setSelected(null)}>
                 ✕
               </button>
@@ -228,24 +169,14 @@ export function WorkflowChart() {
             <div className="workflow-detail-body">
               {(
                 [
-                  ['what happens', 'what', 4],
-                  ['why', 'why', 3],
-                  ['what to do', 'todo', 3],
+                  ['what happens', 'what'],
+                  ['why', 'why'],
+                  ['what to do', 'todo'],
                 ] as const
-              ).map(([label, field, rows]) => (
+              ).map(([label, field]) => (
                 <div key={field}>
                   <div className="workflow-detail-label">{label}</div>
-                  {editing ? (
-                    <textarea
-                      className="workflow-text"
-                      value={byKey[current.key][field]}
-                      rows={rows}
-                      onChange={(e) => update(current.key, { [field]: e.target.value })}
-                      aria-label={label}
-                    />
-                  ) : (
-                    <p className="setup-copy">{byKey[current.key][field]}</p>
-                  )}
+                  <p className="setup-copy">{current[field]}</p>
                 </div>
               ))}
             </div>
@@ -254,9 +185,4 @@ export function WorkflowChart() {
       </aside>
     </section>
   )
-}
-
-// <input type="color"> only takes #rrggbb; anything else falls back to grey.
-function toHex(color: string): string {
-  return /^#[0-9a-f]{6}$/i.test(color) ? color : '#888888'
 }

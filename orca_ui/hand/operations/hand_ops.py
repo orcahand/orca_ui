@@ -203,7 +203,7 @@ def slack_test_supported() -> bool:
     return True
 
 
-def slack_test(hand, *, joints, settings: dict, hold_callback, progress_callback, should_stop) -> dict:
+def slack_test(hand, *, joints, settings: dict, hold_callback, review_callback, progress_callback, should_stop) -> dict:
     """Blocking slack test on the calling thread (see run_slack_test)."""
     from orca_core.maintenance.slack_test import SlackTestSettings, run_slack_test
 
@@ -212,6 +212,7 @@ def slack_test(hand, *, joints, settings: dict, hold_callback, progress_callback
         joints=joints,
         settings=SlackTestSettings(**settings),
         hold_callback=hold_callback,
+        review_callback=review_callback,
         progress_callback=progress_callback,
         should_stop=should_stop,
     )

@@ -58,6 +58,12 @@ def test_too_much_slack_blocks_calibration_until_a_passing_test(client):
                            json={"params": {**FAST, "joints": joints, "unspool": ["ring_mcp"]}})
     assert response.status_code == 200, response.text
     _hold_each(client, ["Test", "Test"])
+    # After the last joint the test waits on a review: Back tests that joint again.
+    assert _wait_for(lambda: _operation(client).get("state") == "awaiting_input")
+    assert _operation(client)["extra"]["step"] == "review"
+    _hold_each(client, ["Back"])
+    assert _wait_for(lambda: _operation(client).get("extra", {}).get("joint") == "ring_mcp")
+    _hold_each(client, ["Test", "Finish"])
     snapshot = _done(client)
     assert snapshot["state"] == "done" and snapshot["result"]["blocked"] is True
     assert snapshot["result"]["slack"] == {"index_pip": "pass", "ring_mcp": "fail"}
@@ -72,7 +78,7 @@ def test_too_much_slack_blocks_calibration_until_a_passing_test(client):
 
     assert client.post("/api/operation/slack_test/start",
                        json={"params": {**FAST, "joints": joints}}).status_code == 200
-    _hold_each(client, ["Test", "Skip"])
+    _hold_each(client, ["Test", "Skip", "Finish"])
     snapshot = _done(client)
     assert snapshot["result"]["blocked"] is False
     assert snapshot["result"]["slack"] == {"index_pip": "pass", "ring_mcp": "skipped"}

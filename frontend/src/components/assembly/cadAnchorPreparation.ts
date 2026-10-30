@@ -49,7 +49,7 @@ export function cadAnchorPreparation(bundle:Bundle,build:Build,kind:AnchorPrepar
    labels.push({text:'Knot housing',point:center})
   }else{
    cord([starts[0],...loop,starts[1]])
-   labels.push({text:'Reinforced stoppers',point:center})
+   labels.push({text:'Ashley stoppers + 1 single knot each',point:center})
    labels.push({text:'Connecting loop',point:loop[50]})
   }
  }else{

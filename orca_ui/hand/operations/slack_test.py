@@ -3,7 +3,8 @@ its motor winds each way at low current; the free rotation is the slack.
 
 Runs orca_core's run_slack_test under the maintenance lease, asking for each
 joint through ``ctx.wait_input`` (hold, then Test, Skip, or Back to test the
-previous joint again). The report is kept
+previous joint again), and once more after the last joint (Finish, or Back to
+test that one again). The report is kept
 in the hand's setup.yaml (slack_tests); a joint with more than half
 a turn of slack blocks calibration until the hand is tensioned and tested
 again. Live angles stream through the snapshot ``extra`` (SlackTestExtra).
@@ -28,6 +29,8 @@ SETTING_BOUNDS = {
 HOLD_TEST = "Test"
 HOLD_SKIP = "Skip"
 HOLD_BACK = "Back"
+REVIEW_FINISH = "Finish"
+REVIEW_PROMPT = "Every joint tested — finish, or go back and test the last joint again"
 
 
 def hold_prompt(joint: str) -> str:
@@ -104,6 +107,18 @@ class _Presenter:
         answer = self._ctx.wait_input(hold_prompt(joint), options)
         return {HOLD_SKIP: False, HOLD_BACK: CORE_BACK}.get(answer, True)
 
+    def review(self) -> bool | str:
+        """Park after the last joint: orca_core's HOLD_BACK tests it again,
+        Finish ends the test."""
+        from orca_core.maintenance.slack_test import HOLD_BACK as CORE_BACK
+
+        with self._lock:
+            self.extra.update(step="review", joint=None, direction=None, live=None, can_back=True)
+            self._publish()
+        self._ctx.set_phase("review", detail="torque off — every joint tested")
+        answer = self._ctx.wait_input(REVIEW_PROMPT, [REVIEW_FINISH, HOLD_BACK])
+        return CORE_BACK if answer == HOLD_BACK else True
+
     def progress(self, event: dict) -> None:
         kind = event.get("event")
         with self._lock:
@@ -128,6 +143,12 @@ class _Presenter:
             elif kind == "slack_sample":
                 self.extra["live"] = event["deg"]
                 self._publish(force=False)
+            elif kind == "slack_phase_done":
+                self._ctx.log(
+                    f"{event['joint']} {'+' if event['direction'] > 0 else '−'}: {event['deg']:.0f}° in "
+                    f"{event['seconds']:.1f} s ({event['reason']}), back in {event['return_s']:.1f} s "
+                    f"({event['returned']})"
+                )
             elif kind == "slack_joint_done":
                 r = event["result"]
                 self.extra["results"][r["joint"]] = _row(r, self._ctx.service.supervisor.config)
@@ -227,6 +248,7 @@ class SlackTestOperation(Operation):
                 joints=self.params.get("joints"),
                 settings=self.params.get("settings") or {},
                 hold_callback=presenter.hold,
+                review_callback=presenter.review,
                 progress_callback=presenter.progress,
                 should_stop=ctx.stop_event.is_set,
             )
@@ -272,7 +294,8 @@ class SimulatedSlackTestOperation(Operation):
         try:
             ctx.set_phase("connecting", detail="opening motor-only connection")
             ctx.sleep(self.params["step_duration_s"])
-            report = simulate_slack_test(ctx, supervisor.config, self.params, presenter.hold, presenter.progress)
+            report = simulate_slack_test(ctx, supervisor.config, self.params, presenter.hold, presenter.progress,
+                                         presenter.review)
             saved = _save(ctx, supervisor.config, report, None)
             presenter.finish(report, saved)
             ctx.set_phase("released", detail="torque off, control mode restored")

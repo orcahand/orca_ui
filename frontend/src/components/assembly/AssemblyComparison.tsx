@@ -1,18 +1,21 @@
+import {useVisualSlot} from './AssemblyVisualSlot'
 import {useRef,useState,type ReactNode} from 'react'
 import {MEDIA,STEPS} from './guide'
 import type {Build} from './buildContent'
 import {photoResolution} from './photoResolution'
 
-export function ViewToggle({photo,onChange}:{photo:boolean;onChange:(photo:boolean)=>void}){
- return <div className="assembly-view-toggle" role="group" aria-label="Image view"><button aria-pressed={!photo} onClick={()=>onChange(false)}>3D model</button><button aria-pressed={photo} onClick={()=>onChange(true)}>Photo</button></div>
+export function ViewToggle({photo,onChange,render=false}:{photo:boolean;onChange:(photo:boolean)=>void;render?:boolean}){
+ return <div className="assembly-view-toggle" role="group" aria-label="Image view"><button aria-pressed={!photo} onClick={()=>onChange(false)}>{render?'Render':'3D model'}</button><button aria-pressed={photo} onClick={()=>onChange(true)}>Photo</button></div>
 }
 
 export function AssemblyComparison({step,build,model,photoSources,children}:{step:string;build:Build;model:()=>ReactNode;photoSources?:readonly string[];children?:ReactNode}){
+ const inSlot=useVisualSlot()
  const dialog=useRef<HTMLDialogElement>(null),[open,setOpen]=useState(false),[index,setIndex]=useState(0),[inline,setInline]=useState(0)
  const photos=(STEPS.find(s=>s.id===step)?.pages??[]).flatMap(p=>MEDIA[String(p)]?.panels??(MEDIA[String(p)]?[{...MEDIA[String(p)],caption:'Assembly photo'}]:[])).filter(p=>!p.side||p.side===build.side).filter(p=>!['finishing-pp','pp-ready'].includes(step)||/panel-036-[45]\.png$/.test(p.src)).filter(p=>!photoSources||photoSources.some(src=>p.src.endsWith('/'+src)))
  const title=STEPS.find(s=>s.id===step)?.title
  function cycle(delta:number){setIndex(i=>(i+delta+photos.length+1)%(photos.length+1))}
  const shown=Math.min(inline,photos.length)
+ if(inSlot)return <>{children}</>
  return <div className="assembly-model-photos">
   <div className="assembly-row">{photos.length>0?<ViewToggle photo={shown>0} onChange={photo=>setInline(photo?1:0)}/>:<span/>}<button className="assembly-text-button" aria-label="Enlarge model and assembly photos" onClick={()=>{setIndex(shown);setOpen(true);dialog.current?.showModal()}}>⤢</button></div>
   {shown===0?children:<figure className="assembly-inline-photo"><img src={photoResolution(photos[shown-1].src)} alt={`Assembly photo ${shown} for ${title}`}/>{photos.length>1&&<div className="assembly-row assembly-image-navigation"><button onClick={()=>setInline(i=>i>1?i-1:photos.length)}>←</button><span>{shown} / {photos.length}</span><button onClick={()=>setInline(i=>i<photos.length?i+1:1)}>→</button></div>}</figure>}

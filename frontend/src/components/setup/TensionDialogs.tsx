@@ -1,7 +1,8 @@
 // The one place tensioning (and manual calibration) dialogs are mounted: whichever such operation is
 // running gets its dialog, whoever started it, and stays readable after it
 // ends until closed. The hold dialog can also be opened before its operation
-// exists, to explain the step before any current flows.
+// exists, to explain the step before any current flows; a hold started from
+// the sweep dialog shows inside that dialog instead.
 
 import { useEffect, useState } from 'react'
 import { isOperationActive, useOperationStore } from '../../state/operationStore'
@@ -18,6 +19,9 @@ export function TensionDialogs() {
   const closeHold = useTensionFlow((s) => s.closeHold)
   const dismissed = useTensionFlow((s) => s.dismissed)
   const dismiss = useTensionFlow((s) => s.dismiss)
+  const sweepRatchet = useTensionFlow((s) => s.sweepRatchet)
+  const setSweepRatchet = useTensionFlow((s) => s.setSweepRatchet)
+  const setHoldClicks = useTensionFlow((s) => s.setHoldClicks)
   const [watched, setWatched] = useState<string | null>(null)
 
   const manualCalibration = operation?.kind === 'calibrate' && operation.params?.manual === true
@@ -41,12 +45,17 @@ export function TensionDialogs() {
   const close = () => {
     if (shown) dismiss(shown.run_id)
     closeHold()
+    setSweepRatchet(null)
+    setHoldClicks(null)
   }
 
   if (shown?.kind === 'guided_tension') {
     return <GuidedTensionDialog operation={shown} onClose={close} />
   }
   if (shown?.kind === 'calibrate') return <ManualCalibrationDialog operation={shown} onClose={close} />
+  if (shown?.kind === 'tension' && sweepRatchet) {
+    return <TensionSweepDialog operation={sweepRatchet} hold={shown} onClose={close} />
+  }
   if (shown?.kind === 'tension') return <HoldTensionDialog operation={shown} onClose={close} />
   if (shown?.kind === 'slack_test') return <SlackTestDialog operation={shown} onClose={close} />
   if (shown?.kind === 'tension_sweep') return <TensionSweepDialog operation={shown} onClose={close} />

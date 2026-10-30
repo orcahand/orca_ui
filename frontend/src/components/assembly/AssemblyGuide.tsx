@@ -1,3 +1,5 @@
+import {AssemblyVisualSlot} from './AssemblyVisualSlot'
+import {FingerPreparation} from './FingerPreparation'
 import {GuideBackgroundEditor} from './GuideBackgroundEditor'
 import {GuideText,GuideEditingContext,useGuideEditing} from './GuideEditing'
 import {ViewToggle} from './AssemblyComparison'
@@ -10,7 +12,7 @@ import {RoutingInspection} from './RoutingInspection'
 import { useRef, useState, type ReactNode } from 'react'
 import { lazy, Suspense } from 'react'
 import { ThumbPpThreading } from './ThumbPpThreading'
-import { TendonPreparation, KnotReinforcement } from './TendonPreparation'
+import { TendonPreparation, KnotReinforcement, KnotConventions } from './TendonPreparation'
 import { FingerMotion } from './FingerMotion'
 import { FINGER_CHECKS } from './fingerMovements'
 import { DriveExplorer } from './DriveExplorer'
@@ -110,7 +112,7 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
     <div className={`assembly-layout ${sidebarCollapsed?'is-sidebar-collapsed':''}`}>
       <button className="assembly-mobile-nav" onClick={() => setNavOpen(!navOpen)} aria-expanded={navOpen} aria-controls="assembly-navigation">{navOpen ? 'Close chapters' : `Chapters · ${chapterTitle(step)}`} ☰</button>
       <aside className={`assembly-sidebar ${navOpen ? 'is-open' : ''}`} id="assembly-navigation">
-        <AssemblyNavigation steps={STEPS} current={step} done={progress.done} title={s=>editing.read(`${s.id}/title`,s.title)} query={query} filtered={filtered} build={build} onGo={go} beforeContents={<>
+        <AssemblyNavigation navOpen={navOpen} steps={STEPS} current={step} done={progress.done} title={s=>editing.read(`${s.id}/title`,s.title)} query={query} filtered={filtered} build={build} onGo={go} beforeContents={<>
                 <div className="assembly-progress"><div className="assembly-row"><span>{completed} / {required.length} steps</span><strong>{percent}%</strong></div><progress value={completed} max={required.length} aria-label="Assembly progress" /></div>
         <label className="assembly-search"><span className="assembly-sr-only">Search assembly instructions</span><input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Find a part or step…" /></label>
         </>}/>
@@ -134,8 +136,8 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
         {step.id === 'p1' && <><Suspense fallback={<p>{"Loading your hand…"}</p>}><PartsExplorer build={build}/></Suspense>{build.version==='touch'&&<p className="assembly-muted"><GuideText variant field="prose/AssemblyGuide.tsx/750d98ce89" text={"Build the fingers and thumb with all skins off. Connect and mount their Touch sensors next, then fit the PP skins before building the hand and tower. Connect the sensor cable tails to the connector board later. Touch uses sensors instead of DP skins."} label="Guide text"/></p>}{build.version==='full'&&<p className="assembly-note"><GuideText variant field="prose/AssemblyGuide.tsx/d6745dd89a" text={"Full-specific sensor installation and harness routing still need a verified procedure before closing the hand."} label="Guide text"/></p>}</>}
         {step.id==='p1'&&<section className="assembly-tool-overview"><h3><GuideText variant field="prose/AssemblyGuide.tsx/f7fe31ffad" text={"Tools"} label="Section heading"/></h3><div className="assembly-tool-columns"><div><h4><GuideText variant field="prose/AssemblyGuide.tsx/5e36900b3e" text={"At the bench"} label="Section heading"/></h4><ul>{equipment.assembly.map((item,i)=><li key={i}><GuideText field={`equipment/assembly/${i}`} text={item} label={`Tool ${i+1}`}/></li>)}</ul></div><div><h4><GuideText variant field="prose/AssemblyGuide.tsx/fb93ba8114" text={"Setup and electronics"} label="Section heading"/></h4><ul>{equipment.setup.map((item,i)=><li key={i}><GuideText field={`equipment/setup/${i}`} text={item} label={`Tool ${i+1}`}/></li>)}</ul></div></div></section>}
         <StepMedia key={`${step.id}-${build.motor}`} step={step.id} build={build}>
-        {step.id==='p123'&&<SpoolOverview build={build}/>}
-        {step.id === 'p6' && <KnotLesson/>}
+        {step.id==='p123'&&build.version!=='base'&&<SpoolOverview build={build}/>}
+        {step.id === 'p6' && <><KnotLesson/>{build.version==='base'&&<><KnotConventions/><KnotReinforcement count={1}/><KnotReinforcement count={3}/></>}</>}
         {step.id === 'p23' && <HandLabels build={build}/>}
         {step.id.startsWith('touch-')&&['touch-ids','touch-test'].includes(step.id)&&<table className="assembly-sensor-ids"><caption>Sensor IDs</caption><thead><tr><th scope="col">Finger</th><th scope="col">ID</th></tr></thead><tbody>{['Thumb','Index','Middle','Ring','Pinky'].map((finger,id)=><tr key={finger}><th scope="row">{finger}</th><td>{id}</td></tr>)}</tbody></table>}
         {!['p1','p6','p23'].includes(step.id) && <div className="assembly-guided-content">
@@ -143,27 +145,25 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
 
           <ol className={`assembly-guided-instructions ${build.version==='base'&&step.id==='p29'?'assembly-dp-preparation':''}`}>{copy.map((instruction,i) => {
             const images=stepFigures.filter(f=>(f.instruction??1)===i+1)
-            const command=commands(step,build).filter((_,n)=>i===(step.id==='p150'?(n===0?0:2):step.id==='p154'?1:0))
+            const command=commands(step,build).filter((_,n)=>i===(step.id==='p150'?(n===0?0:2):step.id==='p154'||build.version==='base'&&step.id==='p112'?1:0))
             return <li key={`${step.id}:${i}`} value={i+1} className={build.version==='base'&&step.id==='p26'&&i===2?'assembly-knot-emphasis':undefined}>
               {build.version==='base'&&step.id==='p37'&&i===1&&<KnotReinforcement count={1}/>}
               <p className="assembly-guided-text"><span aria-hidden="true">{i+1}</span><GuideText field={`${step.id}/instruction/${i}`} text={instruction} label={`Instruction ${i+1}`}/></p>
               {command.map(text=><Command key={text} command={text}/>)}
               {['p105','p110'].includes(step.id)&&i===0&&<a className="assembly-inline-resource" href="https://orca-console-169809101000.europe-west6.run.app" target="_blank" rel="noreferrer">Open ORCA Console flashing tool ↗</a>}
-              {images.length>0&&<MediaGallery key={`${step.id}-${build.side}-${build.motor}-${build.version}-${i}`} items={images} focused={-1} saved={progress.views[step.id]} onSelect={src=>setProgress(p=>({...p,views:{...p.views,[step.id]:src}}))}/>}
-              {step.id==='p139'&&i===0&&checklist.length > 0 && <section className="assembly-work-checklist"><h3><GuideText variant field="prose/AssemblyGuide.tsx/3d29c4c3a3" text={String(step.id === 'p139' ? 'Final assembly checklist' : 'Finger movement checklist')} label="Section heading"/></h3>{checklist.map((label,i) => <label key={label}><input type="checkbox" checked={progress.checks.includes(checkKey(i))} onChange={() => toggleCheck(checkKey(i))} /><span><GuideText field={`${step.id}/check/${i}`} text={label} label={`Checklist item ${i+1}`}/></span></label>)}</section>}
+              <AssemblyVisualSlot key={`${step.id}-${build.side}-${build.motor}-${i}`} build={build} step={step.id} includeStepMedia={i===(MOTION_AT[step.id]??DETAIL_AT[step.id]??0)&&!['p35','p45','p139'].includes(step.id)} figures={images} legacyGallery={images.length>0&&<MediaGallery key={`${step.id}-${build.side}-${build.motor}-${build.version}-${i}`} items={images} focused={-1} saved={progress.views[step.id]} onSelect={src=>setProgress(p=>({...p,views:{...p.views,[step.id]:src}}))}/>}>
+        {build.version==='base'&&i===0&&['finger-parts','p45'].includes(step.id)&&<FingerPreparation build={build} otherFingers={step.id==='p45'}/>}
         {i===1&&step.id==='motor-check'&&<MotorCheck build={build} selected={Number(progress.views['motor-check:selected']??1)} onSelect={id=>setProgress(p=>({...p,views:{...p.views,'motor-check:selected':String(id)}}))} checked={Array.from({length:17},(_,i)=>i+1).filter(id=>progress.checks.includes(`motor-check:${id}`))} onCheck={id=>toggleCheck(`motor-check:${id}`)}/>}
-        {i===(build.version==='base'&&step.id==='pp-ready'?0:DETAIL_AT[step.id]??copy.length-1)&&CAD_DETAILS[step.id]&&step.id!=='p46'&&!(build.motor==='feetech'&&CAD_DETAILS[step.id].motorSpecific)&&<CadDetail key={step.id} build={build} step={step.id}/>}
-        {build.version==='base'&&step.id==='p26'&&i===2&&<KnotReinforcement count={1}/>}
+        {i===(build.version==='base'&&step.id==='pp-ready'?0:DETAIL_AT[step.id]??copy.length-1)&&CAD_DETAILS[step.id]&&step.id!=='p46'&&!(build.version==='base'&&step.id==='thumb-pp')&&!(build.motor==='feetech'&&(step.id==='p98'||build.version!=='base'&&CAD_DETAILS[step.id].motorSpecific))&&<CadDetail key={step.id} build={build} step={step.id}/>}
         {build.version==='base'&&step.id==='p33'&&i===3&&<CadDetail build={build} step="index-dp-skin"/>}
         {build.version==='base'&&step.id==='p42'&&i===0&&<CadDetail build={build} step="index-pp-skin"/>}
-        {i===0&&step.id==='p115'&&<MotorChain build={build}/>}
-        {i===0&&step.id==='p101'&&<BoardIdentification build={build}/>}
+        {i===0&&step.id==='p115'&&build.motor==='dynamixel'&&<MotorChain build={build}/>}
+        {build.version==='base'&&step.id==='thumb-pp'&&i===2&&<CadDetail build={build} step="thumb-pp-skin"/>}
         {build.version!=='base'&&i===1&&['p37','p49','p56'].includes(step.id)&&<KnotReinforcement count={step.id==='p37'?1:3}/>}
         {i===0&&['touch-wrap-short','touch-wrap-long'].includes(step.id)&&<CloveHitchLesson key={step.id}/>}
         {i===1&&step.id==='touch-wrap-short'&&<TouchCableWrap/>}
         {i===1&&step.id==='touch-board-link'&&<TouchBoardConnection/>}
         {i===1&&step.id==='touch-mount'&&<TouchScrewGuide build={build}/>}
-        {i===1&&['p26','thumb-tendons'].includes(step.id) && <TendonPreparation/>}
         {i===1&&step.id==='thumb-tendons'&&<KnotLesson/>}
         {i===2&&step.id==='thumb-tendons'&&<KnotReinforcement count={1}/>}
         {build.version!=='base'&&step.id==='thumb-pp'&&i===0&&<ThumbPpThreading build={build}/>}
@@ -171,12 +171,21 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
         {i===0&&step.id === 'p59' && <TendonRouting step={step.id} build={build}/>}
         {i===1&&step.id === 'p77' && <WristRouting build={build} routeIndex={Number(progress.views['p77:route']??0)} onRoute={index=>setProgress(p=>({...p,views:{...p.views,'p77:route':String(index)}}))}/>}
         {i===0&&step.id === 'p80' && <RoutingInspection build={build}/>}
-        {i===(step.id==='p35'?1:2)&&['p35','p45'].includes(step.id) && <FingerMotion build={build} wholeIndex={step.id==='p35'}/>}
+        {i===(step.id==='p35'?(build.version==='base'?0:1):2)&&['p35','p45'].includes(step.id) && <FingerMotion build={build} wholeIndex={step.id==='p35'}/>}
 
-        {i===(build.version==='base'&&step.id==='p42'?1:MOTION_AT[step.id]??copy.length-1)&&ASSEMBLY_MOTIONS[step.id] && step.id!=='p93' && !(build.motor==='feetech'&&ASSEMBLY_MOTIONS[step.id].motorSpecific) && <ThreadingAnimation key={`motion:${step.id}`} kind={step.animation??'straight'} build={build} step={step.id} />}
+        {i===(build.version==='base'&&step.id==='p42'?1:MOTION_AT[step.id]??copy.length-1)&&ASSEMBLY_MOTIONS[step.id] && step.id!=='p93' && !(build.version!=='base'&&build.motor==='feetech'&&ASSEMBLY_MOTIONS[step.id].motorSpecific) && <ThreadingAnimation key={`motion:${step.id}`} kind={step.animation??'straight'} build={build} step={step.id} />}
         {i===(build.version==='base'&&step.id==='p42'?3:INSPECTION_AT[step.id])&&<JointInspection build={build} step={step.id}/>}
-        {i===(step.id==='p83'?1:3)&&['p83','p123','p126'].includes(step.id)&&<DriveExplorer key={`drive:${step.id}`} build={build} stage={step.id==='p83'?'wrist':step.id==='p123'?'bottom':'top'} checked={step.id==='p83'?progress.tendons:progress.checks.filter(k=>k.startsWith(`${step.id}:tendon:`)).map(k=>Number(k.split(':').at(-1)))} onCheck={i=>setProgress(p=>step.id==='p83'?({...p,tendons:p.tendons.includes(i)?p.tendons.filter(n=>n!==i):[...p.tendons,i],done:p.done.filter(id=>id!==step.id)}):({...p,checks:p.checks.includes(`${step.id}:tendon:${i}`)?p.checks.filter(k=>k!==`${step.id}:tendon:${i}`):[...p.checks,`${step.id}:tendon:${i}`],done:p.done.filter(id=>id!==step.id)}))}/>}
+        {i===(step.id==='p83'?1:build.version==='base'?4:3)&&['p83','p123','p126'].includes(step.id)&&<DriveExplorer key={`drive:${step.id}`} build={build} stage={step.id==='p83'?'wrist':step.id==='p123'?'bottom':'top'} checked={step.id==='p83'?progress.tendons:progress.checks.filter(k=>k.startsWith(`${step.id}:tendon:`)).map(k=>Number(k.split(':').at(-1)))} onCheck={i=>setProgress(p=>step.id==='p83'?({...p,tendons:p.tendons.includes(i)?p.tendons.filter(n=>n!==i):[...p.tendons,i],done:p.done.filter(id=>id!==step.id)}):({...p,checks:p.checks.includes(`${step.id}:tendon:${i}`)?p.checks.filter(k=>k!==`${step.id}:tendon:${i}`):[...p.checks,`${step.id}:tendon:${i}`],done:p.done.filter(id=>id!==step.id)}))}/>}
 
+            </AssemblyVisualSlot>
+        {i===0&&step.id==='p115'&&build.motor==='feetech'&&<MotorChain build={build}/>}
+        {i===1&&['p26','thumb-tendons'].includes(step.id) && <TendonPreparation/>}
+
+        {i===0&&step.id==='p101'&&<BoardIdentification build={build}/>}
+
+        {build.version==='base'&&step.id==='p26'&&i===2&&<KnotReinforcement count={1}/>}
+
+              {step.id==='p139'&&i===0&&checklist.length > 0 && <section className="assembly-work-checklist"><h3><GuideText variant field="prose/AssemblyGuide.tsx/3d29c4c3a3" text={String(step.id === 'p139' ? 'Final assembly checklist' : 'Finger movement checklist')} label="Section heading"/></h3>{checklist.map((label,i) => <label key={label}><input type="checkbox" checked={progress.checks.includes(checkKey(i))} onChange={() => toggleCheck(checkKey(i))} /><span><GuideText field={`${step.id}/check/${i}`} text={label} label={`Checklist item ${i+1}`}/></span></label>)}</section>}
             </li>
           })}</ol>
 
@@ -209,14 +218,14 @@ function MediaGallery({ items, saved, onSelect, focused }: { items: Figure[]; fo
     {items.map((item,i)=>{
       const isPhoto=Boolean(inlinePhotos[item.src]&&item.photo),view=isPhoto?item.photo!:item
       return <figure key={item.src} data-contrast={isPhoto?false:item.contrast??false} data-wide={item.wide||undefined} className={focused<0?'':(item.instruction??i+1)===focused+1?'is-focused':'is-unfocused'}>
-        <div className="assembly-row" style={{justifyContent:item.photo?'space-between':'flex-end'}}>{item.photo&&<ViewToggle photo={isPhoto} onChange={photo=>setInlinePhotos(p=>({...p,[item.src]:photo}))}/>}<button className="assembly-text-button" onClick={()=>enlarge(i)} aria-label={`Enlarge image ${i+1}`}>⤢</button></div>
+        <div className="assembly-row" style={{justifyContent:item.photo?'space-between':'flex-end'}}>{item.photo&&<ViewToggle render photo={isPhoto} onChange={photo=>setInlinePhotos(p=>({...p,[item.src]:photo}))}/>}<button className="assembly-text-button" onClick={()=>enlarge(i)} aria-label={`Enlarge image ${i+1}`}>⤢</button></div>
         <div className="assembly-image-frame">
           <button className="assembly-image-button" data-image-kind={isModelImage(view.src)?'cad':'photo'} onClick={()=>enlarge(i)} aria-label={`Enlarge detail ${i+1}`}><img key={view.src} src={view.src} alt={view.caption} loading="lazy" onLoad={e=>{if(!isModelImage(view.src))e.currentTarget.style.maxWidth=`min(100%, ${e.currentTarget.naturalWidth}px)`}}/></button>
         </div>{item.showCaption&&<figcaption className="assembly-panel-caption"><GuideText field={`caption/${view.src}`} text={view.caption} label="Image caption"/></figcaption>}
       </figure>
     })}
     <dialog ref={dialog} className="assembly-lightbox assembly-comparison" data-contrast={photo?false:item.contrast??false} data-image-kind={isModelImage(shown.src)?'cad':'photo'} aria-label="Enlarged assembly image" onKeyDown={e=>{if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();cycle(e.key==='ArrowRight'?1:-1)}}} onCancel={e=>e.stopPropagation()} onClick={e=>{if(e.target===e.currentTarget)dialog.current?.close()}}>
-      <div className="assembly-row"><span>Instruction {item.instruction??selected+1}</span>{item.photo&&<ViewToggle photo={photo} onChange={setPhoto}/>}<button autoFocus onClick={()=>dialog.current?.close()}>Close image ×</button></div>
+      <div className="assembly-row"><span>Instruction {item.instruction??selected+1}</span>{item.photo&&<ViewToggle render photo={photo} onChange={setPhoto}/>}<button autoFocus onClick={()=>dialog.current?.close()}>Close image ×</button></div>
       <img key={shown.src} src={shown.src} alt={shown.caption} onLoad={e=>{if(!isModelImage(shown.src))e.currentTarget.style.maxWidth=`min(100%, ${e.currentTarget.naturalWidth}px)`}}/>{item.showCaption&&<p className="assembly-lightbox-caption"><GuideText field={`caption/${shown.src}`} text={shown.caption} label="Image caption"/></p>}
       <div className="assembly-row assembly-image-navigation"><button onClick={()=>cycle(-1)} disabled={frames.length<2}>← Previous image</button><span>{frame+1} / {frames.length}{photo?' · Assembly photo':''}</span><button onClick={()=>cycle(1)} disabled={frames.length<2}>Next image →</button></div>
     </dialog>

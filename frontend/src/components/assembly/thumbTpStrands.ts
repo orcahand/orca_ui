@@ -4,6 +4,13 @@ import {ChannelCurve} from './channelStrands'
 import {cadKey,type CadPiece} from './cadScene'
 import type {Build} from './buildContent'
 
+// Round only the corners within a bounded 0.6 mm neighborhood of the measured path.
+function rounded(points:THREE.Vector3[]){
+ const result=[points[0]]
+ for(let i=1;i<points.length-1;i++){const p=points[i],a=points[i-1],b=points[i+1],radius=Math.min(.6,p.distanceTo(a)*.25,p.distanceTo(b)*.25);if(radius<.001){result.push(p);continue}
+ const start=p.clone().lerp(a,radius/p.distanceTo(a)),end=p.clone().lerp(b,radius/p.distanceTo(b));result.push(start,...new THREE.QuadraticBezierCurve3(start,p,end).getPoints(8).slice(1))}
+ result.push(points.at(-1)!);return result
+}
 export function thumbTpStrands(build:Build,pieces:CadPiece[]){
  const ap=pieces.find(p=>p.part.label==='Thumb AP')!,tp=pieces.find(p=>p.part.label==='Thumb TP')!,group=new THREE.Group()
  const colors=['#d99d54','#81bb50','#d3bd50','#ae86eb','#f26962','#29bfcb']
@@ -16,7 +23,7 @@ export function thumbTpStrands(build:Build,pieces:CadPiece[]){
   const transform=(points:THREE.Vector3[],piece:CadPiece)=>points.map(p=>p.clone().applyQuaternion(piece.object.quaternion).add(piece.object.position))
   for(const path of strands){
    const points=[...transform(path.moving,ap),...transform(path.fixed,tp)]
-   path.mesh.geometry.dispose();path.mesh.geometry=new THREE.TubeGeometry(new ChannelCurve(points),1000,.14,10,false)
+   path.mesh.geometry.dispose();path.mesh.geometry=new THREE.TubeGeometry(new ChannelCurve(build.version==='base'?rounded(points):points),1000,.14,10,false)
    path.material.opacity=path.selection<0?.45:path.selection===selected?1:.2
   }
  }

@@ -1,10 +1,10 @@
-// Step 2, in three parts: the calibration itself, automatic or by hand (the
-// whole hand, or a subset picked in the settings drawer), the tension sweep
+// Step 2, in two parts: the calibration itself, automatic or by hand (the
+// whole hand, or a subset picked in the settings drawer), and the tension sweep
 // that compares the hand with the reference and counts the ratchet clicks
-// still missing, and, when it lists any, tensioning those motors again before
-// calibrating and sweeping once more. The slack test the calibration needs lives in the
-// Tension step; a failed one still blocks calibrating here. Per-joint
-// readiness shows as a row of dots, the joint name on hover.
+// still missing; the sweep window holds the motors for those clicks, then the
+// hand is calibrated and swept once more. The slack test the calibration needs
+// lives in the Tension step; a failed one still blocks calibrating here.
+// Per-joint readiness shows as a row of dots, the joint name on hover.
 
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../api/rest'
@@ -15,12 +15,12 @@ import {
   useOperationStore,
   useStartGate,
 } from '../../state/operationStore'
-import { FlowProgress, FlowRunning, FlowStep, type StepState } from './FlowStep'
+import { FlowProgress, FlowRowTitle, FlowRunning, FlowStep, type StepState } from './FlowStep'
 import { failToBanner } from './setupUtils'
-import { CalibrationRecords, SnapshotPromoter, TravelCheck, SlackEstimate } from './TravelBaselines'
-import { SWEEP_HINT, startGuidedTension, startTensionSweep } from './probeStart'
+import { BaselinePicker, CalibrationRecords, SnapshotPromoter, TravelCheck, SlackEstimate } from './TravelBaselines'
+import { SWEEP_HINT, startTensionSweep } from './probeStart'
 import type { SetupVariant } from '../../state/setupVariant'
-import { SWEEP_REPEAT_CHOICES, useTensionFlow } from '../../state/tensionFlow'
+import { useTensionFlow } from '../../state/tensionFlow'
 import { shortDate } from './setupUtils'
 
 const GROUP_ORDER = ['wrist', 'thumb', 'index', 'middle', 'ring', 'pinky']
@@ -127,20 +127,10 @@ export function CalibrateStep({ state, variant }: { state: StepState; variant: S
   const slackTest = handInfo?.slack_test ?? null
   const slackBlock = slackTest?.block ?? null
   const sweep = handInfo?.tension_sweep ?? null
-  const sweepRepeats = useTensionFlow((s) => s.sweepRepeats)
-  const setSweepRepeats = useTensionFlow((s) => s.setSweepRepeats)
-  const runNote = useTensionFlow((s) => s.runNote)
-  const setRunNote = useTensionFlow((s) => s.setRunNote)
   const calibState = slackBlock ? 'warn' : calibrated ? 'done' : 'next'
   const sweepState = sweep?.latest ? 'done' : calibrated ? 'next' : 'todo'
-  // Tendons the newest sweep says need clicks, with their friction as a share
-  // of the reference's and the click count.
-  const loose = Object.entries(sweep?.verdict ?? {})
-    .filter(([, v]) => (v.clicks ?? 0) > 0)
-    .map(([joint, v]) => [joint, { pct: v.share != null ? Math.round(v.share * 100) : null, clicks: v.clicks ?? null }] as const)
-  const againState = loose.length ? 'next' : sweep?.latest ? 'done' : 'todo'
-  const tensionAgain = () =>
-    void startGuidedTension({ ratchet_joints: Object.fromEntries(loose), start_at: 'tension' }).catch(failToBanner)
+  // Tendons the newest sweep says need clicks.
+  const loose = Object.entries(sweep?.verdict ?? {}).filter(([, v]) => (v.clicks ?? 0) > 0)
 
   const toggle = (ids: string[], on: boolean) =>
     setSelected((prev) => {
@@ -258,6 +248,7 @@ export function CalibrateStep({ state, variant }: { state: StepState; variant: S
       <CalibrationRecords />
       {kai && (
         <>
+          <BaselinePicker />
           <SnapshotPromoter />
           <TravelCheck />
           <SlackEstimate />
@@ -303,10 +294,10 @@ export function CalibrateStep({ state, variant }: { state: StepState; variant: S
               <button
                 className={`btn ${calibState === 'next' ? 'btn-primary' : 'btn-secondary'}`}
                 disabled={gate.blocked || !currentValid || !!slackBlock}
-                title={gate.reason ?? slackBlock ?? (!currentValid ? 'calibration current out of range' : undefined)}
+                title={gate.reason ?? slackBlock ?? (!currentValid ? 'calibration current out of range' : 'The motors drive every joint to its hard stops. Keep clear.')}
                 onClick={() => start()}
               >
-                {selected.size > 0 ? `Calibrate ${selected.size}` : 'Calibrate'}
+                {selected.size > 0 ? `Automatic ${selected.size}` : 'Automatic'}
               </button>
               <button
                 className="btn btn-secondary"
@@ -321,30 +312,16 @@ export function CalibrateStep({ state, variant }: { state: StepState; variant: S
           <div className={`calib-step ${sweepState}`}>
             <span className="calib-step-num">{sweepState === 'done' ? '✓' : 'b'}</span>
             <span>
-              <div className="calib-step-title">Tension sweep</div>
-              <div className="calib-step-note">
-                {sweep?.latest
-                  ? `${sweep.latest}${sweep.latest_at ? ` · ${shortDate(sweep.latest_at)}` : ''}${sweep.reference ? ` · vs ${sweep.reference}` : ' · no reference for this motor family'}`
-                  : calibrated
-                    ? `friction along every joint's travel vs the reference curves${sweep?.reference ? ` (${sweep.reference})` : ''}; counts the clicks still missing`
+              <FlowRowTitle title="Tension sweep" info={SWEEP_HINT} />
+              {(sweep?.latest || !calibrated) && (
+                <div className="calib-step-note">
+                  {sweep?.latest
+                    ? `${sweep.latest}${sweep.latest_at ? ` · ${shortDate(sweep.latest_at)}` : ''}${sweep.reference ? ` · vs ${sweep.reference}` : ' · no reference for this motor family'}${loose.length ? ` · ${loose.map(([j, v]) => `${j.replace('_', ' ')} ~${v.clicks}`).join(', ')}` : ''}`
                     : 'needs a calibrated hand'}
-              </div>
+                </div>
+              )}
             </span>
             <span className="calib-step-actions">
-              <label className="flow-field" title="Saved with the measurement, e.g. 'before clicks' or 'after 1 click'">
-                <span>note</span>
-                <input type="text" value={runNote} placeholder="label this run" onChange={(e) => setRunNote(e.target.value)} />
-              </label>
-              <label className="flow-field" title="Passes limit to limit and back per joint; the currents are averaged">
-                <span>passes</span>
-                <select value={sweepRepeats} onChange={(e) => setSweepRepeats(Number(e.target.value))}>
-                  {SWEEP_REPEAT_CHOICES.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-              </label>
               <button
                 className={`btn ${sweepState === 'next' ? 'btn-primary' : 'btn-secondary'}`}
                 disabled={gate.blocked || !calibrated}
@@ -352,29 +329,6 @@ export function CalibrateStep({ state, variant }: { state: StepState; variant: S
                 onClick={() => void startTensionSweep().catch(failToBanner)}
               >
                 Tension sweep
-              </button>
-            </span>
-          </div>
-          <div className={`calib-step ${againState}`}>
-            <span className="calib-step-num">{againState === 'done' ? '✓' : 'c'}</span>
-            <span>
-              <div className="calib-step-title">Tension again</div>
-              <div className="calib-step-note">
-                {loose.length
-                  ? `${loose.map(([j, r]) => `${j.replace('_', ' ')}${r.clicks ? ` ~${r.clicks} click${r.clicks === 1 ? '' : 's'}` : r.pct != null ? ` ${r.pct} %` : ''}`).join(', ')} · ratchet, then calibrate and sweep again`
-                  : sweep?.latest && sweep.reference
-                    ? 'no clicks needed — go on to Run'
-                    : 'only if the measurement flags a tendon'}
-              </div>
-            </span>
-            <span className="calib-step-actions">
-              <button
-                className={`btn ${againState === 'next' ? 'btn-primary' : 'btn-secondary'}`}
-                disabled={gate.blocked || !loose.length}
-                title={gate.reason ?? (loose.length ? 'Open guided tensioning at the ratchet step with these tendons listed' : 'nothing flagged by the last measurement')}
-                onClick={tensionAgain}
-              >
-                Tension {loose.length ? loose.length : ''} again
               </button>
             </span>
           </div>

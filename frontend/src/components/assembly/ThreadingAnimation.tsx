@@ -19,7 +19,9 @@ export function ThreadingAnimation({kind,build,step}:{kind:AnimationKind;build:B
   const canSeeThrough=['p33','p42','p46','p54','p62','p64','p68','p89','p123','p126'].includes(step)
   const [tendon,setTendon]=useState(0)
   const [playing,setPlaying]=useState(false)
-  const lesson=ASSEMBLY_MOTIONS[step]??LESSONS[kind],phase=step==='p126'?(position<.18?0:position<.65?1:2):Math.min(2,Math.floor(position*3))
+  const original=ASSEMBLY_MOTIONS[step]??LESSONS[kind]
+  const lesson=build.version==='base'&&['p123','p126'].includes(step)?{...original,cues:['Pull enough tendon through for three windings and tie one Ashley stopper at the end.','Pull the tendon back to seat the knot, then tuck the 5 mm tail.','With the knot seated, wind three turns and keep the tendon taut as you mount the spool.']}:build.version==='base'&&step==='p33'?{...original,cues:[...original.cues.slice(0,2),'After joining DP and PP, fit both bearings into the outer PP pockets.']}:build.version==='base'&&step==='p62'?{...original,cues:[...original.cues.slice(0,2),'Fit the two TP bearings into the outer TP pockets; the AP bearings are already seated.']}:original
+  const phase=build.version==='base'&&step==='p123'?(position<.25?0:position<.55?1:2):build.version==='base'&&step==='p126'?(position<.3?0:position<.44?1:2):step==='p126'?(position<.18?0:position<.65?1:2):Math.min(2,Math.floor(position*3))
   useEffect(()=>{
     if(!playing)return
     let frame=0,previous=0

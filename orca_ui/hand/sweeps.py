@@ -297,7 +297,7 @@ def _clicks(joint: str, status: str, share: float, deadband: dict, ref_deadband:
              if deadband.get(k) is not None and ref_deadband.get(k) is not None),
             default=0.0,
         )
-        return shipped_reference.clicks_for_slack(extra, joint)
+        return shipped_reference.clicks_for_slack(extra, joint, cap=shipped_reference.SWEEP_MAX_CLICKS)
     return 0
 
 

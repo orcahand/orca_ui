@@ -1,4 +1,4 @@
-import {Fragment,useEffect,useId,useState,useRef,useLayoutEffect,type ReactNode} from 'react'
+import {Fragment,useId,useState,useRef,useLayoutEffect,type ReactNode} from 'react'
 import navigationHand from './navigationHand.json'
 import type {AssemblyStep} from './guide'
 import type {Build} from './buildContent'
@@ -18,7 +18,7 @@ export const chapterTitle=(step:AssemblyStep)=>CHAPTER_NAMES[chapterKey(step)]??
 const regionFor=(step:AssemblyStep)=>({Fingers:'index','Other fingers':'fingers',Thumb:'thumb',Carpals:'palm','Wrist & routing':'wrist',Tower:'tower',Motors:'tower',Spooling:'tower',Hull:'tower'}[chapterKey(step)]??'')
 const REGIONS=[
   {id:'thumb',label:'Thumb',step:'thumb-tendons'},
-  {id:'index',label:'Index finger',step:'p26'},
+  {id:'index',label:'Index finger',step:'finger-parts'},
   {id:'middle',label:'Middle finger',step:'p45'},
   {id:'ring',label:'Ring finger',step:'p45'},
   {id:'pinky',label:'Pinky finger',step:'p45'},
@@ -27,26 +27,25 @@ const REGIONS=[
   {id:'tower',label:'Tower and motors',step:'p93'},
 ]
 
-export function AssemblyNavigation({steps,current,done,query,filtered,build,onGo,beforeContents,title}:{title:(step:AssemblyStep)=>string;beforeContents?:ReactNode;steps:AssemblyStep[];current:AssemblyStep;done:string[];query:string;filtered:AssemblyStep[];build:Build;onGo:(id:string)=>void}) {
+export function AssemblyNavigation({steps,current,done,query,filtered,build,onGo,beforeContents,title,navOpen}:{navOpen?:boolean;title:(step:AssemblyStep)=>string;beforeContents?:ReactNode;steps:AssemblyStep[];current:AssemblyStep;done:string[];query:string;filtered:AssemblyStep[];build:Build;onGo:(id:string)=>void}) {
   const maskId=useId(),contents=useRef<HTMLElement>(null)
   const [jump,setJump]=useState(0)
   const active=chapterKey(current),[open,setOpen]=useState(active),[picked,setPicked]=useState('')
   useLayoutEffect(()=>{
-    const nav=contents.current;if(!nav)return
+    const nav=contents.current;if(!nav||open!==active)return
     const reveal=()=>{
       const target=nav.querySelector<HTMLElement>('[aria-current=step],[aria-current=page]');if(!target||!nav.clientHeight)return
       const box=nav.getBoundingClientRect(),row=target.getBoundingClientRect()
-      const chapter=target.closest('.assembly-chapter')?.querySelector('.assembly-chapter-button')?.getBoundingClientRect()
-      const top=chapter&&row.bottom-chapter.top<nav.clientHeight*.7?chapter.top:row.top
-      if(top<box.top+12||row.bottom>box.bottom-12)nav.scrollTo({top:nav.scrollTop+top-box.top-12,behavior:'instant'})
+      if(row.top<box.top+12)nav.scrollTop+=row.top-box.top-12
+      else if(row.bottom>box.bottom-12)nav.scrollTop+=row.bottom-box.bottom+12
     }
-    const frame=requestAnimationFrame(reveal),observer=new ResizeObserver(reveal);observer.observe(nav)
-    return()=>{cancelAnimationFrame(frame);observer.disconnect()}
-  },[current.id,jump,query,open])
-  useEffect(()=>{setOpen(active)},[active])
+    const frame=requestAnimationFrame(reveal)
+    return()=>cancelAnimationFrame(frame)
+  },[current.id,jump,open,active,navOpen])
+  useLayoutEffect(()=>{setOpen(active)},[active])
   const chapters=[...new Set(steps.map(chapterKey))]
   const region=regionFor(current)
-  const regionStep=(step:string)=>build.version==='base'&&step==='thumb-tendons'?'thumb-parts':step
+  const regionStep=(step:string)=>build.version==='base'&&step==='thumb-tendons'?'thumb-parts':build.version!=='base'&&step==='finger-parts'?'p26':step
   const pickedActive=regionStep(REGIONS.find(r=>r.id===picked)?.step??'')===current.id?picked:''
   const select=(id:string,step:string)=>{const target=steps.find(s=>s.id===regionStep(step));if(!target)return;setOpen(chapterKey(target));onGo(target.id);setPicked(id);setJump(n=>n+1)}
   let previousPhase=''

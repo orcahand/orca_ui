@@ -22,6 +22,9 @@ SWEEP_CEILING = 1.1
 # Below this share of the reference a joint gets clicks from the sweep; above
 # it the difference can be the hand rather than the tendon.
 CLICK_BELOW_SHARE = 0.4
+# The most clicks one round recommends; the next test lists any still missing.
+SLACK_MAX_CLICKS = 5
+SWEEP_MAX_CLICKS = 3
 
 
 @lru_cache(maxsize=1)
@@ -97,18 +100,18 @@ def click_scale(joint: str) -> float:
     return float(((load().get("ratchet") or {}).get("click_scale") or {}).get(joint, 1.0))
 
 
-def clicks_for_slack(slack_deg: float | None, joint: str) -> int | None:
+def clicks_for_slack(slack_deg: float | None, joint: str, cap: int = SLACK_MAX_CLICKS) -> int | None:
     """Clicks that take up ``slack_deg`` motor degrees of free rotation on
-    ``joint``, or None while degrees per click is unknown."""
+    ``joint``, at most ``cap``, or None while degrees per click is unknown."""
     per_click = deg_per_click()
     if slack_deg is None or per_click is None:
         return None
-    return max(0, math.floor(slack_deg * click_scale(joint) / per_click))
+    return min(cap, max(0, math.floor(slack_deg * click_scale(joint) / per_click)))
 
 
-def clicks_for_share(share: float | None, joint: str) -> int | None:
+def clicks_for_share(share: float | None, joint: str, cap: int = SWEEP_MAX_CLICKS) -> int | None:
     """Clicks that raise a sweep's friction ``share`` of the reference toward
-    1.0 without passing SWEEP_CEILING; 0 from CLICK_BELOW_SHARE up."""
+    1.0 without passing SWEEP_CEILING, at most ``cap``; 0 from CLICK_BELOW_SHARE up."""
     if share is None:
         return None
     if share >= CLICK_BELOW_SHARE:
@@ -117,4 +120,4 @@ def clicks_for_share(share: float | None, joint: str) -> int | None:
     clicks = max(0, round((1.0 - share) * click_scale(joint) / per_click))
     while clicks and share + clicks * per_click > SWEEP_CEILING:
         clicks -= 1
-    return clicks
+    return min(cap, clicks)
