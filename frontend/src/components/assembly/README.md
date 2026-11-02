@@ -803,3 +803,28 @@ Unresolved assembly information:
   behavior, finger selection, mobile overflow, complete finger kits, installed
   tower motors and knot seating before winding. Tensioning/calibration source
   and backend processes are outside this change.
+
+
+## Assembly feedback, 2 November
+
+- Applied the twelve text changes in `orca-assembly-edits (3).json` to the guide
+  sources and made the saved white page background the default.
+- Knot reinforcement uses only its three phase buttons, with neutral backgrounds.
+  SVG gradient IDs are instance-specific; the two outgoing tendon strands use a
+  user-space gradient so horizontal paths remain visible.
+- Removed the two AP tube-pulling renders from the second optional PTFE instruction.
+  The AP reinforcement lesson follows instruction 2; thumb preparation has one instruction.
+- Chapter toggles keep the clicked heading in place. Other-finger preparation has
+  persistent Middle, Ring and Pinky buttons.
+- Finger preparation places DP skin above DP, PP skin between PP and AP, and
+  bearings along the outward axis relative to their own segment.
+- DP–PP joining excludes PP bearings. The upper-pin instruction and its regenerated
+  left/right Base renders show the PP bearings separately and seated.
+- FeeTech exploded inventory and BOM replace both Dynamixel motor entries with
+  sixteen HLS2915M motors and one HLS3930M wrist motor. These use manufacturer
+  product images, not substitute CAD meshes. The individual instruction scenes
+  continue to use the existing mechanical CAD. Motor-setup still renders carry a
+  small bottom-right “Dynamixel motors shown” label when FeeTech is selected,
+  including enlarged views; photos, live models and unrelated parts are unmarked.
+  Image sources: [HLS2915M](https://ftservo.github.io/ftservo-wiki/products/models/hl-2915-c001/main/)
+  and [HLS3930M](https://ftservo.github.io/ftservo-wiki/products/models/hl-3930-c001/main/).

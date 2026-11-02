@@ -1,3 +1,4 @@
+import {MotorRenderReference} from './MotorRenderReference'
 import {MEDIA,STEPS} from './guide'
 import {CAD_ILLUSTRATIONS} from './cadIllustrations'
 import {photoResolution} from './photoResolution'
@@ -26,11 +27,11 @@ export function AssemblyVisualSlot({build,figures,legacyGallery,children,step,in
    {tabs.map((name,i)=><button key={name} id={`${id}-${i}`} role="tab" aria-selected={active===name} aria-controls={`${id}-panel`} tabIndex={active===name?0:-1} onClick={()=>setTab(name)}>{name}</button>)}
   </div>{active==='3D model'&&<button className="assembly-text-button" onClick={()=>open(0)} aria-label="Enlarge 3D model">⤢</button>}</div>
   <div id={`${id}-panel`} role="tabpanel" aria-labelledby={`${id}-${tabs.indexOf(active)}`}>
-   {active==='3D model'?children:<div className="assembly-visual-gallery">{items.map((item,i)=><figure key={item.src}><button onClick={()=>open(i)} aria-label={`Enlarge ${active==='Renders'?'render':'photo'} ${i+1}`}><img src={item.src} alt={item.caption} loading="lazy"/></button>{item.showCaption&&/\d|CableHolder/.test(item.caption)&&<figcaption><GuideText field={`caption/${item.src}`} text={item.caption} label="Caption"/></figcaption>}</figure>)}</div>}
+   {active==='3D model'?children:<div className="assembly-visual-gallery">{items.map((item,i)=><figure key={item.src}><button onClick={()=>open(i)} aria-label={`Enlarge ${active==='Renders'?'render':'photo'} ${i+1}`}><MotorRenderReference build={build} src={item.src}><img src={item.src} alt={item.caption} loading="lazy"/></MotorRenderReference></button>{item.showCaption&&/\d|CableHolder/.test(item.caption)&&<figcaption><GuideText field={`caption/${item.src}`} text={item.caption} label="Caption"/></figcaption>}</figure>)}</div>}
   </div>
   <dialog ref={dialog} className="assembly-lightbox assembly-visual-lightbox" aria-label={`Enlarged ${active.toLowerCase()}`} onClose={()=>setEnlarged(false)} onCancel={e=>e.stopPropagation()} onClick={e=>{if(e.target===e.currentTarget)dialog.current?.close()}}>
    <div className="assembly-row"><span>{active}</span><button autoFocus onClick={()=>dialog.current?.close()}>Close ×</button></div>
-   {enlarged&&(active==='3D model'?children:<><img src={items[Math.min(selected,items.length-1)]?.src} alt={items[Math.min(selected,items.length-1)]?.caption}/><div className="assembly-row"><button disabled={items.length<2} onClick={()=>setSelected(i=>(i-1+items.length)%items.length)}>← Previous</button><span>{selected+1} / {items.length}</span><button disabled={items.length<2} onClick={()=>setSelected(i=>(i+1)%items.length)}>Next →</button></div></>)}
+   {enlarged&&(active==='3D model'?children:<><MotorRenderReference build={build} src={items[Math.min(selected,items.length-1)]?.src}><img src={items[Math.min(selected,items.length-1)]?.src} alt={items[Math.min(selected,items.length-1)]?.caption}/></MotorRenderReference><div className="assembly-row"><button disabled={items.length<2} onClick={()=>setSelected(i=>(i-1+items.length)%items.length)}>← Previous</button><span>{selected+1} / {items.length}</span><button disabled={items.length<2} onClick={()=>setSelected(i=>(i+1)%items.length)}>Next →</button></div></>)}
   </dialog>
  </section></VisualSlotContext.Provider>
 }

@@ -40,6 +40,14 @@ export function cadJointPreparation(bundle:Bundle,build:Build,kind:JointPreparat
   if(kind==='pin-clearance')focus=new THREE.Box3().setFromPoints([upper.center,lower.center]).expandByScalar(8)
   for(const p of pins){group.add(p.object);if(kind==='upper-pin'&&p===upper){const axis=p.axis.clone();if(axis.dot(direction)<0)axis.negate();p.object.position.copy(axis).multiplyScalar(13)}}
   for(const p of pieces.filter(p=>p.part.label.startsWith('Bearing')&&p.owner==='Index DP'))group.add(p.object)
+  if(build.version==='base'){
+   const bearings=pieces.filter(p=>p.part.label.startsWith('Bearing')&&p.owner==='Index PP')
+   for(const p of bearings){
+    if(kind==='upper-pin'){const axis=p.axis.clone();if(axis.dot(p.center.clone().sub(pp.center))<0)axis.negate();p.object.position.copy(axis).multiplyScalar(12)}
+    group.add(p.object)
+    labels.push({text:'PP bearing · 4 × 8 × 3',point:p.center.clone().add(p.object.position)})
+   }
+  }
   fade(pp,kind==='pin-clearance'?.32:.65);fade(dp,.5)
   strands=channelStrands(build,pieces);strands.update();group.add(strands.group)
   if(focus)focus.union(pp.bounds).union(dp.bounds).union(new THREE.Box3().setFromObject(strands.group))

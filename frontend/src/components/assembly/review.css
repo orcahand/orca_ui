@@ -358,5 +358,11 @@
 .assembly-dp-preparation { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; }
 .assembly-dp-preparation>li:nth-child(n+3) { grid-column:1/-1; }
 @media(min-width:701px) { .assembly-dp-preparation>li:nth-child(-n+2) { display:grid; grid-template-rows:subgrid; grid-row:span 2; row-gap:0; } }
-.assembly-app .assembly-knot-emphasis>.assembly-guided-text { padding:16px; border-left:4px solid var(--accent); border-radius:6px; background:var(--assembly-image-bg); font-weight:700; }
 @media(max-width:700px) { .assembly-dp-preparation { grid-template-columns:minmax(0,1fr); } }
+
+.assembly-app[data-version=base] .assembly-knot-reinforcement button[aria-pressed=true] { background:transparent; color:var(--accent); }
+.assembly-app .assembly-main { background:#ffffff; }
+
+.assembly-motor-render { display:block; position:relative; }
+.assembly-motor-render-notice { position:absolute; right:8px; bottom:8px; padding:3px 6px; border-radius:3px; background:rgba(255,255,255,.9); color:#60685f; font:10px/1.4 var(--font); pointer-events:none; }
+.assembly-lightbox .assembly-motor-render > img { display:block; width:100%; max-width:100%; max-height:73vh; object-fit:contain; margin:auto; }

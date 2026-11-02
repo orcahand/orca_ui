@@ -47,6 +47,10 @@ export function supplies(build:Build):Supply[] {
   }):[]
   const list:Supply[] = [
     ...touchScrews,
+    ...(build.motor==='feetech'?[
+      {id:'feetech-motor',label:'FeeTech HLS2915M motor',replaces:'Dynamixel XC330 motor',quantity:'16',areas:['Tower'] as Area[],kind:'hardware' as const,exploded:true,note:'Finger and thumb drive motors.',image:'./assembly/supplies/feetech-motor.webp'},
+      {id:'feetech-wrist-motor',label:'FeeTech HLS3930M wrist motor',replaces:'Dynamixel XC430 wrist motor',quantity:'1',areas:['Wrist'] as Area[],kind:'hardware' as const,exploded:true,note:'Wrist drive motor.',image:'./assembly/supplies/feetech-wrist-motor.webp'},
+    ]:[]),
     ...(build.version==='base'&&build.motor==='feetech'?([{id:'feetech-wrist-adapter',label:'FeeTech wrist motor adapter',area:'Wrist',replaces:'Wrist motor adapter'},{id:'feetech-wrist-frame',label:'FeeTech wrist frame',area:'Wrist',replaces:'Wrist frame'},{id:'feetech-motor-tower',label:'FeeTech motor tower',area:'Tower',replaces:'Motor tower'}] as const).map(p=>({id:p.id,label:p.label,replaces:p.replaces,quantity:'1',areas:[p.area],kind:'hardware' as const,exploded:true,note:'FeeTech-specific printed part.',image:`./assembly/supplies/${p.id}.png`,files:[{label:'STL',src:`./assembly/supplies/${p.id}.stl`}]})):[]),
     {id:`carpal-cover-${build.side}`,label:'Carpal cover',quantity:'1',areas:['Carpals'],kind:'hardware',note:'Separate printed carpal cover; omitted from the complete CAD assembly export.',image:`./assembly/supplies/carpal-cover-${build.side}.svg`,files:[{label:'STL',src:`./assembly/supplies/carpal-cover-${build.side}.stl`}]},
     {id:'cord-2m',label:'Tendon · 2m',quantity:'10',areas:['Fingers'],kind:'cord',note:'Ten 2 m lengths; the same tendons continue through carpals, wrist and tower.',image:'./assembly/supplies/cord.svg'},
@@ -127,7 +131,7 @@ export function bomCategory(part:Part|null,supply:Supply|null):typeof BOM_CATEGO
     if(supply.kind==='tube'||supply.id.startsWith('cord-'))return 'Tendons & PTFE'
     if(supply.kind==='cable'||supply.id==='power'||supply.id==='touch-wire')return 'Electronic components'
     if(supply.files?.some(f=>f.label==='STL'))return '3D printed parts'
-    if(supply.kind==='hardware')return supply.id==='oh-board'?'Electronic components':'Mechanical components'
+    if(supply.kind==='hardware')return (supply.id==='oh-board'||supply.id==='feetech-motor'||supply.id==='feetech-wrist-motor')?'Electronic components':'Mechanical components'
   }
   return 'Tools & supplies'
 }
