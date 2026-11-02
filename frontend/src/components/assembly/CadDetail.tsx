@@ -22,6 +22,6 @@ export function CadDetail({build,step}:{build:Build;step:string}){
   <div className="assembly-row"><div><h3><GuideText variant field="prose/CadDetail.tsx/8ec6bab45a" text={String(spec.title)} label="Section heading"/></h3></div>{step!=='p139'&&spec.moving.length>0&&<button className="assembly-secondary" aria-label={playing?'Pause fitting':'Play fitting'} onClick={()=>{startAmount.current=amount===0?1:amount;setPlaying(!playing)}}>{playing?'Ⅱ':'▶'}</button>}</div>
   <AssemblyComparison step={step} build={build} model={renderModel} photoSources={build.version==='base'&&step==='pp-ready'?[]:undefined}>{renderModel()}</AssemblyComparison>
   {step!=='p139'&&spec.moving.length>0&&<><label className="assembly-motion-scrubber"><span>Separated</span><input aria-label="Assembly fitting progress" type="range" min="0" max="1000" value={Math.round((1-amount)*1000)} onChange={e=>{setPlaying(false);setAmount(1-+e.target.value/1000)}}/><span>Fitted</span></label></>}
-  {step==='p139'&&<p><GuideText variant field="prose/CadDetail.tsx/148a516204" text={String(spec.caption)} label="Guide text"/></p>}{(build.version==='full'||build.motor==='feetech')&&<small className="assembly-muted">{build.version==='full'?'Full uses the Base mechanical reference. ':''}{build.motor==='feetech'?'The wrist and tower shown use Dynamixel geometry.':''}</small>}
+  {step==='p139'&&<p><GuideText variant field="prose/CadDetail.tsx/148a516204" text={String(spec.caption)} label="Guide text"/></p>}
  </section>
 }

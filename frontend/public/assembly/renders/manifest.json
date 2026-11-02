@@ -2826,52 +2826,6 @@
     "sourceSha256": "80f97114d06522f3bdcdb75b3cdc95ba7270c5414c9cbb20c5a5954dcbb67332"
   },
   {
-    "key": "base-right-dynamixel",
-    "file": "panel-036-1",
-    "step": "p35",
-    "labels": [
-      "Upper 2 × 6 pin",
-      "Lower 2 × 6 pin"
-    ],
-    "meshes": 90833,
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51"
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-036-2",
-    "step": "p35",
-    "labels": [
-      "Upper 2 × 6 pin",
-      "Lower 2 × 6 pin",
-      "DP tendons"
-    ],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 90833
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-036-1",
-    "step": "p35",
-    "labels": [
-      "Upper 2 × 6 pin",
-      "Lower 2 × 6 pin"
-    ],
-    "meshes": 90775,
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618"
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-036-2",
-    "step": "p35",
-    "labels": [
-      "Upper 2 × 6 pin",
-      "Lower 2 × 6 pin",
-      "DP tendons"
-    ],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 90775
-  },
-  {
     "key": "touch-right-dynamixel",
     "file": "panel-036-1",
     "step": "p35",
@@ -7186,30 +7140,6 @@
   },
   {
     "key": "base-right-dynamixel",
-    "file": "panel-034-4",
-    "step": "p33",
-    "labels": [],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 94029
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-034-5",
-    "step": "p33",
-    "labels": [],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 94029
-  },
-  {
-    "key": "base-right-dynamixel",
-    "file": "panel-034-6",
-    "step": "p33",
-    "labels": [],
-    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
-    "meshes": 94029
-  },
-  {
-    "key": "base-right-dynamixel",
     "file": "panel-063-3",
     "step": "p62",
     "labels": [],
@@ -7535,30 +7465,6 @@
   },
   {
     "key": "base-left-dynamixel",
-    "file": "panel-034-4",
-    "step": "p33",
-    "labels": [],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 93971
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-034-5",
-    "step": "p33",
-    "labels": [],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 93971
-  },
-  {
-    "key": "base-left-dynamixel",
-    "file": "panel-034-6",
-    "step": "p33",
-    "labels": [],
-    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
-    "meshes": 93971
-  },
-  {
-    "key": "base-left-dynamixel",
     "file": "panel-063-3",
     "step": "p62",
     "labels": [],
@@ -7644,5 +7550,107 @@
     "labels": [],
     "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
     "meshes": 86356
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-036-1",
+    "step": "p35",
+    "labels": [
+      "PP bearing · 4 × 8 × 3",
+      "PP bearing · 4 × 8 × 3",
+      "Upper 2 × 6 pin",
+      "Lower 2 × 6 pin"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 94865
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-036-2",
+    "step": "p35",
+    "labels": [
+      "PP bearing · 4 × 8 × 3",
+      "PP bearing · 4 × 8 × 3",
+      "Upper 2 × 6 pin",
+      "Lower 2 × 6 pin",
+      "DP tendons"
+    ],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 94865
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-034-4",
+    "step": "p33",
+    "labels": [],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 89997
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-034-5",
+    "step": "p33",
+    "labels": [],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 89997
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-036-1",
+    "step": "p35",
+    "labels": [
+      "PP bearing · 4 × 8 × 3",
+      "PP bearing · 4 × 8 × 3",
+      "Upper 2 × 6 pin",
+      "Lower 2 × 6 pin"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 94807
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-036-2",
+    "step": "p35",
+    "labels": [
+      "PP bearing · 4 × 8 × 3",
+      "PP bearing · 4 × 8 × 3",
+      "Upper 2 × 6 pin",
+      "Lower 2 × 6 pin",
+      "DP tendons"
+    ],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 94807
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-034-4",
+    "step": "p33",
+    "labels": [],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 89939
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-034-5",
+    "step": "p33",
+    "labels": [],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 89939
+  },
+  {
+    "key": "base-right-dynamixel",
+    "file": "panel-034-6",
+    "step": "p33",
+    "labels": [],
+    "sourceSha256": "aa578c027437ac500fc774d99af49bfec86c807e36b74c23ade44f48cbaa3b51",
+    "meshes": 89997
+  },
+  {
+    "key": "base-left-dynamixel",
+    "file": "panel-034-6",
+    "step": "p33",
+    "labels": [],
+    "sourceSha256": "624449b7c5a1ebd6abb7d64fd07f4066343c22d8f12fef4de19cb01701f3e618",
+    "meshes": 89939
   }
 ]

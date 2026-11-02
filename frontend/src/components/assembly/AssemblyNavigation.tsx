@@ -29,9 +29,10 @@ const REGIONS=[
 
 export function AssemblyNavigation({steps,current,done,query,filtered,build,onGo,beforeContents,title,navOpen}:{navOpen?:boolean;title:(step:AssemblyStep)=>string;beforeContents?:ReactNode;steps:AssemblyStep[];current:AssemblyStep;done:string[];query:string;filtered:AssemblyStep[];build:Build;onGo:(id:string)=>void}) {
   const maskId=useId(),contents=useRef<HTMLElement>(null)
-  const [jump,setJump]=useState(0)
+  const [jump,setJump]=useState(0),manualToggle=useRef<{element:HTMLElement;top:number}|null>(null)
   const active=chapterKey(current),[open,setOpen]=useState(active),[picked,setPicked]=useState('')
   useLayoutEffect(()=>{
+    if(manualToggle.current){const {element,top}=manualToggle.current;manualToggle.current=null;if(contents.current)contents.current.scrollTop+=element.getBoundingClientRect().top-top;return}
     const nav=contents.current;if(!nav||open!==active)return
     const reveal=()=>{
       const target=nav.querySelector<HTMLElement>('[aria-current=step],[aria-current=page]');if(!target||!nav.clientHeight)return
@@ -84,7 +85,7 @@ export function AssemblyNavigation({steps,current,done,query,filtered,build,onGo
         </div>
         return <div className="assembly-chapter" key={chapter}>
           {showPhase&&<p className="assembly-nav-phase">{phase}</p>}
-          <button className={`assembly-chapter-button ${chapter===active?'active':''}`} aria-expanded={expanded} aria-controls={`chapter-${n}`} onClick={()=>setOpen(expanded?'':chapter)}>
+          <button className={`assembly-chapter-button ${chapter===active?'active':''}`} aria-expanded={expanded} aria-controls={`chapter-${n}`} onClick={e=>{manualToggle.current={element:e.currentTarget,top:e.currentTarget.getBoundingClientRect().top};setOpen(expanded?'':chapter)}}>
             <span className={count===required.length?'is-complete':''}>{count===required.length?'✓':String(n+1).padStart(2,'0')}</span><span>{CHAPTER_NAMES[chapter]??chapter}</span><small>{count}/{required.length} <span aria-hidden="true">{expanded?'−':'+'}</span></small>
           </button>
           {expanded&&<div className="assembly-step-links" id={`chapter-${n}`}>{matches.map((s,i)=><Fragment key={s.id}>{s.section&&s.section!==matches[i-1]?.section&&<h4 className="assembly-step-section">{s.section}</h4>}<button className={`${s.id===current.id?'active':''} ${s.hint?'assembly-hint-link':''}`} aria-current={s.id===current.id?'step':undefined} onClick={()=>{setPicked('');onGo(s.id)}}><span aria-label={s.hint?'Optional hint':done.includes(s.id)?'Completed':'Incomplete'}>{s.hint?'HINT':done.includes(s.id)?'✓':String((s.section?required.filter(item=>item.section===s.section):required).indexOf(s)+1).padStart(2,'0')}</span><span>{title(s)}</span></button></Fragment>)}</div>}

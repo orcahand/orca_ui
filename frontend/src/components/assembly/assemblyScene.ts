@@ -125,7 +125,7 @@ export function assemblyScene(bundle:Bundle,build:Build,step:string){
   if(['p33','p42','p46','p54','p62','p64','p68','p89'].includes(step)){
    for(const p of all.filter(p=>p.part.label.startsWith('Bearing'))){
     if(step!=='p89'&&!p.owner)continue
-    const owner=p.owner?bodies.find(b=>b.part.label===p.owner):nearest(bodies,p.center);if(build.version!=='base'&&step==='p33'&&owner?.part.label==='Index PP')continue
+    const owner=p.owner?bodies.find(b=>b.part.label===p.owner):nearest(bodies,p.center);if(step==='p33'&&owner?.part.label==='Index PP')continue
     if(!owner||!included.has(owner)||p.center.distanceTo(owner.center)>43)continue
     if(build.version==='base'&&step==='p46'&&owner.part.label==='Thumb PP')continue
     const axis=p.axis.clone();if(axis.dot(p.center.clone().sub(owner.center))<0)axis.negate()

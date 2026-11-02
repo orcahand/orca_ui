@@ -1,3 +1,4 @@
+import {MotorRenderReference} from './MotorRenderReference'
 import {AssemblyVisualSlot} from './AssemblyVisualSlot'
 import {FingerPreparation} from './FingerPreparation'
 import {GuideBackgroundEditor} from './GuideBackgroundEditor'
@@ -125,7 +126,6 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
         <div className="assembly-breadcrumb"><span>{step.id!=='p1'&&<>{chapterTitle(step)}{step.section?` · ${step.section}`:''}</>}</span><span>{step.id==='p1'?'':step.hint?'HINT · OPTIONAL':`STEP ${String(required.indexOf(step)+1).padStart(2,'0')} / ${required.length}`}</span></div>
         <div className="assembly-step-heading"><h2 ref={heading} tabIndex={-1}><GuideText singleLine field={`${step.id}/title`} text={step.title} label="Step title"/></h2>{step.id!=='p1'&&<StepSupplies key={step.id} step={step.id} build={build} parts={parts} tools={tools}/>}</div>
         {step.id!=='p1'&&build.version==='full'&&(ASSEMBLY_MOTIONS[step.id]||['p23','p35','p45','p80','p83','p115','p123','p126'].includes(step.id))&&<p className="assembly-muted"><GuideText variant field="prose/AssemblyGuide.tsx/4f3cffcb55" text={"Mechanical reference: Base geometry. Full-specific sensor parts are not represented in this model."} label="Guide text"/></p>}
-        {step.id==='p23'&&build.motor==='feetech'&&<p className="assembly-muted"><GuideText variant field="prose/AssemblyGuide.tsx/94c60d5ecc" text={"The anatomy reference uses a Dynamixel wrist and tower; use the FeeTech parts for your build."} label="Guide text"/></p>}
         {step.id === 'p1' && <div className="assembly-step-meta assembly-config-chips">
           <label><span className="assembly-sr-only">Hand</span><select aria-label="Hand" value={build.side} onChange={e=>changeBuild({side:e.target.value as Build['side']})}><option value="right">Right hand</option><option value="left">Left hand</option></select></label>
           <label><span className="assembly-sr-only">Motors</span><select aria-label="Motors" value={build.motor} onChange={e=>changeBuild({motor:e.target.value as Build['motor']})}><option value="dynamixel">Dynamixel</option><option value="feetech">FeeTech</option></select></label>
@@ -146,12 +146,12 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
           <ol className={`assembly-guided-instructions ${build.version==='base'&&step.id==='p29'?'assembly-dp-preparation':''}`}>{copy.map((instruction,i) => {
             const images=stepFigures.filter(f=>(f.instruction??1)===i+1)
             const command=commands(step,build).filter((_,n)=>i===(step.id==='p150'?(n===0?0:2):step.id==='p154'||build.version==='base'&&step.id==='p112'?1:0))
-            return <li key={`${step.id}:${i}`} value={i+1} className={build.version==='base'&&step.id==='p26'&&i===2?'assembly-knot-emphasis':undefined}>
-              {build.version==='base'&&step.id==='p37'&&i===1&&<KnotReinforcement count={1}/>}
+            return <li key={`${step.id}:${i}`} value={i+1} >
               <p className="assembly-guided-text"><span aria-hidden="true">{i+1}</span><GuideText field={`${step.id}/instruction/${i}`} text={instruction} label={`Instruction ${i+1}`}/></p>
+              {build.version==='base'&&step.id==='p37'&&i===1&&<KnotReinforcement count={1}/>}
               {command.map(text=><Command key={text} command={text}/>)}
               {['p105','p110'].includes(step.id)&&i===0&&<a className="assembly-inline-resource" href="https://orca-console-169809101000.europe-west6.run.app" target="_blank" rel="noreferrer">Open ORCA Console flashing tool ↗</a>}
-              <AssemblyVisualSlot key={`${step.id}-${build.side}-${build.motor}-${i}`} build={build} step={step.id} includeStepMedia={i===(MOTION_AT[step.id]??DETAIL_AT[step.id]??0)&&!['p35','p45','p139'].includes(step.id)} figures={images} legacyGallery={images.length>0&&<MediaGallery key={`${step.id}-${build.side}-${build.motor}-${build.version}-${i}`} items={images} focused={-1} saved={progress.views[step.id]} onSelect={src=>setProgress(p=>({...p,views:{...p.views,[step.id]:src}}))}/>}>
+              <AssemblyVisualSlot key={`${step.id}-${build.side}-${build.motor}-${i}`} build={build} step={step.id} includeStepMedia={i===(MOTION_AT[step.id]??DETAIL_AT[step.id]??0)&&!['p35','p45','p139'].includes(step.id)} figures={images} legacyGallery={images.length>0&&<MediaGallery build={build} key={`${step.id}-${build.side}-${build.motor}-${build.version}-${i}`} items={images} focused={-1} saved={progress.views[step.id]} onSelect={src=>setProgress(p=>({...p,views:{...p.views,[step.id]:src}}))}/>}>
         {build.version==='base'&&i===0&&['finger-parts','p45'].includes(step.id)&&<FingerPreparation build={build} otherFingers={step.id==='p45'}/>}
         {i===1&&step.id==='motor-check'&&<MotorCheck build={build} selected={Number(progress.views['motor-check:selected']??1)} onSelect={id=>setProgress(p=>({...p,views:{...p.views,'motor-check:selected':String(id)}}))} checked={Array.from({length:17},(_,i)=>i+1).filter(id=>progress.checks.includes(`motor-check:${id}`))} onCheck={id=>toggleCheck(`motor-check:${id}`)}/>}
         {i===(build.version==='base'&&step.id==='pp-ready'?0:DETAIL_AT[step.id]??copy.length-1)&&CAD_DETAILS[step.id]&&step.id!=='p46'&&!(build.version==='base'&&step.id==='thumb-pp')&&!(build.motor==='feetech'&&(step.id==='p98'||build.version!=='base'&&CAD_DETAILS[step.id].motorSpecific))&&<CadDetail key={step.id} build={build} step={step.id}/>}
@@ -204,7 +204,7 @@ export function AssemblyGuide({ onClose, safetyControl }: { onClose: () => void;
 }
 
 const isModelImage=(src:string)=>/\/(renders|parts|molds)\//.test(src)
-function MediaGallery({ items, saved, onSelect, focused }: { items: Figure[]; focused:number; saved?: string; onSelect: (src: string) => void }) {
+function MediaGallery({ build, items, saved, onSelect, focused }: { build:Build; items: Figure[]; focused:number; saved?: string; onSelect: (src: string) => void }) {
   const [selected,setSelected]=useState(Math.max(0,items.findIndex(item=>item.src===saved)))
   const [photo,setPhoto]=useState(false)
   const [inlinePhotos,setInlinePhotos]=useState<Record<string,boolean>>({})
@@ -220,13 +220,13 @@ function MediaGallery({ items, saved, onSelect, focused }: { items: Figure[]; fo
       return <figure key={item.src} data-contrast={isPhoto?false:item.contrast??false} data-wide={item.wide||undefined} className={focused<0?'':(item.instruction??i+1)===focused+1?'is-focused':'is-unfocused'}>
         <div className="assembly-row" style={{justifyContent:item.photo?'space-between':'flex-end'}}>{item.photo&&<ViewToggle render photo={isPhoto} onChange={photo=>setInlinePhotos(p=>({...p,[item.src]:photo}))}/>}<button className="assembly-text-button" onClick={()=>enlarge(i)} aria-label={`Enlarge image ${i+1}`}>⤢</button></div>
         <div className="assembly-image-frame">
-          <button className="assembly-image-button" data-image-kind={isModelImage(view.src)?'cad':'photo'} onClick={()=>enlarge(i)} aria-label={`Enlarge detail ${i+1}`}><img key={view.src} src={view.src} alt={view.caption} loading="lazy" onLoad={e=>{if(!isModelImage(view.src))e.currentTarget.style.maxWidth=`min(100%, ${e.currentTarget.naturalWidth}px)`}}/></button>
+          <button className="assembly-image-button" data-image-kind={isModelImage(view.src)?'cad':'photo'} onClick={()=>enlarge(i)} aria-label={`Enlarge detail ${i+1}`}><MotorRenderReference build={build} src={view.src}><img key={view.src} src={view.src} alt={view.caption} loading="lazy" onLoad={e=>{if(!isModelImage(view.src))e.currentTarget.style.maxWidth=`min(100%, ${e.currentTarget.naturalWidth}px)`}}/></MotorRenderReference></button>
         </div>{item.showCaption&&<figcaption className="assembly-panel-caption"><GuideText field={`caption/${view.src}`} text={view.caption} label="Image caption"/></figcaption>}
       </figure>
     })}
     <dialog ref={dialog} className="assembly-lightbox assembly-comparison" data-contrast={photo?false:item.contrast??false} data-image-kind={isModelImage(shown.src)?'cad':'photo'} aria-label="Enlarged assembly image" onKeyDown={e=>{if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();cycle(e.key==='ArrowRight'?1:-1)}}} onCancel={e=>e.stopPropagation()} onClick={e=>{if(e.target===e.currentTarget)dialog.current?.close()}}>
       <div className="assembly-row"><span>Instruction {item.instruction??selected+1}</span>{item.photo&&<ViewToggle render photo={photo} onChange={setPhoto}/>}<button autoFocus onClick={()=>dialog.current?.close()}>Close image ×</button></div>
-      <img key={shown.src} src={shown.src} alt={shown.caption} onLoad={e=>{if(!isModelImage(shown.src))e.currentTarget.style.maxWidth=`min(100%, ${e.currentTarget.naturalWidth}px)`}}/>{item.showCaption&&<p className="assembly-lightbox-caption"><GuideText field={`caption/${shown.src}`} text={shown.caption} label="Image caption"/></p>}
+      <MotorRenderReference build={build} src={shown.src}><img key={shown.src} src={shown.src} alt={shown.caption} onLoad={e=>{if(!isModelImage(shown.src))e.currentTarget.style.maxWidth=`min(100%, ${e.currentTarget.naturalWidth}px)`}}/></MotorRenderReference>{item.showCaption&&<p className="assembly-lightbox-caption"><GuideText field={`caption/${shown.src}`} text={shown.caption} label="Image caption"/></p>}
       <div className="assembly-row assembly-image-navigation"><button onClick={()=>cycle(-1)} disabled={frames.length<2}>← Previous image</button><span>{frame+1} / {frames.length}{photo?' · Assembly photo':''}</span><button onClick={()=>cycle(1)} disabled={frames.length<2}>Next image →</button></div>
     </dialog>
   </section>
