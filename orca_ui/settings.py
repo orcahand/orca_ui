@@ -22,6 +22,8 @@ class UiSettings:
     # ``model_version`` is carried along so re-derivation stays on the version
     # the user asked for.
     model_pinned: bool = True
+    # Temporary, see hand_folders: keep each identified hand's files in its own folder.
+    hand_folders: bool = False
     model_version: str | None = None
     # Device path of the board this console is pinned to, or None for "first
     # board to answer". Pinning is what makes two consoles on one machine

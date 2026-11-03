@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
@@ -610,8 +610,8 @@ wheels = [
 
 [[package]]
 name = "orca-core"
-version = "0.10.1"
-source = { registry = "https://pypi.org/simple" }
+version = "0.12.0"
+source = { git = "https://github.com/orcahand/orca_core.git?branch=feature%2Fimprove-calibration#eb10a4b3a30de59b02ea54d7c4058bd121b7e779" }
 dependencies = [
     { name = "dynamixel-sdk" },
     { name = "fastapi" },
@@ -620,10 +620,6 @@ dependencies = [
     { name = "pyserial" },
     { name = "pyyaml" },
     { name = "uvicorn" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/c0/cb/13a088b26b677566b011b7a1d31fbbba51e82bcfe03ce75e7d3874aa47a6/orca_core-0.10.1.tar.gz", hash = "sha256:3c93b5b53400c9cc17bf1e8f4dd4d8004349c14fdff71b1ffc664ad9125b40c5", size = 684674, upload-time = "2026-10-21T13:14:42.167Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f9/7c/0c27421bf1fdab44b9150edaf2868e190ad19b95a9862c79fe2ca8e1351d/orca_core-0.10.1-py3-none-any.whl", hash = "sha256:765a3de67bf9eef0867fe7ab81b072edf5089a580db86e9c67f49cd9cc26d44b", size = 334537, upload-time = "2026-10-21T13:14:40.476Z" },
 ]
 
 [[package]]
@@ -661,7 +657,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "mcp", specifier = ">=1.12,<2" },
     { name = "numpy", specifier = ">=1.24" },
-    { name = "orca-core", specifier = ">=0.10.1,<0.11" },
+    { name = "orca-core", git = "https://github.com/orcahand/orca_core.git?branch=feature%2Fimprove-calibration" },
     { name = "pyserial", specifier = ">=3.5,<4.0.0" },
     { name = "pyyaml", specifier = ">=6,<7" },
     { name = "uvicorn", specifier = ">=0.30" },
