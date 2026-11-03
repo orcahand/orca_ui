@@ -100,7 +100,7 @@ export const GUIDED_WORKFLOW: Workflow = {
       note: 'the listed spools, ~x clicks',
       color: '#f59e0b',
       what:
-        'The finger motors turn a little counterclockwise and hold at the tension current, loading the bottom spools. The dialog marks the spools to ratchet, each with its clicks: from the slack test on the first round, then from the last finger check.',
+        'The finger motors turn a little counterclockwise and hold firmly, loading the bottom spools. The dialog marks the spools to ratchet, each with its clicks: from the slack test on the first round, then from the last finger check.',
       why:
         'The counts are rounded down and capped at 5, so every round stays a little loose: a click only ever adds tension, and the sweep after calibration counts the last ones.',
       todo:
