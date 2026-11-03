@@ -9,6 +9,12 @@ from orca_ui.hand.operations import player
 
 
 @pytest.fixture(autouse=True)
+def _hand_folders_in_tmp(monkeypatch, tmp_path):
+    """A detected hand's folder never lands in the real home directory."""
+    monkeypatch.setenv("ORCA_HAND_FOLDERS", str(tmp_path / "hand_folders"))
+
+
+@pytest.fixture(autouse=True)
 def _no_sidecar_from_the_installed_package(monkeypatch):
     """A packaged model carries no local_config.yaml during tests.
 

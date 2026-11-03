@@ -50,6 +50,7 @@ from orca_ui.hand.detection import (
     probe_hardware,
     run_detection,
 )
+from orca_ui.hand.hand_folders import hand_folder_config
 from orca_ui.hand.sessions import (
     HandSession,
     SessionConnectError,
@@ -177,6 +178,10 @@ class HandSupervisor(threading.Thread):
         # lost.
         self._leaving_maintenance = False
         self._pinned_hardware_version: int | None = self.config.hardware_version
+        # Temporary, see hand_folders: the hand this run works on, locked at its
+        # first identified detection.
+        self._hand_folder_id: str | None = None
+        self._warned_no_hand_folder = False
 
         self._lock = threading.Lock()
         self._session: Optional[HandSession] = None
@@ -562,8 +567,31 @@ class HandSupervisor(threading.Thread):
 
         if self._settings.mock and model_name == MOCK_MODEL_NAME:
             return materialize_mock_model()
-        return _resolve_config_path(None, model_version=model_version,
-                                    model_name=model_name)
+        packaged = _resolve_config_path(None, model_version=model_version,
+                                        model_name=model_name)
+        if self._hand_folder_id:
+            return hand_folder_config(self._hand_folder_id, model_name, packaged)
+        return packaged
+
+    def _is_other_hand(self, detection: HandDetection | None) -> bool:
+        """True when a hand answered that is not the one this run locked onto."""
+        if not self._hand_folder_id or not names_a_hand(detection):
+            return False
+        return getattr(detection.identity, "hand_id", None) != self._hand_folder_id
+
+    def _lock_hand_folder(self, detection: HandDetection | None) -> bool:
+        """Lock this run onto the first hand that identifies itself. True when it just did."""
+        if not self._settings.hand_folders or self._hand_folder_id or not names_a_hand(detection):
+            return False
+        hand_id = getattr(detection.identity, "hand_id", None)
+        if hand_id:
+            self._hand_folder_id = hand_id
+            return True
+        if not self._warned_no_hand_folder:
+            self._warned_no_hand_folder = True
+            logger.warning("this hand reports no serial: its config and calibration "
+                           "stay in the shared model folder")
+        return False
 
     def shutdown(self) -> None:
         self._stop_event.set()
@@ -703,6 +731,15 @@ class HandSupervisor(threading.Thread):
                 presence = presence_from_detection(self.config, detection)
         detection = getattr(presence, "detection", None)
         identity = getattr(detection, "identity", None)
+        if self._is_other_hand(detection):
+            other = getattr(identity, "hand_id", None) or "A hand with no serial"
+            self._set_state(
+                HandState.DETECTING,
+                f"{other} is connected, but this console is working on "
+                f"{self._hand_folder_id}. Restart the console to use it.")
+            delay = self._backoff
+            self._backoff = min(self._backoff * 1.5, DETECT_BACKOFF_MAX_S)
+            return delay
         if identity is not None and identity.hand_id:
             self._hand_id = identity.hand_id
             self._identity = identity
@@ -953,9 +990,13 @@ class HandSupervisor(threading.Thread):
         an empty bus, and adopting that would throw away what we know about
         the hand that was just unplugged.
         """
-        if self._model_pinned or not names_a_hand(detection):
+        locked_now = not upgrade_only and self._lock_hand_folder(detection)
+        if self._is_other_hand(detection):
             return False
-        if detection.model_name == self.model_name:
+        if (self._model_pinned and not locked_now) or not names_a_hand(detection):
+            return False
+        model_name = self.model_name if self._model_pinned else detection.model_name
+        if model_name == self.model_name and not locked_now:
             return False
         if detection.identity is None and detection.side != self.config.type:
             # A hand with no board cannot report its side, so detection
@@ -964,17 +1005,17 @@ class HandSupervisor(threading.Thread):
         if upgrade_only and not self._is_upgrade(detection):
             return False
         try:
-            path = _resolve_config_path(
-                None, model_version=self._settings.model_version,
-                model_name=detection.model_name)
-            config = load_config(path)
+            config = load_config(
+                self._config_path_for(model_name, self._settings.model_version))
         except Exception:
-            logger.exception("could not load detected model %r",
-                             detection.model_name)
+            logger.exception("could not load detected model %r", model_name)
             return False
 
         logger.info("hand identifies as %s (was %s) — switching model",
-                    detection.model_name, self.model_name)
+                    model_name, self.model_name)
+        if locked_now:
+            logger.warning("hand %s: config and calibration in %s",
+                           self._hand_folder_id, os.path.dirname(config.config_path))
         # The pin belongs to the model's own config, not the one it replaces.
         self._pinned_hardware_version = config.hardware_version
         self._install_config(config)
