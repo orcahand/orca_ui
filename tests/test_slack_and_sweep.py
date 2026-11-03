@@ -3,10 +3,14 @@ blocks calibration until a passing test; a sweep is saved as a named dataset and
 reference. Both release the lease when e-stopped."""
 
 import time
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 
+from orca_ui.hand.operations.slack_test import current_options, validate_slack_params
+from orca_ui.hand.operations.tension_sweep import sweep_defaults
+from orca_ui.hand.service import ServiceError
 from orca_ui.mock import materialize_mock_model
 from orca_ui.server import create_app
 from orca_ui.settings import UiSettings
@@ -89,6 +93,42 @@ def test_too_much_slack_blocks_calibration_until_a_passing_test(client):
     _done(client)
     assert client.post("/api/operation/slack_test/start",
                        json={"params": {"current_ma": 500}}).status_code == 422
+
+
+def test_the_slack_test_runs_at_the_motor_familys_current_unless_one_is_chosen(client):
+    offered = client.get("/api/hand/info").json()["slack_current"]
+    assert offered == {"default_ma": 60, "choices_ma": [40, 60, 80, 100]}
+
+    for params, expected in (({}, 60.0), ({"current_ma": 80}, 80.0)):
+        started = client.post("/api/operation/slack_test/start",
+                              json={"params": {**FAST, "joints": ["index_pip"], **params}})
+        assert started.status_code == 200, started.text
+        _hold_each(client, ["Test", "Finish"])
+        _done(client)
+        assert client.get("/api/hand/info").json()["slack_test"]["current_ma"] == expected
+
+
+def test_feetech_slack_test_offers_and_accepts_its_own_currents():
+    from orca_core.hardware.mock_feetech_client import MockFeetechClient
+
+    assert current_options("feetech") == {"default_ma": 120, "choices_ma": [80, 120, 160, 200]}
+    motor_client = object.__new__(MockFeetechClient)
+    session = SimpleNamespace(caps=SimpleNamespace(motors=True), hand=SimpleNamespace(motor_client=motor_client))
+    service = SimpleNamespace(session=session, supervisor=SimpleNamespace(config=SimpleNamespace(joint_ids=[])))
+
+    assert validate_slack_params(service, {"current_ma": 300})["settings"]["current_ma"] == 300.0
+    with pytest.raises(ServiceError, match="current_ma"):
+        validate_slack_params(service, {"current_ma": 301})
+
+
+@pytest.mark.parametrize("family, max_current, expected", [
+    pytest.param("dynamixel", 300, (200.0, 300.0, 300.0), id="dynamixel"),
+    pytest.param("feetech", 900, (400.0, 600.0, 600.0), id="feetech"),
+])
+def test_sweep_defaults_come_from_the_motor_family(family, max_current, expected):
+    service = SimpleNamespace(session=None, supervisor=SimpleNamespace(config=SimpleNamespace(max_current=max_current)))
+    defaults = sweep_defaults(service, family)
+    assert (defaults["hold_current_ma"], defaults["pose_current_ma"], defaults["sweep_current_ma"]) == expected
 
 
 def test_a_sweep_is_saved_and_scored_against_the_reference(client):

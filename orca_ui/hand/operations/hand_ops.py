@@ -218,12 +218,15 @@ def slack_test(hand, *, joints, settings: dict, hold_callback, review_callback, 
     )
 
 
-def slack_setting_defaults() -> dict:
+def slack_setting_defaults(family: str | None) -> dict:
+    """SlackTestSettings defaults, currents from ``family``; unset while it is unknown."""
     import dataclasses
 
+    from orca_core.hardware.motor_factory import motor_client_class
     from orca_core.maintenance.slack_test import SlackTestSettings
 
-    return dataclasses.asdict(SlackTestSettings())
+    settings = SlackTestSettings()
+    return dataclasses.asdict(settings.with_family_currents(motor_client_class(family)) if family else settings)
 
 
 def tension_sweep_supported() -> bool:
@@ -252,12 +255,15 @@ def tension_sweep(
     )
 
 
-def sweep_setting_defaults() -> dict:
+def sweep_setting_defaults(family: str | None) -> dict:
+    """SweepSettings defaults, currents from ``family``; unset while it is unknown."""
     import dataclasses
 
+    from orca_core.hardware.motor_factory import motor_client_class
     from orca_core.maintenance.tension_sweep import SweepSettings
 
-    return dataclasses.asdict(SweepSettings())
+    settings = SweepSettings()
+    return dataclasses.asdict(settings.with_family_currents(motor_client_class(family)) if family else settings)
 
 
 def guided_tension_supported() -> bool:

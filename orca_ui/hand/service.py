@@ -341,6 +341,14 @@ class HandService:
             logger.exception("estimating slack from the calibration failed")
             return None
 
+    def _slack_current(self) -> dict | None:
+        """The winding current and choices for the connected motor family."""
+        from orca_ui.hand.operations.guided_tension import motor_family
+        from orca_ui.hand.operations.slack_test import current_options
+
+        family = motor_family(self)
+        return current_options(family) if family else None
+
     def _slack_test(self, config) -> dict | None:
         """The hand's newest slack test, and whether it blocks calibration."""
         from orca_ui.hand import slack_tests
@@ -477,6 +485,7 @@ class HandService:
             "travel_baseline": self._travel_baseline(config),
             "slack_estimate": self._slack_estimate(config),
             "slack_test": self._slack_test(config),
+            "slack_current": self._slack_current(),
             "tension_sweep": self._tension_sweep(config),
         }
         mapping = getattr(config, "finger_to_sensor_id", None)
