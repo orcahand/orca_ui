@@ -290,6 +290,8 @@ export interface HandInfo {
   travel_baseline?: TravelBaselineSummary | null
   // This hand's newest slack test; `block` is why calibration is refused, or null.
   slack_test?: SlackTestSummary | null
+  // The motor family's slack test current and the choices around it (mA); null while it is unknown.
+  slack_current?: { default_ma: number; choices_ma: number[] } | null
   // Which tension sweep is the reference and this hand's newest one, by name.
   tension_sweep?: {
     reference: string | null

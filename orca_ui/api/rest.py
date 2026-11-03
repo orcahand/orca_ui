@@ -82,12 +82,13 @@ def build_router(service: HandService) -> APIRouter:
     def slack_tests_state():
         from orca_ui.hand import slack_tests
         from orca_ui.hand.operations import hand_ops
+        from orca_ui.hand.operations.guided_tension import motor_family
 
         supported = hand_ops.slack_test_supported()
         return {
             **slack_tests.state(service.supervisor.config),
             "supported": supported,
-            "defaults": hand_ops.slack_setting_defaults() if supported else None,
+            "defaults": hand_ops.slack_setting_defaults(motor_family(service)) if supported else None,
         }
 
     @router.post("/baselines/promote")

@@ -4,7 +4,7 @@
 import { api } from '../../api/rest'
 import { isOperationActive, useOperationStore } from '../../state/operationStore'
 import { useSetupVariant } from '../../state/setupVariant'
-import { DEFAULT_OFFSET_DEG, useTensionFlow } from '../../state/tensionFlow'
+import { DEFAULT_OFFSET_DEG } from '../../state/tensionFlow'
 import { loadPassFractions, loadPassSlack } from './guidedSettings'
 
 export const SLACK_HINT =
@@ -15,8 +15,7 @@ export const SWEEP_HINT =
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 export async function startSlackTest(params: Record<string, unknown> = {}): Promise<void> {
-  const { slackCurrentMa } = useTensionFlow.getState()
-  return startWhenConnected('slack_test', { current_ma: slackCurrentMa, ...params })
+  return startWhenConnected('slack_test', params)
 }
 
 // One pass limit to limit and back per joint.

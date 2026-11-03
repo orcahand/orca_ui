@@ -278,7 +278,7 @@ class SimulatedTensionOperation(Operation):
             supervisor.exit_maintenance()
 
 
-def simulate_slack_test(ctx: OpContext, config, params: dict, hold, progress, review=None) -> dict:
+def simulate_slack_test(ctx: OpContext, config, params: dict, hold, progress, review=None, family=None) -> dict:
     """Lease-free simulated slack test: each joint is held on prompt and turns a
     few degrees, the joints named in ``params["unspool"]`` past half a turn;
     ``review`` after the last joint can send the test back to it."""
@@ -287,7 +287,8 @@ def simulate_slack_test(ctx: OpContext, config, params: dict, hold, progress, re
 
     from orca_core.maintenance.slack_test import FAIL, HOLD_BACK, SlackResult, SlackTestSettings
 
-    settings = SlackTestSettings(**(params.get("settings") or {}))
+    defaults = hand_ops.slack_setting_defaults(family)
+    settings = SlackTestSettings(**{**defaults, **(params.get("settings") or {})})
     joints = [j for j in config.joint_ids if j != "wrist" and j in config.joint_to_motor_map]
     if params.get("joints") is not None:
         joints = [j for j in joints if j in set(params["joints"])]

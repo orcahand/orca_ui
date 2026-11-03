@@ -23,9 +23,12 @@ logger = logging.getLogger(__name__)
 
 PUBLISH_PERIOD_S = 0.1
 SETTING_BOUNDS = {
-    "current_ma": (20.0, 150.0),
     "max_free_deg": (30.0, 180.0),
 }
+MIN_CURRENT_MA = 20.0
+# Around the motor family's own winding current: what the operator is offered, and the most accepted.
+CURRENT_CHOICE_FACTORS = (2 / 3, 1, 4 / 3, 5 / 3)
+MAX_CURRENT_FACTOR = 2.5
 HOLD_TEST = "Test"
 HOLD_SKIP = "Skip"
 HOLD_BACK = "Back"
@@ -35,6 +38,15 @@ REVIEW_PROMPT = "Every joint tested — finish, or go back and test the last joi
 
 def hold_prompt(joint: str) -> str:
     return f"Hold {joint.replace('_', ' ')} still so the joint cannot move, then test"
+
+
+def current_options(family: str) -> dict:
+    """The motor family's winding current and the choices offered around it, in mA."""
+    default_ma = hand_ops.slack_setting_defaults(family)["current_ma"]
+    return {
+        "default_ma": round(default_ma),
+        "choices_ma": [round(default_ma * factor) for factor in CURRENT_CHOICE_FACTORS],
+    }
 
 
 def validate_slack_params(service, params: dict) -> dict:
@@ -56,7 +68,9 @@ def validate_slack_params(service, params: dict) -> dict:
             raise ServiceError("joints must be a non-empty list of this hand's finger joints", status_code=422)
         clean["joints"] = list(joints)
     settings = {}
-    for key, (low, high) in SETTING_BOUNDS.items():
+    family_current_ma = type(session.hand.motor_client).slack_test_current_ma
+    bounds = {**SETTING_BOUNDS, "current_ma": (MIN_CURRENT_MA, family_current_ma * MAX_CURRENT_FACTOR)}
+    for key, (low, high) in bounds.items():
         if params.get(key) is None:
             continue
         try:
@@ -285,9 +299,11 @@ class SimulatedSlackTestOperation(Operation):
         return clean
 
     def run(self, ctx: OpContext) -> dict:
+        from orca_ui.hand.operations.guided_tension import motor_family
         from orca_ui.hand.operations.simulated import simulate_slack_test
 
         supervisor = ctx.service.supervisor
+        family = motor_family(ctx.service)
         ctx.set_phase("acquiring", detail="taking the hand into maintenance")
         supervisor.enter_maintenance(self.kind)
         presenter = _Presenter(ctx)
@@ -295,7 +311,7 @@ class SimulatedSlackTestOperation(Operation):
             ctx.set_phase("connecting", detail="opening motor-only connection")
             ctx.sleep(self.params["step_duration_s"])
             report = simulate_slack_test(ctx, supervisor.config, self.params, presenter.hold, presenter.progress,
-                                         presenter.review)
+                                         presenter.review, family=family)
             saved = _save(ctx, supervisor.config, report, None)
             presenter.finish(report, saved)
             ctx.set_phase("released", detail="torque off, control mode restored")

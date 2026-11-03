@@ -15,7 +15,7 @@ import {
   useStartGate,
 } from '../../state/operationStore'
 import type { SetupVariant } from '../../state/setupVariant'
-import { formatHardwareVersion, isV21Family, SLACK_CURRENT_CHOICES, useTensionFlow } from '../../state/tensionFlow'
+import { formatHardwareVersion, isV21Family, useTensionFlow } from '../../state/tensionFlow'
 import { FlowRowTitle, FlowStep, type StepState } from './FlowStep'
 import { jointGroup, loadPassFractions } from './guidedSettings'
 import { failToBanner, shortDate } from './setupUtils'
@@ -43,6 +43,11 @@ export function TensionStep({ state, variant }: { state: StepState; variant: Set
   const [confirmRestart, setConfirmRestart] = useState(false)
   const slackCurrentMa = useTensionFlow((s) => s.slackCurrentMa)
   const setSlackCurrentMa = useTensionFlow((s) => s.setSlackCurrentMa)
+  const slackCurrent = handInfo?.slack_current ?? null
+  const slackCurrentChoice =
+    slackCurrentMa !== null && slackCurrent?.choices_ma.includes(slackCurrentMa)
+      ? slackCurrentMa
+      : (slackCurrent?.default_ma ?? null)
   const slackTest = handInfo?.slack_test ?? null
   const slackBlock = slackTest?.block ?? null
   const slackMax = slackTest ? Math.max(0, ...Object.values(slackTest.results).map((r) => r.total_deg ?? 0)) : 0
@@ -110,21 +115,23 @@ export function TensionStep({ state, variant }: { state: StepState; variant: Set
               )}
             </span>
             <span className="calib-step-actions">
-              <label className="flow-field" title="The winding current: enough to turn the spool through its slack against the held joint">
-                <span>at</span>
-                <select value={slackCurrentMa} onChange={(e) => setSlackCurrentMa(Number(e.target.value))}>
-                  {SLACK_CURRENT_CHOICES.map((v) => (
-                    <option key={v} value={v}>
-                      {v} mA
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {slackCurrent && (
+                <label className="flow-field" title="The winding current: enough to turn the spool through its slack against the held joint">
+                  <span>at</span>
+                  <select value={slackCurrentChoice ?? undefined} onChange={(e) => setSlackCurrentMa(Number(e.target.value))}>
+                    {slackCurrent.choices_ma.map((v) => (
+                      <option key={v} value={v}>
+                        {v} mA
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <button
                 className={`btn ${slackState === 'done' ? 'btn-secondary' : 'btn-primary'}`}
                 disabled={gate.blocked}
                 title={gate.reason ?? SLACK_HINT}
-                onClick={() => void startSlackTest().catch(failToBanner)}
+                onClick={() => void startSlackTest(slackCurrentChoice === null ? {} : { current_ma: slackCurrentChoice }).catch(failToBanner)}
               >
                 {runningKind === 'slack_test' ? 'Running…' : slackTest ? 'Slack test again' : 'Slack test'}
               </button>

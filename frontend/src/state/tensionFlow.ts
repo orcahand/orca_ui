@@ -15,9 +15,6 @@ export const V211 = 211
 export const DEFAULT_OFFSET_DEG = 15
 export const EXTRA_DEG = 15
 export const PULL_MORE = 'Pull more'
-// The slack test winds a held joint's spool at this current: enough to start the gearbox.
-export const DEFAULT_SLACK_CURRENT_MA = 60
-export const SLACK_CURRENT_CHOICES = [40, 60, 80, 100] as const
 
 export function normalizeHardwareVersion(version: number): number {
   return version < 10 ? version * 100 : version < 100 ? version * 10 : version
@@ -44,7 +41,8 @@ interface TensionFlowState {
   // The run whose dialog the operator closed; a later run shows again.
   dismissed: string | null
   dismiss: (runId: string | null) => void
-  slackCurrentMa: number
+  // The operator's slack test current; null follows the hand's own.
+  slackCurrentMa: number | null
   setSlackCurrentMa: (ma: number) => void
   // The finished sweep whose dialog holds the motors for its clicks; the hold
   // ("tension") run shows inside that dialog while this is set.
@@ -63,7 +61,7 @@ export const useTensionFlow = create<TensionFlowState>((set) => ({
   setWind: (wind) => set({ wind }),
   dismissed: null,
   dismiss: (dismissed) => set({ dismissed }),
-  slackCurrentMa: DEFAULT_SLACK_CURRENT_MA,
+  slackCurrentMa: null,
   setSlackCurrentMa: (slackCurrentMa) => set({ slackCurrentMa }),
   sweepRatchet: null,
   setSweepRatchet: (sweepRatchet) => set({ sweepRatchet }),

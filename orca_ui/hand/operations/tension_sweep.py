@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 DEFAULT_REPEATS = 1
 MAX_REPEATS = 5
 PUBLISH_PERIOD_S = 0.1
-FAMILY_CURRENT_SCALE = {"feetech": 2.0}
 SETTING_BOUNDS = {
     "hold_current_ma": (20.0, 500.0),
     "pose_current_ma": (20.0, 600.0),
@@ -85,16 +84,17 @@ def validate_sweep_params(service, params: dict) -> dict:
 
 
 def sweep_defaults(service, family: str | None = None) -> dict:
-    """SweepSettings defaults for the motor family, currents scaled like the probe's."""
+    """SweepSettings defaults for the motor family, within this console's limits."""
     from orca_ui.hand.operations.guided_tension import motor_family
-    
-    defaults = hand_ops.sweep_setting_defaults()
-    scale = FAMILY_CURRENT_SCALE.get(family or motor_family(service) or "", 1.0)
+
+    defaults = hand_ops.sweep_setting_defaults(family or motor_family(service))
     ceiling = hand_ops.current_ceiling(service.supervisor.config, service.session)
-    for key in list(defaults):
+    for key, value in list(defaults.items()):
+        if value is None:
+            del defaults[key]
+            continue
         if not key.endswith("_ma") or key == "deadband_ma":
             continue
-        value = defaults[key] * scale
         lo, hi = SETTING_BOUNDS.get(key, (0.0, value))
         if ceiling is not None:
             hi = min(hi, ceiling)
