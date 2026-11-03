@@ -204,10 +204,9 @@ def _describe(r: dict) -> str:
     if r.get("skipped"):
         return f"{head}: skipped — {r['skipped']}"
     short = f", stalled {r['short_deg']:.0f}° short of the limit" if (r.get("short_deg") or 0) > 2 else ""
-    return (
-        f"{head}: {r['mean_ma']:.0f} mA over the travel, {r['end_ma']:.0f} mA into the stop, "
-        f"dead band {r['deadband_deg']:.1f}°{short}"
-    )
+    # A sweep that stalls early never reaches the stretch into the stop.
+    stop = "" if r.get("end_ma") is None else f", {r['end_ma']:.0f} mA into the stop"
+    return f"{head}: {r['mean_ma']:.0f} mA over the travel{stop}, dead band {r['deadband_deg']:.1f}°{short}"
 
 
 def _save(ctx: OpContext, config, report: dict, params: dict, family: str | None) -> str | None:

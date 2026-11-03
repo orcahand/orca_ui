@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from orca_ui.hand.operations.slack_test import current_options, validate_slack_params
-from orca_ui.hand.operations.tension_sweep import sweep_defaults
+from orca_ui.hand.operations.tension_sweep import _describe, sweep_defaults
 from orca_ui.hand.service import ServiceError
 from orca_ui.mock import materialize_mock_model
 from orca_ui.server import create_app
@@ -186,3 +186,9 @@ def test_estop_mid_sweep_releases_the_lease(client):
     assert _wait_for(lambda: _operation(client).get("state") == "error")
     assert _wait_for(lambda: client.get("/api/status").json()["state"] == "connected")
     assert client.get("/api/sweeps").json()["sweeps"] == {}
+
+
+def test_a_sweep_that_stalls_before_the_stop_still_gets_a_log_line():
+    line = _describe({"joint": "thumb_dip", "sense": "flex", "run": 1, "mean_ma": 585.0, "end_ma": None,
+                      "deadband_deg": 0.0, "short_deg": 95.6})
+    assert "585 mA over the travel" in line and "into the stop" not in line and "stalled 96°" in line

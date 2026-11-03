@@ -17,6 +17,7 @@ import threading
 
 from orca_ui.hand.operations import hand_ops
 from orca_ui.hand.operations.base import OpContext, Operation
+from orca_ui.hand.operations.events import OperationStopped
 
 
 RECORD = "Record"
@@ -266,6 +267,8 @@ class ManualCapture:
             answer = self._ctx.wait_input(
                 f"Hold {what} on the {direction} end stop, then record", options
             )
+        except OperationStopped:
+            return "abort"
         finally:
             done.set()
             live.join()
