@@ -610,7 +610,7 @@ wheels = [
 
 [[package]]
 name = "orca-core"
-version = "0.6.0"
+version = "0.10.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dynamixel-sdk" },
@@ -621,14 +621,14 @@ dependencies = [
     { name = "pyyaml" },
     { name = "uvicorn" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/93/83/9383ee142edd0bb120b69b0e9764ddc267a137e411796331990b835a9dfb/orca_core-0.6.0.tar.gz", hash = "sha256:5139b60f19800966353a2021be1772f3ced5276aac1e64203111ece9c9cd44df", size = 620389, upload-time = "2026-10-12T15:57:55.546Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c0/cb/13a088b26b677566b011b7a1d31fbbba51e82bcfe03ce75e7d3874aa47a6/orca_core-0.10.1.tar.gz", hash = "sha256:3c93b5b53400c9cc17bf1e8f4dd4d8004349c14fdff71b1ffc664ad9125b40c5", size = 684674, upload-time = "2026-10-21T13:14:42.167Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0d/8c/3f4b529f5b846a6ca8c10e10ab4713ab79060e831997375ebb4dea034d68/orca_core-0.6.0-py3-none-any.whl", hash = "sha256:d6369e6d3f6ca17e3a69d71280914921c7e9c661e8c639029919e2a01c1a6660", size = 300144, upload-time = "2026-10-12T15:57:54.141Z" },
+    { url = "https://files.pythonhosted.org/packages/f9/7c/0c27421bf1fdab44b9150edaf2868e190ad19b95a9862c79fe2ca8e1351d/orca_core-0.10.1-py3-none-any.whl", hash = "sha256:765a3de67bf9eef0867fe7ab81b072edf5089a580db86e9c67f49cd9cc26d44b", size = 334537, upload-time = "2026-10-21T13:14:40.476Z" },
 ]
 
 [[package]]
 name = "orca-ui"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
@@ -661,7 +661,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "mcp", specifier = ">=1.12,<2" },
     { name = "numpy", specifier = ">=1.24" },
-    { name = "orca-core", specifier = ">=0.6.0,<0.7" },
+    { name = "orca-core", specifier = ">=0.10.1,<0.11" },
     { name = "pyserial", specifier = ">=3.5,<4.0.0" },
     { name = "pyyaml", specifier = ">=6,<7" },
     { name = "uvicorn", specifier = ">=0.30" },

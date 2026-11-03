@@ -41,6 +41,9 @@ export interface MotorIssueInput {
   faults: MotorFaultEntry | null
   maxTemp: number
   maxCurrent: number | null
+  // Reboots of one motor before its repetition is worth surfacing. Without
+  // it the threshold only ever reached a log line nobody is watching.
+  reportAfterReboots: number | null
 }
 
 export function tempPct(temp: number | null, maxTemp: number): number | null {
@@ -91,7 +94,16 @@ export function trackClass(faults: MotorFaultEntry | null): string {
  * other reading about it beside the point.
  */
 export function deriveMotorIssues(input: MotorIssueInput): MotorIssue[] {
-  const { motorId, joint, temp, current, faults, maxTemp, maxCurrent } = input
+  const {
+    motorId,
+    joint,
+    temp,
+    current,
+    faults,
+    maxTemp,
+    maxCurrent,
+    reportAfterReboots,
+  } = input
   const issues: MotorIssue[] = []
 
   const hw = faults?.hw_error ?? null
@@ -130,6 +142,42 @@ export function deriveMotorIssues(input: MotorIssueInput): MotorIssue[] {
       ],
       reboot: null,
     })
+  }
+
+  // A motor the system keeps having to recover is a mechanical problem, and
+  // the whole point of the report threshold is that someone sees it. It was
+  // only ever a log warning before, which in a web console is nowhere.
+  const recovery = faults?.recovery ?? null
+  if (recovery && reportAfterReboots) {
+    const repeats = Math.max(
+      recovery.load_reboots,
+      recovery.thermal_recoveries,
+    )
+    const abandoned = recovery.given_up || recovery.thermal_given_up
+    if (abandoned || repeats >= reportAfterReboots) {
+      issues.push({
+        motorId,
+        joint,
+        severity: abandoned ? 'error' : 'warning',
+        label: abandoned
+          ? 'reboot threshold exceeded'
+          : 'repeatedly recovered',
+        detail: abandoned
+          ? `${repeats} recoveries — the system has stopped recovering it`
+          : `recovered ${repeats} times this session`,
+        checks: abandoned
+          ? [
+              'fix what is stalling or heating the joint',
+              'reboot it from the FAULT column, which starts the count again',
+              'or raise the threshold in the Motor Health toolbar',
+            ]
+          : [
+              'check the joint for binding or an over-tensioned tendon',
+              'it will be left latched once it passes the give-up threshold',
+            ],
+        reboot: null,
+      })
+    }
   }
 
   const load = currentClass(current, maxCurrent)

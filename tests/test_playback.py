@@ -617,3 +617,84 @@ def test_the_cap_is_the_timeout_rather_than_stacking_with_the_backstop():
                       _Hand(), "waypoint 1", 20.0)
     assert seen == [20.0]
     assert seen[0] > pl.WAYPOINT_ARRIVAL_TIMEOUT_S
+
+
+# ----- run-in -------------------------------------------------------------------
+
+
+def test_run_in_first_pass_is_slow_then_the_chosen_speed():
+    """The first pass runs at x1 whatever speed was asked for, so a collision
+    shows up while there is still time to stop; the rest fill the duration."""
+    cycle = [[0.0, 0.0], [60.0, 0.0], [0.0, 60.0], [0.0, 0.0]]
+    warm, rate_hz, _ = _interpolate(cycle, speed=1.0)
+    fast, _, _ = _interpolate(cycle, speed=3.0)
+    frames, rate = player.run_in_frames(cycle, duration_s=30, speed=3.0)
+    assert rate == rate_hz
+    assert frames[:len(warm)] == warm
+    assert frames[len(warm):len(warm) + len(fast)] == fast
+    assert (len(frames) - len(warm)) % len(fast) == 0
+    assert len(frames) >= 30 * rate_hz
+    # At x1 the whole run is plain passes.
+    plain, _ = player.run_in_frames(cycle, duration_s=30, speed=1.0)
+    assert len(plain) % len(warm) == 0
+
+
+def test_run_in_caps_the_current_for_the_run_and_restores_it(client):
+    client.post("/api/torque/enable")
+    control = client.get("/api/hand/info").json()["control"]
+    before = control["max_current"]
+    assert before is not None
+    cap = int(before) + 50
+    response = client.post("/api/operation/run_in/start", json={"params": {
+        "duration_s": 30, "speed": 4.0, "max_current_ma": cap}})
+    assert response.status_code == 200, response.text
+    _wait_op_state(client, "running")
+    assert _wait_for(
+        lambda: client.get("/api/hand/info").json()["control"]["max_current"] == cap)
+    client.post("/api/operation/stop")
+    _wait_op_state(client, "done")
+    assert client.get("/api/hand/info").json()["control"]["max_current"] == before
+
+
+def test_run_in_refuses_an_absurd_cap_or_speed(client):
+    client.post("/api/torque/enable")
+    assert client.post("/api/operation/run_in/start", json={"params": {
+        "duration_s": 30, "max_current_ma": 0}}).status_code == 400
+    assert client.post("/api/operation/run_in/start", json={"params": {
+        "duration_s": 30, "max_current_ma": 5000}}).status_code == 400
+    assert client.post("/api/operation/run_in/start", json={"params": {
+        "duration_s": 30, "max_current_ma": "lots"}}).status_code == 400
+    assert client.post("/api/operation/run_in/start", json={"params": {
+        "duration_s": 30, "speed": 7}}).status_code == 400
+
+class TestLoopCycleCount:
+    """Looping runs until stopped unless a count is asked for. It used to stop
+    at a hard-coded 1000 nobody requested, which ended an unattended run with
+    the hand still and nothing in the log to say why."""
+
+    def test_the_default_is_indefinite(self):
+        from orca_ui.hand.operations.player import DEFAULT_MAX_LOOP_CYCLES
+
+        assert DEFAULT_MAX_LOOP_CYCLES is None
+
+    def test_an_absent_or_blank_count_means_indefinite(self):
+        from orca_ui.hand.operations.player import _max_cycles
+
+        assert _max_cycles(None) is None
+        assert _max_cycles("") is None
+
+    def test_a_count_is_taken_as_given(self):
+        from orca_ui.hand.operations.player import _max_cycles
+
+        assert _max_cycles(1) == 1
+        assert _max_cycles("250") == 250
+
+    def test_a_nonsense_count_is_refused(self):
+        from orca_ui.hand.operations.player import _max_cycles
+        from orca_ui.hand.service import ServiceError
+
+        for bad in (0, -5):
+            with pytest.raises(ServiceError, match="at least 1"):
+                _max_cycles(bad)
+        with pytest.raises(ServiceError, match="whole number"):
+            _max_cycles("many")

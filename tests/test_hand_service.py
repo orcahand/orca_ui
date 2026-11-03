@@ -140,29 +140,23 @@ def test_wrist_is_measured_and_follows_commands(service):
 
     assert _wait_for(wrist_tracks), service.session.measured_joints()
 
-def test_max_current_floor_is_the_calibration_current(service):
-    """orca_core refuses a ceiling below the calibration current. The floor is
-    published so the UI can stop there, and a write below it is rejected
-    BEFORE the hardware is touched — a half-applied ceiling would leave the
-    motors and the config disagreeing."""
-    state = service.control_state()
-    floor = state["max_current_floor"]
-    assert floor == service.supervisor.config.calibration_current
-    assert state["max_current"] >= floor
-
+def test_the_calibration_current_follows_the_ceiling_the_console_sets(service):
+    """There is no separate calibration current to collide with: a ceiling the
+    operator types becomes what calibration drives the hardstops at, so no
+    combination of currents is refused."""
     before = service.control_state()["max_current"]
-    with pytest.raises(ServiceError) as excinfo:
-        service.set_max_current(floor - 1)
-    # The rejection names the value that was refused and quotes orca_core's
-    # reason, so the operator is not left guessing which limit bit.
-    assert str(floor - 1) in str(excinfo.value)
-    assert "calibration current" in str(excinfo.value)
-    # Nothing moved: not our snapshot, not the hand's config.
-    assert service.control_state()["max_current"] == before
-    assert service.session.hand.config.max_current == before
+    lowered = max(1, before // 2)
 
-    service.set_max_current(floor)
-    assert service.control_state()["max_current"] == floor
+    service.set_max_current(lowered)
+    assert service.control_state()["max_current"] == lowered
+    config = service.session.hand.config
+    assert config.max_current == lowered
+    assert config.calibration_current == lowered
+    # A per-group table shipped with the model no longer overrides it.
+    assert config.calibration_current_for("index_mcp") == lowered
+
+    service.set_max_current(before)
+    assert service.control_state()["max_current"] == before
 
 def test_direct_motor_mode_gating_and_moves(service):
     snapshot = service.motor_snapshot()
@@ -432,14 +426,47 @@ def test_servo_writes_are_refused_on_a_family_without_the_registers(service, mon
     assert service._servo_gains == {} and service._servo_profiles == {}
 
 
-def test_reboot_needs_torque_off_and_reports_an_unanswered_read_back(service, monkeypatch):
-    service.enable_torque()
+def test_reboot_works_with_torque_on_and_puts_that_motor_back(service, monkeypatch):
+    """Torque is not a precondition: the fault policy reboots single motors on
+    an energized hand and restores their torque, so refusing to let a person
+    do the same was an arbitrary gate. The rebooted motor must not be left
+    dead in an otherwise live hand."""
     motor = service.supervisor.config.motor_ids[0]
-    with pytest.raises(ServiceError) as excinfo:
-        service.reboot_motor(motor)
-    assert excinfo.value.status_code == 409
+    client = service.session.hand.motor_client
+    monkeypatch.setattr(type(client), "reboot_motor", lambda self, mid: None,
+                        raising=False)
+    monkeypatch.setattr(type(client), "read_hardware_error", lambda self, mid: 0)
+    monkeypatch.setattr("orca_ui.hand.service.MOTOR_REBOOT_SETTLE_S", 0.0)
+
+    service.enable_torque()
+    enabled: list = []
+    monkeypatch.setattr(service.session.hand, "enable_torque",
+                        lambda ids=None: enabled.extend(ids or []))
+    assert service.reboot_motor(motor)["cleared"] is True
+    assert enabled == [motor], "its torque was not restored"
     service.disable_torque()
 
+
+def test_a_manual_reboot_clears_that_motors_reboot_count(service, monkeypatch):
+    """A motor left latched for exceeding its threshold would otherwise stay
+    abandoned for the whole session, however often someone fixes and
+    restarts it."""
+    motor = service.supervisor.config.motor_ids[0]
+    client = service.session.hand.motor_client
+    monkeypatch.setattr(type(client), "reboot_motor", lambda self, mid: None,
+                        raising=False)
+    monkeypatch.setattr(type(client), "read_hardware_error", lambda self, mid: 0)
+    monkeypatch.setattr("orca_ui.hand.service.MOTOR_REBOOT_SETTLE_S", 0.0)
+
+    hand = service.session.hand
+    cleared: list = []
+    monkeypatch.setattr(hand, "clear_fault_record", cleared.append)
+    service.reboot_motor(motor)
+    assert cleared == [motor]
+
+
+def test_reboot_reports_an_unanswered_read_back(service, monkeypatch):
+    motor = service.supervisor.config.motor_ids[0]
     client = service.session.hand.motor_client
     monkeypatch.setattr(type(client), "reboot_motor", lambda self, mid: None, raising=False)
     monkeypatch.setattr(type(client), "read_hardware_error", lambda self, mid: None)

@@ -44,11 +44,11 @@ GOTO_TENSION = f"{GOTO}tension"
 PUBLISH_PERIOD_S = 0.1
 HOLD_BOUNDS_MA = (20.0, 500.0)
 # Run settings: currents in mA, and how far the motors turn counterclockwise while tensioning in degrees.
+# The ratcheting hold is not a run setting: orca_core runs it at each motor's own ceiling.
 CURRENT_BOUNDS_MA = {
     "hold_ap": HOLD_BOUNDS_MA,
     "hold_mcp": HOLD_BOUNDS_MA,
     "hold_pip": HOLD_BOUNDS_MA,
-    "tension_current": (50.0, 1000.0),
     "tension_offset_deg": (0.0, 45.0),
 }
 # Input values "current:<key>=<mA>" change a current mid-run instead of answering a prompt.
@@ -57,7 +57,6 @@ LIVE_STEP = {
     "hold_ap": "range",
     "hold_mcp": "range",
     "hold_pip": "range",
-    "tension_current": "tension",
 }
 # Input values "pass:<group>=<value>" change a group's pass threshold mid-run
 # (a fraction under fraction scoring, degrees of slack under slack scoring).
@@ -93,7 +92,6 @@ def default_currents(config=None, family: str | None = None) -> dict:
         "hold_ap": float(hold["abd"]),
         "hold_mcp": float(hold["mcp"]),
         "hold_pip": float(hold["pip"]),
-        "tension_current": float(entry["tension"]),
         "tension_offset_deg": DEFAULT_TENSION_OFFSET_DEG,
     }
 
@@ -237,6 +235,7 @@ class _Presenter:
         self._slack = self._extra["scoring"] == SCORING_SLACK
         self._lock = threading.Lock()
         self._last_publish = 0.0
+        self._rounds_before = 0
 
     @property
     def step(self) -> str:
@@ -254,13 +253,18 @@ class _Presenter:
         self._last_publish = now
         self._ctx.set_extra(dict(self._extra))
 
+    def _round(self, run_round: int) -> int:
+        """The routine numbers rounds per run; the operator counts across resumes."""
+        return int(run_round) + self._rounds_before
+
     def progress(self, event: dict) -> None:
         kind = event.get("event")
         with self._lock:
             if kind == "step":
-                if event["round"] != self._extra["round"]:
+                round_no = self._round(event["round"])
+                if round_no != self._extra["round"]:
                     self._extra.update(motors=[], passed=0, scored=0, fraction=0.0)
-                self._extra.update(step=event["step"], round=event["round"])
+                self._extra.update(step=event["step"], round=round_no)
                 if "stage" in event:
                     self._extra.update(
                         {k: event[k] for k in ("stage", "stage_index", "stage_count")}
@@ -283,11 +287,12 @@ class _Presenter:
                 if "excluded" in event:
                     self._extra["excluded"] = list(event["excluded"])
                 if kind == "score":
+                    round_no = self._round(event["round"])
                     self._extra["history"] = self._extra["history"] + [
-                        {k: event[k] for k in ("round", "passed", "scored", "fraction")}
+                        {"round": round_no, **{k: event[k] for k in ("passed", "scored", "fraction")}}
                     ]
                     self._ctx.log(
-                        f"round {event['round']}: {event['passed']}/{event['scored']} "
+                        f"round {round_no}: {event['passed']}/{event['scored']} "
                         + ("joints within their slack tolerance" if self._slack
                            else "motors reached their travel")
                     )
@@ -309,6 +314,7 @@ class _Presenter:
                 self._ctx.log(f"motor {event['motor']} cleared and holding again")
                 self._publish()
             elif kind == "resumed":
+                self._rounds_before = int(event["rounds"])
                 if "best" in event:
                     best = event["best"]
                     self._extra["resumed"] = {
@@ -359,7 +365,7 @@ class _Presenter:
         action = prompt["action"]
         with self._lock:
             self._publish()
-        self._ctx.set_phase(action, detail=f"round {prompt.get('round', 1)}")
+        self._ctx.set_phase(action, detail=f"round {self._round(prompt.get('round', 1))}")
         if self._on_prompt is not None:
             self._on_prompt()
         opening, self._opening = self._opening, False
@@ -548,10 +554,7 @@ class _LiveCurrents(Operation):
             presenter.log(f"{key.replace('_', ' ')} set to {current:.0f}{_unit(key)}")
             hand = self._hand
             if hand is not None and presenter.step == LIVE_STEP.get(key):
-                if key == "tension_current":
-                    hand_ops.set_max_current(hand, current)
-                else:
-                    hand_ops.set_joint_currents(hand, self.hold_for)
+                hand_ops.set_joint_currents(hand, self.hold_for)
         return True
 
 
@@ -594,7 +597,6 @@ class GuidedTensionOperation(_LiveCurrents):
                 progress_callback=presenter.progress,
                 should_stop=ctx.stop_event.is_set,
                 hold_current=self.hold_for,
-                tension_current=lambda: self.currents["tension_current"],
                 tension_offset_deg=lambda: self.currents["tension_offset_deg"],
                 scoring=self.scoring,
                 pass_fraction=self.pass_fraction,
@@ -931,7 +933,6 @@ class SimulatedGuidedTensionOperation(_LiveCurrents):
                             "action": "tension",
                             "options": ["Done", "Pull more"] + goto(),
                             "round": round_no,
-                            "tension_current": self.currents["tension_current"],
                         }
                     )
                     if answer != "Pull more":

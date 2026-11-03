@@ -6,6 +6,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from orca_ui.api import schemas
+from orca_ui import changelog as changelog_doc
 from orca_ui.hand.service import HandService, ServiceError
 from orca_ui.hand.taxel_geometry import get_taxel_geometry
 
@@ -116,6 +117,16 @@ def build_router(service: HandService) -> APIRouter:
         except KeyError as e:
             raise HTTPException(status_code=404, detail=str(e.args[0]))
         return {"active": body.name}
+
+    @router.get("/changelog")
+    def changelog():
+        return changelog_doc.changelog()
+
+    @router.post("/changelog/seen")
+    def changelog_seen(body: schemas.ChangelogSeenRequest):
+        latest = changelog_doc.latest_version()
+        changelog_doc.set_seen(latest if body.dismissed else None)
+        return changelog_doc.changelog()
 
     @router.get("/ports")
     def ports():
@@ -340,6 +351,20 @@ def build_router(service: HandService) -> APIRouter:
     @router.post("/control/max_current")
     def control_max_current(body: schemas.MaxCurrentRequest):
         guard(service.set_max_current, body.ma)
+        return {"ok": True, "control": service.control_state()}
+
+    @router.post("/control/fault_budgets")
+    def control_fault_budgets(body: schemas.FaultBudgetsRequest):
+        changes = {key: value for key, value in (
+            ("report_after_reboots", body.report_after_reboots),
+            ("giveup_after_reboots", body.giveup_after_reboots),
+            ("thermal_giveup_after_reboots", body.thermal_giveup_after_reboots),
+            ("thermal_clear_margin_c", body.thermal_clear_margin_c),
+            ("thermal_hold_all", body.thermal_hold_all),
+        ) if value is not None}
+        if body.thermal_unlimited:
+            changes["thermal_giveup_after_reboots"] = None
+        guard(service.set_fault_budgets, **changes)
         return {"ok": True, "control": service.control_state()}
 
     @router.post("/control/pose_source")

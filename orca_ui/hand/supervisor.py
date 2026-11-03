@@ -172,6 +172,10 @@ class HandSupervisor(threading.Thread):
         # The hardware version the board last reported; None with no board.
         self._board_hardware_version: int | None = None
         # What config.yaml pins (None = auto); a fresh load is still the pin.
+        # Set while maintenance hands the bus back and the session is being
+        # rebuilt, so a front-end can say so instead of showing the hand as
+        # lost.
+        self._leaving_maintenance = False
         self._pinned_hardware_version: int | None = self.config.hardware_version
 
         self._lock = threading.Lock()
@@ -294,6 +298,7 @@ class HandSupervisor(threading.Thread):
                 rescanning=self._upgrade_probes_left > 0,
                 bare=self._settings.bare,
                 state=self._state,
+                leaving_maintenance=self._leaving_maintenance,
                 capabilities=caps,
                 torque_enabled=self._torque_enabled,
                 message=self._message,
@@ -470,10 +475,13 @@ class HandSupervisor(threading.Thread):
         self._publish()
         self._wake.set()
 
-    def enter_maintenance(self, kind: str, timeout: float = 15.0) -> MaintenanceLease:
+    def enter_maintenance(self, kind: str, timeout: float = 15.0,
+                          probe: bool = True) -> MaintenanceLease:
         """Hand the hardware to an operation: the run loop tears the session
         down, suspends health checks and reconnects, and acks. Blocks the
-        calling (operation) thread until the hardware is actually free."""
+        calling (operation) thread until the hardware is actually free.
+        ``probe=False`` skips the port probe that follows, for an operation
+        that only needs the motor port and resolves it itself."""
         with self._lock:
             if self._released:
                 raise RuntimeError(
@@ -496,7 +504,7 @@ class HandSupervisor(threading.Thread):
         presence = None
         if self._settings.bare:
             presence = self._bare_presence()
-        elif not self._settings.mock:
+        elif not self._settings.mock and probe:
             # Ports are closed now — a probe finally sees the real picture.
             try:
                 presence = self._probe_hardware()
@@ -535,8 +543,11 @@ class HandSupervisor(threading.Thread):
         if released:
             self._set_state(HandState.DISCONNECTED, RELEASED_MESSAGE, ports={})
         else:
-            self._set_state(HandState.DETECTING,
-                            "maintenance finished — reconnecting")
+            # Flagged so a front-end can tell this reconnect apart from a
+            # hand that dropped: it is the expected end of an operation.
+            with self._lock:
+                self._leaving_maintenance = True
+            self._set_state(HandState.DETECTING, "leaving maintenance")
         self._wake.set()
 
     def _config_path_for(self, model_name: str,
@@ -757,6 +768,8 @@ class HandSupervisor(threading.Thread):
                 "for it; use the rescan control to re-attempt the connection",
                 ", ".join(self._missing_devices(session.caps)))
 
+        with self._lock:
+            self._leaving_maintenance = False
         state = HandState.DEGRADED if session.caps.degraded else HandState.CONNECTED
         self._set_state(state, f"[{session.tier}] {session.message}", session.ports)
 

@@ -9,6 +9,7 @@ import { api } from '../../api/rest'
 import type { OperationSnapshot } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
 import { operationLabel, useOperationStore } from '../../state/operationStore'
+import { PowerFaultBar } from './PowerFaultBar'
 import { TeleopBar } from './TeleopBar'
 
 const DONE_LINGER_MS = 3000
@@ -41,6 +42,9 @@ export function TransportBar() {
   // but a teleop preview under a running operation is legitimate.
   return (
     <>
+      {/* First, and red: a supply or wiring fault means power the hand down,
+          which outranks anything else on this strip. */}
+      <PowerFaultBar />
       <OperationBar />
       <TeleopBar />
     </>

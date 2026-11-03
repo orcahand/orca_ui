@@ -10,7 +10,7 @@ import type { OperationSnapshot } from '../api/types'
 export const V20 = 200
 export const V21 = 210
 export const V211 = 211
-// How far the finger motors slowly turn counterclockwise while you ratchet, and what one
+// How far the finger motors slowly turn counterclockwise before they hold, and what one
 // "Pull more" adds. Mirror the backend's tension.py.
 export const DEFAULT_OFFSET_DEG = 15
 export const EXTRA_DEG = 15

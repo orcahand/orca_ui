@@ -26,6 +26,11 @@ export interface Capabilities {
 
 export interface StatusSnapshot {
   state: HandState
+  // True from the moment maintenance hands the bus back until a session is
+  // live again. The reconnect that follows is routine, so the views stay up
+  // rather than dropping to the boot screen — a normal exit from calibration
+  // should not look like an unstable hand.
+  leaving_maintenance?: boolean
   capabilities: Capabilities | null
   torque_enabled: boolean
   message: string
@@ -157,6 +162,9 @@ export interface JointGains {
 export interface ControlState {
   torque_enabled: boolean
   max_current: number
+  // Fault-recovery thresholds, per motor. The thermal one is null when
+  // unlimited, which is the default.
+  fault_budgets?: FaultBudgets
   // The one gain set every loop joint shares, or null when they differ.
   gains: JointGains | null
   // Live gains per loop-controlled joint, read back from the controller.
@@ -267,13 +275,6 @@ export interface HandInfo {
   tension_progress_slack?: TensionProgress | null
   // Present once this hand was calibrated after its last completed tensioning.
   slack_estimate?: SlackEstimate | null
-  // The connected hand's calibration current and its motors' ceiling (mA).
-  calibration_current?: {
-    default: number
-    // v2.1 hands whose model sets a current per joint group; null otherwise.
-    groups: Record<'abd' | 'mcp' | 'pip', number> | null
-    max: number | null
-  } | null
   // Fingertip model per slot and slots holding another finger's model; absent
   // when the connector-board firmware doesn't report fingertip identities.
   fingertips?: FingertipIdentities
@@ -283,7 +284,6 @@ export interface HandInfo {
     hold_ap: number
     hold_mcp: number
     hold_pip: number
-    tension_current: number
   }
   // The named travel baseline guided tensioning scores against; null = the
   // shared v2.1 block.
@@ -550,6 +550,9 @@ export interface TaxelGeometry {
   [finger: string]: {
     frame: string
     positions: [number, number, number][] // mm, fingertip-local
+    // Per taxel, row-major 3x3 rotation from the taxel's own force axes
+    // (z = outward surface normal) into the sensor frame.
+    orientations?: number[][][]
     source: string
   }
 }
@@ -789,7 +792,11 @@ export type HwErrorKind = 'thermal' | 'power' | 'load' | 'encoder' | 'unknown'
 export interface HwErrorInfo {
   flags: string[]
   kind: HwErrorKind
-  disabled: boolean // always true today; the motor will not move until reboot
+  // Whether this motor de-energized itself, read from its own stop mask.
+  // Not a property of the fault: the families ship almost disjoint masks, so
+  // the same condition stops one and not the other. null when the mask could
+  // not be read.
+  disabled: boolean | null
   needs_cooling: boolean // separate from kind: a motor can latch both
   temperature_c: number | null
   headline: string
@@ -810,6 +817,25 @@ export interface MotorFaultEntry {
   // Did this motor answer the last error sweep? null before the first one:
   // "not asked yet" is not "not answering".
   answering?: boolean | null
+  // What orca_core's fault policy has done about this motor. null before the
+  // first poll, or on a core that predates fault recovery.
+  recovery?: MotorRecovery | null
+}
+
+export interface MotorRecovery {
+  // Reboots after a fault that stopped the motor under load.
+  load_reboots: number
+  // Latches cleared after the motor cooled. Budgeted separately, and
+  // unlimited by default.
+  thermal_recoveries: number
+  // Waiting for this motor to cool before clearing its thermal latch.
+  cooling: boolean
+  // Left latched: it kept overloading, so recovering it again would only
+  // hide the mechanical cause.
+  given_up: boolean
+  thermal_given_up: boolean
+  // Every fault seen, including ones that did not stop the motor.
+  faults: number
 }
 
 // The servo's own position-PID and feedforward gains (X-series registers
@@ -1153,7 +1179,6 @@ export interface GuidedTensionExtra {
   hold_pip?: number
   // Joints the hand's config holds at a fixed current (mA) instead of their group's.
   hold_fixed?: Record<string, number>
-  tension_current?: number
   tension_offset_deg?: number
   pulled_deg?: number
   // Which rule scores this run, and its thresholds per joint group: a pass
@@ -1181,4 +1206,36 @@ export interface GuidedTensionExtra {
   // Tendons to ratchet when the run was opened from the slack test, with the
   // clicks each needs (pct is unused there).
   ratchet?: Record<string, { pct: number | null; clicks: number | null }>
+}
+
+// Per-motor shutdown threshold read from the motors (Temperature Limit).
+// Distinct from the family's rated operating temperature: the rating is a
+// datasheet figure, this is what actually turns the motor off.
+export type ShutdownTemps = Record<string, number>
+
+export interface FaultBudgets {
+  // Reboots of one motor before its repetition is called out prominently.
+  report_after_reboots: number
+  // Load reboots before the motor is left latched instead of recovered.
+  giveup_after_reboots: number
+  // Thermal recoveries before giving up; null means never.
+  thermal_giveup_after_reboots: number | null
+  // How far below its own limit a motor must cool before it drives again.
+  // The hardware's own hysteresis is about a degree, not enough to cool.
+  thermal_clear_margin_c: number
+  // One hot motor takes the whole hand off torque rather than only itself.
+  // On by default: the motors heat each other, so a motor between driving
+  // neighbours never gets back under the margin on its own.
+  thermal_hold_all: boolean
+}
+
+export interface ChangelogDoc {
+  ui_version: string
+  latest_version: string | null
+  /** The orca_core release the latest entry pairs with. */
+  recommended_core: string | null
+  versions: string[]
+  /** True while an indicator file beside the backend dismisses this release. */
+  dismissed: boolean
+  markdown: string
 }

@@ -32,6 +32,8 @@ export interface SceneSettings {
   ghost: boolean
   forceResultant: boolean
   forceTaxels: boolean
+  // Each taxel's outward surface normal, to check the per-taxel axes.
+  taxelNormals: boolean
   jointGlow: boolean
   // Accent-colored ghost posed from the live teleop retargeter output.
   teleopGhost: boolean
@@ -66,6 +68,7 @@ const SCENE_DEFAULTS: SceneSettings = {
   ghost: false,
   forceResultant: true,
   forceTaxels: true,
+  taxelNormals: false,
   jointGlow: false,
   teleopGhost: true,
 }

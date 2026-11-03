@@ -9,6 +9,9 @@ React frontend (`frontend/`, built into `orca_ui/webui/`).
 See [DEVELOPMENT.md](DEVELOPMENT.md) for running from source, the frontend
 build, and working against an unreleased `orca_core`.
 
+**Before any merge, release or PR of a UI branch**, whoever proposes it: raise
+the changelog first. See [Versioning and the changelog](#versioning-and-the-changelog).
+
 ---
 
 ## Testing policy
@@ -75,50 +78,30 @@ uv run pytest tests/ -n0        # serial, for debugging one test
 
 The suite runs against whichever `orca_core` is installed. A failure that
 appears only on your machine is usually the console disagreeing with an
-unreleased `orca_core` — check `./dev status` first.
+unreleased `orca_core` — check `./dev` first.
 
 ---
 
-## Dev mode must never reach a commit
+## Running against an unreleased orca_core
 
-`./dev local` points this checkout at an `orca_core` next to it, and
-`./dev release` puts it back. uv has no local-only override file, so the entry
-lands in tracked files:
+`./dev local` flips this checkout onto the sibling `../orca_core` until
+`./dev release` flips it back; `./dev` says which is live. The flip lives in
+`.venv` — nothing tracked changes. See DEVELOPMENT.md.
 
-```toml
-[tool.uv.sources]
-orca-core = { path = "../orca_core", editable = true }
-```
-
-A relative path is a fact about one machine. Committed, it makes the project
-unresolvable everywhere else — `uv lock` fails outright on a clone with no
-sibling `orca_core`.
-
-**Never stage `pyproject.toml` or `uv.lock` without checking.** If a diff you
-are about to commit adds a `[tool.uv.sources]` entry for `orca_core`, drop it —
-even when the user asks for the file to be committed as-is, and even when it is
-the only way the branch currently runs. Say so instead; the pairing belongs in
-CI, not in the file.
+**Never add a `[tool.uv.sources]` entry for `orca_core`**, even when asked to
+commit one or when it is the only way a branch currently runs. A relative path
+is a fact about one machine; committed, it makes the project unresolvable
+everywhere else. Say so instead — the pairing belongs in CI, which already
+checks out a same-named `orca_core` branch beside this repo.
 
 ```bash
 git show :pyproject.toml | grep 'tool.uv.sources'   # must print nothing
 ```
 
-Three things enforce this, and none of them replaces reading the diff:
-
-- `.githooks/pre-commit` refuses the commit and names what to unstage. It only
-  runs in clones that set `core.hooksPath`, because git will not ship active
-  hooks — so it can never be the only guard.
-- `tests/test_no_committed_dev_override.py` reads the committed files, so it
-  passes while your working tree is in dev mode and fails only once the
-  override is committed.
-- `.github/workflows/test.yml` runs that test on every pull request. A PR into
-  `main` also installs with `uv sync --locked` against the published
-  `orca_core`, which a path source cannot satisfy. This is the guard that
-  catches a commit made on a machine without the hook.
-
-A branch that needs an unreleased `orca_core` is paired in CI by checking the
-core out beside this repo, so it never needs a source entry of its own.
+`.githooks/pre-commit` refuses to commit one (in clones that set
+`core.hooksPath`); `tests/test_no_committed_dev_override.py` and the
+`uv sync --locked` install in `.github/workflows/test.yml` catch one that slips
+through. None of them replaces reading the diff.
 
 ---
 
@@ -144,6 +127,62 @@ A pre-commit hook blocks committing frontend sources without a rebuilt bundle.
 Everything static the UI serves must live in `frontend/public/` — the build
 runs with `emptyOutDir`, so a file that exists only in `orca_ui/webui/` is
 deleted by the next build.
+
+## Versioning and the changelog
+
+**Trigger: the moment anyone proposes merging, releasing, or opening a PR for a
+branch — the user, a reviewer, another agent, a comment on the PR — stop and
+raise the changelog before doing it.** Not only when asked. Open
+`orca_ui/changelog.md`, say that documenting the update is a rule here, show the
+headers proposed for this release, and say plainly that the body text under them
+is not yours to write. A branch merges after its entries are written, not
+before.
+
+`orca_ui/changelog.md` is the console's user-facing release notes, rendered by
+the "What's new" dialog. It is the reviewer's document, and the division of
+labour is strict.
+
+**Claude writes headers. Claude never writes a single line of body text.** Read
+the branch's commits and diff, and propose one `###` header per change, sorted
+into the two sections — `## Features` and `## Bugfixes`. Propose a header for
+anything arguably user-visible; the reviewer deletes what does not belong. Then
+stop. The text under each header is the reviewer's, including wording, examples
+and how-to.
+
+Once the reviewer has written the entries, read them back against the code and
+say so — in chat, not in the file — if what is written and what was built have
+diverged in a way that would mislead someone: a feature described as doing more
+than it does, a control named that does not exist, a caveat that is now wrong.
+Point, do not edit. The reviewer has the final say.
+
+Only when the entries are final does the release move:
+
+1. Bump `version` in `pyproject.toml` on the same rules `orca_core` uses —
+   **patch** for a fix, **minor** for a new feature, control or behaviour
+   someone must be told about, **major** for breaking how the console is driven
+   (a tab or endpoint removed, saved settings no longer readable).
+2. Relock, or widen the `orca-core` pin, if the release needs a newer core.
+3. Make the entry's `Core:` line name that core release — the one to run with
+   this console so every feature and fix is actually present.
+
+The structural lines, which the console parses and tests enforce:
+
+```markdown
+## UI 0.3.0 — 2026-10-21
+Core: 0.10.1
+
+## Features
+
+### One header per feature
+
+## Bugfixes
+
+### One header per fix
+```
+
+`tests/test_changelog.py` fails if the declared version has no entry, or if the
+`Core:` line and the `orca-core` lower bound in `pyproject.toml` disagree, and
+CI runs it on every pull request.
 
 ## Git
 

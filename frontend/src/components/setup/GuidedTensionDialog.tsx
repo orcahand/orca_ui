@@ -132,6 +132,18 @@ export function GuidedTensionDialog({
     : null
   const [sentFor, setSentFor] = useState<string | null>(null)
   const [confirmRestart, setConfirmRestart] = useState(false)
+  // Which round last had a range check: a run resumed with every joint already
+  // passed opens straight on the score, where Finish alone would be a dead end.
+  const [checkedRound, setCheckedRound] = useState<number | null>(null)
+  useEffect(() => {
+    if (extra?.step === 'range') setCheckedRound(extra.round)
+  }, [extra?.step, extra?.round])
+  const recheck =
+    extra?.step === 'score' && checkedRound !== extra.round
+      ? (extra.stages ?? [])
+          .filter((st) => awaiting?.options.includes(`${GOTO}${st.key}`))
+          .map((st) => ({ title: st.title, option: `${GOTO}${st.key}` }))
+      : []
 
   // Stop this run, then start a fresh one with the same settings and no saved
   // progress: resume=false makes the backend drop the scores it kept.
@@ -351,6 +363,8 @@ export function GuidedTensionDialog({
               step={step}
               preview={preview}
               thresholds={thresholds}
+              recheck={recheck}
+              onRecheck={sent ? undefined : send}
             />
             {awaiting && (
               <div className="gt-actions">
@@ -389,12 +403,16 @@ function StepContent({
   step,
   preview,
   thresholds,
+  recheck,
+  onRecheck,
 }: {
   operation: OperationSnapshot
   extra: GuidedTensionExtra | null
   step: TensionStep | null
   preview: ReactNode
   thresholds: Thresholds
+  recheck: { title: string; option: string }[]
+  onRecheck?: (option: string) => void
 }) {
   if (operation.state === 'error') {
     return (
@@ -512,6 +530,26 @@ function StepContent({
               )}
             </div>
           </div>
+          {recheck.length > 0 && (
+            <div className="flow-info warn">
+              <div>
+                Nothing was checked this round: every joint passed in an earlier run. Check a
+                finger again, or Finish to keep those scores.
+              </div>
+              <div className="gt-actions" style={{ marginTop: 6 }}>
+                {recheck.map((r) => (
+                  <button
+                    key={r.option}
+                    className="btn btn-secondary"
+                    disabled={!onRecheck}
+                    onClick={onRecheck ? () => onRecheck(r.option) : undefined}
+                  >
+                    Check {r.title.toLowerCase()} again
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <MotorGrid motors={motors} thresholds={thresholds} canRetest />
           <ExcludedNote excluded={extra.excluded} />
         </div>
@@ -540,10 +578,11 @@ function StepContent({
           <div className="gt-pane">
             <h3 className="gt-heading">Now use the ratchet tool</h3>
             <p className="setup-copy">
-              Hulls off. The finger motors have slowly turned {extra.pulled_deg ?? extra.tension_offset_deg}°
-              counterclockwise and are holding with {extra.tension_current} mA of current, the rotation should have
-              placed some tension on all tendons attached to the bottom spools. If any bottom spool tendons still feel
-              loose, press "{PULL_MORE}" ({EXTRA_DEG}° more).
+              Hulls off. The finger motors have slowly turned{' '}
+              {extra.pulled_deg ?? extra.tension_offset_deg}° counterclockwise and are holding
+              where they came to rest, at each motor's full available current, so the rotation
+              should have placed some tension on all tendons attached to the bottom spools. If any
+              bottom spool tendons still feel loose, press "{PULL_MORE}" ({EXTRA_DEG}° more).
             </p>
             <p className="setup-copy">
               Turn the top spool of each marked motor by the clicks shown next to it. The counts are rounded down on
@@ -777,7 +816,6 @@ const CURRENT_FIELDS = [
   { key: 'hold_ap', label: 'Hold · APs', step: 'range', min: 20, max: 500, unit: 'mA', inc: 10 },
   { key: 'hold_mcp', label: 'Hold · MCPs', step: 'range', min: 20, max: 500, unit: 'mA', inc: 10 },
   { key: 'hold_pip', label: 'Hold · PIPs', step: 'range', min: 20, max: 500, unit: 'mA', inc: 10 },
-  { key: 'tension_current', label: 'Tensioning', step: 'tension', min: 50, max: 1000, unit: 'mA', inc: 10 },
   { key: 'tension_offset_deg', label: 'Turn CCW', step: null, min: 0, max: 45, unit: '°', inc: 5 },
 ] as const
 

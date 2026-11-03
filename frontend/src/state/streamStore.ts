@@ -31,8 +31,13 @@ export interface LatestFrames {
     // there is no joint estimate to derive them from.
     positions: Record<string, number>
     // The motor family's rated max operating temperature (°C), from the
-    // backend; null until the first telemetry payload carries it.
+    // backend; null until the first telemetry payload carries it. A datasheet
+    // figure: a motor runs past it without stopping.
     maxTempC: number | null
+    // What actually turns a motor off, per motor, read from its own
+    // Temperature Limit register. Hands do not all ship the same value, and
+    // it sits above the rated figure.
+    shutdownTemps: Record<string, number>
     // Per-motor fault table (bus errors + command adherence), 1 Hz.
     faults: MotorsFaults | null
   }
@@ -56,6 +61,7 @@ export const latest: LatestFrames = {
   },
   tactile: { forces: null, taxels: null, tForces: 0, tTaxels: 0 },
   motors: { temps: {}, currents: {}, positions: {}, maxTempC: null,
+            shutdownTemps: {},
             faults: null },
   teleop: { preview: null },
   stats: null,
