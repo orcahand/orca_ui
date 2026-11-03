@@ -40,6 +40,14 @@ logger = logging.getLogger(__name__)
 # transaction where the motor family can read the register from every motor at
 # once, one read per motor otherwise.
 HW_ERROR_SWEEP_S = 10.0
+# While a motor is being held off to cool, the hold has to be re-asserted
+# faster than the hardware brings it back.
+FAULT_HOLD_POLL_S = 1.0
+# Consecutive failed or stale motor reads before the bus going quiet is
+# reported. Skipping a stale read is normal and must not shout; a bus that
+# has stopped answering is not, and left unreported it reads as a hand that
+# simply stopped moving for no recorded reason.
+STALE_READ_WARN_AFTER = 5
 
 # Bare motor mode reads position and current this often. There is no control
 # loop to starve and no tendon whose timing matters — the point of a bench is
@@ -53,11 +61,15 @@ BENCH_TELEMETRY_HZ = 20.0
 # that a motor heating under load is visible while it happens.
 BENCH_TEMP_HZ = 1.0
 
-# Minimum gap between motor-bus telemetry reads on a hand with no joint loop.
-# There is no loop to contend with, but the bus is half-duplex: every read
-# blocks commands for its whole round trip, and temperature moves over minutes,
-# so reading faster than this buys nothing.
-MOTOR_TELEMETRY_MIN_INTERVAL_S = 10.0
+# Motor-bus telemetry on a hand with no joint loop. Current is what an operator
+# watches while tensioning, so it reads at the same rate bare motor mode uses;
+# there is no control loop to starve, and one transaction a tick for a whole
+# chain is a fraction of what the joint loop does at 200 Hz. Temperature rides
+# the same tick far slower: it moves over minutes and costs a round trip of its
+# own.
+MOTOR_TELEMETRY_HZ = 20.0
+MOTOR_TELEMETRY_MIN_INTERVAL_S = 1.0 / MOTOR_TELEMETRY_HZ
+MOTOR_TEMP_HZ = 1.0
 
 # How long motor telemetry may go unread while the hand keeps moving before a
 # read is forced through anyway.
@@ -256,6 +268,7 @@ class TelemetryService:
         self._last_motor_telemetry = float("-inf")
         self._last_bench_read = float("-inf")
         self._last_bench_temp = float("-inf")
+        self._last_motor_temp = float("-inf")
         self._motor_health: dict[str, dict] = {"temps": {}, "currents": {}}
         self._sensor_health = SensorHealthMonitor()
         # Joints whose encoder is currently distrusted (joint -> "verdict:
@@ -278,6 +291,21 @@ class TelemetryService:
         # Which motors answered the last error sweep. None until the first
         # one: "we have not asked" is not the same as "nothing answered".
         self._motor_answering: "dict[int, bool] | None" = None
+        # Core's per-motor fault records, refreshed each fault poll.
+        self._fault_records: dict = {}
+        self._last_fault_poll = 0.0
+        # Per-motor shutdown threshold from the motors themselves; None until
+        # read, {} when the family cannot report it.
+        self._shutdown_temps: "dict[int, float] | None" = None
+        # Per-motor stop mask: which latched bits de-energize that motor.
+        # None until read, {} when the family cannot report it.
+        self._stop_masks: "dict[int, int] | None" = None
+        # Consecutive failed or stale motor reads, for reporting a bus that
+        # has gone quiet rather than silently withholding telemetry.
+        self._stale_reads = 0
+        # Consecutive fault-poll exceptions. Reported, not swallowed: a crash
+        # here means nothing is recovering motors.
+        self._fault_poll_failures = 0
         self._last_hw_error_sweep = 0.0
         self._was_driven = False
 
@@ -347,9 +375,15 @@ class TelemetryService:
         try:
             positions = hand.get_motor_pos(as_dict=True)
             currents = hand.get_motor_current(as_dict=True)
-        except Exception:
+            if not getattr(hand, "last_read_ok", True):
+                logger.debug("bench telemetry read stale; skipping this tick")
+                self._note_read_failure("bench read returned a stale cache")
+                return
+        except Exception as error:
             logger.debug("bench telemetry read failed", exc_info=True)
+            self._note_read_failure(f"bench read raised {type(error).__name__}")
             return
+        self._note_read_ok()
         if now - self._last_bench_temp >= 1.0 / BENCH_TEMP_HZ:
             try:
                 self._motor_health["temps"] = {
@@ -399,10 +433,15 @@ class TelemetryService:
 
         if session.caps.motors:
             self._sweep_hardware_errors(session)
+            self._drive_fault_policy(session)
             if not session.caps.feedback_loop:
                 if self._motor_telemetry_is_due():
-                    self._last_motor_telemetry = time.monotonic()
-                    self._publish_motor_health(session)
+                    now = time.monotonic()
+                    self._last_motor_telemetry = now
+                    temps_due = now - self._last_motor_temp >= 1.0 / MOTOR_TEMP_HZ
+                    if temps_due:
+                        self._last_motor_temp = now
+                    self._publish_motor_health(session, temps=temps_due)
             elif not self._hand_is_driven():
                 self._bus_read_tick(session)
             elif self._telemetry_is_stale():
@@ -537,11 +576,26 @@ class TelemetryService:
         """temps/currents plus the family's rated max operating temperature
         (same source as scripts/stress_test.py's monitor)."""
         payload = dict(self._motor_health)
-        max_temp = getattr(getattr(session, "hand", None), "motor_client",
-                           None)
-        max_temp = getattr(max_temp, "max_operating_temp_c", None)
+        client = getattr(getattr(session, "hand", None), "motor_client", None)
+        max_temp = getattr(client, "max_operating_temp_c", None)
         if max_temp is not None:
             payload["max_temp_c"] = float(max_temp)
+        # The rated figure above is a datasheet number; what actually turns a
+        # motor off is its own Temperature Limit register, which hands do not
+        # all ship alike. EEPROM, so read once per session.
+        # The bench path builds this service without __init__, so read
+        # through getattr rather than assuming the attribute exists.
+        if getattr(self, "_shutdown_temps", None) is None and client is not None:
+            read = getattr(client, "read_temperature_limits", None)
+            try:
+                self._shutdown_temps = {} if read is None else {
+                    int(mid): value for mid, value in (read() or {}).items()
+                    if value is not None}
+            except Exception:
+                logger.debug("temperature limits unreadable", exc_info=True)
+                self._shutdown_temps = {}
+        if getattr(self, "_shutdown_temps", None):
+            payload["shutdown_temps"] = dict(self._shutdown_temps)
         return payload
 
     def _publish_motor_state(self, session) -> None:
@@ -658,10 +712,22 @@ class TelemetryService:
             if not flags:
                 self._hw_errors_warned.discard(int(mid))
                 continue
+            # Whether this motor de-energized itself comes from its own stop
+            # mask. Asserting it instead was wrong for every condition a
+            # given hand does not unload on, which is three of the six.
+            mask = self._sweep_stop_masks(client).get(int(mid))
+            stopped = None
+            if mask is not None:
+                try:
+                    halted, _ = client.split_faults(raw[int(mid)], mask)
+                    stopped = bool(halted)
+                except Exception:
+                    stopped = None
             info = classify_hw_error(
                 flags, motor=mid, joint=motor_to_joint.get(mid),
                 temperature_c=(self._motor_health.get("temps") or {}).get(int(mid)),
-                can_reboot=hasattr(client, "reboot_motor"))
+                can_reboot=hasattr(client, "reboot_motor"),
+                stopped=stopped)
             found[int(mid)] = flags
             classified[int(mid)] = info
             if int(mid) in self._hw_errors_warned:
@@ -681,6 +747,114 @@ class TelemetryService:
         self._hw_errors = found
         self._hw_error_info = classified
 
+    def _note_read_failure(self, reason: str) -> None:
+        """Count a failed or stale motor read, and report a persistent one.
+
+        A single stale read is ordinary and silent. A run of them means the
+        bus has stopped answering, which otherwise leaves no trace at all:
+        the reads are skipped rather than published, so an overnight loss
+        looks like a hand that stopped moving for no reason.
+        """
+        self._stale_reads = getattr(self, "_stale_reads", 0) + 1
+        if self._stale_reads != STALE_READ_WARN_AFTER:
+            return
+        message = (f"motor reads have failed {self._stale_reads} times in a "
+                   f"row ({reason}); the bus has stopped answering. Telemetry "
+                   "is being withheld rather than shown stale.")
+        logger.warning(message)
+        print(f"\033[93mWarning: {message}\033[0m")
+
+    def _note_read_ok(self) -> None:
+        """Clear the stale-read run, reporting a recovery that was announced."""
+        if getattr(self, "_stale_reads", 0) >= STALE_READ_WARN_AFTER:
+            logger.warning("motor reads are answering again")
+        self._stale_reads = 0
+
+    def _drive_fault_policy(self, session) -> None:
+        """Let orca_core act on what the motors are reporting.
+
+        The console is a subscriber here, not the decision-maker: core owns
+        what a fault means and performs the recovery, and this only chooses
+        the moment and reports the outcome. Skipped while the hand is being
+        driven - a reboot takes the bus for the best part of a second, and
+        mid-motion is the worst time to lose it.
+        """
+        hand = getattr(session, "hand", None)
+        poll = getattr(hand, "poll_faults", None)
+        if poll is None:
+            return
+        # Deferred while the hand is driven, but not indefinitely: a motor
+        # overheats under exactly the sustained load that keeps the hand
+        # driven, so a long replay or teleop session must not be able to hide
+        # it. Same trade the health read already makes. A motor that faulted
+        # has stopped itself, so recovering it mid-run costs bus time, not
+        # motion.
+        if self._hand_is_driven() and not self._telemetry_is_stale():
+            return
+        now = time.monotonic()
+        # A cooling motor re-energizes itself about a second after dropping
+        # below its limit, so re-asserting the hold every sweep interval
+        # leaves it running most of the time and it never cools. Poll fast
+        # while anything is being held off, and pay the bus for it.
+        cooling = any(getattr(record, "cooling", False)
+                      for record in (getattr(self, "_fault_records", None)
+                                     or {}).values())
+        interval = FAULT_HOLD_POLL_S if cooling else HW_ERROR_SWEEP_S
+        if now - self._last_fault_poll < interval:
+            return
+        self._last_fault_poll = now
+        config = None
+        get_config = getattr(self._service, "fault_policy_config", None)
+        if get_config is not None:
+            config = get_config()
+        try:
+            actions = poll(config) if config is not None else poll()
+        except Exception:
+            # Not debug: this is the code that recovers motors, and a crash
+            # in it means nothing is being recovered. Swallowing it silently
+            # makes a hand that stops look like a mystery rather than a bug.
+            self._fault_poll_failures = getattr(
+                self, "_fault_poll_failures", 0) + 1
+            if self._fault_poll_failures in (1, 10, 100):
+                logger.warning(
+                    "fault handling raised (%d time(s)); motors are not being "
+                    "recovered while this persists",
+                    self._fault_poll_failures, exc_info=True)
+            return
+        self._fault_poll_failures = 0
+        for action in actions:
+            # A reboot cleared that motor's latch, so drop the cached cause
+            # rather than leaving it on the panel until the next sweep - which
+            # is deferred while the hand is driven, so the fault would sit
+            # there beside a motor that is working again. A fault still
+            # present comes straight back on the next sweep.
+            if action.kind == "reboot":
+                self.forget_hw_error(action.motor_id)
+            if action.prominent:
+                message = f"motor {action.motor_id} {action.reason}"
+                logger.warning(message)
+                # orca_ui installs no printing handler, and a motor being
+                # recovered or abandoned has to reach the operator.
+                print(f"\033[93mWarning: {message}\033[0m")
+        self._fault_records = getattr(hand, "fault_records", {}) or {}
+
+    def _sweep_stop_masks(self, client) -> dict:
+        """Each motor's stop mask, read once per session.
+
+        EEPROM on both families, so it does not change under us, and it is
+        the only honest answer to "did this fault stop the motor".
+        """
+        if getattr(self, "_stop_masks", None) is None:
+            read = getattr(client, "read_stop_mask", None)
+            try:
+                self._stop_masks = {} if read is None else {
+                    int(mid): value for mid, value in (read() or {}).items()}
+            except Exception:
+                logger.warning("stop masks unreadable; whether a fault stops "
+                               "a motor cannot be reported", exc_info=True)
+                self._stop_masks = {}
+        return self._stop_masks
+
     @staticmethod
     def _drain_alerts(client) -> dict:
         """Motors whose status packets carried the Alert bit since last asked.
@@ -694,7 +868,11 @@ class TelemetryService:
         try:
             return take() or {}
         except Exception:
-            logger.debug("hardware-alert drain failed", exc_info=True)
+            # Not debug: this is how a fault is noticed between sweeps. If it
+            # fails, faults go unnoticed while the hand is being driven and
+            # nothing says so.
+            logger.warning("hardware-alert drain failed; faults raised between "
+                           "sweeps will be missed", exc_info=True)
             return {}
 
     @staticmethod
@@ -709,7 +887,8 @@ class TelemetryService:
             if read_one is not None:
                 return {int(mid): read_one(mid) for mid in hand.config.motor_ids}
         except Exception:
-            logger.debug("hardware-error sweep failed", exc_info=True)
+            logger.warning("hardware-error sweep failed; no motor's latch "
+                           "state is known this tick", exc_info=True)
         return None
 
     def _publish_motor_faults(self, session) -> None:
@@ -725,6 +904,9 @@ class TelemetryService:
                 self._hw_error_info = {}
                 self._hw_errors_warned = set()
                 self._motor_answering = None
+                self._fault_records = {}
+                self._shutdown_temps = None
+                self._stop_masks = None
         bus = self._bus_errors.snapshot()
         tracking = self._tracking.snapshot()
         config = getattr(getattr(self._service, "supervisor", None),
@@ -749,6 +931,16 @@ class TelemetryService:
             # Classified: which kind of latch, and what to do about it. The
             # dashboard needs this to tell a power latch from a hot motor.
             entry["hw_error"] = self._hw_error_info.get(mid)
+            # What core's fault policy has done about this motor so far.
+            record = self._fault_records.get(mid)
+            entry["recovery"] = None if record is None else {
+                "load_reboots": record.reboots,
+                "thermal_recoveries": record.thermal_recoveries,
+                "cooling": record.cooling,
+                "given_up": record.given_up,
+                "thermal_given_up": record.thermal_given_up,
+                "faults": len(record.events),
+            }
             motors[mid] = entry
         self._hub.publish(T.MOTORS_FAULTS,
                           {"motors": motors, "bus": bus["bus"]})
@@ -763,11 +955,19 @@ class TelemetryService:
                     int(k): round(float(v), 1)
                     for k, v in session.hand.get_motor_temp(as_dict=True).items()}
             if currents:
+                reading = session.hand.get_motor_current(as_dict=True)
+                # A failed bus read returns the client's stale cache, so
+                # publishing it would present a frozen value as a live one.
+                if not getattr(session.hand, "last_read_ok", True):
+                    logger.debug("motor current read stale; skipping this publish")
+                    self._note_read_failure("current read returned a stale cache")
+                    return
+                self._note_read_ok()
                 self._motor_health["currents"] = {
-                    int(k): round(float(v), 1)
-                    for k, v in session.hand.get_motor_current(as_dict=True).items()}
-        except Exception:
+                    int(k): round(float(v), 1) for k, v in reading.items()}
+        except Exception as error:
             logger.debug("motor telemetry read failed", exc_info=True)
+            self._note_read_failure(f"current read raised {type(error).__name__}")
             return
         self._hub.publish(T.MOTORS_TELEMETRY,
                           self._motor_health_payload(session))

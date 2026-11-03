@@ -6,7 +6,7 @@ import pytest
 import yaml
 from orca_core.hand_config import OrcaHandConfig
 
-from orca_ui.hand.service import HandService, ServiceError
+from orca_ui.hand.service import HandService
 from orca_ui.mock import materialize_mock_model
 from orca_ui.settings import UiSettings
 
@@ -71,14 +71,43 @@ def test_a_yaml_that_names_the_family_resolves_before_connect():
     assert svc.supervisor.config.calibration_current == 900
 
 
-def test_a_ceiling_below_the_calibration_current_is_refused_before_the_write():
+def test_a_ceiling_below_the_familys_calibration_current_is_accepted():
+    """The family's two defaults are equal, and calibration follows the
+    ceiling, so lowering it is not a configuration clash."""
     svc = _connected(_service(_config_left_to_the_family()))
     try:
-        before = svc.session.hand.config.max_current
-        floor = svc.session.hand.config.calibration_current
-        with pytest.raises(ServiceError):
-            svc.set_max_current(floor - 1)
-        assert svc.session.hand.config.max_current == before
-        assert svc.control_state()["max_current"] == before
+        lower = svc.session.hand.config.calibration_current - 1
+        svc.set_max_current(lower)
+        assert svc.session.hand.config.max_current == lower
+        assert svc.session.hand.config.calibration_current == lower
+        assert svc.control_state()["max_current"] == lower
+    finally:
+        svc.stop()
+
+
+def test_the_v21_group_table_does_not_outrank_the_ceiling_the_console_sets():
+    """A model shipping a calibration current per joint group drives some
+    groups above ``max_current`` — nothing validates the two against each
+    other. A ceiling typed into the console replaces the table outright, so
+    every joint is driven onto its hardstops at the figure the operator chose."""
+    path = _config_left_to_the_family(motor_type="dynamixel")
+    with open(path, encoding="utf-8") as f:
+        raw = yaml.safe_load(f)
+    raw["hardware_version"] = 21
+    raw["calibration_current_v21"] = {"dynamixel": {"abd": 300, "mcp": 500, "pip": 500}}
+    with open(path, "w", encoding="utf-8") as f:
+        yaml.safe_dump(raw, f)
+
+    svc = _connected(_service(path))
+    try:
+        config = svc.session.hand.config
+        assert config.calibration_group_currents == {"abd": 300, "mcp": 500, "pip": 500}
+        assert config.calibration_current_for("index_mcp") == 500
+
+        svc.set_max_current(420)
+        config = svc.session.hand.config
+        assert config.calibration_group_currents == {}
+        assert all(config.calibration_current_for(joint) == 420
+                   for joint in ("index_abd", "index_mcp", "index_pip", "wrist"))
     finally:
         svc.stop()

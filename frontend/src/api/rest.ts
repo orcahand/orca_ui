@@ -5,6 +5,7 @@ import type {
   MotorConfigValues,
   MotorConfigWriteResult,
   BusBaudInfo,
+  ChangelogDoc,
   BusBaudResult,
   BoardsInfo,
   DemoEntry,
@@ -86,6 +87,9 @@ export const api = {
   status: () => request<StatusSnapshot>('/api/status'),
   handInfo: () => request<HandInfo>('/api/hand/info'),
   stats: () => request<Stats>('/api/stats'),
+  changelog: () => request<ChangelogDoc>('/api/changelog'),
+  changelogSeen: (dismissed: boolean) =>
+    post<ChangelogDoc>('/api/changelog/seen', { dismissed }),
   ports: () => request<PortInfo[]>('/api/ports'),
   taxelGeometry: () => request<TaxelGeometry>('/api/tactile/geometry'),
   // Re-arm the probes for declared hardware this session did not get. Keeps
@@ -104,7 +108,7 @@ export const api = {
   // Pins hardware_version in the hand's config.yaml; null = take the board's.
   setHardwareVersion: (version: number | null) =>
     post<StatusSnapshot>('/api/hardware_version', { version }),
-  // Clears a latched hardware error. The motor returns with torque off.
+  // Clears a latched hardware error. The motor's torque is restored if the hand has torque.
   rebootMotor: (id: number) =>
     post<{
       motor: number
@@ -200,6 +204,16 @@ export const api = {
   resetGains: (joints?: string[]) =>
     post('/api/control/gains/reset', { joints: joints ?? null }),
   setMaxCurrent: (ma: number) => post('/api/control/max_current', { ma }),
+  // Omitted fields are left alone. thermal_unlimited clears the thermal
+  // budget, which cannot be expressed as a number.
+  setFaultBudgets: (body: {
+    report_after_reboots?: number
+    giveup_after_reboots?: number
+    thermal_giveup_after_reboots?: number
+    thermal_unlimited?: boolean
+    thermal_clear_margin_c?: number
+    thermal_hold_all?: boolean
+  }) => post('/api/control/fault_budgets', body),
   setPoseSource: (mode: PoseSource) =>
     post<{ control: ControlState }>('/api/control/pose_source', { mode }),
   rebase: () => post('/api/control/rebase'),

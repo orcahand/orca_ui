@@ -13,6 +13,7 @@ open-loop pacing: nothing else waits for the hand.
 
 from __future__ import annotations
 
+import logging
 import math
 import time
 
@@ -23,6 +24,8 @@ from orca_ui.hand.operations.base import OpContext, Operation
 from orca_ui.hand.states import ControlSource
 from orca_ui.library import CONTINUOUS, MOTOR_WAYPOINTS, WAYPOINTS, LibraryError
 
+logger = logging.getLogger(__name__)
+
 SPEEDS = (0.5, 1.0, 2.0)
 WAYPOINT_SPEED_DEG_S = 60.0   # cruise speed for synthesized waypoint segments
 MIN_SEGMENT_S = 0.3           # floor so near-identical waypoints still glide
@@ -31,7 +34,10 @@ MIN_SEGMENT_S = 0.3           # floor so near-identical waypoints still glide
 WAYPOINT_RATE_HZ = 100.0
 LEAD_IN_MIN_DEG = 2.0         # skip the approach glide when already at start
 PROGRESS_EVERY_S = 0.2
-MAX_LOOP_CYCLES = 1000
+# Loop playback runs until stopped unless a cycle count is asked for. It used
+# to stop silently at 1000, which ended an overnight run with nothing in the
+# operation's own log to say why the hand had gone still.
+DEFAULT_MAX_LOOP_CYCLES = None
 
 # Stepped playback ("interp_steps"): N intermediate commands per segment
 # instead of the cruise-speed glide — crisp point-to-point motion where the
@@ -281,10 +287,33 @@ def _await_arrival(ctx: OpContext, hand, what: str,
         return False
 
 
+def _max_cycles(value) -> "int | None":
+    """Cycles to play before stopping a loop; ``None`` runs until stopped.
+
+    Looping used to stop at a hard-coded 1000 without the caller asking for
+    it, which is how an overnight run ended with the hand still and nothing
+    saying why.
+    """
+    from orca_ui.hand.service import ServiceError
+
+    if value in (None, ""):
+        return None
+    try:
+        cycles = int(value)
+    except (TypeError, ValueError):
+        raise ServiceError("max_cycles must be a whole number of cycles, or "
+                           "null to loop until stopped", status_code=422)
+    if cycles < 1:
+        raise ServiceError("max_cycles must be at least 1, or null to loop "
+                           "until stopped", status_code=422)
+    return cycles
+
+
 def play_frames(ctx: OpContext, *, name: str, joint_ids: list[str],
                 frames: list[list[float]], rate_hz: float,
                 speed: float, loop: bool,
-                holds: "list[int] | tuple" = ()) -> dict:
+                holds: "list[int] | tuple" = (),
+                max_cycles: "int | None" = DEFAULT_MAX_LOOP_CYCLES) -> dict:
     """Paced playback with pause/stop; returns {frames, cycles}.
 
     ``duration_s`` counts the commanded motion only — waypoint holds add to
@@ -307,7 +336,9 @@ def play_frames(ctx: OpContext, *, name: str, joint_ids: list[str],
     ctx.set_phase("playing", progress=0.0,
                   detail=f"{name} · {duration_s:.1f}s @ ×{speed:g}")
     ctx.log(f"playing {name}: {total} frames, {duration_s:.1f}s at ×{speed:g}"
-            f"{' (loop)' if loop else ''}")
+            f"{' (loop)' if loop else ''}"
+            + (f", stopping after {max_cycles} cycle(s)"
+               if loop and max_cycles else ", until stopped" if loop else ""))
     if holds:
         ctx.log(f"holding at {len(holds)} waypoint(s) until the hand arrives "
                 f"(≤{DWELL_MAX_S:g}s each)")
@@ -316,10 +347,11 @@ def play_frames(ctx: OpContext, *, name: str, joint_ids: list[str],
         _stream(ctx, joint_ids, frames, dt, progress=ctx.set_progress,
                 holds=holds)
         cycles += 1
-        if loop and cycles >= MAX_LOOP_CYCLES:
-            ctx.log(f"loop backstop reached ({MAX_LOOP_CYCLES} cycles) — "
+        reached_cap = max_cycles is not None and cycles >= max_cycles
+        if loop and reached_cap:
+            ctx.log(f"requested {max_cycles} cycle(s) complete — "
                     "stopping playback")
-        if not loop or cycles >= MAX_LOOP_CYCLES:
+        if not loop or reached_cap:
             return {"frames": total, "cycles": cycles,
                     "duration_s": duration_s}
         ctx.set_detail(f"{name} · cycle {cycles + 1}")
@@ -424,6 +456,7 @@ class ReplayOperation(Operation):
             "name": str(name),
             "speed": speed,
             "loop": bool(params.get("loop", False)),
+            "max_cycles": _max_cycles(params.get("max_cycles")),
             "type": traj_type,
             "interp_steps": interp_steps,
             # None = the INTERP_STEP_PERIOD_S default; only meaningful in
@@ -471,6 +504,7 @@ class ReplayOperation(Operation):
             frames=frames, rate_hz=rate_hz,
             speed=self.params["speed"], loop=self.params["loop"],
             holds=holds,
+            max_cycles=self.params.get("max_cycles"),
         )
 
     def _run_motor_waypoints(self, ctx: OpContext) -> dict:
@@ -527,12 +561,16 @@ class ReplayOperation(Operation):
             total = len(frames)
             duration_s = total * dt
             cycles = 0
+            max_cycles = self.params.get("max_cycles")
             ctx.set_phase("playing", progress=0.0,
                           detail=f"{name} · motor stepping @ "
                                  f"×{self.params['speed']:g}")
             ctx.log(f"playing {name}: {len(waypoints)} motor waypoints, "
                     f"{total} commands at {dt * 1000:.0f} ms each"
-                    f"{' (loop)' if loop else ''}")
+                    f"{' (loop)' if loop else ''}"
+                    + (f", stopping after {max_cycles} cycle(s)"
+                       if loop and max_cycles
+                       else ", until stopped" if loop else ""))
             last_progress = 0.0
             while True:
                 # frames[0] restates where the approach already put the hand.
@@ -558,10 +596,11 @@ class ReplayOperation(Operation):
                             unsettled += 1
                         ctx.sleep(dt)
                 cycles += 1
-                if loop and cycles >= MAX_LOOP_CYCLES:
-                    ctx.log(f"loop backstop reached ({MAX_LOOP_CYCLES} "
-                            "cycles) — stopping playback")
-                if not loop or cycles >= MAX_LOOP_CYCLES:
+                reached_cap = max_cycles is not None and cycles >= max_cycles
+                if loop and reached_cap:
+                    ctx.log(f"requested {max_cycles} cycle(s) complete — "
+                            "stopping playback")
+                if not loop or reached_cap:
                     if unsettled and max_settle_s is not None:
                         ctx.log(f"moved on before every motor settled at "
                                 f"{unsettled} waypoint(s) — the "
@@ -622,6 +661,7 @@ class DemoOperation(Operation):
             ctx, name=self.params["name"], joint_ids=joint_ids,
             frames=frames, rate_hz=rate_hz, speed=1.0,
             loop=self.params["loop"],
+            max_cycles=self.params.get("max_cycles"),
         )
 
 
@@ -631,10 +671,20 @@ RUN_IN_MAX_S = 1800
 # Multiples of the cruise speed; one pass takes about 15 s at x1.
 RUN_IN_SPEEDS = (1.0, 2.0, 3.0, 4.0)
 RUN_IN_DEFAULT_SPEED = 3.0
+# The first pass always runs at x1, whatever speed was chosen: a tendon that
+# was routed wrong or a finger that collides shows up in the first seconds,
+# and at cruise speed there is time to hit stop before anything breaks.
+RUN_IN_WARMUP_SPEED = 1.0
+RUN_IN_MAX_CURRENT_CEILING_MA = 2000
 
 
 class RunInOperation(Operation):
-    """Loop the full-range run-in sequence for a fixed time after calibration."""
+    """Loop the full-range run-in sequence for a fixed time after calibration.
+
+    The first pass is slow (RUN_IN_WARMUP_SPEED), the rest run at the chosen
+    speed. ``max_current_ma`` caps the motors for the run and the previous
+    ceiling is put back afterwards, stopped or not.
+    """
 
     kind = "run_in"
     control_source = ControlSource.OPERATION
@@ -654,7 +704,19 @@ class RunInOperation(Operation):
         speed = float(params.get("speed", RUN_IN_DEFAULT_SPEED))
         if speed not in RUN_IN_SPEEDS:
             raise ServiceError(f"speed must be one of {list(RUN_IN_SPEEDS)}")
-        return {"duration_s": duration_s, "speed": speed}
+        clean = {"duration_s": duration_s, "speed": speed,
+                 "max_current_ma": None}
+        cap = params.get("max_current_ma")
+        if cap is not None:
+            try:
+                cap = int(cap)
+            except (TypeError, ValueError):
+                raise ServiceError("max_current_ma must be a whole number of mA")
+            if not 1 <= cap <= RUN_IN_MAX_CURRENT_CEILING_MA:
+                raise ServiceError(
+                    f"max_current_ma must be 1..{RUN_IN_MAX_CURRENT_CEILING_MA} mA")
+            clean["max_current_ma"] = cap
+        return clean
 
     def run(self, ctx: OpContext) -> dict:
         from orca_ui.hand.presets import RUN_IN_SEQUENCE
@@ -666,13 +728,46 @@ class RunInOperation(Operation):
         for fractions in RUN_IN_SEQUENCE + RUN_IN_SEQUENCE[:1]:
             pose = hand_ops.pose_from_fractions(hand, fractions)
             cycle.append([pose.get(j) for j in joint_ids])
-        # Faster frames rather than a faster feed: the command rate stays at WAYPOINT_RATE_HZ.
         speed = self.params.get("speed", RUN_IN_DEFAULT_SPEED)
-        frames, rate_hz, _holds = _interpolate(cycle, speed=speed)
-        cycles = max(1, math.ceil(
-            self.params["duration_s"] * rate_hz / len(frames)))
-        ctx.log(f"run-in at ×{speed:g}: one pass {len(frames) / rate_hz:.1f}s")
-        return play_frames(
-            ctx, name=f"run-in ×{speed:g}", joint_ids=joint_ids,
-            frames=frames * cycles, rate_hz=rate_hz, speed=1.0, loop=False,
-        )
+        frames, rate_hz = run_in_frames(cycle, self.params["duration_s"], speed)
+        warm_s = len(_interpolate(cycle, speed=RUN_IN_WARMUP_SPEED)[0]) / rate_hz
+        if speed != RUN_IN_WARMUP_SPEED:
+            ctx.log(f"run-in: first pass at ×{RUN_IN_WARMUP_SPEED:g} ({warm_s:.0f}s), "
+                    f"then ×{speed:g}")
+        else:
+            ctx.log(f"run-in at ×{speed:g}: one pass {warm_s:.1f}s")
+
+        cap = self.params.get("max_current_ma")
+        previous = service.control_state().get("max_current") if cap is not None else None
+        if cap is not None:
+            service.set_max_current(cap)
+            ctx.log(f"motor current capped at {cap} mA for the run"
+                    + (f" (was {previous} mA)" if previous is not None else ""))
+        try:
+            return play_frames(
+                ctx, name=f"run-in ×{speed:g}", joint_ids=joint_ids,
+                frames=frames, rate_hz=rate_hz, speed=1.0, loop=False,
+            )
+        finally:
+            if cap is not None and previous is not None and previous != cap:
+                try:
+                    service.set_max_current(previous)
+                    ctx.log(f"motor current ceiling back at {previous} mA")
+                except Exception:
+                    logger.exception("run-in: restoring the current ceiling failed")
+                    ctx.log(f"could not restore the {previous} mA ceiling - "
+                            "check max current before the next run")
+
+
+def run_in_frames(cycle: list[list[float]], duration_s: float,
+                  speed: float) -> tuple[list[list[float]], float]:
+    """Frames for a run-in of about ``duration_s``: one pass at the warm-up
+    speed, then whole passes at ``speed`` until the time is used up."""
+    warm, rate_hz, _holds = _interpolate(cycle, speed=RUN_IN_WARMUP_SPEED)
+    budget = duration_s * rate_hz
+    if speed == RUN_IN_WARMUP_SPEED:
+        cycles = max(1, math.ceil(budget / len(warm)))
+        return warm * cycles, rate_hz
+    fast, _rate, _holds = _interpolate(cycle, speed=speed)
+    cycles = max(1, math.ceil((budget - len(warm)) / len(fast)))
+    return warm + fast * cycles, rate_hz

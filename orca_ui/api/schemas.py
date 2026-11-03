@@ -13,6 +13,12 @@ class JointTargets(BaseModel):
     angles: dict[str, float]
 
 
+class ChangelogSeenRequest(BaseModel):
+    """Whether this release's notes should stay shut until the next one."""
+
+    dismissed: bool
+
+
 class ModelSelectRequest(BaseModel):
     """Which hand config to run. ``name`` null hands the choice back to
     hardware detection; ``version`` defaults to the model's newest."""
@@ -56,6 +62,23 @@ class GainsResetRequest(BaseModel):
 
 class MaxCurrentRequest(BaseModel):
     ma: int = Field(gt=0, le=2000)
+
+
+class FaultBudgetsRequest(BaseModel):
+    """Fault-recovery thresholds, per motor. Omitted fields are left alone.
+
+    ``thermal_giveup_after_reboots`` accepts null, meaning never give up: a
+    motor that has cooled can work again, and the wait is self-limiting.
+    """
+
+    report_after_reboots: Optional[int] = Field(default=None, ge=1, le=100)
+    giveup_after_reboots: Optional[int] = Field(default=None, ge=1, le=100)
+    thermal_giveup_after_reboots: Optional[int] = Field(default=None, ge=1,
+                                                        le=100)
+    thermal_unlimited: bool = False
+    thermal_clear_margin_c: Optional[float] = Field(default=None, ge=1, le=60)
+    # One hot motor takes the whole hand off torque, rather than only itself.
+    thermal_hold_all: Optional[bool] = None
 
 
 class ServoGainsRequest(BaseModel):

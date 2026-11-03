@@ -26,7 +26,7 @@ env/
 node_modules/
 .superpowers/
 
-# Where orca-dev remembers this machine's orca_core checkout
+# A machine-local orca_core path, from the orca-dev tool
 .orca-dev.json
 
 # Assembly ZIP archives are tracked; full models are restored at UI startup.
@@ -37,3 +37,7 @@ node_modules/
 
 # Personal Claude Code instructions, never committed
 CLAUDE.local.md
+
+# The changelog dismissal: one indicator file, written when someone ticks
+# "do not show again". Created on demand, cleared on every write.
+.changelog/

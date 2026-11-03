@@ -219,6 +219,7 @@ function HandRig({
       const threshold = tactile.thresholdEnabled ? tactile.threshold : 0
       rig.arrows.setResultantVisible(scene.forceResultant && tactileOk)
       rig.arrows.setTaxelsVisible(scene.forceTaxels && tactileOk)
+      rig.arrows.setNormalsVisible(scene.taxelNormals && rig.arrows.available)
       if (scene.forceResultant && tactileOk) {
         rig.arrows.updateResultants(frames.tactile.forces, scheme, threshold)
       }

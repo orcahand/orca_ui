@@ -1,13 +1,11 @@
-"""Dev mode must never reach a commit.
+"""No orca_core source override may reach a commit.
 
-Pointing this checkout at an orca_core next to it needs a ``[tool.uv.sources]``
-entry, because uv has no local-only override file. That entry is a fact about
-one machine: committed, it makes the project unresolvable everywhere else —
-``uv lock`` fails outright on a clone with no sibling orca_core.
+A ``[tool.uv.sources]`` path entry is a fact about one machine: committed, it
+makes the project unresolvable everywhere else — ``uv lock`` fails outright on
+a clone with no sibling orca_core. ``./dev`` never writes one, but a hand-made
+entry is just as fatal.
 
-These tests read the *committed* files, not the working tree, so they pass
-while you are pointed at a local checkout and fail only once that reaches a
-commit.
+These tests read the *committed* files, not the working tree.
 """
 
 import re
@@ -19,9 +17,8 @@ import pytest
 # other source, so the table header appearing at all is the entry.
 SOURCE_TABLE = re.compile(r"^[ \t]*\[tool\.uv\.sources", re.MULTILINE)
 
-FIX = ("Keep the override in your working tree, out of the commit:\n"
-       "    git restore --staged pyproject.toml uv.lock\n"
-       "A branch that needs unpublished orca_core is paired in CI instead — "
+FIX = ("Drop the entry and run against a local core with `./dev local`\n"
+       "instead. A branch that needs unpublished orca_core is paired in CI — "
        "see .github/workflows/test.yml.")
 
 
@@ -78,37 +75,3 @@ def test_committed_lock_resolves_orca_core_from_the_registry():
         f"uv.lock in HEAD resolves orca_core from {source}, not the "
         f"registry.\n{FIX}")
 
-
-class TestLeavingDevModeKeepsThePin:
-    """`orca-dev release` re-adds the orca-core requirement. Where it gets that
-    requirement from decides whether leaving dev mode is lossless."""
-
-    def test_the_spec_is_the_one_the_project_declares(self):
-        """Not a copy. A constant here named 0.4.x long after the project moved
-        to 0.5, so leaving dev mode walked the requirement two minors back and
-        installed a core the console no longer supported."""
-        import re
-        from pathlib import Path
-
-        from orca_ui.core_source import released_core_spec
-
-        declared = re.search(r"""["'](orca[-_]core[^"']*)["']""",
-                             Path("pyproject.toml").read_text())
-        assert declared, "pyproject.toml declares no orca-core requirement"
-        assert released_core_spec() == declared.group(1)
-
-    def test_no_exact_core_version_is_hardcoded_in_the_tooling(self):
-        """Any literal pin here is a second copy waiting to go stale."""
-        import re
-        from pathlib import Path
-
-        source = Path("orca_ui/core_source.py").read_text()
-        pins = re.findall(r"orca[-_]core\s*[<>=!]+\s*\d+\.\d+\.\d+", source)
-        assert pins == [], f"hardcoded core pins in core_source.py: {pins}"
-
-    def test_the_fallback_does_not_narrow_anything(self):
-        """When the committed file cannot be read, the answer must not be a
-        guess at the pin -- a wide spec lets the resolver do its job."""
-        from orca_ui.core_source import CORE_RELEASE_SPEC_FALLBACK
-
-        assert not re.search(r">=\s*\d+\.\d+\.\d+", CORE_RELEASE_SPEC_FALLBACK)
