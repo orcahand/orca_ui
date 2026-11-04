@@ -50,6 +50,12 @@ needed it goes quiet.
 
 ## Working against an unreleased orca_core
 
+> **On `merge/assembly-calibration-with-main`:** temporarily, a plain clone of this
+> experimental branch installs `orca_core` from GitHub, at the commit in `uv.lock`.
+> `./dev run` and `./dev test` still use your `../orca_core` checkout, and print a
+> warning about the source entry, which is expected on this branch. See
+> [Using this experimental branch](README.md#using-this-experimental-branch).
+
 `pyproject.toml` depends on the published `orca_core`, which is what a plain
 clone installs and what the wheel declares. To run a branch that needs an
 unreleased core, check the matching `orca_core` branch out beside this repo
