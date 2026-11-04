@@ -200,8 +200,9 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="orca-bench",
         description="ORCA Motor Bench: hold, jog, range and cycle a few hand "
-                    "motors on a bus, with live motor statistics. Runs the "
-                    "console's motor stack; opens its own compact page.",
+                    "motors on a bus, or run a thermal test on clamped ones, "
+                    "with live motor statistics. Runs the console's motor "
+                    "stack; opens its own compact page.",
     )
     parser.add_argument("--motors", type=str, default=None, metavar="IDS",
                         help="Motor ids on the bus, comma-separated (default "
@@ -224,6 +225,10 @@ def parse_args(argv=None) -> argparse.Namespace:
                              "on 5001 can stay open).")
     parser.add_argument("--no-browser", action="store_true",
                         help="Don't open a browser window on startup.")
+    parser.add_argument("--keep-running", action="store_true",
+                        help="Stay up after the browser window is closed. By "
+                             "default the server exits once the last tab has "
+                             "been gone for a few seconds (never during a run).")
     parser.add_argument("--library-dir", type=str, default=None,
                         help="Pose/trajectory library root (default "
                              "~/.orca_ui/library); unused by the bench page.")
@@ -256,6 +261,7 @@ def build_settings(argv=None) -> UiSettings:
         host=args.host,
         port=args.port,
         open_browser=not args.no_browser,
+        exit_on_close=not args.keep_running,
         library_dir=args.library_dir,
         # No hand, no glove: the teleop subsystem has nothing to drive here.
         teleop_enabled=False,

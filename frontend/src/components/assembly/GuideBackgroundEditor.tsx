@@ -2,7 +2,7 @@ import {GuideColorWheel} from './GuideColorWheel'
 import {useContext,useEffect,useRef,useState} from 'react'
 import {GuideEditingContext} from './GuideEditing'
 
-const PRESETS=[['White','#ffffff'],['Warm paper','#f6f5f0'],['Soft grey','#e8e9e5'],['Sage','#93a69a'],['Dark sage','#70877a'],['Charcoal','#29343c']] as const
+const PRESETS=[['White','#ffffff'],['ORCA paper','#f6f5f1'],['Drawing grey','#eae7df'],['ORCA dark','#1a1c2a'],['Dark panel','#232637']] as const
 // These are the surfaces that actually paint behind transparent renders/canvases.
 const SURFACES='.assembly-image-button,.assembly-joint-motion,.assembly-model-controls-frame,.assembly-finger-preview,.assembly-anatomy-viewport,.assembly-screw-model,.assembly-area-canvas,.assembly-area-scroll,.assembly-cad-detail-canvas,.assembly-hand-label-render,[class*="-canvas"]'
 const TARGETS=`${SURFACES},.assembly-main,.assembly-sidebar,.assembly-hand-navigation,.assembly-contents-scroll,.assembly-header,section,figure,.assembly-image-frame,.assembly-note,.assembly-supplies,.assembly-tool-overview,.assembly-check,.assembly-app`
@@ -11,7 +11,7 @@ function selector(name:string){return /^tag-(figure|section|dialog)$/.test(name)
 const GLOBAL=['assembly-app','assembly-main','assembly-sidebar','assembly-hand-navigation','assembly-contents-scroll','assembly-header']
 export function GuideBackgroundEditor({step}:{step:string}){
  const editing=useContext(GuideEditingContext)!,panel=useRef<HTMLDivElement>(null)
- const [open,setOpen]=useState(false),[picking,setPicking]=useState(false),[selected,setSelected]=useState(''),[color,setColor]=useState('#f6f5f0')
+ const [open,setOpen]=useState(false),[picking,setPicking]=useState(false),[selected,setSelected]=useState(''),[color,setColor]=useState('#f6f5f1')
  const root=()=>panel.current?.closest<HTMLElement>('.assembly-app')??null
  function select(element:HTMLElement){
   const name=Array.from(element.classList).find(c=>c.startsWith('assembly-'))??`tag-${element.tagName.toLowerCase()}`
@@ -22,7 +22,7 @@ export function GuideBackgroundEditor({step}:{step:string}){
   setSelected(key)
   setPicking(false)
   const rgb=getComputedStyle(element).backgroundColor.match(/[\d.]+/g)
-  setColor(editing.draft.backgrounds[key]??(rgb&&rgb.length>=3&&rgb[3]!=='0'?'#'+rgb.slice(0,3).map(v=>Math.round(+v).toString(16).padStart(2,'0')).join(''):'#f6f5f0'))
+  setColor(editing.draft.backgrounds[key]??(rgb&&rgb.length>=3&&rgb[3]!=='0'?'#'+rgb.slice(0,3).map(v=>Math.round(+v).toString(16).padStart(2,'0')).join(''):'#f6f5f1'))
  }
  useEffect(()=>{setSelected('');setPicking(false);setOpen(false)},[step,editing.scope])
  useEffect(()=>{

@@ -1,0 +1,482 @@
+/* Fingers mode on the bench page. Layout only — colours are theme.css tokens. */
+
+.fingers-main {
+  grid-template-columns: minmax(360px, 3fr) minmax(300px, 2fr);
+}
+
+@media (max-width: 900px) {
+  .fingers-main {
+    grid-template-columns: 1fr;
+  }
+}
+
+.finger-hint {
+  flex: 1;
+  font-size: 10px;
+  color: var(--dimmer);
+}
+
+/* --- joint rows --- */
+
+.finger-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  background: var(--panel-strong);
+  border: 1px solid var(--panel-border);
+}
+
+.finger-row.incomplete {
+  border-style: dashed;
+}
+
+.finger-row-main,
+.finger-row-ends {
+  display: flex;
+  align-items: center;
+  gap: 6px 10px;
+  flex-wrap: wrap;
+  font-size: 11px;
+}
+
+.finger-row input,
+.finger-row select {
+  font-family: var(--font);
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 0;
+  padding: 3px 6px;
+}
+
+.finger-row input:disabled,
+.finger-row select:disabled {
+  opacity: 0.6;
+}
+
+.finger-name {
+  width: 110px;
+  font-weight: 600;
+  color: var(--text-bright) !important;
+}
+
+.finger-group {
+  width: 80px;
+}
+
+.finger-live {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 70px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-bright);
+}
+
+.finger-live-bar {
+  display: block;
+  height: 3px;
+  background: var(--panel-border-strong);
+}
+
+.finger-live-bar span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width 80ms linear;
+}
+
+.finger-jog,
+.finger-row-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.finger-jog .btn,
+.finger-row-tools .btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  min-width: 26px;
+}
+
+.finger-jog small {
+  color: var(--dim);
+  font-size: 10px;
+}
+
+.finger-row-tools {
+  margin-left: auto;
+}
+
+.finger-remove:not(:disabled):hover {
+  color: var(--err);
+}
+
+.finger-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.finger-end-name {
+  color: var(--dim);
+  min-width: 42px;
+}
+
+.finger-end input[type='number'] {
+  width: 70px;
+  text-align: right;
+}
+
+.finger-end .btn {
+  font-size: 10px;
+  padding: 3px 8px;
+}
+
+.finger-span {
+  color: var(--dimmer);
+  font-size: 10px;
+  margin-left: auto;
+}
+
+/* --- control --- */
+
+.finger-control .bench-run-buttons {
+  margin-bottom: 12px;
+}
+
+.bench-run-hint {
+  font-size: 10px;
+  color: var(--dim);
+}
+
+.finger-group-block {
+  padding-top: 8px;
+  margin-top: 8px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.finger-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.finger-group-head h3 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-bright);
+  letter-spacing: 0.3px;
+  min-width: 70px;
+}
+
+.finger-group-head .finger-slider.master {
+  flex: 1;
+  min-width: 160px;
+}
+
+.finger-group-buttons {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.finger-group-buttons .btn {
+  font-size: 10px;
+  padding: 2px 8px;
+}
+
+.finger-slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  padding: 3px 0;
+}
+
+.finger-slider-name {
+  color: var(--muted);
+  width: 90px;
+  flex: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finger-slider.master .finger-slider-name {
+  width: auto;
+  color: var(--dim);
+}
+
+.finger-slider-track {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.finger-slider-track input[type='range'] {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.finger-slider-track input[type='range']:disabled {
+  opacity: 0.4;
+}
+
+/* Where the joint actually is, under the slider: a tick that trails the thumb. */
+.finger-slider-live {
+  position: absolute;
+  left: -9999px;
+  bottom: -3px;
+  width: 2px;
+  height: 6px;
+  margin-left: -1px;
+  background: var(--ok);
+  pointer-events: none;
+  transition: left 80ms linear;
+}
+
+.finger-slider-value {
+  width: 58px;
+  flex: none;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-bright);
+}
+
+.finger-slider-value small {
+  display: block;
+  color: var(--ok);
+  font-size: 9px;
+}
+
+/* --- motor terms and the coupling helper --- */
+
+.finger-row-terms {
+  display: flex;
+  align-items: center;
+  gap: 6px 8px;
+  flex-wrap: wrap;
+  font-size: 11px;
+}
+
+.finger-term {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.finger-term input[type='number'] {
+  width: 62px;
+  text-align: right;
+}
+
+.finger-term-plus,
+.finger-term-times {
+  color: var(--dimmer);
+}
+
+.finger-row-terms .btn {
+  font-size: 10px;
+  padding: 2px 8px;
+}
+
+.finger-helper {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--panel-border);
+  font-size: 11px;
+}
+
+.finger-helper summary {
+  cursor: pointer;
+  color: var(--dim);
+}
+
+.finger-helper p {
+  margin: 6px 0 8px;
+  color: var(--dimmer);
+  font-size: 10px;
+}
+
+.finger-helper .bench-fields {
+  margin-bottom: 0;
+}
+
+.finger-helper select {
+  font-family: var(--font);
+  font-size: 10px;
+  color: var(--muted);
+  background: var(--panel-strong);
+  border: 1px solid var(--panel-border-strong);
+  padding: 3px 4px;
+}
+
+/* --- a finger's joints, collapsible --- */
+
+.finger-finger {
+  margin-bottom: 8px;
+}
+
+.finger-finger summary {
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-bright);
+  letter-spacing: 0.3px;
+  padding: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.finger-finger summary small {
+  font-weight: 400;
+  color: var(--dimmer);
+}
+
+.finger-finger .finger-row {
+  margin-left: 10px;
+}
+
+/* --- the coupling formula, as written --- */
+
+.finger-formula {
+  margin: 6px 0 4px;
+  padding: 8px 12px;
+  list-style: none;
+  background: var(--panel-strong);
+  border: 1px solid var(--panel-border);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  color: var(--text-bright);
+}
+
+.finger-formula li {
+  display: flex;
+  gap: 14px;
+  align-items: baseline;
+  padding: 2px 0;
+}
+
+.finger-formula li::before {
+  content: '◦';
+  color: var(--dimmer);
+}
+
+.finger-formula small {
+  color: var(--dim);
+  font-size: 10px;
+  margin-left: auto;
+}
+
+/* --- the four steps --- */
+
+.finger-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.finger-step {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 12px;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  cursor: pointer;
+  text-align: left;
+}
+
+.finger-step small {
+  font-weight: 400;
+  font-size: 10px;
+  color: var(--dimmer);
+}
+
+.finger-step.on {
+  color: var(--text-bright);
+  border-color: var(--accent);
+  background: rgb(var(--accent-rgb) / 0.08);
+}
+
+@media (max-width: 760px) {
+  .finger-steps {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.finger-q {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--dim);
+}
+
+.finger-name-static {
+  font-weight: 600;
+  color: var(--text-bright);
+  width: 110px;
+}
+
+.finger-formula-row .finger-row-main {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.finger-formula-row .finger-name {
+  width: 100px;
+}
+
+.finger-row.finger-tendon {
+  padding: 5px 10px;
+  margin-bottom: 4px;
+}
+
+/* --- named setups --- */
+
+.finger-presets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: -4px 0 12px;
+  font-size: 11px;
+}
+
+.finger-presets-label {
+  color: var(--dim);
+}
+
+.finger-presets select {
+  font-family: var(--font);
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--panel-strong);
+  border: 1px solid var(--panel-border-strong);
+  padding: 3px 6px;
+  min-width: 160px;
+}
+
+.finger-presets .btn {
+  font-size: 10px;
+  padding: 3px 8px;
+}
+
+.finger-presets small {
+  color: var(--dimmer);
+  margin-left: 4px;
+}

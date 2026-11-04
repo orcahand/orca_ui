@@ -232,10 +232,123 @@ motor-shaft degrees — nothing is calibrated and nothing is a joint:
   for download, and `GET /api/bench/logs/{name}` serves them.
 
 Torque must be on before a run starts, the current ceiling applies, and the
-E-stop ends the run and drops torque, exactly as in the console. The full
+E-stop ends the run and drops torque, exactly as in the console. Closing
+the browser window stops the server too: once the last tab has been gone
+for ten seconds it exits as if Ctrl+C had been pressed — but never while a
+run is going, so a long test survives a closed tab. **Quit** in the header
+does the same at once; `--keep-running` turns the automatic exit off (so
+does `--no-browser`). The full
 console is one click away at `/console` on the same backend; a calibrated
 hand motor cycled from the bench page is refused any range outside its
 calibrated travel.
+
+### Thermal test (the bench's **Thermal** mode)
+
+The same bench, a different question: how hot do the motors get under a
+given current, and how fast do they cool? The page has two modes, switched
+in its header — **Cycle** (above) and **Thermal** — and remembers the last
+one; a run in progress picks the mode when the page opens. The motors under
+test are clamped
+so they cannot turn (pairwise, shaft to shaft, is the usual fixture). With
+the shaft blocked, a motor told to go somewhere far away pushes with exactly
+its Goal Current and stays put, so the page writes Goal Current as a
+waveform — a **sine** around an offset, a **square** wave or a **constant** —
+and flips the far target's side whenever the signed current changes sign.
+
+- **Motors and pairs.** One tile per motor: temperature now, current, shaft
+  position, which motor it is coupled to, and a tick for "in the test" that
+  takes the partner along — a coupled pair is driven as one unit and cut as
+  one (a cut motor has no torque, so its partner would only spin it). The
+  pairs editor underneath says who is joined to whom (**pair in order** does
+  1↔2, 3↔4, …) and whether the partner is **opposed** — its current
+  inverted so the two push against each other. Face to face on one coupler
+  the same sign already opposes; through a belt or gears it does not; if a
+  pair spins, flip it. **Find pairs** works it out by moving: every motor is
+  released, then each in turn is held and turned **turn by** degrees (15°
+  by default — more than the coupling's backlash) left and right while the
+  other shafts are watched — whichever follows is its partner, the way it
+  follows sets **opposed**, and the result replaces the pairs (a motor that
+  nothing follows is left unpaired; one that several follow is reported, not
+  paired). **check** on a pair (or **check all**) double-checks
+  the coupling: each motor in turn moves the same step left and right while
+  its partner is released, and the released shaft is read — a partner that follows is
+  coupled, one that stays put is not, and the direction it follows with sets
+  **opposed** for you; each pair shows when it last passed. The pairs, the
+  checks and the test settings are saved beside the bench config in
+  `~/.orca_ui/bench/orca-bench/thermal_setup.yaml`, so they follow the bench,
+  not the browser. A motor without a partner is driven against nothing
+  and is flagged, since it will spin and be cut for slipping unless it is
+  clamped some other way.
+- **Load.** **coupled pairs** is the above: shafts blocked pairwise, the
+  waveform as each motor's current limit against its partner. **free — the
+  motors turn** is for motors with nothing on the shaft: the servos are
+  switched into current control for the run, the signed waveform goes
+  straight to Goal Current, and the motors turn back and forth with it
+  (round and round with an offset). Pairs are ignored, nothing is cut for
+  moving, and the configured control mode is put back when the run ends.
+- **Test.** Waveform shape, amplitude, offset and frequency (0.01–5 Hz) with
+  a preview; |offset| + amplitude has to fit under the **max current**
+  ceiling in the bar above. With **stagger the pairs' phases** on (the
+  default) each pair runs the waveform at its own phase, the phases spread
+  evenly, so the pairs peak in turn; the panel shows the resulting supply
+  peak — the highest sum of every motor's |current| — next to what it would
+  be with every motor in phase. Heat for a set time or **until stopped**, then
+  **cool for** a set time with the current off and the temperatures still
+  recorded. A motor is **cut** — Goal Current 0, target where it is, the
+  rest go on — when it reaches the temperature limit or when its shaft
+  moves more than the slip tolerance from where it started (the fixture let
+  go). The motor family's own shutdown temperature is the limit's ceiling.
+- **Run.** Phase and time left, the hottest motor, per motor the
+  temperature from start to now, its rate of climb over the last minute,
+  goal and actual current, RMS current, drift and when it was cut; the
+  temperature of every motor over the whole run (the limit dashed in) and
+  the last 30 s of current underneath.
+- **Log CSV.** One row per motor per sample (goal and actual current,
+  position, drift, temperature; **sample rows** sets the rate) and one per
+  cut, to `~/.orca_ui/bench/orca-bench/logs/thermal-<date>-<time>-001.csv`,
+  split into parts like the cycle log. `GET /api/thermal/history` returns
+  the run's decimated temperature traces, so a page opened mid-run shows the
+  whole curve.
+
+When the run ends — finished, stopped or e-stopped — every motor gets Goal
+Current 0 and a target at its present position, then the console's current
+ceiling is written back, so the motors are simply held, as before the run.
+
+### Fingers (the bench's **Fingers** mode)
+
+A hand on the bench, driven by joint rather than by motor. The mode is a
+four-step workflow, in the order a hand goes on; everything is set up on
+the page and saved beside the bench config, so it comes back on restart,
+and **save as…** keeps named copies to switch between.
+
+1. **Tendons.** Name each tendon and pick the motor it is wound on; hold a
+   motor and jog it to see which tendon moves. **full hand** lays out the
+   usual set — per finger `abd`, `pp` (proximal phalanx) and `pip`
+   (fingertip), the thumb's `dip`, and two wrist axes.
+2. **Coupling.** Each joint is one editable formula, q = gain · θ(tendon) +
+   gain · θ(tendon) + …, with the gain in joint degrees per shaft degree.
+   Routed tendons make joints share motors; in every finger MCP and PIP are
+   q_MCP = r_s(θ_pp + θ_pip) / r_MCP and q_PIP = r_s(θ_pp − θ_pip) / r_PIP,
+   and the routing panel writes those gains into every finger from the
+   radii. Abduction is a tendon on its own motor. Joints that share motors
+   must be as many as those motors, and the map invertible, or the run
+   refuses them.
+3. **Range.** The open and the closed end of every joint, in joint degrees
+   read through the coupling: move the joint by hand to an end and **Set**
+   it, or hold and jog there. **Set zero here** fixes where 0° is.
+4. **Control.** **Engage** starts the `finger_control` operation; joint
+   sliders by finger, a **curl** slider per finger for MCP and PIP, and
+   open/close buttons. The run glides in joint space at the set speed and
+   writes the motors wherever the coupling puts them. Slider targets are
+   clamped to the captured ends; before anything is written the corners of
+   every joint range are mapped to shaft travel and checked against the
+   same span and calibration limits as a cycle run; every motor in play
+   must be held; the e-stop ends the run; disengaging leaves the motors
+   held where they are.
+
+`GET`/`PUT /api/fingers/setup`, `/api/fingers/presets` and
+`POST /api/fingers/targets` (fractions per joint, only while engaged) are
+the endpoints behind it.
 
 ### Endurance reports
 

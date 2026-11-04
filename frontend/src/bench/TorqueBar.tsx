@@ -8,7 +8,14 @@ import { api } from '../api/rest'
 import { useAppStore } from '../state/appStore'
 import { useOperationActive } from '../state/operationStore'
 
-export function TorqueBar({ connected }: { connected: boolean }) {
+export function TorqueBar({
+  connected,
+  heldHint = 'all held — jog to tension, Start to cycle',
+}: {
+  connected: boolean
+  // What "all held" means on this page.
+  heldHint?: string
+}) {
   const control = useAppStore((s) => s.control)
   const torque = useAppStore((s) => s.status?.torque_enabled ?? false)
   const total = useAppStore((s) => s.handInfo?.joints.filter((j) => j.motor_id !== null).length ?? 0)
@@ -76,7 +83,7 @@ export function TorqueBar({ connected }: { connected: boolean }) {
           ? 'all released — turn a spool by hand, then Set A / Set B; hold one motor to wind against it'
           : partial
             ? `${heldCount} of ${total} held — the rest turn freely`
-            : 'all held — jog to tension, Start to cycle'}
+            : heldHint}
       </span>
       <div className="header-spacer" />
       <label className="stress-field" title="current ceiling for every motor (Goal Current)">

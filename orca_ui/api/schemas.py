@@ -49,6 +49,13 @@ class BenchMotorsRequest(BaseModel):
     motor_ids: Optional[list[int]] = None
 
 
+class FingerTargetsRequest(BaseModel):
+    """Where the engaged finger run should glide to: fraction per joint name."""
+
+    targets: dict[str, float]
+    speed_deg_s: Optional[float] = None
+
+
 class ModelSelectRequest(BaseModel):
     """Which hand config to run. ``name`` null hands the choice back to
     hardware detection; ``version`` defaults to the model's newest."""

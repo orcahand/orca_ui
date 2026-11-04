@@ -7,12 +7,16 @@ import type {
   SensorFrameEntry,
   DemoEntry,
   DirectMotorSnapshot,
+  FingerPresets,
+  FingerSetupStored,
   HandInfo,
   JointCalibrateResult,
   ModelMetadata,
   ModelsInfo,
   OperationLogPayload,
   OperationSnapshot,
+  ThermalHistory,
+  ThermalSetupStored,
   PortInfo,
   PoseEntry,
   Stats,
@@ -185,7 +189,36 @@ export const api = {
   operationResume: () => post<{ ok: boolean }>('/api/operation/resume'),
   operationInput: (value: string) =>
     post<{ ok: boolean }>('/api/operation/input', { value }),
+  fingerSetup: () => request<FingerSetupStored>('/api/fingers/setup'),
+  saveFingerSetup: (body: Partial<FingerSetupStored>) =>
+    request<FingerSetupStored>('/api/fingers/setup', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  fingerPresets: () => request<FingerPresets>('/api/fingers/presets'),
+  saveFingerPreset: (name: string) =>
+    request<FingerPresets>(`/api/fingers/presets/${encodeURIComponent(name)}`, { method: 'PUT' }),
+  loadFingerPreset: (name: string) =>
+    post<FingerSetupStored>(`/api/fingers/presets/${encodeURIComponent(name)}/load`),
+  deleteFingerPreset: (name: string) =>
+    request<FingerPresets>(`/api/fingers/presets/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  // Only while finger control is engaged (409 otherwise).
+  fingerTargets: (targets: Record<string, number>, speedDegS?: number) =>
+    post<{ targets: Record<string, number>; speed_deg_s: number }>('/api/fingers/targets', {
+      targets,
+      speed_deg_s: speedDegS ?? null,
+    }),
+  thermalHistory: () => request<ThermalHistory>('/api/thermal/history'),
+  thermalSetup: () => request<ThermalSetupStored>('/api/thermal/setup'),
+  saveThermalSetup: (body: Partial<ThermalSetupStored>) =>
+    request<ThermalSetupStored>('/api/thermal/setup', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
   // Never raises server-side; always 200 with a report of what was actioned.
+  quit: () => post<{ ok: boolean }>('/api/quit'),
   estop: () =>
     post<{ ok: boolean; report: Record<string, unknown> }>('/api/estop'),
 

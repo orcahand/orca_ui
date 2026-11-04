@@ -110,10 +110,12 @@ class _CsvLog:
     """One run's CSV log: numbered parts, appended to whenever logging is on,
     the next part started once the current one reaches ``max_bytes``."""
 
-    def __init__(self, directory: str, started: datetime, max_bytes: int):
+    def __init__(self, directory: str, started: datetime, max_bytes: int, *,
+                 prefix: str = "cycle", columns: tuple = LOG_COLUMNS):
         os.makedirs(directory, exist_ok=True)
         self._dir = directory
-        self._base = started.strftime("cycle-%Y%m%d-%H%M%S")
+        self._base = started.strftime(f"{prefix}-%Y%m%d-%H%M%S")
+        self.columns = columns
         self.max_bytes = max_bytes
         self.part = 0
         self.files: list[str] = []
@@ -138,7 +140,7 @@ class _CsvLog:
         self._file = open(self.path, "a", newline="")
         self._writer = csv.writer(self._file)
         if new:
-            self._writer.writerow(LOG_COLUMNS)
+            self._writer.writerow(self.columns)
             self.files.append(self.name)
         self._file.flush()
 
@@ -158,7 +160,7 @@ class _CsvLog:
     def write(self, **fields) -> None:
         if self._writer is None:
             return
-        row = [fields.get(c, "") for c in LOG_COLUMNS]
+        row = [fields.get(c, "") for c in self.columns]
         self._writer.writerow(["" if v is None else
                                (round(v, 3) if isinstance(v, float) else v)
                                for v in row])
@@ -180,6 +182,30 @@ def _finite(value) -> float:
     if not math.isfinite(value):
         raise ValueError
     return value
+
+
+def check_shaft_range(motor_id: int, lo: float, hi: float, limits: dict,
+                      who: str | None = None) -> None:
+    """Refuse a shaft range too small to be a range, too long to be anything
+    but a typo, or outside a calibrated motor's travel."""
+    from orca_ui.hand.service import ServiceError
+
+    who = f"motor {motor_id}: " if who is None else who
+    span = abs(hi - lo)
+    if span < MIN_TRAVEL_DEG:
+        raise ServiceError(who + f"the range is {span:.1f}° — set the two ends "
+                           f"at least {MIN_TRAVEL_DEG:g}° apart")
+    if span > MAX_SPAN_DEG:
+        raise ServiceError(who + f"{span:.0f}° of travel is more than "
+                           f"{MAX_SPAN_DEG:g}° ({MAX_SPAN_DEG / 360:g} turns)")
+    bounds = limits.get(motor_id)
+    if bounds and None not in bounds:
+        lim_lo, lim_hi = sorted(_deg(b) for b in bounds)
+        if (min(lo, hi) < lim_lo - CALIBRATED_SLACK_DEG
+                or max(lo, hi) > lim_hi + CALIBRATED_SLACK_DEG):
+            raise ServiceError(who + f"motor {motor_id} is calibrated to "
+                               f"{lim_lo:.1f}°..{lim_hi:.1f}° — keep its range "
+                               "inside that travel")
 
 
 class _MotorRun:
@@ -446,24 +472,7 @@ class MotorCycleOperation(Operation):
                 raise ServiceError(
                     f"motor id {motor_id} is released — hold it first",
                     status_code=409)
-            span = abs(hi - lo)
-            if span < MIN_TRAVEL_DEG:
-                raise ServiceError(
-                    f"motor {motor_id}: the range is {span:.1f}° — set A and B "
-                    f"at least {MIN_TRAVEL_DEG:g}° apart")
-            if span > MAX_SPAN_DEG:
-                raise ServiceError(
-                    f"motor {motor_id}: {span:.0f}° of travel is more than "
-                    f"{MAX_SPAN_DEG:g}° ({MAX_SPAN_DEG / 360:g} turns)")
-            bounds = limits.get(motor_id)
-            if bounds and None not in bounds:
-                lim_lo, lim_hi = sorted(_deg(b) for b in bounds)
-                if (min(lo, hi) < lim_lo - CALIBRATED_SLACK_DEG
-                        or max(lo, hi) > lim_hi + CALIBRATED_SLACK_DEG):
-                    raise ServiceError(
-                        f"motor {motor_id} is calibrated to "
-                        f"{lim_lo:.1f}°..{lim_hi:.1f}° — keep its range inside "
-                        "that travel")
+            check_shaft_range(motor_id, lo, hi, limits)
             motors.append(cls._validate_cycle(motor_id, entry, lo, hi))
         # Config order, so the run reads the same way whatever order the
         # cards were ticked in.

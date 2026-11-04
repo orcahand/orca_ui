@@ -30,7 +30,7 @@ export function CarpalCover({build}:{build:Build}){
   <p className="assembly-muted">{build.side==='left'?'Left':'Right'} hand. Four self-tapping M1.4×6 screws.</p>
   <div className="assembly-carpal-cover-canvas">
    {loaded?.side===build.side?<Canvas key={build.side} orthographic frameloop="demand" camera={{position:[0,0,1000],near:.1,far:4000}} dpr={[1,2]}>
-    <color attach="background" args={['#e8edef']}/><ambientLight intensity={1.3}/><hemisphereLight intensity={1.4}/><directionalLight position={[200,400,600]} intensity={3}/><directionalLight position={[-300,0,-300]} intensity={1.5}/>
+    <ambientLight intensity={1.3}/><hemisphereLight intensity={1.4}/><directionalLight position={[200,400,600]} intensity={3}/><directionalLight position={[-300,0,-300]} intensity={1.5}/>
     <Model bundle={loaded.bundle} geometry={loaded.geometry} body={loaded.body} build={build} progress={progress}/><OrbitControls enablePan={false} minZoom={.7} maxZoom={3}/>
    </Canvas>:<p>{failed?'Unable to load the cover model. Reopen this step to retry.':'Loading the carpal cover…'}</p>}
   </div>

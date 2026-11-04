@@ -38,6 +38,11 @@ class OpContext:
         self.stop_event = stop_event
         self._input_queue = input_queue
 
+    @property
+    def run_id(self) -> str | None:
+        snapshot = self._manager.snapshot() or {}
+        return snapshot.get("run_id")
+
     # ----- snapshot updates ---------------------------------------------------
 
     def set_phase(self, phase: str, detail: str | None = None,

@@ -390,6 +390,165 @@ export interface MotorCycleResult {
   log_rows: number
 }
 
+// ----- motor_thermal operation (orca_ui/hand/operations/thermal.py) ----------
+
+export type ThermalWaveform = 'sine' | 'square' | 'constant'
+// coupled: shafts blocked pairwise, Goal Current bounds a far push.
+// free: nothing on the shafts, the servo runs in current control and turns.
+export type ThermalLoad = 'coupled' | 'free'
+export type ThermalMotorState = 'driving' | 'cooling' | 'limit' | 'slipped' | 'done'
+export type ThermalPhase = 'heating' | 'cooldown'
+
+export interface ThermalMotorReport {
+  id: number
+  invert: boolean
+  partner: number | null // the motor it is coupled to, shaft to shaft
+  phase_s: number // the waveform is evaluated at t - phase_s
+  state: ThermalMotorState
+  via_partner: boolean // cut because the partner was
+  stopped_s: number | null
+  goal_ma: number
+  current_ma: number | null
+  current_rms_ma: number | null
+  peak_current_ma: number
+  position_deg: number | null
+  drift_deg: number | null
+  drift_max_deg: number
+  temp_start_c: number | null
+  temp_c: number | null
+  temp_max_c: number | null
+  rise_c: number | null
+  rate_c_per_min: number | null
+  limit_at_s: number | null
+}
+
+export interface ThermalLive {
+  t: number
+  goal_ma: Record<string, number>
+  currents: Record<string, number>
+  positions: Record<string, number>
+  temps: Record<string, number>
+}
+
+export interface ThermalExtra {
+  elapsed_s: number
+  phase: ThermalPhase
+  phase_elapsed_s: number
+  phase_total_s: number | null // null while heating until stopped
+  progress: number | null
+  waveform: ThermalWaveform
+  frequency_hz: number
+  amplitude_ma: number
+  offset_ma: number
+  temp_limit_c: number
+  max_temp_c: number
+  slip_deg: number
+  slip_check: boolean
+  pairs: [number, number][]
+  load: ThermalLoad
+  stagger: boolean
+  driving: number
+  live: ThermalLive
+  motors: ThermalMotorReport[]
+  history_points: number
+  log: { on: boolean; file: string; files: string[]; rows: number }
+}
+
+export interface ThermalResult {
+  elapsed_s: number
+  motors: ThermalMotorReport[]
+  log_file: string | null
+  log_files: string[]
+  log_rows: number
+}
+
+// GET/PUT /api/thermal/setup — the page's remembered setup, kept beside the
+// bench config. Shapes inside are the page's own (frontend/src/thermal).
+export interface ThermalSetupStored {
+  pairs: { a: number; b: number; opposed: boolean; checked?: { at: string; sense: 1 | -1 } }[] | null
+  settings: Record<string, unknown> | null
+  motors: Record<string, { included: boolean }> | null
+}
+
+// ----- finger_control operation (orca_ui/hand/operations/fingers.py) ---------
+
+// GET/PUT /api/fingers/setup — a hand mounted on the bench, kept beside the
+// bench config: tendons (each wound on a motor), joints (each a linear
+// combination of tendons, gain in joint degrees per shaft degree, with two
+// captured ends in joint degrees), and the shaft zeros.
+export interface FingerTendon {
+  name: string
+  motor: number | null
+}
+
+// The file names tendons; the run takes terms resolved to motors.
+export interface FingerTerm {
+  tendon?: string
+  motor?: number
+  gain: number
+}
+
+export interface FingerJointStored {
+  name: string
+  terms: FingerTerm[]
+  open_deg: number | null
+  closed_deg: number | null
+  group: string
+}
+
+export interface FingerSetupStored {
+  tendons: FingerTendon[] | null
+  joints: FingerJointStored[] | null
+  // Shaft degrees per motor id at which every joint reads zero.
+  zeros: Record<string, number> | null
+  settings: Record<string, unknown> | null
+}
+
+// GET /api/fingers/presets — named copies of the setup, kept beside it.
+export interface FingerPresets {
+  presets: { name: string; saved_at: number }[]
+}
+
+export interface FingerJointReport {
+  name: string
+  motors: number[]
+  open_deg: number
+  closed_deg: number
+  target: number // fraction, 0 open .. 1 closed
+  cmd_deg: number
+  position_deg: number | null
+  fraction: number | null
+  current_ma: number | null
+}
+
+export interface FingerExtra {
+  elapsed_s: number
+  speed_deg_s: number
+  joints: FingerJointReport[]
+}
+
+// ----- pair_discovery operation (orca_ui/hand/operations/pairs.py) -----------
+
+export interface PairDiscoveryExtra {
+  mover: number | null
+  pairs: { a: number; b: number; opposed: boolean; followed_deg: number }[]
+  ambiguous: { motor: number; followers: number[] }[]
+}
+
+export interface PairDiscoveryResult extends PairDiscoveryExtra {
+  unpaired: number[]
+}
+
+// GET /api/thermal/history — the run's decimated traces, for a page that
+// opens mid-run; the live stream appends from there.
+export interface ThermalHistory {
+  run_id: string | null
+  period_s?: number
+  t_s: number[]
+  temps: Record<string, (number | null)[]>
+  currents: Record<string, (number | null)[]>
+}
+
 // ----- bus_scan operation (orca_ui/hand/operations/scan.py) ------------------
 
 export interface BusScanMotor {

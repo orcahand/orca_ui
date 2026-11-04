@@ -34,7 +34,7 @@ export function TouchScrewGuide({build}:{build:Build}){
   </div>
   <div className="assembly-screw-model" aria-label={`${finger} sensor with four color-coded screw locations`}>
    {loaded?.key===key?<Canvas key={`${key}-${finger}`} orthographic frameloop="demand" camera={{position:[0,0,1000],near:.1,far:4000}} dpr={[1,2]}>
-    <color attach="background" args={['#e8edef']}/><ambientLight intensity={1.4}/><hemisphereLight intensity={1.5}/><directionalLight position={[250,400,600]} intensity={3}/><directionalLight position={[-300,0,-600]} intensity={2}/>
+    <ambientLight intensity={1.4}/><hemisphereLight intensity={1.5}/><directionalLight position={[250,400,600]} intensity={3}/><directionalLight position={[-300,0,-600]} intensity={2}/>
     <ScrewModel bundle={loaded.bundle} build={build} finger={finger} length={length} exploded={exploded} seeThrough={seeThrough} onSelect={setLength}/><OrbitControls enablePan={false} minZoom={.6} maxZoom={3}/>
    </Canvas>:<p>{failed?'The model could not load. Use the reference screw diagrams below.':'Loading the sensor screw positions…'}</p>}
   </div>

@@ -54,14 +54,20 @@ def build_operation_manager(service, settings, publish_topic) -> OperationManage
     # In-session ops run for real in mock mode too (the mock stack is the
     # production stack over in-memory links).
     from orca_ui.hand.operations.bench import MotorCycleOperation
+    from orca_ui.hand.operations.fingers import FingerControlOperation
     from orca_ui.hand.operations.player import DemoOperation, ReplayOperation
     from orca_ui.hand.operations.record import RecordOperation
     from orca_ui.hand.operations.stress import StressTestOperation
+    from orca_ui.hand.operations.pairs import PairDiscoveryOperation
+    from orca_ui.hand.operations.thermal import ThermalTestOperation
     manager.register(ReplayOperation)
     manager.register(DemoOperation)
     manager.register(RecordOperation)
     manager.register(StressTestOperation)
     manager.register(MotorCycleOperation)
+    manager.register(ThermalTestOperation)
+    manager.register(PairDiscoveryOperation)
+    manager.register(FingerControlOperation)
     return manager
 
 

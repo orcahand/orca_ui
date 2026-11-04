@@ -71,6 +71,10 @@ class StreamHub:
         with self._clients_lock:
             self._clients.add(client)
 
+    def client_count(self) -> int:
+        with self._clients_lock:
+            return len(self._clients)
+
     def unregister(self, client: ClientConnection) -> None:
         client.alive = False
         with self._clients_lock:

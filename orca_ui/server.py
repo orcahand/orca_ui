@@ -5,14 +5,19 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import os
+import threading
+import time
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 
 from orca_ui.settings import UiSettings
 from orca_ui.streaming import topics as T
 from orca_ui.streaming.hub import StreamHub
+
+logger = logging.getLogger(__name__)
 
 WEBUI_DIR = os.path.join(os.path.dirname(__file__), "webui")
 
@@ -62,6 +67,13 @@ def create_app(settings: UiSettings) -> FastAPI:
         from orca_ui.bench import BenchAutoAdopt
         auto_adopt = BenchAutoAdopt(service)
 
+    idle_exit = None
+    if settings.exit_on_close and settings.open_browser:
+        idle_exit = IdleExit(
+            clients=hub.client_count,
+            busy=lambda: operations.active() or (teleop is not None and teleop.active()),
+        )
+
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
         from orca_ui.assembly_assets import prepare_assembly_models
@@ -70,11 +82,15 @@ def create_app(settings: UiSettings) -> FastAPI:
         telemetry.start()
         if auto_adopt is not None:
             auto_adopt.start()
+        if idle_exit is not None:
+            idle_exit.start()
         broadcaster = asyncio.create_task(hub.broadcaster())
         try:
             yield
         finally:
             broadcaster.cancel()
+            if idle_exit is not None:
+                idle_exit.shutdown()
             if auto_adopt is not None:
                 auto_adopt.shutdown()
             # Teleop first: no targets may race into a dying stack.
@@ -95,6 +111,20 @@ def create_app(settings: UiSettings) -> FastAPI:
     app.state.teleop_installer = installer
     app.state.telemetry = telemetry
 
+    @app.post("/api/quit")
+    def quit_server():
+        """Stop the server from the page — the same orderly shutdown as
+        Ctrl+C in the terminal: the run is refused, the hand is released."""
+        if operations.active():
+            raise HTTPException(status_code=409,
+                                detail="a run is in progress — stop it first")
+        if teleop is not None and teleop.active():
+            raise HTTPException(status_code=409,
+                                detail="teleop is active — stop it first")
+        logger.info("quit requested from the page — shutting down")
+        request_shutdown()
+        return {"ok": True}
+
     app.include_router(build_rest_router(service, telemetry))
     app.include_router(build_assets_router(service))
     app.include_router(build_assembly_router())
@@ -107,6 +137,62 @@ def create_app(settings: UiSettings) -> FastAPI:
     mount_assets(app)
     _mount_webui(app, bench=settings.bench)
     return app
+
+
+def request_shutdown() -> None:
+    """Ask uvicorn to stop the way Ctrl+C does, so the lifespan teardown runs
+    and the hand is released on the way out."""
+    import signal
+    import threading
+
+    # From a request handler the signal must land on the main thread; a
+    # short delay lets the HTTP reply go out first.
+    threading.Timer(0.3, lambda: os.kill(os.getpid(), signal.SIGINT)).start()
+
+
+class IdleExit(threading.Thread):
+    """Exit when the browser is gone.
+
+    The server is a tool that opened its own window; once that window — and
+    every other tab on it — has been closed for ``GRACE_S``, the terminal
+    should not need a Ctrl+C. A reload or a brief network blip is shorter
+    than the grace. Never fires while an operation or teleop is active (a
+    long run keeps going with the tab closed), and never before a browser
+    has connected at least once, so a slow browser launch is not mistaken
+    for a closed one.
+    """
+
+    GRACE_S = 10.0
+    POLL_S = 1.0
+
+    def __init__(self, clients, busy):
+        super().__init__(name="IdleExit", daemon=True)
+        self._clients = clients
+        self._busy = busy
+        self._stop = threading.Event()
+
+    def shutdown(self) -> None:
+        self._stop.set()
+
+    def run(self) -> None:
+        seen_client = False
+        empty_since: float | None = None
+        while not self._stop.wait(self.POLL_S):
+            if self._clients() > 0:
+                seen_client = True
+                empty_since = None
+                continue
+            if not seen_client or self._busy():
+                empty_since = None
+                continue
+            now = time.monotonic()
+            if empty_since is None:
+                empty_since = now
+            elif now - empty_since >= self.GRACE_S:
+                logger.info("browser closed — shutting down (start with "
+                            "--keep-running to stay up without a page)")
+                request_shutdown()
+                return
 
 
 def _mount_webui(app: FastAPI, bench: bool = False) -> None:

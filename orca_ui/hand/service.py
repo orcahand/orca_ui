@@ -1236,6 +1236,13 @@ class HandService:
             logger.warning("could not apply the %d mA current ceiling", ma,
                            exc_info=True)
 
+    def reapply_current_ceiling(self) -> None:
+        """Put the live ceiling back on every motor after an operation that
+        wrote Goal Current itself (the thermal bench modulates it)."""
+        session = self.session
+        if session is not None and session.caps.motors:
+            self._apply_current_ceiling(session)
+
     def _apply_servo_gains(self, session) -> None:
         """Re-apply the operator's chosen gains.
 

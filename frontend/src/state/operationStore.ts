@@ -24,6 +24,9 @@ const OPERATION_LABELS: Record<string, string> = {
   wizard: 'full setup',
   stress_test: 'stress test',
   motor_cycle: 'motor cycle',
+  motor_thermal: 'thermal test',
+  pair_discovery: 'pair discovery',
+  finger_control: 'finger control',
   bus_scan: 'bus scan',
 }
 

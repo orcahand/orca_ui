@@ -316,6 +316,86 @@ def build_router(service: HandService, telemetry=None) -> APIRouter:
             raise HTTPException(status_code=404, detail="no such log")
         return FileResponse(path, media_type="text/csv", filename=name)
 
+    @router.get("/thermal/history")
+    def thermal_history():
+        """The current (or last) thermal run's temperature history, for a
+        page that opens mid-run or reloads."""
+        from orca_ui.hand.operations.thermal import ThermalTestOperation
+
+        operation = _manager().operation
+        if not isinstance(operation, ThermalTestOperation):
+            return {"run_id": None, "t_s": [], "temps": {}, "currents": {}}
+        return operation.history()
+
+    @router.get("/thermal/setup")
+    def thermal_setup():
+        """The thermal page's remembered setup: coupled pairs (with their
+        last coupling check), waveform settings, which motors are in."""
+        from orca_ui.hand.operations.thermal import load_setup
+
+        return load_setup(service.settings)
+
+    @router.put("/thermal/setup")
+    def thermal_setup_save(body: dict):
+        from orca_ui.hand.operations.thermal import save_setup
+
+        return guard(save_setup, service.settings, body)
+
+    @router.get("/fingers/setup")
+    def finger_setup():
+        """The fingers page's remembered setup: joints (name, motor, the
+        captured open and closed shaft positions, group) and its settings."""
+        from orca_ui.hand.operations.fingers import load_setup
+
+        return load_setup(service.settings)
+
+    @router.put("/fingers/setup")
+    def finger_setup_save(body: dict):
+        from orca_ui.hand.operations.fingers import save_setup
+
+        return guard(save_setup, service.settings, body)
+
+    @router.get("/fingers/presets")
+    def finger_presets():
+        from orca_ui.hand.operations.fingers import list_presets
+
+        return list_presets(service.settings)
+
+    @router.put("/fingers/presets/{name}")
+    def finger_preset_save(name: str):
+        """Keep the setup in force under a name."""
+        from orca_ui.hand.operations.fingers import save_preset
+
+        return guard(save_preset, service.settings, name)
+
+    @router.post("/fingers/presets/{name}/load")
+    def finger_preset_load(name: str):
+        """Make a saved preset the setup in force. 409 while finger control runs."""
+        from orca_ui.hand.operations.fingers import FingerControlOperation, load_preset
+
+        manager = _manager()
+        if isinstance(manager.operation, FingerControlOperation) and manager.active():
+            raise HTTPException(status_code=409, detail="disengage finger control first")
+        return guard(load_preset, service.settings, name)
+
+    @router.delete("/fingers/presets/{name}")
+    def finger_preset_delete(name: str):
+        from orca_ui.hand.operations.fingers import delete_preset
+
+        return guard(delete_preset, service.settings, name)
+
+    @router.post("/fingers/targets")
+    def finger_targets(body: schemas.FingerTargetsRequest):
+        """Joint targets for the engaged finger run: a fraction per joint, 0
+        open to 1 closed. 409 unless finger control is running."""
+        from orca_ui.hand.operations.fingers import FingerControlOperation
+
+        manager = _manager()
+        operation = manager.operation
+        if not isinstance(operation, FingerControlOperation) or not manager.active():
+            raise HTTPException(status_code=409, detail="finger control is not engaged")
+        return guard(operation.set_targets, body.targets, body.speed_deg_s)
+
     @router.post("/bench/motors")
     def bench_motors(body: schemas.BenchMotorsRequest):
         """Adopt a motor set into the bench config and reconnect on it —

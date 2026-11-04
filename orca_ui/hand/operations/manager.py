@@ -74,6 +74,13 @@ class OperationManager:
         with self._lock:
             return self._snapshot.as_dict() if self._snapshot else None
 
+    @property
+    def operation(self) -> Operation | None:
+        """The most recently started operation object, finished or not, for
+        reads of state it keeps beyond the snapshot (a run's history)."""
+        with self._lock:
+            return self._operation
+
     def active(self) -> bool:
         with self._lock:
             return (

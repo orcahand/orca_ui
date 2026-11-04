@@ -38,6 +38,10 @@ class UiSettings:
     host: str = "0.0.0.0"
     port: int = 5001
     open_browser: bool = True
+    # Exit once the last browser tab has been closed for a while (never while
+    # a run or teleop is in progress). Off with --keep-running, and implied
+    # off when no browser was opened: a headless server is left alone.
+    exit_on_close: bool = True
     # Pose/trajectory library root; None -> ~/.orca_ui/library. Recordings and
     # user poses live under <root>/<model_name>/.
     library_dir: str | None = None

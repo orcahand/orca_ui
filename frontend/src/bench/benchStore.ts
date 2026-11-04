@@ -8,6 +8,14 @@ import { create } from 'zustand'
 import type { BusScanResult, HandInfo } from '../api/types'
 
 export type CycleMode = 'glide' | 'step'
+// What the page is for right now: cycling tendons, heating clamped
+// motors, or driving fingers mounted on them.
+export type BenchMode = 'cycle' | 'thermal' | 'fingers'
+const MODE_KEY = 'orca-ui.bench.mode'
+
+function isBenchMode(value: unknown): value is BenchMode {
+  return value === 'cycle' || value === 'thermal' || value === 'fingers'
+}
 export type EndName = 'a' | 'b'
 
 export interface CycleSettings {
@@ -95,6 +103,8 @@ export function motorLabel(motors: BenchMotor[], id: number | string): string {
 }
 
 interface BenchState {
+  mode: BenchMode
+  setMode(mode: BenchMode): void
   model: string | null
   motors: BenchMotor[]
   setup: Record<string, MotorSetup>
@@ -118,6 +128,27 @@ interface BenchState {
 }
 
 export const useBenchStore = create<BenchState>((set, get) => ({
+  // The URL hash (#thermal / #cycle) wins, so a mode can be linked to;
+  // otherwise the last mode used on this browser.
+  mode: (() => {
+    const hash = window.location.hash.replace('#', '')
+    if (isBenchMode(hash)) return hash
+    try {
+      const stored = localStorage.getItem(MODE_KEY)
+      return isBenchMode(stored) ? stored : 'cycle'
+    } catch {
+      return 'cycle'
+    }
+  })(),
+  setMode: (mode) => {
+    set({ mode })
+    try {
+      localStorage.setItem(MODE_KEY, mode)
+      window.history.replaceState(null, '', `#${mode}`)
+    } catch {
+      /* storage disabled: the mode just does not persist */
+    }
+  },
   model: null,
   motors: [],
   setup: {},

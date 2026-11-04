@@ -29,7 +29,7 @@ export function TouchCableWrap(){
   <div className="assembly-clip-tabs"><button aria-pressed={!close} onClick={()=>setClose(false)}>Whole cable</button><button aria-pressed={close} onClick={()=>setClose(true)}>Wrap close-up</button></div>
   <div className="assembly-cable-model" role="img" aria-label="Rotatable 130 millimetre cable with a 30 millimetre copper wrap and 70 millimetres from the wrap end to the right connector">
    <Canvas orthographic frameloop="demand" camera={{position:[0,0,180],near:.1,far:1000}} dpr={[1,2]}>
-    <color attach="background" args={['#e8edef']}/><ambientLight intensity={1.6}/><directionalLight position={[20,70,90]} intensity={3}/><directionalLight position={[-40,-50,30]} intensity={1.4}/>
+    <ambientLight intensity={1.6}/><directionalLight position={[20,70,90]} intensity={3}/><directionalLight position={[-40,-50,30]} intensity={1.4}/>
     <Cable progress={progress} close={close}/><OrbitControls key={String(close)} enablePan={false} enableZoom={false}/>
    </Canvas>
   </div>

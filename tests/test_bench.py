@@ -2,6 +2,7 @@
 bench page reads, over a simulated two-motor bench."""
 
 import json
+import math
 import time
 
 import pytest
@@ -163,3 +164,125 @@ def test_calibrated_motor_cannot_be_cycled_past_its_travel(tmp_path):
         assert "calibrated" in response.json()["detail"]
         # A hand's motor list is the hand's: the bench page may not rewrite it.
         assert hand.post("/api/bench/motors", json={"motor_ids": [1]}).status_code == 409
+
+
+def test_thermal_test_drives_locked_motors_behind_its_gates(bench):
+    """The thermal bench writes Goal Current itself: nothing without torque,
+    nothing above the ceiling, and the ceiling is back on when it ends."""
+    start = lambda **p: bench.post("/api/operation/motor_thermal/start",  # noqa: E731
+                                   json={"params": p})
+    # Nothing is driven without torque; the gate is per motor.
+    assert start(motors=[1, 2]).status_code == 409
+    assert bench.post("/api/motors/1/torque", json={"enabled": True}).status_code == 200
+    assert start(motors=[1, 2]).status_code == 409
+    assert bench.post("/api/motors/2/torque", json={"enabled": True}).status_code == 200
+    # |offset| + amplitude must fit under the console's current ceiling.
+    ceiling = bench.get("/api/hand/info").json()["control"]["max_current"]
+    assert start(motors=[1, 2], amplitude_ma=ceiling, offset_ma=1).status_code == 400
+    assert start(motors=[1, 2], temp_limit_c=500).status_code == 400
+    # A coupled pair is one unit: both in the test or neither.
+    assert start(motors=[1], pairs=[[1, 2]]).status_code == 400
+
+    response = start(motors=[{"id": 1}, {"id": 2, "invert": True}], pairs=[[1, 2]],
+                     amplitude_ma=100, offset_ma=20, frequency_hz=2.0, duration_s=1.0,
+                     cooldown_s=0.5, log=True, log_hz=10)
+    assert response.status_code == 200, response.text
+    assert bench.get("/api/hand/info").json()["control"]["direct_motor_mode"] is True
+    extra = _wait_for(lambda: (_operation(bench).get("extra") or {}).get("live", {}).get("goal_ma")
+                      and _operation(bench)["extra"])
+    # What the page reads: a report per motor and the live goal/actual pair.
+    for key in ("phase", "progress", "driving", "temp_limit_c", "max_temp_c",
+                "live", "motors", "history_points", "log"):
+        assert key in extra, key
+    assert {m["id"] for m in extra["motors"]} == {1, 2}
+    assert extra["motors"][1]["invert"] is True
+    assert extra["motors"][0]["partner"] == 2 and extra["pairs"] == [[1, 2]]
+    # The mock reads back what was written: the goal current is the current.
+    assert 0 <= extra["live"]["goal_ma"]["1"] <= 120
+
+    final = _wait_for(lambda: _operation(bench)["state"] in ("done", "error")
+                      and _operation(bench), timeout=20)
+    assert final["state"] == "done", final
+    report = {m["id"]: m for m in final["result"]["motors"]}
+    assert report[1]["state"] == "done" and report[1]["temp_c"] is not None
+    assert final["result"]["log_rows"] > 0
+    history = bench.get("/api/thermal/history").json()
+    assert history["run_id"] == final["run_id"] and set(history["temps"]) == {"1", "2"}
+    # The page's pairing is the bench's, kept beside its config, not the browser's.
+    saved = bench.put("/api/thermal/setup", json={"pairs": [{"a": 1, "b": 2, "opposed": False}]})
+    assert saved.status_code == 200 and bench.get("/api/thermal/setup").json()["pairs"] == [
+        {"a": 1, "b": 2, "opposed": False}]
+    assert bench.put("/api/thermal/setup", json={"pairs": [{"a": 1, "b": 1}]}).status_code == 400
+    # Left as it was found: direct mode off, torque on, ceiling re-applied.
+    control = bench.get("/api/hand/info").json()["control"]
+    assert control["direct_motor_mode"] is False
+    assert bench.get("/api/status").json()["torque_enabled"] is True
+    # The mock reads Goal Current back as the current: the ceiling is on again.
+    hand = bench.app.state.service.session.hand
+    assert hand.get_motor_current(as_dict=True)[1] == ceiling
+
+
+def test_finger_control_clamps_to_the_captured_range_behind_the_torque_gate(bench):
+    """Fingers on the bench: joints are the operator's — a linear combination
+    of motors and two captured ends in joint degrees — kept beside the bench
+    config. Driving them is a run that refuses released motors, a coupling it
+    cannot invert, unknown joints, and any target past the captured ends."""
+    # MCP and PIP read as a sum and a difference of two shafts: mcp =
+    # 0.5 (θ1 + θ2), pip = 0.5 (θ1 − θ2) (gains in joint deg per shaft deg).
+    joints = [{"name": "index_mcp", "group": "index", "open_deg": 0.0, "closed_deg": 90.0,
+               "terms": [{"motor": 1, "gain": 0.5}, {"motor": 2, "gain": 0.5}]},
+              {"name": "index_pip", "group": "index", "open_deg": 0.0, "closed_deg": 100.0,
+               "terms": [{"motor": 1, "gain": 0.5}, {"motor": 2, "gain": -0.5}]}]
+    # The setup follows the bench, not the browser.
+    assert bench.put("/api/fingers/setup", json={"joints": joints}).status_code == 200
+    stored = bench.get("/api/fingers/setup").json()
+    assert stored["joints"][1]["terms"][1] == {"motor": 2, "gain": -0.5}
+
+    start = lambda **p: bench.post("/api/operation/finger_control/start",  # noqa: E731
+                                   json={"params": p})
+    assert bench.post("/api/fingers/targets", json={"targets": {"index_mcp": 1}}).status_code == 409
+    # Nothing moves without torque, and it is per motor.
+    assert start(joints=joints).status_code == 409
+    assert bench.post("/api/motors/1/torque", json={"enabled": True}).status_code == 200
+    assert start(joints=joints).status_code == 409
+    assert bench.post("/api/motors/2/torque", json={"enabled": True}).status_code == 200
+    bench.post("/api/control/pose_source", json={"mode": "estimate"})
+    # Two joints with the same terms cannot be told apart; a joint on a motor
+    # another coupling owns makes three joints on two motors.
+    same = [joints[0], {**joints[1], "terms": joints[0]["terms"]}]
+    assert start(joints=same).status_code == 400
+    third = joints + [{"name": "ring", "open_deg": 0, "closed_deg": 10,
+                       "terms": [{"motor": 2, "gain": 1}]}]
+    assert start(joints=third).status_code == 400
+    assert start(joints=[{**joints[0], "closed_deg": 0.5}]).status_code == 400
+    response = start(joints=joints, speed_deg_s=2000)
+    assert response.status_code == 200, response.text
+    assert _wait_for(lambda: (_operation(bench) or {}).get("state") == "running")
+
+    assert bench.post("/api/fingers/targets", json={"targets": {"thumb": 0.5}}).status_code == 404
+    # A target past the end is clamped to it, never written past it.
+    response = bench.post("/api/fingers/targets",
+                          json={"targets": {"index_mcp": 7.0, "index_pip": -3.0}})
+    assert response.status_code == 200, response.text
+    assert response.json()["targets"] == {"index_mcp": 1.0, "index_pip": 0.0}
+
+    def arrived():
+        extra = (_operation(bench) or {}).get("extra") or {}
+        by_name = {j["name"]: j for j in extra.get("joints", [])}
+        mcp, pip = by_name.get("index_mcp"), by_name.get("index_pip")
+        return (mcp and pip and mcp["position_deg"] is not None
+                and abs(mcp["position_deg"] - 90.0) < 2.0
+                and abs(pip["position_deg"]) < 2.0)
+    assert _wait_for(arrived, timeout=10)
+    # MCP closed with PIP open means both shafts at +90: the coupling, applied.
+    shafts = {m["id"]: m["position"] for m in bench.get("/api/motors/direct").json()["motors"]}
+    assert shafts[1] == pytest.approx(math.radians(90), abs=0.05)
+    assert shafts[2] == pytest.approx(math.radians(90), abs=0.05)
+
+    assert bench.post("/api/operation/stop").status_code == 200
+    assert _wait_for(lambda: (_operation(bench) or {}).get("state") == "done")
+    # Let go of the bus but not of the fingers: direct mode off, motors held.
+    control = bench.get("/api/hand/info").json()["control"]
+    assert control["direct_motor_mode"] is False
+    assert control["control_source"] == "manual"
+    assert control["held_motors"] == [1, 2]

@@ -11,13 +11,8 @@ import { useAppStore } from '../state/appStore'
 import { useOperationActive, useOperationStore } from '../state/operationStore'
 import { type BenchMotor, useBenchStore } from './benchStore'
 import { CycleFields } from './CycleFields'
+import { JOG_STEPS_DEG, useJog } from './useJog'
 import { formatDeg, formatMa, useMotorLive } from './useMotorLive'
-
-// Below the backend's 0.8 rad per-move cap, so every jog is one accepted write.
-const JOG_STEPS_DEG = [2, 10, 30]
-const JOG_REPEAT_MS = 180
-const JOG_REPEAT_AFTER_MS = 400
-const DEG = Math.PI / 180
 
 export function MotorCard({ motor, connected }: { motor: BenchMotor; connected: boolean }) {
   const setup = useBenchStore((s) => s.setup[motor.id])
@@ -30,7 +25,6 @@ export function MotorCard({ motor, connected }: { motor: BenchMotor; connected: 
     (s) => s.operation?.kind === 'motor_cycle' && opActive,
   )
   const [step, setStep] = useState(JOG_STEPS_DEG[1])
-  const [jogging, setJogging] = useState(false)
   const [holdBusy, setHoldBusy] = useState(false)
 
   const posRef = useRef<HTMLSpanElement>(null)
@@ -39,10 +33,6 @@ export function MotorCard({ motor, connected }: { motor: BenchMotor; connected: 
   const tempRef = useRef<HTMLSpanElement>(null)
   const faultRef = useRef<HTMLSpanElement>(null)
   const livePos = useRef<number | null>(null)
-  const repeat = useRef<{ timer: number | null; interval: number | null }>({
-    timer: null,
-    interval: null,
-  })
 
   const id = String(motor.id)
   useMotorLive((frames) => {
@@ -82,6 +72,7 @@ export function MotorCard({ motor, connected }: { motor: BenchMotor; connected: 
   const manual = control?.control_source === 'manual'
   const canJog = connected && held && manual && !opActive
   const canHold = connected && manual && !opActive && !holdBusy
+  const { jogging, startRepeat, stopRepeat } = useJog(motor.id, livePos, step, canJog)
 
   const toggleHold = async () => {
     setHoldBusy(true)
@@ -93,51 +84,6 @@ export function MotorCard({ motor, connected }: { motor: BenchMotor; connected: 
     } finally {
       setHoldBusy(false)
     }
-  }
-
-  const jogOnce = async (direction: 1 | -1) => {
-    try {
-      let positionDeg = livePos.current
-      if (positionDeg === null) {
-        const snapshot = await api.motorsDirect()
-        const entry = snapshot.motors.find((m) => m.id === motor.id)
-        if (!entry) return
-        positionDeg = entry.position / DEG
-      }
-      if (!useAppStore.getState().control?.direct_motor_mode) {
-        await api.motorsDirectMode(true)
-      }
-      const target = (positionDeg + direction * step) * DEG
-      await api.motorsDirectPosition(motor.id, target)
-      // Optimistic: the next stream sample confirms, and a held button keeps
-      // stepping from where the last write asked for.
-      livePos.current = positionDeg + direction * step
-      setError(null)
-    } catch (error) {
-      setError(String((error as Error).message ?? error))
-      stopRepeat()
-    }
-  }
-
-  const stopRepeat = () => {
-    const r = repeat.current
-    if (r.timer !== null) window.clearTimeout(r.timer)
-    if (r.interval !== null) window.clearInterval(r.interval)
-    r.timer = null
-    r.interval = null
-    setJogging(false)
-  }
-
-  const startRepeat = (direction: 1 | -1) => {
-    if (!canJog) return
-    setJogging(true)
-    void jogOnce(direction)
-    repeat.current.timer = window.setTimeout(() => {
-      repeat.current.interval = window.setInterval(
-        () => void jogOnce(direction),
-        JOG_REPEAT_MS,
-      )
-    }, JOG_REPEAT_AFTER_MS)
   }
 
   const capture = (which: 'a' | 'b') => {

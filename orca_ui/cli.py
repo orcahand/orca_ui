@@ -63,6 +63,10 @@ def parse_args(argv=None) -> argparse.Namespace:
                         help="HTTP port (default: 5001).")
     parser.add_argument("--no-browser", action="store_true",
                         help="Don't automatically open a browser window on startup.")
+    parser.add_argument("--keep-running", action="store_true",
+                        help="Stay up after the browser window is closed. By "
+                             "default the server exits once the last tab has "
+                             "been gone for a few seconds (never during a run).")
     parser.add_argument("--fast-hz", type=float, default=60.0,
                         help="Sampling rate for encoder/tactile telemetry "
                              "(in-memory reads; default 60).")
@@ -150,6 +154,7 @@ def build_settings(argv=None) -> UiSettings:
         host=args.host,
         port=args.port,
         open_browser=not args.no_browser,
+        exit_on_close=not args.keep_running,
         fast_hz=args.fast_hz,
         mid_hz=args.mid_hz,
         slow_hz=args.slow_hz,
