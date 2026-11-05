@@ -388,13 +388,28 @@ def build_router(service: HandService, telemetry=None) -> APIRouter:
     def finger_targets(body: schemas.FingerTargetsRequest):
         """Joint targets for the engaged finger run: a fraction per joint, 0
         open to 1 closed. 409 unless finger control is running."""
+        return guard(_finger_run().set_targets, body.targets, body.speed_deg_s)
+
+    def _finger_run():
         from orca_ui.hand.operations.fingers import FingerControlOperation
 
         manager = _manager()
         operation = manager.operation
         if not isinstance(operation, FingerControlOperation) or not manager.active():
             raise HTTPException(status_code=409, detail="finger control is not engaged")
-        return guard(operation.set_targets, body.targets, body.speed_deg_s)
+        return operation
+
+    @router.post("/fingers/cycle")
+    def finger_cycle(body: schemas.FingerCycleRequest):
+        """Walk the engaged run through poses, dwell_s at each, cycles times
+        round (0: until stopped). A slider target ends the cycle."""
+        return guard(_finger_run().set_cycle, [p.model_dump() for p in body.poses],
+                     body.cycles, body.dwell_s, body.speed_deg_s)
+
+    @router.delete("/fingers/cycle")
+    def finger_cycle_stop():
+        """End the cycle; the joints stay where they are."""
+        return guard(_finger_run().stop_cycle)
 
     @router.post("/bench/motors")
     def bench_motors(body: schemas.BenchMotorsRequest):

@@ -85,6 +85,54 @@ export function MotorHandles({ motorId, connected }: { motorId: number | null; c
   )
 }
 
+// Pin every tendon's motor at once so the spools stay put while the tendons
+// are wound on and tensioned, then let them all go again.
+function HoldAll({ connected }: { connected: boolean }) {
+  const tendons = useFingerStore((s) => s.tendons)
+  const control = useAppStore((s) => s.control)
+  const setError = useAppStore((s) => s.setError)
+  const opActive = useOperationActive()
+  const [busy, setBusy] = useState(false)
+  const wound = [...new Set(tendons.map((t) => t.motor).filter((m): m is number => m !== null))]
+  const heldSet = new Set(control?.held_motors ?? [])
+  const held = wound.filter((m) => heldSet.has(m)).length
+  const can = connected && control?.control_source === 'manual' && !opActive && !busy && wound.length > 0
+  const setAll = async (enabled: boolean) => {
+    setBusy(true)
+    try {
+      for (const id of wound) if (heldSet.has(id) !== enabled) await api.motorTorque(id, enabled)
+      setError(null)
+    } catch (error) {
+      setError(String((error as Error).message ?? error))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <span className="finger-hold-all">
+      <button
+        className="btn btn-info"
+        disabled={!can || held === wound.length}
+        title="torque on every tendon's motor: the spools stay put while you wind and tension the tendons"
+        onClick={() => void setAll(true)}
+      >
+        hold all
+      </button>
+      <button
+        className="btn btn-danger"
+        disabled={!can || held === 0}
+        title="torque off every tendon's motor: the spools turn freely"
+        onClick={() => void setAll(false)}
+      >
+        release all
+      </button>
+      <small>
+        {wound.length === 0 ? 'no motors assigned' : `${held}/${wound.length} held`}
+      </small>
+    </span>
+  )
+}
+
 function TendonRow({
   tendon,
   index,
@@ -138,6 +186,14 @@ function TendonRow({
         <span className="finger-live" title="live shaft position">
           <span ref={posRef}>—</span>
         </span>
+        <button
+          className={`btn btn-secondary finger-direction ${(tendon.direction ?? 1) < 0 ? 'on' : ''}`}
+          disabled={locked}
+          title="winding sense: flip when the tendon is wound the other way round its spool, so + turns pay it out instead of pulling it in"
+          onClick={() => patchTendon(index, { direction: (tendon.direction ?? 1) < 0 ? 1 : -1 })}
+        >
+          {(tendon.direction ?? 1) < 0 ? 'wound −' : 'wound +'}
+        </button>
         <MotorHandles motorId={tendon.motor} connected={connected} />
         <span className="finger-span">{movers.length ? `moves ${movers.join(', ')}` : 'moves nothing yet'}</span>
         <span className="finger-row-tools">
@@ -169,12 +225,14 @@ export function FingerTendons({ connected, locked }: { connected: boolean; locke
         <h2>Tendons</h2>
         <small className="finger-hint">
           name each tendon and pick the motor it is wound on — hold a motor and jog it to see which tendon
-          moves
+          moves; hold all to tension the spools. If the MCP and PIP of a finger come out swapped, flip the
+          winding sense of one of its tendons
         </small>
+        <HoldAll connected={connected} />
         <button
           className="btn btn-secondary"
           disabled={locked}
-          title="start from a whole hand: a tendon per phalanx on the motors in number order, its joints, MCP and PIP coupled"
+          title="start from a whole hand: per finger abd, 1 (flexion, thumb side) and 2, on the motors in number order, its joints, MCP and PIP coupled"
           onClick={() => {
             if ((tendons.length === 0 && joints.length === 0) || window.confirm('Replace the tendons and joints with a full hand?'))
               addHand()

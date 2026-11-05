@@ -110,6 +110,16 @@ export function jointAnglesOf(
   return out
 }
 
+/** Shaft degrees each motor must turn to move one joint by dq degrees while
+ *  the coupling's other joints stay put: a column of the inverse. Null when
+ *  the coupling cannot be inverted. */
+export function shaftDeltaFor(c: Coupling, jointName: string, dq: number): Record<number, number> | null {
+  const j = c.joints.findIndex((joint) => joint.name === jointName)
+  const inverse = j < 0 ? null : invert(c.matrix)
+  if (!inverse) return null
+  return Object.fromEntries(c.motors.map((motor, i) => [motor, inverse[i][j] * dq]))
+}
+
 /** Gains for an MCP/PIP pair on a sum/difference tendon routing, as the
  *  formula reads:  q_MCP = r_s (θ_U + θ_C) / r_MCP,   q_PIP = r_s (θ_U − θ_C) / r_PIP. */
 export function differentialGains(spoolRadius: number, radiusMcp: number, radiusPip: number) {

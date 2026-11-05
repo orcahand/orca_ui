@@ -8,6 +8,8 @@ import type {
   DemoEntry,
   DirectMotorSnapshot,
   FingerPresets,
+  FingerCycleReport,
+  FingerPose,
   FingerSetupStored,
   HandInfo,
   JointCalibrateResult,
@@ -204,6 +206,10 @@ export const api = {
   deleteFingerPreset: (name: string) =>
     request<FingerPresets>(`/api/fingers/presets/${encodeURIComponent(name)}`, { method: 'DELETE' }),
   // Only while finger control is engaged (409 otherwise).
+  // Walk the engaged run through poses; a slider target ends the cycle.
+  fingerCycle: (poses: FingerPose[], cycles: number, dwellS: number, speedDegS?: number) =>
+    post<FingerCycleReport>('/api/fingers/cycle', { poses, cycles, dwell_s: dwellS, speed_deg_s: speedDegS ?? null }),
+  fingerCycleStop: () => request<{ stopped: boolean }>('/api/fingers/cycle', { method: 'DELETE' }),
   fingerTargets: (targets: Record<string, number>, speedDegS?: number) =>
     post<{ targets: Record<string, number>; speed_deg_s: number }>('/api/fingers/targets', {
       targets,

@@ -1,8 +1,8 @@
 // Step 2 — coupling: which tendons move each joint, and by how much. Every
 // joint is one editable formula line, q = gain · θ(tendon) + gain · θ(tendon)
 // + …, grouped by finger. The routing panel at the top holds the one rule a
-// hand's fingers share — MCP and PIP as a sum and a difference of the pp
-// tendon (proximal phalanx, U) and the pip tendon (fingertip, C) — with its
+// hand's fingers share — MCP and PIP as a sum and a difference of tendon 1
+// (thumb side, U) and tendon 2 (C) — with its
 // radii, and writes the gains it produces into every finger; the lines stay
 // editable afterwards.
 
@@ -168,12 +168,12 @@ function RoutingPanel({ locked }: { locked: boolean }) {
       <span className="thermal-group-title">tendon routing in every finger</span>
       <ul className="finger-formula" aria-label="coupling of MCP and PIP in every finger">
         <li>
-          q<sub>MCP</sub> = r<sub>s</sub>(θ<sub>pp</sub> + θ<sub>pip</sub>) / {settings.mcpRadiusMm}
-          <small>= {(settings.spoolRadiusMm / settings.mcpRadiusMm).toFixed(3)} · (θ<sub>pp</sub> + θ<sub>pip</sub>)</small>
+          q<sub>MCP</sub> = r<sub>s</sub>(θ<sub>1</sub> + θ<sub>2</sub>) / {settings.mcpRadiusMm}
+          <small>= {(settings.spoolRadiusMm / settings.mcpRadiusMm).toFixed(3)} · (θ<sub>1</sub> + θ<sub>2</sub>)</small>
         </li>
         <li>
-          q<sub>PIP</sub> = r<sub>s</sub>(θ<sub>pp</sub> − θ<sub>pip</sub>) / {settings.pipRadiusMm}
-          <small>= {(settings.spoolRadiusMm / settings.pipRadiusMm).toFixed(3)} · (θ<sub>pp</sub> − θ<sub>pip</sub>)</small>
+          q<sub>PIP</sub> = r<sub>s</sub>(θ<sub>1</sub> − θ<sub>2</sub>) / {settings.pipRadiusMm}
+          <small>= {(settings.spoolRadiusMm / settings.pipRadiusMm).toFixed(3)} · (θ<sub>1</sub> − θ<sub>2</sub>)</small>
         </li>
       </ul>
       <div className="bench-fields">
@@ -183,12 +183,12 @@ function RoutingPanel({ locked }: { locked: boolean }) {
         <button
           className="btn btn-primary"
           disabled={locked || pairs === 0}
-          title="write these gains into the MCP and PIP lines of every finger, on the pp (U) and pip (C) tendons those lines name"
+          title="write these gains into the MCP and PIP lines of every finger, on tendon 1 (U, thumb side) and tendon 2 (C) as those lines name them"
           onClick={coupleFingers}
         >
           apply to {pairs} finger{pairs === 1 ? '' : 's'}
         </button>
-        <small className="finger-hint">abduction is one tendon on its own motor; edit any other line below by hand</small>
+        <small className="finger-hint">tendon 1 is the flexion tendon nearer the thumb, 2 the other; abduction is one tendon on its own motor; edit any line below by hand</small>
       </div>
     </div>
   )

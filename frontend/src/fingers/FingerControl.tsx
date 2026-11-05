@@ -1,7 +1,8 @@
 // Step 4 — control: Engage starts the run, then every joint has a slider
 // from open to closed and every finger a curl slider that moves its flexion
-// joints together. Everything the operation validates is gated here too, so
-// Engage says why it is off instead of bouncing a 409.
+// joints together. The sliders can be kept as named poses, and the run can
+// cycle through the poses in order. Everything the operation validates is
+// gated here too, so Engage says why it is off instead of bouncing a 409.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api/rest'
@@ -11,7 +12,7 @@ import { useMotorLive } from '../bench/useMotorLive'
 import { useAppStore } from '../state/appStore'
 import { isOperationActive, operationLabel, useOperationStore } from '../state/operationStore'
 import { type MotorJoint, couplingsOf, jointAnglesOf } from './coupling'
-import { fractionOf, groupsOf, readyJoints, resolve, useFingerStore } from './fingerStore'
+import { type FingerPose, fractionOf, groupsOf, readyJoints, resolve, useFingerStore } from './fingerStore'
 
 function JointSlider({ joint, all, engaged }: { joint: MotorJoint; all: MotorJoint[]; engaged: boolean }) {
   const target = useFingerStore((s) => s.targets[joint.name] ?? 0)
@@ -116,6 +117,148 @@ function GroupSlider({
   )
 }
 
+// Named poses of the sliders, and the cycle that walks the run through them.
+function PosePanel({ engaged, extra, names }: { engaged: boolean; extra: FingerExtra | null; names: string[] }) {
+  const poses = useFingerStore((s) => s.poses)
+  const targets = useFingerStore((s) => s.targets)
+  const setTargets = useFingerStore((s) => s.setTargets)
+  const capturePose = useFingerStore((s) => s.capturePose)
+  const removePose = useFingerStore((s) => s.removePose)
+  const movePose = useFingerStore((s) => s.movePose)
+  const settings = useFingerStore((s) => s.settings)
+  const patchSettings = useFingerStore((s) => s.patchSettings)
+  const setError = useAppStore((s) => s.setError)
+  const [busy, setBusy] = useState(false)
+  const cycle = extra?.cycle ?? null
+
+  const call = async (action: () => Promise<unknown>) => {
+    setBusy(true)
+    try {
+      await action()
+      setError(null)
+    } catch (error) {
+      setError(String((error as Error).message ?? error))
+    } finally {
+      setBusy(false)
+    }
+  }
+  const capture = () => {
+    const name = window.prompt('Keep the sliders as pose…', `pose ${poses.length + 1}`)
+    if (!name?.trim()) return
+    capturePose(name.trim(), Object.fromEntries(names.map((n) => [n, targets[n] ?? 0])))
+  }
+  // A stored pose may name joints that are not engaged now: only the engaged ones go.
+  const goTo = (pose: FingerPose) =>
+    setTargets(Object.fromEntries(Object.entries(pose.targets).filter(([n]) => names.includes(n))))
+  const startCycle = () =>
+    call(() => api.fingerCycle(poses, settings.cycleCount, settings.cycleDwellS, settings.speedDegS))
+  const stopCycle = () => call(() => api.fingerCycleStop())
+  const describe = (pose: FingerPose) =>
+    Object.entries(pose.targets)
+      .map(([n, f]) => `${n} ${Math.round(f * 100)}%`)
+      .join(' · ')
+
+  return (
+    <div className="finger-poses">
+      <div className="finger-group-head">
+        <h3>poses</h3>
+        <button
+          className="btn btn-secondary"
+          disabled={!engaged || names.length === 0 || poses.length >= 64}
+          title="keep where the sliders are now as a named pose"
+          onClick={capture}
+        >
+          + capture pose
+        </button>
+        <span className="finger-group-buttons">
+          {cycle ? (
+            <button className="btn btn-danger" disabled={busy} onClick={stopCycle}>
+              ◼ stop cycle
+            </button>
+          ) : (
+            <button
+              className="btn btn-primary"
+              disabled={busy || !engaged || poses.length < 2}
+              title={poses.length < 2 ? 'a cycle needs at least two poses' : 'walk through the poses in order'}
+              onClick={startCycle}
+            >
+              ▶ cycle
+            </button>
+          )}
+          <label className="stress-field" title="rounds through the poses; 0 keeps going until stopped">
+            ×
+            <input
+              type="number"
+              min={0}
+              max={100000}
+              step={1}
+              value={settings.cycleCount}
+              disabled={!!cycle}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10)
+                if (Number.isFinite(v) && v >= 0) patchSettings({ cycleCount: v })
+              }}
+            />
+          </label>
+          <label className="stress-field" title="how long each pose is held once every joint has arrived">
+            dwell
+            <input
+              type="number"
+              min={0}
+              max={600}
+              step={0.1}
+              value={settings.cycleDwellS}
+              disabled={!!cycle}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value)
+                if (Number.isFinite(v) && v >= 0) patchSettings({ cycleDwellS: v })
+              }}
+            />
+            s
+          </label>
+        </span>
+        <span className="bench-run-hint">
+          {cycle
+            ? `${cycle.phase === 'moving' ? 'going to' : 'holding'} ${cycle.pose} (${cycle.index + 1}/${cycle.poses.length}) · round ${cycle.done + 1}${cycle.cycles ? ` of ${cycle.cycles}` : ''}`
+            : poses.length
+              ? 'go to a pose, or cycle through them in this order — a slider ends the cycle'
+              : 'capture a pose to come back to it'}
+        </span>
+      </div>
+      {poses.map((pose, index) => (
+        <div key={pose.name} className={`finger-pose ${cycle?.pose === pose.name ? 'on' : ''}`}>
+          <button className="btn btn-secondary" disabled={!engaged || !!cycle} title={describe(pose)} onClick={() => goTo(pose)}>
+            go
+          </button>
+          <span className="finger-pose-name">{pose.name}</span>
+          <span className="finger-pose-detail" title={describe(pose)}>
+            {describe(pose)}
+          </span>
+          <span className="finger-row-tools">
+            <button
+              className="btn btn-secondary"
+              disabled={!engaged || !!cycle}
+              title="overwrite this pose with where the sliders are now"
+              onClick={() => capturePose(pose.name, Object.fromEntries(names.map((n) => [n, targets[n] ?? 0])))}
+            >
+              update
+            </button>
+            <button className="btn btn-secondary" disabled={!!cycle || index === 0} title="move up" onClick={() => movePose(index, -1)}>
+              ↑
+            </button>
+            <button className="btn btn-secondary" disabled={!!cycle || index === poses.length - 1} title="move down" onClick={() => movePose(index, 1)}>
+              ↓
+            </button>
+            <button className="btn btn-secondary finger-remove" disabled={!!cycle} title="forget this pose" onClick={() => removePose(index)}>
+              ×
+            </button>
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function FingerControl({ connected }: { connected: boolean }) {
   const joints = useFingerStore((s) => s.joints)
   const tendons = useFingerStore((s) => s.tendons)
@@ -161,8 +304,9 @@ export function FingerControl({ connected }: { connected: boolean }) {
   const seededRun = useRef<string | null>(null)
   useEffect(() => {
     if (!ours || !extra || !operation) return
-    if (seededRun.current === operation.run_id) return
     if (!extra.joints.length) return
+    // While a cycle runs the run leads, and the sliders show where it is going.
+    if (seededRun.current === operation.run_id && !extra.cycle) return
     seededRun.current = operation.run_id
     seedTargets(Object.fromEntries(extra.joints.map((j) => [j.name, j.target])))
   }, [ours, extra, operation, seedTargets])
@@ -256,11 +400,12 @@ export function FingerControl({ connected }: { connected: boolean }) {
             : blocked ?? `${ready.length} joint(s) ready${skipped ? `, ${skipped} not yet` : ''}`}
         </span>
       </div>
+      <PosePanel engaged={!!ours} extra={extra} names={shown.map((j) => j.name)} />
       {groups.length === 0 ? (
         <p className="panel-empty">The sliders appear once a joint has its tendons, a solvable coupling and both ends.</p>
       ) : (
         groups.map((g) => (
-          <GroupSlider key={g.group || '\u0000'} group={g.group} joints={g.joints} all={shown} engaged={!!ours} />
+          <GroupSlider key={g.group || '\u0000'} group={g.group} joints={g.joints} all={shown} engaged={!!ours || !!extra?.cycle} />
         ))
       )}
     </section>

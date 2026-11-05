@@ -1,26 +1,160 @@
 // Step 3 — range: the open and the closed end of every joint, in joint
-// degrees read through the coupling. Release the motors, move a joint by
-// hand to an end and Set it — or hold its first tendon's motor and jog
-// there. Set zero records the shaft positions at which every joint reads 0°.
+// degrees read through the coupling. Hold the finger's motors and jog the
+// joint itself — every motor of the coupling turns by its share of the
+// inverse, so the other joints stay put — to an end and Set it. Set zero
+// records the shaft positions at which every joint reads 0°.
 
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { api } from '../api/rest'
 import { useAppStore } from '../state/appStore'
+import { useOperationActive } from '../state/operationStore'
 import { useBenchStore } from '../bench/benchStore'
 import { formatDeg, useMotorLive } from '../bench/useMotorLive'
-import { type Coupling, type MotorJoint, couplingProblem, couplingsOf, jointAnglesOf } from './coupling'
-import { MotorHandles, motorLabel } from './FingerTendons'
+import { type Coupling, type MotorJoint, couplingProblem, couplingsOf, jointAnglesOf, shaftDeltaFor } from './coupling'
+import { motorLabel } from './FingerTendons'
 import { fractionOf, groupsOf, hasRange, resolve, useFingerStore } from './fingerStore'
+
+const JOINT_STEP_DEG = 5
+const JOG_REPEAT_MS = 180
+const JOG_REPEAT_AFTER_MS = 400
+// Below the backend's 0.8 rad per-write cap, so every motor's share is one accepted write.
+const MAX_SHAFT_STEP_DEG = 40
+const DEG = Math.PI / 180
+
+// Hold or release every motor of the joint's coupling, and jog the joint in
+// joint degrees through the inverse of the coupling.
+function JointHandles({
+  joint,
+  coupling,
+  connected,
+  positions,
+}: {
+  joint: MotorJoint
+  coupling: Coupling
+  connected: boolean
+  positions: React.MutableRefObject<Record<string, number>>
+}) {
+  const control = useAppStore((s) => s.control)
+  const setError = useAppStore((s) => s.setError)
+  const motors = useBenchStore((s) => s.motors)
+  const opActive = useOperationActive()
+  const [busy, setBusy] = useState(false)
+  const [jogging, setJogging] = useState(false)
+  const repeat = useRef<{ timer: number | null; interval: number | null }>({ timer: null, interval: null })
+  const heldSet = new Set(control?.held_motors ?? [])
+  const allHeld = coupling.motors.every((m) => heldSet.has(m))
+  const manual = control?.control_source === 'manual'
+  const canHold = connected && manual && !opActive && !busy
+  const canJog = connected && manual && !opActive && allHeld && couplingProblem(coupling) === null
+
+  const toggleHold = async () => {
+    setBusy(true)
+    try {
+      for (const id of coupling.motors) if (heldSet.has(id) !== !allHeld) await api.motorTorque(id, !allHeld)
+      setError(null)
+    } catch (error) {
+      setError(String((error as Error).message ?? error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const stopRepeat = () => {
+    const r = repeat.current
+    if (r.timer !== null) window.clearTimeout(r.timer)
+    if (r.interval !== null) window.clearInterval(r.interval)
+    r.timer = null
+    r.interval = null
+    setJogging(false)
+  }
+  const jogOnce = async (direction: 1 | -1) => {
+    try {
+      const deltas = shaftDeltaFor(coupling, joint.name, direction * JOINT_STEP_DEG)
+      if (!deltas) throw new Error(`${joint.name}: the coupling cannot be inverted`)
+      const largest = Math.max(...Object.values(deltas).map(Math.abs))
+      if (largest > MAX_SHAFT_STEP_DEG)
+        throw new Error(
+          `${joint.name}: ${JOINT_STEP_DEG}° of joint needs ${largest.toFixed(0)}° of shaft — the gains look too small`,
+        )
+      for (const motor of coupling.motors) {
+        if (positions.current[String(motor)] === undefined)
+          throw new Error(`${motorLabel(motors, motor)}: no live position yet`)
+      }
+      if (!useAppStore.getState().control?.direct_motor_mode) await api.motorsDirectMode(true)
+      for (const motor of coupling.motors) {
+        const target = positions.current[String(motor)] + deltas[motor]
+        await api.motorsDirectPosition(motor, target * DEG)
+        // Optimistic: a held button keeps stepping from where the last write asked for.
+        positions.current[String(motor)] = target
+      }
+      setError(null)
+    } catch (error) {
+      setError(String((error as Error).message ?? error))
+      stopRepeat()
+    }
+  }
+  const startRepeat = (direction: 1 | -1) => {
+    if (!canJog) return
+    setJogging(true)
+    void jogOnce(direction)
+    repeat.current.timer = window.setTimeout(() => {
+      repeat.current.interval = window.setInterval(() => void jogOnce(direction), JOG_REPEAT_MS)
+    }, JOG_REPEAT_AFTER_MS)
+  }
+
+  const names = coupling.motors.map((m) => motorLabel(motors, m)).join(', ')
+  const title = canJog
+    ? `${JOINT_STEP_DEG}° of ${joint.name} (hold to repeat); the other joints of the finger stay put`
+    : `hold ${names} to jog the joint`
+  return (
+    <span className="finger-jog">
+      <button
+        className={`btn ${allHeld ? 'btn-danger' : 'btn-info'}`}
+        disabled={!canHold}
+        title={allHeld ? `release ${names}: the motors turn freely` : `hold ${names}: torque on, the finger pins where it is`}
+        onClick={() => void toggleHold()}
+      >
+        {allHeld ? 'release' : 'hold'}
+      </button>
+      <button
+        className="btn btn-secondary"
+        disabled={!canJog}
+        title={title}
+        onPointerDown={() => startRepeat(-1)}
+        onPointerUp={stopRepeat}
+        onPointerLeave={stopRepeat}
+        onPointerCancel={stopRepeat}
+      >
+        −
+      </button>
+      <button
+        className="btn btn-secondary"
+        disabled={!canJog}
+        title={title}
+        onPointerDown={() => startRepeat(1)}
+        onPointerUp={stopRepeat}
+        onPointerLeave={stopRepeat}
+        onPointerCancel={stopRepeat}
+      >
+        +
+      </button>
+      {jogging && <small>jogging…</small>}
+    </span>
+  )
+}
 
 function RangeRow({
   joint,
   coupling,
   connected,
   locked,
+  positions,
 }: {
   joint: MotorJoint
   coupling: Coupling | undefined
   connected: boolean
   locked: boolean
+  positions: React.MutableRefObject<Record<string, number>>
 }) {
   const joints = useFingerStore((s) => s.joints)
   const patchJoint = useFingerStore((s) => s.patchJoint)
@@ -55,8 +189,6 @@ function RangeRow({
     patchJoint(index, { [which]: Number.isFinite(value) ? value : null })
   }
   const span = joint.open_deg !== null && joint.closed_deg !== null ? joint.closed_deg - joint.open_deg : null
-  const motors = useBenchStore((s) => s.motors)
-  const firstMotor = joint.terms[0]?.motor ?? null
 
   return (
     <div className={`finger-row ${hasRange(joint) && !problem ? '' : 'incomplete'}`}>
@@ -99,8 +231,10 @@ function RangeRow({
                 ? 'the ends are the same'
                 : `${Math.abs(span).toFixed(1)}° of travel${span < 0 ? ', closing backward' : ''}`}
         </span>
-        <span className="finger-row-tools" title={`jog ${motorLabel(motors, firstMotor)}`}>
-          <MotorHandles motorId={firstMotor} connected={connected} />
+        <span className="finger-row-tools">
+          {coupling && (
+            <JointHandles joint={joint} coupling={coupling} connected={connected} positions={positions} />
+          )}
         </span>
       </div>
     </div>
@@ -142,7 +276,8 @@ export function FingerRange({ connected, locked }: { connected: boolean; locked:
       <div className="panel-header">
         <h2>Range</h2>
         <small className="finger-hint">
-          release the motors, move a joint by hand to each end and Set it — or hold and jog there
+          hold a finger's motors and jog each joint to its ends with − and +, then Set them; a jog moves
+          only that joint, so if another one bends the coupling is wrong
         </small>
         <button
           className="btn btn-secondary"
@@ -166,7 +301,14 @@ export function FingerRange({ connected, locked }: { connected: boolean; locked:
               </small>
             </summary>
             {members.map((joint) => (
-              <RangeRow key={joint.name} joint={joint} coupling={couplingOf(joint)} connected={connected} locked={locked} />
+              <RangeRow
+                key={joint.name}
+                joint={joint}
+                coupling={couplingOf(joint)}
+                connected={connected}
+                locked={locked}
+                positions={livePositions}
+              />
             ))}
           </details>
         ))

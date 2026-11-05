@@ -479,6 +479,8 @@ export interface ThermalSetupStored {
 export interface FingerTendon {
   name: string
   motor: number | null
+  // Winding sense of the tendon on its spool: -1 when a positive shaft turn pays the tendon out.
+  direction?: 1 | -1
 }
 
 // The file names tendons; the run takes terms resolved to motors.
@@ -496,12 +498,19 @@ export interface FingerJointStored {
   group: string
 }
 
+// A named pose: a fraction per joint name, 0 open to 1 closed.
+export interface FingerPose {
+  name: string
+  targets: Record<string, number>
+}
+
 export interface FingerSetupStored {
   tendons: FingerTendon[] | null
   joints: FingerJointStored[] | null
   // Shaft degrees per motor id at which every joint reads zero.
   zeros: Record<string, number> | null
   settings: Record<string, unknown> | null
+  poses: FingerPose[] | null
 }
 
 // GET /api/fingers/presets — named copies of the setup, kept beside it.
@@ -521,10 +530,21 @@ export interface FingerJointReport {
   current_ma: number | null
 }
 
+export interface FingerCycleReport {
+  poses: string[]
+  index: number
+  pose: string
+  phase: 'moving' | 'dwelling'
+  done: number
+  cycles: number // 0: until stopped
+  dwell_s: number
+}
+
 export interface FingerExtra {
   elapsed_s: number
   speed_deg_s: number
   joints: FingerJointReport[]
+  cycle: FingerCycleReport | null
 }
 
 // ----- pair_discovery operation (orca_ui/hand/operations/pairs.py) -----------

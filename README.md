@@ -323,12 +323,12 @@ and **save as…** keeps named copies to switch between.
 
 1. **Tendons.** Name each tendon and pick the motor it is wound on; hold a
    motor and jog it to see which tendon moves. **full hand** lays out the
-   usual set — per finger `abd`, `pp` (proximal phalanx) and `pip`
-   (fingertip), the thumb's `dip`, and two wrist axes.
+   usual set — per finger `abd` and the two flexion tendons `1` (the one
+   nearer the thumb) and `2`, the thumb's `dip`, and two wrist axes.
 2. **Coupling.** Each joint is one editable formula, q = gain · θ(tendon) +
    gain · θ(tendon) + …, with the gain in joint degrees per shaft degree.
    Routed tendons make joints share motors; in every finger MCP and PIP are
-   q_MCP = r_s(θ_pp + θ_pip) / r_MCP and q_PIP = r_s(θ_pp − θ_pip) / r_PIP,
+   q_MCP = r_s(θ_1 + θ_2) / r_MCP and q_PIP = r_s(θ_1 − θ_2) / r_PIP,
    and the routing panel writes those gains into every finger from the
    radii. Abduction is a tendon on its own motor. Joints that share motors
    must be as many as those motors, and the map invertible, or the run
@@ -344,7 +344,11 @@ and **save as…** keeps named copies to switch between.
    every joint range are mapped to shaft travel and checked against the
    same span and calibration limits as a cycle run; every motor in play
    must be held; the e-stop ends the run; disengaging leaves the motors
-   held where they are.
+   held where they are. **capture pose** keeps the sliders under a name
+   (saved with the setup); **go** returns to one, and **cycle** walks the
+   run through the poses in order, holding each for the dwell once every
+   joint has arrived, for the set number of rounds or until stopped. Touching
+   a slider ends the cycle.
 
 `GET`/`PUT /api/fingers/setup`, `/api/fingers/presets` and
 `POST /api/fingers/targets` (fractions per joint, only while engaged) are

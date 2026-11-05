@@ -57,7 +57,10 @@ SINGULAR_COND = 1e6
 NAME_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_ .-]{0,31}$")
 
 SETUP_FILE = "finger_setup.yaml"
-SETUP_KEYS = ("tendons", "joints", "zeros", "settings")
+SETUP_KEYS = ("tendons", "joints", "zeros", "settings", "poses")
+MAX_POSES = 64
+MAX_CYCLES = 100_000
+MAX_DWELL_S = 600.0
 
 
 # ----- the remembered setup ---------------------------------------------------
@@ -148,7 +151,10 @@ def clean_tendons(raw) -> list[dict]:
             if motor in motors:
                 raise ServiceError(f"motor {motor} is wound with two tendons")
             motors.add(motor)
-        out.append({"name": name, "motor": motor})
+        direction = entry.get("direction", 1)
+        if direction not in (1, -1):
+            raise ServiceError(f"tendon {name!r}: direction must be 1 or -1")
+        out.append({"name": name, "motor": motor, "direction": direction})
     return out
 
 
@@ -284,6 +290,40 @@ def couplings_of(joints: list[dict], zeros: dict[int, float]) -> list[Coupling]:
     return [Coupling(members, zeros) for members in groups.values()]
 
 
+def clean_poses(raw) -> list[dict]:
+    """Named poses: a fraction per joint name, 0 open to 1 closed."""
+    from orca_ui.hand.service import ServiceError
+
+    if not isinstance(raw, list):
+        raise ServiceError("poses must be a list of {name, targets}")
+    if len(raw) > MAX_POSES:
+        raise ServiceError(f"at most {MAX_POSES} poses")
+    out: list[dict] = []
+    names: set[str] = set()
+    for i, entry in enumerate(raw):
+        if not isinstance(entry, dict):
+            raise ServiceError("each pose is {name, targets}")
+        name = str(entry.get("name") or "").strip()
+        if not NAME_RE.match(name):
+            raise ServiceError(f"pose {i + 1}: the name must be 1–32 letters, "
+                               "digits, spaces, dots, dashes or underscores")
+        if name.lower() in names:
+            raise ServiceError(f"pose {name!r} is listed twice")
+        names.add(name.lower())
+        targets = entry.get("targets")
+        if not isinstance(targets, dict):
+            raise ServiceError(f"pose {name!r}: targets must be {{joint name: fraction}}")
+        clean: dict[str, float] = {}
+        for joint, value in targets.items():
+            try:
+                fraction = _finite(value)
+            except ValueError:
+                raise ServiceError(f"pose {name!r}: {joint} must be a number 0..1")
+            clean[str(joint)] = min(1.0, max(0.0, fraction))
+        out.append({"name": name, "targets": clean})
+    return out
+
+
 def save_setup(settings, body: dict) -> dict:
     import yaml
 
@@ -300,6 +340,8 @@ def save_setup(settings, body: dict) -> dict:
         if not isinstance(body["settings"], dict):
             raise ServiceError("settings must be an object")
         clean["settings"] = body["settings"]
+    if body.get("poses") is not None:
+        clean["poses"] = clean_poses(body["poses"])
     current = {k: v for k, v in load_setup(settings).items() if v is not None}
     current.update(clean)
     with open(setup_path(settings), "w") as f:
@@ -435,6 +477,30 @@ class _Joint:
         }
 
 
+class _Cycle:
+    """Poses run in turn by the engaged run, as the loop walks through them."""
+
+    def __init__(self, poses: list[dict], cycles: int, dwell: float):
+        self.poses = poses
+        self.cycles = cycles
+        self.dwell = dwell
+        self.index = 0
+        self.done = 0
+        self.phase = "moving"
+        self.until = 0.0
+
+    def report(self) -> dict:
+        return {
+            "poses": [p["name"] for p in self.poses],
+            "index": self.index,
+            "pose": self.poses[self.index]["name"],
+            "phase": self.phase,
+            "done": self.done,
+            "cycles": self.cycles,
+            "dwell_s": self.dwell,
+        }
+
+
 class FingerControlOperation(Operation):
     kind = "finger_control"
     control_source = ControlSource.OPERATION
@@ -444,6 +510,8 @@ class FingerControlOperation(Operation):
         self._lock = threading.Lock()
         self._pending: dict[str, float] = {}
         self._speed = float(params.get("speed_deg_s", DEFAULT_SPEED_DEG_S))
+        self._cycle: _Cycle | None = None
+        self._cycle_request: _Cycle | None | bool = False   # False: nothing new
 
     @classmethod
     def validate(cls, service, params: dict) -> dict:
@@ -526,7 +594,48 @@ class FingerControlOperation(Operation):
             self._pending.update(clean)
             if speed is not None:
                 self._speed = speed
+            if clean:
+                self._cycle_request = None   # a hand on a slider ends the cycle
         return {"targets": clean, "speed_deg_s": speed if speed is not None else self._speed}
+
+    def set_cycle(self, poses, cycles, dwell_s, speed_deg_s=None) -> dict:
+        """Run the poses in turn, each held for ``dwell_s`` once every joint
+        has arrived, ``cycles`` times round (0: until stopped)."""
+        from orca_ui.hand.service import ServiceError
+
+        clean = clean_poses(poses)
+        if len(clean) < 2:
+            raise ServiceError("a cycle needs at least two poses")
+        known = {j["name"] for j in self.params["joints"]}
+        for pose in clean:
+            unknown = sorted(set(pose["targets"]) - known)
+            if unknown:
+                raise ServiceError(f"pose {pose['name']!r}: unknown joint {unknown[0]!r}",
+                                   status_code=404)
+            if not pose["targets"]:
+                raise ServiceError(f"pose {pose['name']!r} has no joints")
+        try:
+            cycles = int(cycles)
+            dwell = _finite(dwell_s)
+        except (TypeError, ValueError):
+            raise ServiceError("cycles must be an integer and dwell_s a number")
+        if not 0 <= cycles <= MAX_CYCLES:
+            raise ServiceError(f"cycles must be 0 (until stopped)..{MAX_CYCLES}")
+        if not 0 <= dwell <= MAX_DWELL_S:
+            raise ServiceError(f"dwell_s must be 0..{MAX_DWELL_S:g}")
+        speed = None if speed_deg_s is None else self.clean_speed(speed_deg_s)
+        cycle = _Cycle(clean, cycles, dwell)
+        with self._lock:
+            if speed is not None:
+                self._speed = speed
+            self._cycle_request = cycle
+        return cycle.report()
+
+    def stop_cycle(self) -> dict:
+        with self._lock:
+            self._cycle_request = None
+            was = self._cycle
+        return {"stopped": was is not None}
 
     # ----- run ----------------------------------------------------------------------
 
@@ -581,12 +690,18 @@ class FingerControlOperation(Operation):
             with self._lock:
                 pending, self._pending = self._pending, {}
                 speed = self._speed
+                request, self._cycle_request = self._cycle_request, False
             for joint in self._joints:
                 if joint.name in pending:
                     joint.target = pending[joint.name]
+            if request is not False:
+                self._switch_cycle(ctx, request)
             step = speed * dt
-            if any([j.tick(step) for j in self._joints]):
+            moved = any([j.tick(step) for j in self._joints])
+            if moved:
                 self._write()
+            if self._cycle is not None:
+                self._advance_cycle(ctx, now, moved)
             if now - self._last_sample >= SAMPLE_PERIOD_S:
                 self._sample(now)
             self._publish(ctx, force=bool(pending))
@@ -596,6 +711,47 @@ class FingerControlOperation(Operation):
                 ctx.sleep(delay)
             else:
                 next_t = time.monotonic()
+
+    def _switch_cycle(self, ctx: OpContext, cycle) -> None:
+        if self._cycle is not None and cycle is None:
+            ctx.log(f"cycle stopped after {self._cycle.done} round(s)")
+        self._cycle = cycle
+        if cycle is not None:
+            names = " → ".join(p["name"] for p in cycle.poses)
+            rounds = "until stopped" if cycle.cycles == 0 else f"{cycle.cycles} time(s)"
+            ctx.log(f"cycling {names} {rounds}, {cycle.dwell:g} s at each pose")
+            self._goto(cycle.poses[0])
+            cycle.phase = "moving"
+        self._publish(ctx, force=True)
+
+    def _goto(self, pose: dict) -> None:
+        for joint in self._joints:
+            if joint.name in pose["targets"]:
+                joint.target = pose["targets"][joint.name]
+
+    def _advance_cycle(self, ctx: OpContext, now: float, moved: bool) -> None:
+        cycle = self._cycle
+        assert cycle is not None
+        if cycle.phase == "moving":
+            if moved:
+                return
+            cycle.phase = "dwelling"
+            cycle.until = now + cycle.dwell
+            return
+        if now < cycle.until:
+            return
+        cycle.index += 1
+        if cycle.index >= len(cycle.poses):
+            cycle.index = 0
+            cycle.done += 1
+            if cycle.cycles and cycle.done >= cycle.cycles:
+                ctx.log(f"cycle finished: {cycle.done} round(s)")
+                self._cycle = None
+                self._publish(ctx, force=True)
+                return
+        self._goto(cycle.poses[cycle.index])
+        cycle.phase = "moving"
+        self._publish(ctx, force=True)
 
     def _write(self) -> None:
         shafts: list[float] = []
@@ -629,4 +785,5 @@ class FingerControlOperation(Operation):
             "elapsed_s": round(now - self._t0, 1),
             "speed_deg_s": self._speed,
             "joints": [j.report() for j in self._joints],
+            "cycle": None if self._cycle is None else self._cycle.report(),
         })

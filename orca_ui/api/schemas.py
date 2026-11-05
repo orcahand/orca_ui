@@ -56,6 +56,21 @@ class FingerTargetsRequest(BaseModel):
     speed_deg_s: Optional[float] = None
 
 
+class FingerPose(BaseModel):
+    name: str
+    targets: dict[str, float]
+
+
+class FingerCycleRequest(BaseModel):
+    """Poses the engaged finger run walks through, dwell_s at each once the
+    joints have arrived, cycles times round (0: until stopped)."""
+
+    poses: list[FingerPose]
+    cycles: int = 0
+    dwell_s: float = 0.5
+    speed_deg_s: Optional[float] = None
+
+
 class ModelSelectRequest(BaseModel):
     """Which hand config to run. ``name`` null hands the choice back to
     hardware detection; ``version`` defaults to the model's newest."""

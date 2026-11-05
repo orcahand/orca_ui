@@ -279,6 +279,21 @@ def test_finger_control_clamps_to_the_captured_range_behind_the_torque_gate(benc
     assert shafts[1] == pytest.approx(math.radians(90), abs=0.05)
     assert shafts[2] == pytest.approx(math.radians(90), abs=0.05)
 
+    # A cycle walks the poses with the same clamping, and a hand on a slider
+    # ends it rather than fighting it.
+    poses = [{"name": "open", "targets": {"index_mcp": 0, "index_pip": 0}},
+             {"name": "bad", "targets": {"index_mcp": 9, "index_pip": 1}}]
+    assert bench.post("/api/fingers/cycle", json={"poses": poses[:1], "cycles": 1}).status_code == 400
+    response = bench.post("/api/fingers/cycle", json={"poses": poses, "cycles": 0, "dwell_s": 0.1})
+    assert response.status_code == 200, response.text
+
+    def cycling():
+        extra = (_operation(bench) or {}).get("extra") or {}
+        return (extra.get("cycle") or {}).get("done", 0) >= 1
+    assert _wait_for(cycling, timeout=10)
+    assert bench.post("/api/fingers/targets", json={"targets": {"index_mcp": 0.5}}).status_code == 200
+    assert _wait_for(lambda: ((_operation(bench) or {}).get("extra") or {}).get("cycle") is None)
+
     assert bench.post("/api/operation/stop").status_code == 200
     assert _wait_for(lambda: (_operation(bench) or {}).get("state") == "done")
     # Let go of the bus but not of the fingers: direct mode off, motors held.

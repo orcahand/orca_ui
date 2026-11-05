@@ -13,12 +13,12 @@
 
 import { create } from 'zustand'
 import { api } from '../api/rest'
-import type { FingerJointStored, FingerSetupStored, FingerTendon } from '../api/types'
+import type { FingerJointStored, FingerPose, FingerSetupStored, FingerTendon } from '../api/types'
 import type { BenchMotor } from '../bench/benchStore'
 import { type MotorJoint, couplingProblem, couplingsOf, differentialGains } from './coupling'
 
 export type FingerJoint = FingerJointStored
-export type { FingerTendon }
+export type { FingerPose, FingerTendon }
 
 export type FingerStep = 'tendons' | 'coupling' | 'range' | 'control'
 export const STEPS: { step: FingerStep; label: string; title: string }[] = [
@@ -36,6 +36,9 @@ export interface FingerSettings {
   spoolRadiusMm: number
   mcpRadiusMm: number
   pipRadiusMm: number
+  // Cycling through the poses: rounds (0: until stopped) and the hold at each.
+  cycleCount: number
+  cycleDwellS: number
 }
 
 export const DEFAULT_SETTINGS: FingerSettings = {
@@ -43,30 +46,31 @@ export const DEFAULT_SETTINGS: FingerSettings = {
   spoolRadiusMm: 10,
   mcpRadiusMm: 19.6,
   pipRadiusMm: 16.6,
+  cycleCount: 10,
+  cycleDwellS: 0.5,
 }
 export const NAME_RE = /^[A-Za-z0-9_][A-Za-z0-9_ .-]{0,31}$/
 
 // A hand's tendons and joints by finger: the template a full hand starts
-// from. Tendons are named after the phalanx they pull on: in every finger
-// MCP and PIP are coupled on the pp tendon (proximal phalanx, between the
-// abduction base and the PIP; U in the formula) and the pip tendon (the
-// fingertip phalanx; C); abduction, the thumb's DIP and the two wrist axes
-// are a tendon each.
+// from. In every finger MCP and PIP are coupled on two flexion tendons,
+// numbered from the thumb side: 1 is the one nearer the thumb (U in the
+// formula), 2 the other (C); abduction, the thumb's DIP and the two wrist
+// axes are a tendon each.
 const FINGERS = ['index', 'middle', 'ring', 'pinky']
 export const HAND_TENDONS: string[] = [
-  'thumb_abd', 'thumb_pp', 'thumb_pip', 'thumb_dip',
-  ...FINGERS.flatMap((f) => [`${f}_abd`, `${f}_pp`, `${f}_pip`]),
+  'thumb_abd', 'thumb_1', 'thumb_2', 'thumb_dip',
+  ...FINGERS.flatMap((f) => [`${f}_abd`, `${f}_1`, `${f}_2`]),
   'wrist_flex', 'wrist_abd',
 ]
 export const HAND_JOINTS: { name: string; group: string; tendons: string[] }[] = [
   { name: 'thumb_abd', group: 'thumb', tendons: ['thumb_abd'] },
-  { name: 'thumb_mcp', group: 'thumb', tendons: ['thumb_pp', 'thumb_pip'] },
-  { name: 'thumb_pip', group: 'thumb', tendons: ['thumb_pp', 'thumb_pip'] },
+  { name: 'thumb_mcp', group: 'thumb', tendons: ['thumb_1', 'thumb_2'] },
+  { name: 'thumb_pip', group: 'thumb', tendons: ['thumb_1', 'thumb_2'] },
   { name: 'thumb_dip', group: 'thumb', tendons: ['thumb_dip'] },
   ...FINGERS.flatMap((f) => [
     { name: `${f}_abd`, group: f, tendons: [`${f}_abd`] },
-    { name: `${f}_mcp`, group: f, tendons: [`${f}_pp`, `${f}_pip`] },
-    { name: `${f}_pip`, group: f, tendons: [`${f}_pp`, `${f}_pip`] },
+    { name: `${f}_mcp`, group: f, tendons: [`${f}_1`, `${f}_2`] },
+    { name: `${f}_pip`, group: f, tendons: [`${f}_1`, `${f}_2`] },
   ]),
   { name: 'wrist_flex', group: 'wrist', tendons: ['wrist_flex'] },
   { name: 'wrist_abd', group: 'wrist', tendons: ['wrist_abd'] },
@@ -115,14 +119,15 @@ export function tendonsFor(joint: FingerJoint, tendons: FingerTendon[]): FingerT
 
 /** Joints with their tendon terms turned into motor terms. */
 export function resolve(joints: FingerJoint[], tendons: FingerTendon[]): MotorJoint[] {
-  const motorOf = new Map(tendons.map((t) => [t.name, t.motor]))
+  const tendonOf = new Map(tendons.map((t) => [t.name, t]))
   return joints.map((joint) => {
     const terms: MotorJoint['terms'] = []
     const unresolved: string[] = []
     for (const term of joint.terms) {
-      const motor = term.tendon !== undefined ? motorOf.get(term.tendon) : term.motor
+      const tendon = term.tendon !== undefined ? tendonOf.get(term.tendon) : undefined
+      const motor = term.tendon !== undefined ? tendon?.motor : term.motor
       if (motor === null || motor === undefined) unresolved.push(term.tendon ?? '?')
-      else terms.push({ motor, gain: term.gain })
+      else terms.push({ motor, gain: term.gain * (tendon?.direction ?? 1) })
     }
     return {
       name: joint.name,
@@ -198,6 +203,8 @@ interface FingerState {
   settings: FingerSettings
   // Slider positions while engaged, by joint name.
   targets: Record<string, number>
+  // Named poses: slider positions kept with the setup.
+  poses: FingerPose[]
 
   setStep(step: FingerStep): void
   adopt(model: string, motors: BenchMotor[]): void
@@ -219,7 +226,7 @@ interface FingerState {
   // PIP of each finger coupled from the radii; replaces both lists.
   addHand(): void
   // Re-derive every finger's MCP/PIP gains from the radii on the tendons
-  // those rows name (the first two distinct ones are pp U and pip C).
+  // those rows name (the first two distinct ones are tendon 1 U and 2 C).
   coupleFingers(): void
   setZeros(zeros: Record<string, number>): void
 
@@ -233,6 +240,11 @@ interface FingerState {
   seedTargets(targets: Record<string, number>): void
   setTarget(name: string, fraction: number): void
   setTargets(targets: Record<string, number>): void
+
+  // Keep the sliders as a named pose; an existing name is overwritten.
+  capturePose(name: string, targets: Record<string, number>): void
+  removePose(index: number): void
+  movePose(index: number, by: -1 | 1): void
 }
 
 export const useFingerStore = create<FingerState>((set, get) => ({
@@ -251,6 +263,7 @@ export const useFingerStore = create<FingerState>((set, get) => ({
   zeros: {},
   settings: DEFAULT_SETTINGS,
   targets: {},
+  poses: [],
 
   setStep: (step) => {
     set({ step })
@@ -295,7 +308,7 @@ export const useFingerStore = create<FingerState>((set, get) => ({
   },
 
   reload: async () => {
-    let stored: FingerSetupStored = { tendons: null, joints: null, zeros: null, settings: null }
+    let stored: FingerSetupStored = { tendons: null, joints: null, zeros: null, settings: null, poses: null }
     try {
       stored = await api.fingerSetup()
     } catch {
@@ -306,6 +319,7 @@ export const useFingerStore = create<FingerState>((set, get) => ({
       joints: (stored.joints ?? []).map((j) => ({ ...j, terms: j.terms ?? [] })),
       zeros: stored.zeros ?? {},
       settings: { ...DEFAULT_SETTINGS, ...((stored.settings ?? {}) as Partial<FingerSettings>) },
+      poses: stored.poses ?? [],
     })
   },
 
@@ -464,5 +478,29 @@ export const useFingerStore = create<FingerState>((set, get) => ({
     for (const [name, value] of Object.entries(targets)) clean[name] = Math.min(1, Math.max(0, value))
     set({ targets: { ...get().targets, ...clean } })
     send(clean)
+  },
+
+  // ----- poses -------------------------------------------------------------
+
+  capturePose: (name, targets) => {
+    const pose = { name, targets: { ...targets } }
+    const poses = get().poses
+    const at = poses.findIndex((p) => p.name.toLowerCase() === name.toLowerCase())
+    const next = at < 0 ? [...poses, pose] : poses.map((p, i) => (i === at ? pose : p))
+    set({ poses: next })
+    save({ poses: next })
+  },
+  removePose: (index) => {
+    const next = get().poses.filter((_, i) => i !== index)
+    set({ poses: next })
+    save({ poses: next })
+  },
+  movePose: (index, by) => {
+    const next = [...get().poses]
+    const to = index + by
+    if (to < 0 || to >= next.length) return
+    ;[next[index], next[to]] = [next[to], next[index]]
+    set({ poses: next })
+    save({ poses: next })
   },
 }))

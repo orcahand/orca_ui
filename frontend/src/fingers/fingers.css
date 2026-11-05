@@ -480,3 +480,62 @@
   color: var(--dimmer);
   margin-left: 4px;
 }
+
+.finger-hold-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.finger-hold-all small {
+  font-size: 10px;
+  color: var(--dimmer);
+  white-space: nowrap;
+}
+
+.finger-direction.on {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+/* --- poses --- */
+
+.finger-poses {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  background: var(--panel-strong);
+  border: 1px solid var(--panel-border);
+}
+
+.finger-poses .finger-group-head {
+  flex-wrap: wrap;
+}
+
+.finger-pose {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 11px;
+}
+
+.finger-pose.on {
+  color: var(--accent);
+}
+
+.finger-pose .btn {
+  font-size: 10px;
+  padding: 2px 8px;
+}
+
+.finger-pose-name {
+  min-width: 90px;
+  font-weight: 600;
+}
+
+.finger-pose-detail {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dimmer);
+}
