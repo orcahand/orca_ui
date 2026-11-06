@@ -203,7 +203,6 @@ def build_settings(argv=None) -> UiSettings:
     return UiSettings(
         config_path=config_path,
         model_pinned=model_pinned,
-        hand_folders=not model_pinned,
         model_version=args.model_version,
         board=None if args.mock else args.board,
         mock=args.mock,
