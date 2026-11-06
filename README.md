@@ -1,10 +1,14 @@
 # ORCA Hand Console
 
-> ## ⚠️ Experimental branch: `merge/assembly-calibration-with-main`
+> ## ⚠️ For current users, New version — run `uv sync`
 >
-> This branch combines the assembly guide, the new tensioning and calibration, and the fixes on `main`. It is
-> unreleased and only lightly tested, and it will be replaced by a release on `main`. See
-> [Using this experimental branch](#using-this-experimental-branch).
+> ```bash
+> git pull
+> uv sync
+> ```
+>
+> This release needs `orca_core` 0.6.0. running uv sync will update the orca_core packaged with your orca_ui. Without
+> it the console will not start.
 
 ## Welcome to ORCA UI!
 Orca Ui is the web based user-interface for the [ORCA Hand](https://www.orcahand.com), it offers: 
@@ -22,57 +26,7 @@ The UI adapts to the hand described by the config: tactile-only hands get the
 taxel/force views, joint-sensing hands get encoder gauges and the closed-loop
 control panel, full hands support everything. 
 
-## Using this experimental branch
-
-The console on this branch runs a matching unreleased `orca_core`, which it installs by itself from [`feature/improve-calibration`](https://github.com/orcahand/orca_core/tree/feature/improve-calibration). You don't need a separate `orca_core` clone.
-
-```bash
-git clone --depth 1 --branch merge/assembly-calibration-with-main https://github.com/orcahand/orca_ui.git
-cd orca_ui
-uv run orca-ui
-```
-
-If you already have orca_ui cloned, stash or commit any changes, then run:
-
-```bash
-git fetch origin merge/assembly-calibration-with-main:merge/assembly-calibration-with-main
-git switch merge/assembly-calibration-with-main
-uv run orca-ui
-```
-
-- The clone is large because the assembly guide's media is in the repository, and the first start takes a few minutes.
-- The header should show **DEV CORE · feature/improve-calibration**. If it doesn't, you aren't running this version.
-- If the install stops on a build error, try `uv run --python 3.12 orca-ui`.
-- This setup has had a fresh-clone test on a Mac, and hasn't been tried on a Windows clone. Please report any setup
-  problem.
-- Run `git pull` only when you want to update. This branch will be replaced at the release, and you will need a fresh
-  clone of `main` then. Your hand folders stay where they are.
-
-**What's different from `main`**
-
-- **Each hand gets its own folder.** A plain `uv run orca-ui` keeps a hand's config and calibration in
-  `~/orca_bench/<serial>/<model>/`, created the first time the hand connects. A hand set up earlier in
-  `~/orca_bench/<serial>/` has its files copied in, and the originals stay. A hand that reports no serial uses the
-  shared model folder, and the console logs a warning.
-- **One hand per run.** Each run stays on the first hand it identifies. To use another hand, press Ctrl+C and start the
-  console again.
-- **One console per hand.** A second console in another terminal holds the hand, so the one you're looking at can't
-  connect. Close the others first.
-- **Naming a model or config skips this.** `--config` and `--model` use exactly what you name, with no hand folder and
-  no one-hand limit.
-- **Tensioning.** Motors pull, settle where they stopped, then hold at each motor's ceiling while you ratchet. The
-  default pull is 15°, and **Pull more** adds 15°. The Tensioning current field is gone. Avoid hard pushes on a finger
-  while the motors hold, because they may loosen the tendon.
-- **Calibration.** Fingers drive onto their stops at each motor's ceiling, so keep your fingers clear and the power
-  switch within reach. The calibration current sliders are gone. Manual calibration asks once per step and has **Back**.
-- **Slack test and tension sweep.** Currents come from the motor type: 60 mA on Dynamixel and 120 mA on Feetech for the
-  slack test, and you can still choose another. Feetech values are provisional. On Feetech a pass can miss small slack,
-  so also check the tendons by hand. The sweep can stop short on some joints.
-- **Motor faults.** You can reboot one motor with its torque on.
-- **Teleoperation.** Point it at the same hand folder, so it reads the calibration you just made:
-  `--model_path ~/orca_bench/<serial>/<model>/config.yaml`. Tension first and calibrate last.
-
-To get started with the released console, follow these steps:
+To get started with Orca UI, follow these steps:
 
 ## Installation
 
@@ -94,7 +48,7 @@ cd orca_ui
 uv sync
 ```
 
-Amongst other setup procedures uv sync installs the `orca_core` fixed in `uv.lock`, from GitHub on this experimental branch and from PyPI on `main`. This allows you to utilize the ui WITHOUT using or affecting your local orca repository.
+Amongst other setup procedures uv sync installs the latest published `orca_core` from PyPI, this allows you to utilize the ui WITHOUT using or affecting your local orca repository.
 
 2. IF you wish to run the ui from your local orca_core, rebuild the frontend,
 or developing against an unreleased `orca_core` make sure to consult
