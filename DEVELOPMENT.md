@@ -112,6 +112,28 @@ orca_core's ROMs (orca_core degrees map onto the URDF 1:1 — there is no
 per-joint correction table). Verify joint directions with the mock sweep tool,
 one joint at a time.
 
+## Assembly guide media
+
+The guide's photos, videos and 3D models live in the public bucket
+`orca-public-a5h6t`, not in git. Each file is stored under its guide path with
+a fingerprint of its contents added, such as
+`guide/clips/p35-329-review-1a2b3c4d5e6f7a8b.mp4`, so a changed file gets a new
+name and nothing stored is ever replaced.
+`frontend/src/components/assembly/storedMedia.json` tells the guide where each
+file is stored. After adding or changing media in `frontend/public/assembly/`,
+run from the repository root:
+
+```bash
+python3 scripts/guide_media.py
+```
+
+It first checks, with no login, that no guide media is committed and that
+every catalog entry is stored. It then asks for the media folder, lists what
+is new and asks before uploading. Commit `storedMedia.json` afterwards.
+Uploading needs upload rights on the bucket and the `gcloud` CLI signed in
+(`gcloud auth login`); Google Cloud Shell has it signed in already. CI runs
+the same command, which only checks when no one is at the terminal.
+
 ## Releasing
 
 ```bash

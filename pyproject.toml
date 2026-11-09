@@ -50,8 +50,14 @@ build-backend = "hatchling.build"
 # the sdist, so both targets need it.
 artifacts = [
     "/orca_ui/webui/",
-    "!/orca_ui/webui/assembly/parts/*/assembly.glb",
-    "!/orca_ui/webui/assembly/parts/*/.assembly-model.json",
+    # Guide media is fetched from the public bucket, so a local copy never ships.
+    "!/orca_ui/webui/assembly/**/*.mp4",
+    "!/orca_ui/webui/assembly/**/*.png",
+    "!/orca_ui/webui/assembly/**/*.webp",
+    "!/orca_ui/webui/assembly/**/*.jpg",
+    "!/orca_ui/webui/assembly/**/*.jpeg",
+    "!/orca_ui/webui/assembly/**/*.glb",
+    "!/orca_ui/webui/assembly/**/*.stl",
 ]
 
 [tool.hatch.build.targets.wheel]
