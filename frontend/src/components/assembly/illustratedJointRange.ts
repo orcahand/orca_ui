@@ -3,7 +3,7 @@ import ranges from './modelJointRanges.json'
 import frames from './livePoseFrames.json'
 import type { Build } from './buildContent'
 
-// Model limits come from public/assembly/movement/{left,right}/hand.urdf.
+// Model limits come from orca_ui/models/hand_v2/{left,right}/hand.urdf.
 // Convert their absolute angles into rotations about the exported CAD bearing axis.
 export function illustratedJointRange(build: Build, joint: string, axis: THREE.Vector3) {
   const limits = (ranges[build.side] as Record<string, number[]>)[joint]
