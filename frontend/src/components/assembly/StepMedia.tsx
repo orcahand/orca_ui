@@ -1,6 +1,7 @@
 import { useId, useState, type ReactNode } from 'react'
 import type { Build } from './buildContent'
 import localClips from './local-clips.json'
+import { mediaUrl } from './media'
 
 type Clip = { src: string; poster: string; title: string }
 export function StepMedia({
@@ -99,9 +100,9 @@ export function StepMedia({
             controls
             playsInline
             preload="metadata"
-            poster={clip.poster}
+            poster={mediaUrl(clip.poster)}
             aria-label={clip.title}
-            src={clip.src}
+            src={mediaUrl(clip.src)}
           />
         </div>
       ) : (

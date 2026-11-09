@@ -50,6 +50,7 @@ import {
 } from './buildContent'
 import './assembly.css'
 import './review.css'
+import { mediaImage } from './media'
 
 const MOTION_AT: Record<string, number> = {
   p33: 0,
@@ -1096,7 +1097,7 @@ function MediaGallery({
                 <MotorRenderReference build={build} src={view.src}>
                   <img
                     key={view.src}
-                    src={view.src}
+                    {...mediaImage(view.src)}
                     alt={view.caption}
                     loading="lazy"
                     onLoad={(e) => {
@@ -1146,7 +1147,7 @@ function MediaGallery({
         <MotorRenderReference build={build} src={shown.src}>
           <img
             key={shown.src}
-            src={shown.src}
+            {...mediaImage(shown.src)}
             alt={shown.caption}
             onLoad={(e) => {
               if (!isModelImage(shown.src))

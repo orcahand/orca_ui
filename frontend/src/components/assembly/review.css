@@ -45,13 +45,13 @@
   max-height: 560px;
   object-fit: contain;
 }
-.assembly-app .assembly-guided-instructions .assembly-image-button:has(img[src*='/touch/']) {
+.assembly-app .assembly-guided-instructions .assembly-image-button:has(img[data-media*='/touch/']) {
   background: transparent;
 }
-.assembly-app .assembly-guided-instructions img[src*='/touch/'] {
+.assembly-app .assembly-guided-instructions img[data-media*='/touch/'] {
   mix-blend-mode: multiply;
 }
-[data-theme='dark'] .assembly-app .assembly-guided-instructions img[src*='/touch/'] {
+[data-theme='dark'] .assembly-app .assembly-guided-instructions img[data-media*='/touch/'] {
   mix-blend-mode: normal;
 }
 .assembly-app .assembly-kit {

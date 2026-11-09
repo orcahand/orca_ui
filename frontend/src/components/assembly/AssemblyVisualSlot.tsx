@@ -5,6 +5,7 @@ import { photoResolution } from './photoResolution'
 import { Children, createContext, useContext, useId, useRef, useState, type ReactNode } from 'react'
 import type { Build, Figure } from './buildContent'
 import { GuideText } from './GuideEditing'
+import { mediaImage } from './media'
 
 export const VisualSlotContext = createContext(false)
 export const useVisualSlot = () => useContext(VisualSlotContext)
@@ -130,7 +131,7 @@ export function AssemblyVisualSlot({
                     aria-label={`Enlarge ${active === 'Renders' ? 'render' : 'photo'} ${i + 1}`}
                   >
                     <MotorRenderReference build={build} src={item.src}>
-                      <img src={item.src} alt={item.caption} loading="lazy" />
+                      <img {...mediaImage(item.src)} alt={item.caption} loading="lazy" />
                     </MotorRenderReference>
                   </button>
                   {item.showCaption && /\d|CableHolder/.test(item.caption) && (
@@ -173,7 +174,7 @@ export function AssemblyVisualSlot({
                   src={items[Math.min(selected, items.length - 1)]?.src}
                 >
                   <img
-                    src={items[Math.min(selected, items.length - 1)]?.src}
+                    {...mediaImage(items[Math.min(selected, items.length - 1)]?.src)}
                     alt={items[Math.min(selected, items.length - 1)]?.caption}
                   />
                 </MotorRenderReference>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { mediaImage } from './media'
 const cues = [
   'Leave a working end long enough to handle. Fold the cord back to make a bight.',
   'Fold the bight to form two loops. Keep track of which side leads to the long standing part.',
@@ -35,7 +36,7 @@ export function KnotLesson() {
       </div>
       <div className="assembly-knot-layout">
         <img
-          src={`./assembly/media/ashley-${frame + 1}.jpg`}
+          {...mediaImage(`./assembly/media/ashley-${frame + 1}.jpg`)}
           alt={`Ashley stopper, stage ${frame + 1}: ${cues[frame]}`}
         />
         <div>
@@ -66,7 +67,7 @@ export function KnotLesson() {
             aria-pressed={i === frame}
             onClick={() => select(i)}
           >
-            <img src={`./assembly/media/ashley-${i + 1}.jpg`} alt="" />
+            <img {...mediaImage(`./assembly/media/ashley-${i + 1}.jpg`)} alt="" />
             <span>{i + 1}</span>
           </button>
         ))}

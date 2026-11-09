@@ -47,8 +47,6 @@ def create_app(settings: UiSettings) -> FastAPI:
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
-        from orca_ui.assembly_assets import prepare_assembly_models
-        await asyncio.to_thread(prepare_assembly_models)
         service.start()
         telemetry.start()
         broadcaster = asyncio.create_task(hub.broadcaster())

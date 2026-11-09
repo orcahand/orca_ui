@@ -30,6 +30,7 @@ import {
   type Part,
   type Supply,
 } from './assemblyParts'
+import { downloadMedia, mediaImage, mediaUrl } from './media'
 
 type Item = {
   part: Part
@@ -391,7 +392,7 @@ export function PartsExplorer({ build }: { build: Build }) {
     [query, setQuery] = useState('')
   const [retry, setRetry] = useState(0),
     [settled, setSettled] = useState(false)
-  const hasArchive =
+  const hasModel =
     (build.version === 'base' || build.version === 'touch') &&
     (build.motor === 'dynamixel' || build.version === 'base')
   const stage = useRef<HTMLDivElement>(null),
@@ -562,7 +563,7 @@ export function PartsExplorer({ build }: { build: Build }) {
         {!bundle ? (
           <div className="assembly-cad-placeholder" role="status">
             {failed ? (
-              hasArchive ? (
+              hasModel ? (
                 <div className="assembly-model-recovery">
                   <h3>
                     <GuideText
@@ -573,18 +574,8 @@ export function PartsExplorer({ build }: { build: Build }) {
                     />
                   </h3>
                   <p>
-                    The UI normally unpacks this model automatically when it starts. If the model
-                    files have not been extracted, restart the UI or run this from your{' '}
-                    <code>orca_ui</code> checkout:
-                  </p>
-                  <code className="assembly-recovery-command">
-                    uv run python -m orca_ui.assembly_assets
-                  </code>
-                  <p>
-                    The archive for your selection is <code>orca_ui/models/assembly/{key}.zip</code>
-                    . You can also unzip its <code>assembly.glb</code> into{' '}
-                    <code>orca_ui/webui/assembly/parts/{key}/</code>. For frontend development,
-                    extract it into <code>frontend/public/assembly/parts/{key}/</code> too.
+                    The model downloads from the guide's online storage. Check the internet
+                    connection, then retry.
                   </p>
                   <button
                     type="button"
@@ -701,7 +692,7 @@ export function PartsExplorer({ build }: { build: Build }) {
                         <span key={itemKey(item)}>
                           {item.supplement && (
                             <img
-                              src={item.part.thumbnail}
+                              {...mediaImage(item.part.thumbnail)}
                               alt=""
                               style={{
                                 position: 'absolute',
@@ -842,7 +833,7 @@ export function PartsExplorer({ build }: { build: Build }) {
                           {(row.part?.thumbnail || row.supply?.image) && (
                             <img
                               className="assembly-bom-thumbnail"
-                              src={row.part?.thumbnail ?? row.supply?.image}
+                              {...mediaImage(row.part?.thumbnail ?? row.supply?.image)}
                               alt=""
                             />
                           )}
@@ -949,7 +940,7 @@ function PartCard({
         <span className="assembly-part-quantity" aria-label={`Quantity: ${quantity}`}>
           {quantityBadge(quantity)}
         </span>
-        <img src={image} alt={label} />
+        <img {...mediaImage(image)} alt={label} />
       </div>
       <figcaption>
         <GuideText
@@ -961,7 +952,16 @@ function PartCard({
         />
       </figcaption>
       {files?.map((file) => (
-        <a key={file.src} className="assembly-text-button" href={file.src} download>
+        <a
+          key={file.src}
+          className="assembly-text-button"
+          href={mediaUrl(file.src)}
+          download
+          onClick={(e) => {
+            e.preventDefault()
+            downloadMedia(file.src)
+          }}
+        >
           Download {file.label} ↓
         </a>
       ))}

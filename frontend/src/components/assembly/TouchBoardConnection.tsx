@@ -7,6 +7,7 @@ import * as THREE from 'three'
 import { loadBundle, type Bundle } from './cadAssets'
 import { cadPieces, disposePieces } from './cadScene'
 import type { Build } from './buildContent'
+import { mediaUrl } from './media'
 
 const TOUCH_PORT = new THREE.Vector3(-14.98, 124.42, 13.3)
 const OH_PORT = new THREE.Vector3(-25.6, 32, 50.3)
@@ -125,7 +126,7 @@ export function TouchBoardConnection() {
     let live = true
     Promise.all([
       loadBundle('touch-right-dynamixel'),
-      new GLTFLoader().loadAsync('./assembly/details/touch-connector-board.glb'),
+      new GLTFLoader().loadAsync(mediaUrl('./assembly/details/touch-connector-board.glb')),
     ])
       .then(([bundle, gltf]) => {
         if (live) setLoaded({ bundle, board: gltf.scene })

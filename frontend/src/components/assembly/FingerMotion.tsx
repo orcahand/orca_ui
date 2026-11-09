@@ -6,6 +6,7 @@ import { FINGERS, MOVEMENTS } from './fingerMovements'
 import views from './cad-route-views.json'
 import { FingerOutlets } from './FingerOutlets'
 import { CadFingerMovement } from './CadFingerMovement'
+import { mediaUrl } from './media'
 export function FingerMotion({
   build,
   indexOnly = false,
@@ -120,7 +121,7 @@ export function FingerMotion({
                 aria-label={`${MOVEMENTS[movement][0]} end leaving the PP`}
               >
                 <image
-                  href={`./assembly/renders/${referenceKey}.webp`}
+                  href={mediaUrl(`./assembly/renders/${referenceKey}.webp`)}
                   width={reference.width}
                   height={reference.height}
                 />
@@ -140,7 +141,7 @@ export function FingerMotion({
                 aria-label={`${MOVEMENTS[movement][0]} tendon highlighted on the assembled PP`}
               >
                 <image
-                  href={photoResolution('./assembly/media/panel-036-3.png')}
+                  href={mediaUrl(photoResolution('./assembly/media/panel-036-3.png'))}
                   width="475"
                   height="318"
                 />

@@ -1346,12 +1346,6 @@
   overflow-wrap: anywhere;
   font-size: 12px;
 }
-.assembly-recovery-command {
-  display: block;
-  padding: 12px;
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
-}
 .assembly-visual-inventory {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2972,8 +2966,8 @@
   }
 }
 
-.assembly-app img[src*='/assembly/renders/'],
-.assembly-app img[src*='/assembly/parts/'] {
+.assembly-app img[data-media*='/assembly/renders/'],
+.assembly-app img[data-media*='/assembly/parts/'] {
   mix-blend-mode: normal;
 }
 

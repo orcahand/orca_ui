@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { touchCableScene } from './touchCableScene'
+import { mediaImage } from './media'
 function Cable({ progress, close }: { progress: number; close: boolean }) {
   const model = useMemo(() => touchCableScene(), []),
     { camera, size, invalidate } = useThree()
@@ -149,7 +150,7 @@ export function TouchCableWrap() {
       {reference && (
         <figure className="assembly-cable-reference">
           <img
-            src="./assembly/touch/wrap-short.png"
+            {...mediaImage('./assembly/touch/wrap-short.png')}
             alt="Original cable photo with a 3 cm copper wrap and 7 cm from its end to the right connector"
           />
           <figcaption>

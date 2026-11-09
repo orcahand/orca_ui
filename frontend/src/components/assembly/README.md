@@ -15,16 +15,15 @@ both motor families and hand sides; no physical motor configuration was run.
 
 ## Model distribution
 
-The four complete Base/Touch assembly GLBs are distributed in
-[`orca_ui/models/assembly/`](../../../../orca_ui/models/assembly/README.md) as ZIPs.
-The backend restores both packaged and source assets automatically at startup;
-extracted GLBs are ignored by Git. Manual recovery from the repository root:
-`uv run python -m orca_ui.assembly_assets`. The opening model viewer shows the
-selected archive's exact path and a retry action if loading fails.
-
-After regenerating source models, run `python scripts/package_assembly_models.py`
-before restarting the backend. Startup treats the ZIPs as authoritative. This
-changes distribution only; the measured geometry and runtime asset URLs are unchanged.
+The guide's photos, videos and 3D models, including the four complete Base/Touch
+assembly GLBs, live in a public bucket, not in git. `storedMedia.json` maps each
+path under `frontend/public/assembly/` to its stored name. Every place that shows
+or loads media goes through `media.ts`: a published file comes from the bucket, and
+anything the catalog doesn't list loads from the app itself, so new media shows
+locally before it is published. Images carry their guide path in `data-media`,
+which stylesheets match on instead of `src`. Generator scripts still write into
+`frontend/public/assembly/`, which Git ignores for media. Publishing is described
+in [DEVELOPMENT.md](../../../../DEVELOPMENT.md#assembly-guide-media).
 
 ## Workspace
 
@@ -153,8 +152,8 @@ changing its channel geometry. The original matching images remain available
 in the enlarged comparison. These views do not assign joint tendons to top or
 bottom spools; that assignment still requires confirmation.
 
-All walkthrough media is local in `frontend/public/assembly/`. No full PDF or
-whole assembly video is shipped. The main video is cut into bounded MP4 files
+All walkthrough media is published to the public bucket (see Model distribution).
+No full PDF or whole assembly video is shipped. The main video is cut into bounded MP4 files
 and played with native video controls. Replace these assets and update
 `local-clips.json` / `media-catalog.json` as cleaner media becomes available.
 

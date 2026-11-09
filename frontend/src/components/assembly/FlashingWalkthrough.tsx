@@ -2,6 +2,7 @@ import { GuideText } from './GuideEditing'
 import { photoResolution } from './photoResolution'
 import { useRef, useState } from 'react'
 import type { Build } from './buildContent'
+import { mediaImage } from './media'
 const phases = [
   {
     title: 'Choose the order',
@@ -107,7 +108,10 @@ export function FlashingWalkthrough({ build }: { build: Build }) {
                 dialog.current?.showModal()
               }}
             >
-              <img src={photoResolution(`./assembly/media/panel-${id}.png`)} alt={imageNames[id]} />
+              <img
+                {...mediaImage(photoResolution(`./assembly/media/panel-${id}.png`))}
+                alt={imageNames[id]}
+              />
             </button>
             <figcaption>
               <GuideText
@@ -146,7 +150,7 @@ export function FlashingWalkthrough({ build }: { build: Build }) {
         onCancel={(e) => e.stopPropagation()}
       >
         <button onClick={() => dialog.current?.close()}>Close image ×</button>
-        {enlarged && <img src={enlarged} alt={phase.title} />}
+        {enlarged && <img {...mediaImage(enlarged)} alt={phase.title} />}
       </dialog>
     </section>
   )

@@ -3,6 +3,7 @@ import { fitBeltBetweenSleeves } from './beltGuideGeometry'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import type { Inventory, Part } from './assemblyParts'
 import type { Build } from './buildContent'
+import { mediaUrl } from './media'
 export type Bundle = { inventory: Inventory; scene: THREE.Group }
 const bundles = new Map<string, Promise<Bundle>>()
 export function loadBundle(key: string) {
@@ -16,7 +17,7 @@ export function loadBundle(key: string) {
           throw new Error('Unavailable')
         return r.json() as Promise<Inventory>
       }),
-      new GLTFLoader().loadAsync(`./assembly/parts/${key}/assembly.glb`),
+      new GLTFLoader().loadAsync(mediaUrl(`./assembly/parts/${key}/assembly.glb`)),
     ]).then(([inventory, gltf]) => {
       fitBeltBetweenSleeves(gltf.scene, inventory)
       return { inventory, scene: gltf.scene }

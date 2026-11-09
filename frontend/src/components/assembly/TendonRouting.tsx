@@ -5,6 +5,7 @@ import { AssemblyComparison } from './AssemblyComparison'
 import { routingDiagram, type RoutingImage } from './routingDiagrams'
 import type { Build } from './buildContent'
 import { photoResolution } from './photoResolution'
+import { mediaUrl } from './media'
 function Face({
   image,
   point,
@@ -22,7 +23,11 @@ function Face({
     r = image.markerRadius ?? Math.min(view[2], view[3]) * 0.055
   const drawing = (
     <svg viewBox={view.join(' ')} role="img" aria-label={title}>
-      <image href={photoResolution(image.src)} width={image.width} height={image.height} />
+      <image
+        href={mediaUrl(photoResolution(image.src))}
+        width={image.width}
+        height={image.height}
+      />
       {point && (
         <>
           <circle
@@ -106,7 +111,7 @@ function Face({
             aria-label="Assembly photo"
           >
             <image
-              href={photoResolution(image.reference.src)}
+              href={mediaUrl(photoResolution(image.reference.src))}
               width={image.reference.width}
               height={image.reference.height}
             />
@@ -221,7 +226,7 @@ export function TendonRouting({
             aria-label={`${route.name}: follow the highlighted tendon into its channel`}
           >
             <image
-              href={photoResolution(diagram.image.src)}
+              href={mediaUrl(photoResolution(diagram.image.src))}
               width={diagram.image.width}
               height={diagram.image.height}
             />

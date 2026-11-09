@@ -1,5 +1,6 @@
 import { GuideText } from './GuideEditing'
 import { useEffect, useId, useState } from 'react'
+import { mediaImage, mediaUrl } from './media'
 
 const stages = [
   {
@@ -40,7 +41,7 @@ function HitchFrame({ frame, thumbnail = false }: { frame: number; thumbnail?: b
         </clipPath>
       </defs>
       <image
-        href="./assembly/touch/clove-hitch.png"
+        href={mediaUrl('./assembly/touch/clove-hitch.png')}
         width="414"
         height="312"
         clipPath={`url(#${clip})`}
@@ -125,7 +126,7 @@ export function CloveHitchLesson() {
       <details className="assembly-hitch-reference">
         <summary>See the copper wire on the cable</summary>
         <img
-          src="./assembly/touch/wrap-start.png"
+          {...mediaImage('./assembly/touch/wrap-start.png')}
           alt="Close-up of the starting copper-wire hitch around the black cable sleeve"
         />
       </details>

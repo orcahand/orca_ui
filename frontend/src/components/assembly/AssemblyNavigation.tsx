@@ -2,6 +2,7 @@ import { Fragment, useId, useState, useRef, useLayoutEffect, type ReactNode } fr
 import navigationHand from './navigationHand.json'
 import type { AssemblyStep } from './guide'
 import type { Build } from './buildContent'
+import { mediaUrl } from './media'
 
 const CHAPTER_NAMES: Record<string, string> = {
   'Start here': 'Your ORCA hand',
@@ -135,7 +136,9 @@ export function AssemblyNavigation({
           <defs>
             <mask id={maskId} style={{ maskType: 'alpha' }}>
               <image
-                href={`./assembly/navigation/${build.version === 'touch' ? 'touch' : 'base'}-right.webp`}
+                href={mediaUrl(
+                  `./assembly/navigation/${build.version === 'touch' ? 'touch' : 'base'}-right.webp`,
+                )}
                 width="640"
                 height="900"
               />
@@ -143,7 +146,9 @@ export function AssemblyNavigation({
           </defs>
           <g transform={build.side === 'left' ? 'translate(640 0) scale(-1 1)' : undefined}>
             <image
-              href={`./assembly/navigation/${build.version === 'touch' ? 'touch' : 'base'}-right.webp`}
+              href={mediaUrl(
+                `./assembly/navigation/${build.version === 'touch' ? 'touch' : 'base'}-right.webp`,
+              )}
               width="640"
               height="900"
             />

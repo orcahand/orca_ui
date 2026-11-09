@@ -1,6 +1,7 @@
 import { GuideText } from './GuideEditing'
 import { useId, useState } from 'react'
 import type { Build } from './buildContent'
+import { mediaImage } from './media'
 
 const phases = [
   [
@@ -29,7 +30,9 @@ export function ThumbPpThreading({ build }: { build: Build }) {
       <div className="assembly-thumb-threading-views">
         <figure>
           <img
-            src={`./assembly/renders/${build.version === 'touch' ? 'touch' : 'base'}-${build.side}-dynamixel/thumb-pp-part.webp`}
+            {...mediaImage(
+              `./assembly/renders/${build.version === 'touch' ? 'touch' : 'base'}-${build.side}-dynamixel/thumb-pp-part.webp`,
+            )}
             alt={`${build.side} ${build.version} thumb PP without its skin`}
           />
           <figcaption>

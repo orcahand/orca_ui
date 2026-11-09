@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { GuideText } from './GuideEditing'
 import type { Build } from './buildContent'
 import { stepPartImages } from './stepPartImages'
+import { mediaImage } from './media'
 
 export function StepSupplies({
   step,
@@ -53,7 +54,12 @@ export function StepSupplies({
               <figure key={i}>
                 <div className="assembly-step-part-images">
                   {stepPartImages(item, build, step).map((image) => (
-                    <img key={image.src} src={image.src} alt={image.label} title={image.label} />
+                    <img
+                      key={image.src}
+                      {...mediaImage(image.src)}
+                      alt={image.label}
+                      title={image.label}
+                    />
                   ))}
                 </div>
                 <figcaption>

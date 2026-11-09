@@ -3,6 +3,7 @@ import { useRef, useState, type ReactNode } from 'react'
 import { MEDIA, STEPS } from './guide'
 import type { Build } from './buildContent'
 import { photoResolution } from './photoResolution'
+import { mediaImage } from './media'
 
 export function ViewToggle({
   photo,
@@ -85,7 +86,7 @@ export function AssemblyComparison({
       ) : (
         <figure className="assembly-inline-photo">
           <img
-            src={photoResolution(photos[shown - 1].src)}
+            {...mediaImage(photoResolution(photos[shown - 1].src))}
             alt={`Assembly photo ${shown} for ${title}`}
           />
           {photos.length > 1 && (
@@ -131,7 +132,7 @@ export function AssemblyComparison({
             <div className="assembly-enlarged-model">{model()}</div>
           ) : (
             <img
-              src={photoResolution(photos[index - 1].src)}
+              {...mediaImage(photoResolution(photos[index - 1].src))}
               alt={`Assembly photo ${index} for ${title}`}
             />
           ))}

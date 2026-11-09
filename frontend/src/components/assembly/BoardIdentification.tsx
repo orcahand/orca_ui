@@ -1,6 +1,7 @@
 import { GuideText } from './GuideEditing'
 import { useRef, useState } from 'react'
 import type { Build } from './buildContent'
+import { mediaUrl } from './media'
 
 // Coordinates are on the unmodified board photograph, displayed 90° counterclockwise.
 // The complete STEP omits the USB, power and fan sockets, so use the actual board here.
@@ -59,7 +60,7 @@ export function BoardIdentification({ build }: { build: Build }) {
   const drawing = (
     <svg viewBox="0 0 1152 864" role="img" aria-label={`OH board: ${port.name} highlighted`}>
       <image
-        href="./assembly/details/oh-board-reference.jpeg"
+        href={mediaUrl('./assembly/details/oh-board-reference.jpeg')}
         width="864"
         height="1152"
         transform="translate(0 864) rotate(-90)"

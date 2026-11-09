@@ -7,6 +7,7 @@ import { loadBundle, type Bundle } from './cadAssets'
 import { cadPieces, disposePieces, fade, ease, framed } from './cadScene'
 import { motorPieces, motorOwner, jointForMotor, jointName } from './driveMap'
 import type { Build } from './buildContent'
+import { mediaImage } from './media'
 function Chain({
   bundle,
   build,
@@ -200,7 +201,10 @@ export function MotorChain({ build }: { build: Build }) {
         </p>
       ) : (
         <div className="assembly-motor-chain-reference">
-          <img src="./assembly/media/feetech-5.jpg" alt="FeeTech motor column and direct cables" />
+          <img
+            {...mediaImage('./assembly/media/feetech-5.jpg')}
+            alt="FeeTech motor column and direct cables"
+          />
         </div>
       )}
       <div className="assembly-motor-ids">

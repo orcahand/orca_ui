@@ -5,6 +5,7 @@ import { OrbitControls } from '@react-three/drei'
 import { loadBundle, type Bundle } from './cadAssets'
 import type { Build } from './buildContent'
 import { touchScrewScene, TOUCH_FINGERS, SCREW_COLORS, type TouchFinger } from './touchScrewScene'
+import { mediaImage } from './media'
 function ScrewModel({
   bundle,
   build,
@@ -188,7 +189,7 @@ export function TouchScrewGuide({ build }: { build: Build }) {
           {['fingers', 'thumb'].map((kind) => (
             <figure key={kind}>
               <img
-                src={`./assembly/touch/screws-${kind}.png`}
+                {...mediaImage(`./assembly/touch/screws-${kind}.png`)}
                 alt={
                   kind === 'thumb'
                     ? 'Thumb: blue M1.4×4 screws at the tip, orange M1.4×6 below'
