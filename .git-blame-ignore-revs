@@ -1,0 +1,5 @@
+# Commits that only reformat code, skipped by blame. GitHub reads this file;
+# locally, run once per clone: git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# Format the assembly guide with Prettier
+eae622e885d3a475eea2a7ecc048f4f1def2cab3
