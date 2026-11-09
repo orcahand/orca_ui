@@ -1,4 +1,4 @@
-import type {AssemblyStep} from './guide'
+import type { AssemblyStep } from './guide'
 
 const TOOLS = {
   measure: 'Ruler or tape measure · millimetres',
@@ -23,42 +23,109 @@ const TOOLS = {
 type Tool = keyof typeof TOOLS
 
 // Every step has an explicit entry, including operations done entirely by hand.
-export const STEP_TOOLS:Record<string,Tool[]> = {
-  p1:[],p6:['cut'],p23:[],p13:['measure'],p15:['measure','cut'],
-  p18:['brush'],p16:['measure','cut'],p20:['cut'],p22:['wire'],
-  p26:['measure','cut'],p29:['tuck'],p31:['finish','brush'],
-  'prepare-pp':['tuck'],'pp-ready':[],p33:[],p35:[],
-  'finishing-pp':[],p37:['measure','cut','tuck'],
-  p42:[],p45:['measure','cut','tuck','finish','brush'],
-  'thumb-tendons':['measure'],'thumb-parts':['finish','brush'],'thumb-dp':['tuck'],'thumb-pp':['measure','tuck'],'thumb-pp-ready':[],'thumb-tp-pins':[],'thumb-skins':[],'thumb-test':[],
-  p46:[],p49:['measure','cut','tuck'],
-  p54:[],p56:['measure','cut','tuck'],
-  p59:[],p62:[],p64:[],p68:[],p70:[],
-  p73:[],p75:['driver','measure','cut'],p77:[],p80:[],p83:['labels'],p89:[],
-  p93:['driver'],p98:[],p97:[],p101:[],p105:['console','flash'],p110:['console','flash'],
-  p150:['firmware','flash'],p154:['firmware','flash'],p99:['driver'],
-  p112:['computer'],p115:['computer','labels'],p117:['computer'],p122:['driver'],
-  p123:['measure','cut','tuck','labels'],p126:['measure','cut','tuck','driver'],
-  p127:['driver'],p129:['cloth'],p132:['cloth'],p135:[],p136:['driver'],
-  p139:[],p141:['computer'],'motor-check':['computer'],p142:['driver'],
-  p145:['scale','mixing','gloves'],p147:['scale'],p148:['scale','mixing','gloves'],
-  'touch-parts':['measure','wire','driver','marker','paxini'],
-  'touch-ids':['paxini','labels'],'touch-wrap-short':['measure','wire'],
-  'touch-wrap-long':['measure','wire'],'touch-paint':['marker'],
-  'touch-skins':[],'touch-route':[],'touch-connect':[],'touch-mount':['driver'],
-  'touch-board-mount':['driver'],'touch-board-connect':[],'touch-board-link':[],'touch-test':['computer'],
+export const STEP_TOOLS: Record<string, Tool[]> = {
+  p1: [],
+  p6: ['cut'],
+  p23: [],
+  p13: ['measure'],
+  p15: ['measure', 'cut'],
+  p18: ['brush'],
+  p16: ['measure', 'cut'],
+  p20: ['cut'],
+  p22: ['wire'],
+  p26: ['measure', 'cut'],
+  p29: ['tuck'],
+  p31: ['finish', 'brush'],
+  'prepare-pp': ['tuck'],
+  'pp-ready': [],
+  p33: [],
+  p35: [],
+  'finishing-pp': [],
+  p37: ['measure', 'cut', 'tuck'],
+  p42: [],
+  p45: ['measure', 'cut', 'tuck', 'finish', 'brush'],
+  'thumb-tendons': ['measure'],
+  'thumb-parts': ['finish', 'brush'],
+  'thumb-dp': ['tuck'],
+  'thumb-pp': ['measure', 'tuck'],
+  'thumb-pp-ready': [],
+  'thumb-tp-pins': [],
+  'thumb-skins': [],
+  'thumb-test': [],
+  p46: [],
+  p49: ['measure', 'cut', 'tuck'],
+  p54: [],
+  p56: ['measure', 'cut', 'tuck'],
+  p59: [],
+  p62: [],
+  p64: [],
+  p68: [],
+  p70: [],
+  p73: [],
+  p75: ['driver', 'measure', 'cut'],
+  p77: [],
+  p80: [],
+  p83: ['labels'],
+  p89: [],
+  p93: ['driver'],
+  p98: [],
+  p97: [],
+  p101: [],
+  p105: ['console', 'flash'],
+  p110: ['console', 'flash'],
+  p150: ['firmware', 'flash'],
+  p154: ['firmware', 'flash'],
+  p99: ['driver'],
+  p112: ['computer'],
+  p115: ['computer', 'labels'],
+  p117: ['computer'],
+  p122: ['driver'],
+  p123: ['measure', 'cut', 'tuck', 'labels'],
+  p126: ['measure', 'cut', 'tuck', 'driver'],
+  p127: ['driver'],
+  p129: ['cloth'],
+  p132: ['cloth'],
+  p135: [],
+  p136: ['driver'],
+  p139: [],
+  p141: ['computer'],
+  'motor-check': ['computer'],
+  p142: ['driver'],
+  p145: ['scale', 'mixing', 'gloves'],
+  p147: ['scale'],
+  p148: ['scale', 'mixing', 'gloves'],
+  'touch-parts': ['measure', 'wire', 'driver', 'marker', 'paxini'],
+  'touch-ids': ['paxini', 'labels'],
+  'touch-wrap-short': ['measure', 'wire'],
+  'touch-wrap-long': ['measure', 'wire'],
+  'touch-paint': ['marker'],
+  'touch-skins': [],
+  'touch-route': [],
+  'touch-connect': [],
+  'touch-mount': ['driver'],
+  'touch-board-mount': ['driver'],
+  'touch-board-connect': [],
+  'touch-board-link': [],
+  'touch-test': ['computer'],
 }
 
-export function stepTools(step:AssemblyStep):string[] {
-  return (STEP_TOOLS[step.id]??[]).map(id=>TOOLS[id])
+export function stepTools(step: AssemblyStep): string[] {
+  return (STEP_TOOLS[step.id] ?? []).map((id) => TOOLS[id])
 }
 
 export function buildTools() {
   return {
-    assembly:['Sharp scissors or flush cutters','Ruler or tape measure',TOOLS.finish,TOOLS.tuck,TOOLS.driver],
-    setup:[TOOLS.computer],
+    assembly: [
+      'Sharp scissors or flush cutters',
+      'Ruler or tape measure',
+      TOOLS.finish,
+      TOOLS.tuck,
+      TOOLS.driver,
+    ],
+    setup: [TOOLS.computer],
   }
 }
 
-const TOOL_ONLY = /^(?:Ruler|Cutters|Wire cutters|Black permanent marker|Labels or marker|Paxini adapter|ORCA UI|Allen key|Hex keys|File|Soft brush|Small blunt tool|Scale|Cups|Separate mixing sticks|Gloves|Wiping cloth|Hand screwdriver|Windows laptop|Computer with|J-Link|Tag-Connect)/i
-export const partsOnly=(items:string[])=>items.filter(item=>!TOOL_ONLY.test(item))
+const TOOL_ONLY =
+  /^(?:Ruler|Cutters|Wire cutters|Black permanent marker|Labels or marker|Paxini adapter|ORCA UI|Allen key|Hex keys|File|Soft brush|Small blunt tool|Scale|Cups|Separate mixing sticks|Gloves|Wiping cloth|Hand screwdriver|Windows laptop|Computer with|J-Link|Tag-Connect)/i
+export const partsOnly = (items: string[]) => items.filter((item) => !TOOL_ONLY.test(item))
