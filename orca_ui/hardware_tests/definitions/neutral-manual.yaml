@@ -1,0 +1,24 @@
+id: neutral-manual
+title: Neutral and manual control
+group: existing
+summary: The hand reaches its neutral pose and follows joint commands.
+steps:
+  - id: B4a
+    title: Neutral pose matches main
+    kind: compare
+    check: compare_neutral
+    instructions: >
+      The check moves the hand to neutral with main's orca_core and with the branch's, and reads the motor
+      positions. Both config copies take their joint ranges, neutral pose and joint-to-motor maps from the
+      console's config, which the hand's calibration was made with, so both sides turn the same joint angle
+      into the same motor position.
+    pass_rule: >
+      Every motor reaches the same position on both, within main's repeatability over its cycles (at least
+      ±1°). If the two sides still map joint angles to motors differently, the result is inconclusive, not a
+      fail. Each side's distance from its own commanded target is shown beside it.
+  - id: B4b
+    title: Every slider moves its joint the right way
+    kind: manual
+    panels: [motor_positions]
+    instructions: In the Dashboard, move each joint's slider a little and watch the finger.
+    pass_rule: Every joint moves in the direction its slider says.

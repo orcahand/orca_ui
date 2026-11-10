@@ -1,0 +1,11 @@
+id: config-loading
+title: Config loading
+group: existing
+summary: Every packaged model config loads.
+steps:
+  - id: B2
+    title: Every packaged model loads on both
+    kind: compare
+    check: compare_config_loading
+    instructions: The check loads every packaged model config with main's orca_core and with the branch's; no hand is needed.
+    pass_rule: Every model main can load, the branch loads too.

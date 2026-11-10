@@ -1,0 +1,19 @@
+id: joint-loop
+title: Joint-encoder closed loop
+group: existing
+summary: Hands with joint encoders control joint angles in a closed loop with a freshness watchdog.
+steps:
+  - id: B6a
+    title: Joints follow commands on both
+    kind: compare
+    applies_to: {requires: [encoders]}
+    check: compare_joint_loop
+    instructions: The check commands a few joint angles with main's and the branch's orca_core and records the encoder readings.
+    pass_rule: The joints reach the commanded angles on both, with the same error.
+  - id: B6b
+    title: The watchdog reacts to a lost encoder link
+    kind: manual
+    applies_to: {requires: [encoders]}
+    panels: [joint_encoders, operation_log]
+    instructions: With the closed loop running, unplug the encoder link, watch the console, then plug it back in.
+    pass_rule: The watchdog stops the loop safely and the console says why; the loop recovers after reconnecting.

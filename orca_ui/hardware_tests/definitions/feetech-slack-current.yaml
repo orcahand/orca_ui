@@ -1,0 +1,15 @@
+id: feetech-slack-current
+title: Feetech slack-test current
+group: observation
+summary: Which current lets the slack test see small slack on Feetech hands. Shipped as provisional.
+steps:
+  - id: C1
+    title: Known slack read at 120, 200 and 300 mA
+    kind: observe
+    applies_to: {motor_families: [feetech]}
+    action: operation:slack_test
+    panels: [motor_positions, motor_currents, operation_log]
+    instructions: |
+      Loosen one tendon by a known number of ratchet clicks. Run the slack test three times at each of
+      120, 200 and 300 mA and note the readings for that joint.
+    pass_rule: Recorded only.

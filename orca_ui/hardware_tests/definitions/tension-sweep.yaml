@@ -1,0 +1,14 @@
+id: tension-sweep
+title: Tension sweep
+group: new
+summary: Drives each finger joint limit to limit and records motor current and position.
+steps:
+  - id: A3
+    title: Sweep runs and saves its dataset
+    kind: auto
+    panels: [motor_positions, motor_currents, operation_log]
+    check: tension_sweep_runs
+    instructions: The check runs the tension sweep on all finger joints with the family defaults.
+    pass_rule: >
+      It completes; a new sweep dataset and a sweeps entry in setup.yaml exist; a joint that stalls is
+      recorded and the sweep carries on.

@@ -1,0 +1,10 @@
+id: teleop
+title: Teleop with the branch
+group: existing
+summary: orca_teleop drives the hand through the branch's orca_core.
+steps:
+  - id: B10
+    title: Hand tracking moves the hand
+    kind: manual
+    instructions: Run the planned hand-tracking session with the branch's orca_core.
+    pass_rule: Tracking moves the hand as it does on main.

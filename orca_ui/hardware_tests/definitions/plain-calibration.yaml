@@ -1,0 +1,16 @@
+id: plain-calibration
+title: Plain calibration
+group: existing
+summary: Calibration drives each joint onto its hardstops and saves the motor limits.
+steps:
+  - id: B3
+    title: Calibration matches main within main's own spread
+    kind: compare
+    check: compare_plain_calibration
+    params: {main_runs: 2}
+    panels: [motor_positions, motor_currents]
+    instructions: >
+      The check calibrates twice with main's orca_core and once with the branch's, each on its own copy
+      of this hand's config, recording position and current throughout. Both sides make one plain pass:
+      pinned to v2.0, or with re-drives off on a v2.1 hand whose v2.1 joint map differs from its base map.
+    pass_rule: Every joint's limits from the branch lie within the spread of main's two runs.

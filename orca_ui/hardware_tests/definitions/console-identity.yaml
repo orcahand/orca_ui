@@ -1,0 +1,14 @@
+id: console-identity
+title: Board picker and boot screen
+group: new
+summary: The header's board picker shows each board's serial and board id; the boot screen shows the ORCA logo.
+steps:
+  - id: A16
+    title: The board picker names the board; the boot screen shows the logo
+    kind: manual
+    check: board_identity_listed
+    instructions: |
+      1. Open the board picker in the header ("board: auto"): this hand's board is listed with its serial and
+         its board id, marked as the one the console holds.
+      2. The next time the console starts (or press Reconnect), the boot screen shows the ORCA logo.
+    pass_rule: The board is listed with serial and board id, and the boot screen shows the logo.

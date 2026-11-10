@@ -1,0 +1,11 @@
+id: script-flags
+title: Script flags
+group: existing
+summary: Every orca_core script shares the same command-line flags.
+steps:
+  - id: B8
+    title: Every script starts and accepts the shared flags
+    kind: compare
+    check: compare_script_flags
+    instructions: The check runs every orca_core script's help, and the non-interactive ones with the mock hand, on main and on the branch.
+    pass_rule: Every script main can start, the branch starts too, and the shared flags take effect.

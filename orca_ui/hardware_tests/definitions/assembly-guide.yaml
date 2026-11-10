@@ -1,0 +1,20 @@
+id: assembly-guide
+title: Assembly guide
+group: new
+summary: The step-by-step build guide in Setup, with its media in the public bucket.
+steps:
+  - id: G1
+    title: The guide offers only the public edition and stays within the hand's joint ranges
+    kind: manual
+    instructions: |
+      Already verified in the WP5 walkthrough on 2026-11-09, no need to repeat: media from the bucket,
+      3D models, video seeking, STL downloads, blending and the kept browser profile.
+      1. Setup tab → Assembly instructions → Open assembly guide.
+      2. The Version picker offers no Touch version; there is no Internal/External edition picker and no
+         firmware-flashing chapter.
+      3. Open a step with a moving 3D hand (a finger's motion or joint test) and watch it for a few
+         seconds: every finger bends within its natural range, none past it.
+      4. Close the guide and open it again: it reopens on the step you left.
+    pass_rule: >
+      Only the public edition is offered, the moving hand stays within its joint ranges, and the guide
+      reopens where you left it.

@@ -1,0 +1,11 @@
+id: sweep-stalls
+title: Sweep stalls
+group: observation
+summary: thumb_dip, and after re-tensioning some others, stalled short in the sweep.
+steps:
+  - id: C2
+    title: Sweep with the other thumb motors holding lower, then off
+    kind: observe
+    check: sweep_stall_variants
+    instructions: The check repeats the thumb sweep with the other thumb motors holding at a lower current, then with them off.
+    pass_rule: Recorded only.

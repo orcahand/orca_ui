@@ -1,0 +1,14 @@
+id: software
+title: Software checks
+group: existing
+summary: Both test suites and the downstream check, on exactly the code being merged.
+steps:
+  - id: S1
+    title: Both suites and the downstream check pass
+    kind: auto
+    check: software_suites
+    instructions: >
+      Runs orca_core's test suite, orca_ui's suite against this orca_core, and orca_core's
+      tools/check_downstream.py --run-tests with this orca_ui as the sibling checkout. Each output is
+      saved in the step folder. Takes a few minutes and needs no hand.
+    pass_rule: All three exit 0.

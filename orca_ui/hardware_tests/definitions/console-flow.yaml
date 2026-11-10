@@ -1,0 +1,11 @@
+id: console-flow
+title: Console setup flow
+group: new
+summary: The Setup tab drives tensioning, the slack test, the sweep, calibration and running.
+steps:
+  - id: A12
+    title: Every routine starts, shows progress, cancels and ends clearly
+    kind: manual
+    instructions: |
+      In the Setup tab, start each routine once, watch its progress, cancel one of them, and let the others finish.
+    pass_rule: Every routine starts, shows progress, can be cancelled, and ends with a clear result.

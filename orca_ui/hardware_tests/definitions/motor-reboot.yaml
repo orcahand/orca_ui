@@ -1,0 +1,13 @@
+id: motor-reboot
+title: Reboot one motor with torque on
+group: new
+summary: One motor can be rebooted while the rest of the hand keeps torque.
+steps:
+  - id: A10
+    title: Rebooted motor returns, the others keep holding
+    kind: auto
+    check: motor_reboot_torque_on
+    params: {joint: index_pip}
+    panels: [motor_positions, motor_currents]
+    instructions: The check holds a pose, reboots the motor driving one finger joint, and reads the others.
+    pass_rule: The reboot is allowed; that motor answers again; the other motors keep torque and position.

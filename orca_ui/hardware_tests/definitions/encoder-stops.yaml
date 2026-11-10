@@ -1,0 +1,12 @@
+id: encoder-stops
+title: Calibration stops against the joint encoders
+group: observation
+summary: Where calibration stopped compared with what the joint encoders read.
+steps:
+  - id: C5
+    title: Stops compared with encoder readings
+    kind: observe
+    applies_to: {requires: [encoders]}
+    check: calibration_vs_encoders
+    instructions: The check calibrates with the branch's orca_core while recording the joint encoders, and compares each stop with the encoder angle.
+    pass_rule: Recorded only.

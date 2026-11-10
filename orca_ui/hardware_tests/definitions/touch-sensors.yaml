@@ -1,0 +1,13 @@
+id: touch-sensors
+title: Touch sensors
+group: existing
+summary: Tactile fingertips report health and live data.
+steps:
+  - id: B7
+    title: Same sensor health on both
+    kind: compare
+    applies_to: {requires: [tactile]}
+    check: compare_tactile_health
+    panels: [tactile]
+    instructions: The check reads the tactile link and fingertip health with main's and the branch's orca_core.
+    pass_rule: Same health on both, and live data arrives on both.

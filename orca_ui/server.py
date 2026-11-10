@@ -21,12 +21,14 @@ def create_app(settings: UiSettings) -> FastAPI:
     from orca_ui.api.assembly import build_router as build_assembly_router
     from orca_ui.api.assets import build_router as build_assets_router
     from orca_ui.api.assets import mount_assets
+    from orca_ui.api.hardware_tests import build_router as build_hardware_tests_router
     from orca_ui.api.rest import build_router as build_rest_router
     from orca_ui.api.ws import build_ws_router
     from orca_ui.hand.service import HandService
     from orca_ui.hand.telemetry import TelemetryService
 
     from orca_ui.hand.operations import build_operation_manager
+    from orca_ui.hardware_tests.session import HardwareTests
 
     hub = StreamHub()
     service = HandService(
@@ -44,6 +46,7 @@ def create_app(settings: UiSettings) -> FastAPI:
         service.attach_teleop_manager(teleop)
     telemetry = TelemetryService(service, hub, settings)
     service.attach_telemetry(telemetry)
+    hardware_tests = HardwareTests(service, settings, readings=hub.latest)
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -57,6 +60,7 @@ def create_app(settings: UiSettings) -> FastAPI:
             # Teleop first: no targets may race into a dying stack.
             if teleop is not None:
                 teleop.shutdown()
+            hardware_tests.shutdown()
             operations.shutdown()
             telemetry.stop()
             service.stop()
@@ -67,10 +71,12 @@ def create_app(settings: UiSettings) -> FastAPI:
     app.state.hub = hub
     app.state.operations = operations
     app.state.teleop = teleop
+    app.state.hardware_tests = hardware_tests
 
     app.include_router(build_rest_router(service))
     app.include_router(build_assets_router(service))
     app.include_router(build_assembly_router())
+    app.include_router(build_hardware_tests_router(hardware_tests))
     app.include_router(build_ws_router(service, hub))
     if teleop is not None:
         from orca_ui.api.teleop_ws import build_teleop_ws_router

@@ -1,0 +1,43 @@
+id: guided-tensioning
+title: Guided tensioning
+group: new
+summary: Rounds of centring, range checks and tensioning, scored against the v2.1 travel baseline.
+steps:
+  - id: A4a
+    title: Guided tensioning completes on v2.1
+    kind: manual
+    applies_to: {hardware_versions: [210, 211]}
+    action: operation:guided_tension
+    panels: [motor_positions, motor_currents, operation_log]
+    check: guided_tension_finished
+    instructions: |
+      Start guided tensioning with the button and follow its prompts, turning the ratchets where asked,
+      until it finishes.
+    pass_rule: All rounds complete and the pull runs at max_current.
+  - id: A4b
+    title: Guided tensioning refuses v2.0 unless overridden
+    kind: auto
+    check: guided_tension_refusal
+    instructions: >
+      The check starts guided tensioning with the branch's orca_core on a copy of this hand's config
+      pinned to v2.0, once plainly and once with the any-hardware override.
+    pass_rule: Pinned to v2.0 it refuses with a message; with the override it starts.
+  - id: A4c
+    title: In-run controls work and every current limit lands
+    kind: manual
+    applies_to: {hardware_versions: [210, 211]}
+    action: operation:guided_tension
+    panels: [operation_log]
+    check: guided_tension_controls
+    instructions: |
+      Start guided tensioning with the button and, within its first round:
+      1. At the second finger's pose, press Back once, then Continue.
+      2. Jump to another finger by clicking it in the dialog's left list.
+      3. In a range check, click ↺ beside one joint so it is tested again.
+      4. While a range check runs, open Advanced settings and change one hold current (for example MCPs 140 → 120 mA).
+      5. At the score, press Finish anyway. Do not press Tension, so the calibration stays valid.
+      Slack scoring is not offered on the Setup page; B12 runs it with the script.
+    pass_rule: >
+      Back or a jump, test again and the current change are recorded and the run ends cleanly. Every limit
+      read back from the motors is what was asked: the frozen fingers at the tension current, the moved
+      joints at their hold current.

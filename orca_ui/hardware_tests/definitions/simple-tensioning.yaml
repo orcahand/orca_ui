@@ -1,0 +1,21 @@
+id: simple-tensioning
+title: Simple tensioning steps
+group: new
+summary: Simple tensioning's step list can be clicked to go back and forth, and to restart the hold.
+steps:
+  - id: A15
+    title: Jumping between steps and restarting the hold
+    kind: manual
+    check: simple_tension_jumps
+    panels: [motor_currents, operation_log]
+    instructions: |
+      Setup tab → Tension → c Simple tensioning → Start. Leave "wind the tendons to the hard stops first" unticked.
+      1. Press Activate current and wait for "Ratchet the spools". Do not turn any spool.
+      2. Click "Tension the hand" in the dialog's left list: it goes back to that step.
+      3. Click "Ratchet the spools" in the left list: it returns, still holding, without a restart.
+      4. Click "Tension the hand" again, then "Release & activate again": the motors let go and hold again.
+      5. Press "Done — release motors".
+      No spool was turned, so the calibration stays valid.
+    pass_rule: >
+      Each click shows the step it names; the restart releases and holds again; the run ends released
+      without an error.

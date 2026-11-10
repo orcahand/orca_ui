@@ -1,0 +1,12 @@
+id: console-features
+title: Console features outside the new routines
+group: existing
+summary: Fingertip numbering, poses and demos, the teleop tab, the 3D view and the motors view.
+steps:
+  - id: B9
+    title: Same behaviour as on main
+    kind: manual
+    instructions: |
+      Open each of these and use it briefly: fingertip numbering (Touch hands), Poses and demos, Teleop,
+      3D, Motors. Compare with main's console if anything looks off.
+    pass_rule: Each works as it does on main.
