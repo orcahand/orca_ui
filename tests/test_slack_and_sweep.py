@@ -95,6 +95,22 @@ def test_too_much_slack_blocks_calibration_until_a_passing_test(client):
                        json={"params": {"current_ma": 500}}).status_code == 422
 
 
+def test_an_answer_the_hold_prompt_does_not_offer_never_winds_the_joint(client):
+    started = client.post("/api/operation/slack_test/start",
+                          json={"params": {**FAST, "joints": ["index_pip"]}})
+    assert started.status_code == 200, started.text
+    for stray in ("Finish", "skip", "back"):
+        assert _wait_for(lambda: _operation(client).get("state") == "awaiting_input")
+        assert client.post("/api/operation/input", json={"value": stray}).status_code == 200
+        assert _wait_for(lambda: any(repr(stray) in entry["line"]
+                                     for entry in client.get("/api/operation/log").json()["lines"]))
+    snapshot = _operation(client)
+    assert snapshot["extra"]["step"] == "hold" and snapshot["extra"]["joint"] == "index_pip"
+    assert snapshot["extra"]["results"]["index_pip"]["status"] is None
+    _hold_each(client, ["Skip", "Finish"])
+    assert _done(client)["result"]["slack"] == {"index_pip": "skipped"}
+
+
 def test_the_slack_test_runs_at_the_motor_familys_current_unless_one_is_chosen(client):
     offered = client.get("/api/hand/info").json()["slack_current"]
     assert offered == {"default_ma": 60, "choices_ma": [40, 60, 80, 100]}

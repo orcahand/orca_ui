@@ -243,7 +243,8 @@ class TensionSweepOperation(Operation):
         ctx.set_phase("acquiring", detail="taking the hand into maintenance")
         lease = supervisor.enter_maintenance(self.kind)
         hand = None
-        presenter = _Presenter(ctx, sweeps.reference(supervisor.config, family))
+        # The reference is read inside the try, so a damaged setup.yaml still releases the lease.
+        presenter = _Presenter(ctx, None)
         try:
             ctx.check_stop()
             ctx.set_phase("connecting", detail="opening motor-only connection")

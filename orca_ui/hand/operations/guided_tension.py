@@ -63,6 +63,8 @@ LIVE_STEP = {
 PASS_INPUT = "pass:"
 # Input values "reboot:<motor id>" clear a motor's latched hardware error and hold it again.
 REBOOT_INPUT = "reboot:"
+# The steps where the finger motors hold anyway, so a rebooted motor holding again surprises no one.
+REBOOT_STEPS = ("range", "score", "tension")
 # "again:<joint>": drop the joint's kept pass so the range check tests it again.
 AGAIN_INPUT = "again:"
 PASS_GROUPS = ("ap", "mcp", "pip")
@@ -290,6 +292,9 @@ class _Presenter:
                 round_no = self._round(event["round"])
                 if round_no != self._extra["round"]:
                     self._extra.update(motors=[], passed=0, scored=0, fraction=0.0)
+                # The slack test's clicks are for the first tension step only.
+                if self._extra["step"] == "tension" and event["step"] != "tension":
+                    self._extra.pop("ratchet", None)
                 self._extra.update(step=event["step"], round=round_no)
                 if "stage" in event:
                     self._extra.update(
@@ -409,6 +414,10 @@ class _Presenter:
             return first
         return self._ctx.wait_input(PROMPTS[action], list(prompt["options"]))
 
+    def faults(self) -> dict:
+        with self._lock:
+            return dict(self._extra.get("faults") or {})
+
     def seed_ratchet(self, ratchet: dict) -> None:
         """A ratchet list the run was opened with (from the slack test)."""
         with self._lock:
@@ -519,6 +528,9 @@ class _LiveCurrents(Operation):
             return
         if hand is None or presenter is None:
             logger.warning("no hand to reboot motor %d on", motor)
+            return
+        if str(motor) not in presenter.faults() or presenter.step not in REBOOT_STEPS:
+            presenter.log(f"ignored a reboot of motor {motor}: only a faulted motor, while the motors hold")
             return
         joint = hand.config.motor_to_joint_dict.get(motor)
         presenter.log(f"rebooting motor {motor} ({joint})")

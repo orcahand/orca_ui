@@ -107,6 +107,15 @@ class _Presenter:
         self._last = now
         self._ctx.set_extra({**self.extra, "results": dict(self.extra["results"])})
 
+    def _ask(self, prompt: str, options: list[str]) -> str:
+        """An answer this prompt offers; anything else, such as a click meant for an
+        earlier prompt, is logged and ignored, so it can never wind a joint."""
+        while True:
+            answer = self._ctx.wait_input(prompt, options)
+            if answer in options:
+                return answer
+            self._ctx.log(f"ignored {answer!r}: this prompt takes {', '.join(options)}")
+
     def hold(self, joint: str) -> bool | str:
         """Park on the hold prompt for ``joint``; False when the operator skips
         it, orca_core's HOLD_BACK to test the previous joint again."""
@@ -118,8 +127,8 @@ class _Presenter:
             self._publish()
         self._ctx.set_phase("hold", detail=f"torque off — hold {joint.replace('_', ' ')}")
         options = [HOLD_TEST, HOLD_SKIP] + ([HOLD_BACK] if can_back else [])
-        answer = self._ctx.wait_input(hold_prompt(joint), options)
-        return {HOLD_SKIP: False, HOLD_BACK: CORE_BACK}.get(answer, True)
+        answer = self._ask(hold_prompt(joint), options)
+        return {HOLD_TEST: True, HOLD_SKIP: False, HOLD_BACK: CORE_BACK}[answer]
 
     def review(self) -> bool | str:
         """Park after the last joint: orca_core's HOLD_BACK tests it again,
@@ -130,7 +139,7 @@ class _Presenter:
             self.extra.update(step="review", joint=None, direction=None, live=None, can_back=True)
             self._publish()
         self._ctx.set_phase("review", detail="torque off — every joint tested")
-        answer = self._ctx.wait_input(REVIEW_PROMPT, [REVIEW_FINISH, HOLD_BACK])
+        answer = self._ask(REVIEW_PROMPT, [REVIEW_FINISH, HOLD_BACK])
         return CORE_BACK if answer == HOLD_BACK else True
 
     def progress(self, event: dict) -> None:

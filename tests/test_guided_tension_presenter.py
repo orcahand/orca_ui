@@ -51,6 +51,7 @@ def test_a_latched_motor_is_shown_until_its_reboot_clears_it(monkeypatch):
     ctx = _Ctx()
     op = GuidedTensionOperation({})
     presenter = op._presenter = _Presenter(ctx, {})
+    presenter.progress({"event": "step", "step": "range", "round": 1})
     presenter.progress({"event": "fault", "motor": 8, "joint": "index_mcp", "flags": ["overload"]})
     fault = ctx.extra["faults"]["8"]
     assert fault["kind"] == "load" and fault["joint"] == "index_mcp" and "reboot" in fault["advice"]
@@ -69,9 +70,46 @@ def test_a_latched_motor_is_shown_until_its_reboot_clears_it(monkeypatch):
     assert ctx.extra["faults"] == {}
     assert any("holding again" in line for line in ctx.lines)
     # A reboot the fault survives stays shown, marked as such.
+    presenter.progress({"event": "fault", "motor": 8, "joint": "index_mcp", "flags": ["overload"]})
     monkeypatch.setattr(hand_ops, "reboot_held_motor", lambda hand, mid: ["overload"])
     op.handle_input("reboot:8")
     assert ctx.extra["faults"]["8"]["relatched"] is True
+
+
+def test_a_reboot_is_refused_unless_that_motor_is_faulted_and_the_motors_hold(monkeypatch):
+    from orca_ui.hand.operations import hand_ops
+    from orca_ui.hand.operations.guided_tension import GuidedTensionOperation
+
+    ctx = _Ctx()
+    op = GuidedTensionOperation({})
+    presenter = op._presenter = _Presenter(ctx, {})
+
+    class _Hand:
+        class config:
+            motor_to_joint_dict = {8: "index_mcp", 1: "wrist"}
+
+    op._hand = _Hand()
+    rebooted = []
+    monkeypatch.setattr(hand_ops, "reboot_held_motor", lambda hand, mid: rebooted.append(mid) or [])
+    presenter.progress({"event": "step", "step": "pose", "round": 1})
+    presenter.progress({"event": "fault", "motor": 8, "joint": "index_mcp", "flags": ["overload"]})
+    op.handle_input("reboot:8")
+    presenter.progress({"event": "step", "step": "range", "round": 1})
+    for motor in ("254", "1", "-1"):
+        op.handle_input(f"reboot:{motor}")
+    assert rebooted == []
+    op.handle_input("reboot:8")
+    assert rebooted == [8]
+
+
+def test_the_slack_tests_clicks_leave_after_the_first_tension_step():
+    ctx = _Ctx()
+    presenter = _Presenter(ctx, {})
+    presenter.seed_ratchet({"index_mcp": 3})
+    presenter.progress({"event": "step", "step": "tension", "round": 1})
+    assert ctx.extra["ratchet"] == {"index_mcp": 3}
+    presenter.progress({"event": "step", "step": "pose", "round": 2})
+    assert "ratchet" not in ctx.extra
 
 
 def test_rounds_count_on_from_the_saved_progress():
