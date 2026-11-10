@@ -294,7 +294,7 @@ export function HandScene({
       frameloop="demand"
       dpr={[1, 2]}
       camera={{ fov: 35, position: [0.28, 0.25, 0.3], near: 0.01, far: 10 }}
-      style={{ background: scene.bg, minHeight: 480 }}
+      style={{ background: scene.bg }}
     >
       <hemisphereLight
         args={[scene.hemiSky, scene.hemiGround, scene.hemiIntensity]}
