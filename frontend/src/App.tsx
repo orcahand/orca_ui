@@ -15,7 +15,10 @@ import { DashboardView } from './components/views/DashboardView'
 import { MotorsView } from './components/views/MotorsView'
 import { PosesView } from './components/views/PosesView'
 import { SetupView } from './components/views/SetupView'
+import { SetupTabs } from './components/setup/SetupTabs'
+import { VisualCalibrationView } from './components/visual/VisualCalibrationView'
 import { TeleopView } from './components/views/TeleopView'
+import { StudyView } from './components/views/StudyView'
 import { useAppStore } from './state/appStore'
 import { hasUnseenChangelog, useChangelogStore } from './state/changelogStore'
 import { useOperationActive } from './state/operationStore'
@@ -78,8 +81,17 @@ export default function App() {
       <AppHeader />
       <TransportBar />
       <ErrorBanner />
-      {booting && view === 'setup' ? (
-        <AssemblyCard />
+      {view === 'visual-calibration' ? (
+        // The camera needs no hand: reachable while booting too.
+        <VisualCalibrationView />
+      ) : view === 'study' ? (
+        // The study runs on its own server: reachable without a hand session.
+        <StudyView />
+      ) : booting && view === 'setup' ? (
+        <>
+          <SetupTabs />
+          <AssemblyCard />
+        </>
       ) : booting ? (
         // Some tabs stay reachable while the backend is up but no hand
         // session exists: Teleop (test a camera/glove against the 3D ghost)

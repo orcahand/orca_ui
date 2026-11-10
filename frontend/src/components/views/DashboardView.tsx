@@ -14,6 +14,10 @@ import { TactilePanel } from '../tactile/TactilePanel'
 import { TeleopStatusCard } from '../teleop/TeleopStatusCard'
 import { CameraPreview } from '../teleop/CameraPreview'
 import { HandScenePanel } from '../three/HandScenePanel'
+import { StudyCalibrationPanel } from '../visual/StudyCalibrationPanel'
+import { RigCamera } from '../rig/RigCamera'
+import { RigPanel } from '../rig/RigPanel'
+import { useRigPolling } from '../../state/rigStore'
 
 export function DashboardView() {
   const status = useAppStore((s) => s.status)
@@ -23,6 +27,8 @@ export function DashboardView() {
   // for a motor lying on the bench, and the pseudo-joints match none of its
   // links. The motors are the page.
   const bare = status?.bare ?? false
+  // The calibration rig, when orca-ui found it: drawn around the hand, its controls beside.
+  useRigPolling()
 
   return (
     <>
@@ -65,9 +71,14 @@ export function DashboardView() {
             alignItems: 'start',
           }}
         >
-          <HandScenePanel height="min(52vh, 560px)" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+            <HandScenePanel height="min(52vh, 560px)" withRig />
+            <RigCamera />
+          </div>
           {/* CameraPreview self-hides unless a camera teleop session is live. */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <RigPanel />
+            {caps?.motors && <StudyCalibrationPanel />}
             {caps?.motors && <MotorPanel />}
             <CameraPreview />
           </div>

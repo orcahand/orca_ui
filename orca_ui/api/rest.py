@@ -354,6 +354,13 @@ def build_router(service: HandService) -> APIRouter:
         guard(service.set_max_current, body.ma)
         return {"ok": True, "control": service.control_state()}
 
+    @router.post("/control/motor_currents")
+    def control_motor_currents(body: dict):
+        """Per-motor goal-current limits for an experiment (hand_study collisions): {"ma": {motor_id: mA}};
+        motors not named keep the console's max current. The config is not touched; /control/max_current
+        puts every motor back on one value."""
+        return {"ok": True, "currents": guard(service.set_motor_currents, body.get("ma") or {})}
+
     @router.post("/control/fault_budgets")
     def control_fault_budgets(body: schemas.FaultBudgetsRequest):
         changes = {key: value for key, value in (

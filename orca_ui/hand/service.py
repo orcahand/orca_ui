@@ -78,6 +78,7 @@ BENCH_MAX_INTERP_STEPS = 200
 # Dynamixel firmware restart: the motor is off the bus until it finishes,
 # so a read-back any sooner just times out and looks like a failed reboot.
 MOTOR_REBOOT_SETTLE_S = 0.5
+HAND_MOTION_SETTLE_S = 1.0  # after its last changed target the hand counts as moving this long (the rig plate waits)
 
 # One-shot moves (apply pose, go neutral): distance-scaled glide instead of a
 # fixed duration, so a far target never starts at whip speed.
@@ -218,6 +219,10 @@ class HandService:
         self._control_source = ControlSource.MANUAL
         self._control_owner_label = ControlSource.MANUAL.value
         self._operation_manager = None  # attached post-construction (server.py)
+        # The hand and the calibration rig's plate never move together (docs/rig-dashboard.md):
+        # the plate asks hand_motion_blocker(), joint targets ask plate_motion_guard.
+        self._motion_until = 0.0
+        self.plate_motion_guard: Callable[[], str | None] | None = None
         self._sweeper = None  # mock-only dev sweeper, for estop
         self._teleop_manager = None  # attached post-construction (server.py)
         self._telemetry = None  # attached in server.py
@@ -611,6 +616,12 @@ class HandService:
     def select_board(self, device: str | None) -> dict:
         """Pin the console to one board by device path, or (``None``) back
         to first-to-answer. Reconnects when the pin actually changes."""
+        if device:
+            from orca_ui.hand.boards import is_rig_board
+            reason = is_rig_board(device)
+            if reason:
+                raise ServiceError(f"{device} is the calibration rig's board ({reason}), not a hand",
+                                   status_code=409)
         try:
             self.supervisor.select_board(device)
         except (HandBusyError, ModelSelectError) as e:
@@ -1070,7 +1081,9 @@ class HandService:
         seed = self._current_pose(session)
         # The hand may have been posed by hand while limp: the interpolator
         # must ramp out of where it actually is, not where it last drove to.
-        self.worker.reset(seed)
+        # It ramps motor-space commands, so it is seeded with orca_core's own
+        # estimate; the targets keep the (study-mapped) true pose.
+        self.worker.reset(self._current_pose(session, raw=True))
         with self._state_lock:
             self._targets = dict(seed)
         self._publish_control_state()
@@ -1087,11 +1100,11 @@ class HandService:
         self.worker.reset()
         self._publish_control_state()
 
-    def _current_pose(self, session: HandSession) -> dict:
+    def _current_pose(self, session: HandSession, raw: bool = False) -> dict:
         measured = session.measured_joints()
         if measured:
             return {j: float(v) for j, v in measured.items()}
-        estimate = session.estimate_joints()
+        estimate = session.estimate_joints(raw=raw)
         return {j: float(v) for j, v in (estimate or {}).items()}
 
     def current_pose(self) -> dict:
@@ -1147,10 +1160,64 @@ class HandService:
             if rom is not None:
                 value = min(max(value, float(rom[0])), float(rom[1]))
             clean[joint] = value
-        self.worker.submit_targets(clean)
+        # The visual calibration study's map (off by default), for every source: the targets
+        # stay the angles asked for (echo); the motors get the commands that really reach them.
+        self._refuse_while_plate_moves()
+        sent = self._study_command(clean)
+        with self._state_lock:
+            moved = any(abs(self._targets.get(j, math.inf) - v) > 0.05 for j, v in clean.items())
+        if moved:
+            self._note_motion(HAND_MOTION_SETTLE_S)
+        self.worker.submit_targets(sent)
         with self._state_lock:
             self._targets.update(clean)
         self._publish_targets()
+
+    def _study_command(self, angles: dict[str, float]) -> dict[str, float]:
+        """The motor-space commands for true joint angles: the selected study map
+        (identity when off). The last targets fill the pose a coupled map needs."""
+        from orca_ui.hand.study_map import STUDY_MAP
+
+        if not STUDY_MAP.enabled:
+            return angles
+        with self._state_lock:
+            current = dict(self._targets)
+        return STUDY_MAP.command(angles, current)
+
+    def _glide_op(self, session: HandSession, pose: dict[str, float], num_steps: int, fallback):
+        """A one-shot interpolated move to a true pose: `fallback` (orca_core's own
+        move) when no study map is selected, else the mapped pose."""
+        sent = self._study_command(pose)
+        if sent is pose:
+            return fallback
+
+        def op():
+            session.hand.set_joint_positions(sent, num_steps=num_steps, step_size=_MOVE_STEP_S)
+            settle = getattr(session.hand, "wait_for_motion", None)
+            if settle is not None:
+                try:
+                    settle()
+                except Exception:
+                    logger.warning("study-mapped move did not settle", exc_info=True)
+        return op
+
+    def _note_motion(self, seconds: float) -> None:
+        self._motion_until = max(self._motion_until, time.monotonic() + seconds)
+
+    def _refuse_while_plate_moves(self) -> None:
+        guard = self.plate_motion_guard
+        reason = guard() if guard is not None else None
+        if reason:
+            raise ServiceError(reason, status_code=409)
+
+    def hand_motion_blocker(self) -> str | None:
+        """Why the rig's plate may not turn now (the hand moves or an operation holds it), or None."""
+        if time.monotonic() < self._motion_until:
+            return "the hand is moving: the plate waits until it stops"
+        manager = self._operation_manager
+        if manager is not None and manager.active():
+            return "an operation drives the hand: the plate waits until it ends"
+        return None
 
     def _publish_targets(self) -> None:
         from orca_ui.streaming import topics as T
@@ -1165,11 +1232,14 @@ class HandService:
         self._require_manual_control()
         neutral = {j: float(v) for j, v in session.hand.config.neutral_position.items()}
         num_steps = self._move_steps(session, neutral)
-        self.worker.submit_op(
+        self._refuse_while_plate_moves()
+        self._note_motion(num_steps * _MOVE_STEP_S + HAND_MOTION_SETTLE_S)
+        self.worker.submit_op(self._glide_op(
+            session, neutral, num_steps,
             lambda: session.hand.set_neutral_position(
                 num_steps=num_steps, step_size=_MOVE_STEP_S
             )
-        )
+        ))
         with self._state_lock:
             self._targets.update(neutral)
         self._publish_targets()
@@ -1180,11 +1250,14 @@ class HandService:
         self._require_manual_control()
         zero = {j: 0.0 for j in session.hand.config.joint_ids}
         num_steps = self._move_steps(session, zero)
-        self.worker.submit_op(
+        self._refuse_while_plate_moves()
+        self._note_motion(num_steps * _MOVE_STEP_S + HAND_MOTION_SETTLE_S)
+        self.worker.submit_op(self._glide_op(
+            session, zero, num_steps,
             lambda: session.hand.set_zero_position(
                 num_steps=num_steps, step_size=_MOVE_STEP_S
             )
-        )
+        ))
         with self._state_lock:
             self._targets.update(zero)
         self._publish_targets()
@@ -1620,6 +1693,22 @@ class HandService:
             )
             store[motor_id] = ServoGains(**merged)
         return result
+
+    def set_motor_currents(self, ma: dict) -> dict:
+        """Goal-current limits per motor (mA), the rest at the console's max current; config untouched."""
+        session = self._require_motors()
+        ids = list(session.hand.config.motor_ids)
+        base = float(self._max_current or session.hand.config.max_current)
+        want = {int(k): float(v) for k, v in ma.items()}
+        unknown = sorted(set(want) - set(ids))
+        if unknown:
+            raise ServiceError(f"no motors {unknown}")
+        if any(not 0 < v <= 2000 for v in want.values()):
+            raise ServiceError("currents must be in (0, 2000] mA")
+        currents = [want.get(i, base) for i in ids]
+        with _bus_fence(session.hand):
+            session.hand.set_max_current(currents)
+        return dict(zip(ids, currents))
 
     def set_max_current(self, ma: int) -> None:
         import dataclasses
@@ -2593,9 +2682,10 @@ class HandService:
         if not angles:
             raise ServiceError(f"pose {name!r} is empty")
         num_steps = self._move_steps(session, angles)
+        sent = self._study_command(angles)
         self.worker.submit_op(
             lambda: session.hand.set_joint_positions(
-                angles, num_steps=num_steps, step_size=_MOVE_STEP_S
+                sent, num_steps=num_steps, step_size=_MOVE_STEP_S
             )
         )
         with self._state_lock:

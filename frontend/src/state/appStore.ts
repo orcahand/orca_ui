@@ -17,7 +17,9 @@ export type ViewName =
   | 'poses'
   | 'teleop'
   | 'setup'
+  | 'visual-calibration'
   | 'motors'
+  | 'study'
 
 export interface TactileSettings {
   displayMode: TaxelDisplayMode

@@ -209,6 +209,9 @@ function dispatch(message: ServerMessage): void {
     }
     case TOPICS.jointsEstimate:
       Object.assign(latest.joints.estimate, data.angles as object)
+      latest.joints.standard = (data.standard as Record<string, number> | undefined) ?? {}
+      latest.joints.main = (data.main as Record<string, number> | undefined) ?? {}
+      latest.joints.overlays = (data.overlays as Record<string, Record<string, number>> | undefined) ?? {}
       markDirty()
       break
     case TOPICS.jointsTarget:

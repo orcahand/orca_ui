@@ -88,12 +88,20 @@ def run_detection(config, *, force: bool = False) -> HandDetection | None:
     if not force and "auto" not in _overrides(config):
         return None
     try:
-        return detect_hand()
+        detection = detect_hand()
     except Exception as e:
         # One line, no traceback: this runs on every reconnect attempt, and a
         # persistently unhappy serial stack would drown the log.
         logger.warning("hand detection failed: %s", e)
         return None
+    # The calibration rig's board answers like a hand's (rig_detect): never take it as one.
+    from orca_ui.hand.boards import is_rig_board
+    for port in (detection.motor_port, detection.sensing_port):
+        reason = port and is_rig_board(port)
+        if reason:
+            logger.warning("detection found the calibration rig's board on %s (%s), not a hand", port, reason)
+            return None
+    return detection
 
 
 def presence_from_detection(config, detection: HandDetection | None, *,

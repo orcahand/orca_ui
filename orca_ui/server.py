@@ -22,6 +22,7 @@ def create_app(settings: UiSettings) -> FastAPI:
     from orca_ui.api.assets import build_router as build_assets_router
     from orca_ui.api.assets import mount_assets
     from orca_ui.api.rest import build_router as build_rest_router
+    from orca_ui.api.visual_calibration import build_router as build_visual_calibration_router
     from orca_ui.api.ws import build_ws_router
     from orca_ui.hand.service import HandService
     from orca_ui.hand.telemetry import TelemetryService
@@ -51,6 +52,7 @@ def create_app(settings: UiSettings) -> FastAPI:
         await asyncio.to_thread(prepare_assembly_models)
         service.start()
         telemetry.start()
+        visual.start_rig_watcher()
         broadcaster = asyncio.create_task(hub.broadcaster())
         try:
             yield
@@ -62,6 +64,8 @@ def create_app(settings: UiSettings) -> FastAPI:
             operations.shutdown()
             telemetry.stop()
             service.stop()
+            visual.stop_rig_watcher()
+            visual.release_turntable(close=True)
 
     app = FastAPI(title="ORCA Hand Console", version="0.2.0", lifespan=lifespan)
     app.state.settings = settings
@@ -73,6 +77,33 @@ def create_app(settings: UiSettings) -> FastAPI:
     app.include_router(build_rest_router(service))
     app.include_router(build_assets_router(service))
     app.include_router(build_assembly_router())
+    visual = build_visual_calibration_router(mock=settings.mock)
+    app.include_router(visual)
+    # E-STOP also drops the visual-calibration turntable's torque.
+    hand_estop = service.estop
+
+    def estop() -> dict:
+        report = hand_estop()
+        report["turntable_released"] = visual.release_turntable()
+        return report
+    service.estop = estop
+
+    def hand_ports() -> set[str]:
+        """The hand's ports and pinned board: never probed or opened as the rig."""
+        status = service.supervisor.status()
+        return {p for p in (*status.ports.values(), status.board_pinned) if p}
+    visual.attach_hand(hand_ports, service.hand_motion_blocker)
+
+    def study_hand() -> str | None:
+        """The connected hand's id for the study maps: its folder in ~/orca_bench."""
+        from pathlib import Path as _P
+        parts = _P(getattr(service.supervisor.config, "config_path", "") or "").parts
+        return parts[parts.index("orca_bench") + 1] if "orca_bench" in parts[:-2] else None
+    from orca_ui.hand.study_map import STUDY_MAP
+    STUDY_MAP.hand_source = study_hand
+    from orca_ui.hand import overlays
+    overlays.config_source = lambda: getattr(service.supervisor.config, "config_path", None)
+    service.plate_motion_guard = visual.plate_motion_guard
     app.include_router(build_ws_router(service, hub))
     if teleop is not None:
         from orca_ui.api.teleop_ws import build_teleop_ws_router

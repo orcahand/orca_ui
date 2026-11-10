@@ -9,6 +9,11 @@ React frontend (`frontend/`, built into `orca_ui/webui/`).
 See [DEVELOPMENT.md](DEVELOPMENT.md) for running from source, the frontend
 build, and working against an unreleased `orca_core`.
 
+**Visual calibration** (branch `visual-calibration`): Setup › Visual calibration,
+`frontend/src/components/visual/`, two step tabs: 1 · Rig (calibration object,
+no hand), 2 · Hand. Plan and rig config live in orca_core
+(`experiments/visual_calibration/`, a self-contained experiment; the router puts it on sys.path).
+
 **Before any merge, release or PR of a UI branch**, whoever proposes it: raise
 the changelog first. See [Versioning and the changelog](#versioning-and-the-changelog).
 

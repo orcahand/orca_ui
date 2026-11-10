@@ -9,6 +9,13 @@ export interface LatestFrames {
   joints: {
     measured: Record<string, number>
     estimate: Record<string, number>
+    // orca_core's own estimate while a study map is selected (estimate is then the
+    // study's true angles); empty when no map is on.
+    standard: Record<string, number>
+    // orca_core's estimate with main's packaged hard stops (the red ghost); empty when the hand's are the same
+    main: Record<string, number>
+    // Every mapping's angles by overlay id (orca_ui/hand/overlays.py), drawn as ghost hands
+    overlays: Record<string, Record<string, number>>
     target: Record<string, number>
     // Raw (clamped) teleop retargeter output — the 3D "teleop ghost". Flows
     // in preview AND engaged; cleared when the teleop session ends.
@@ -52,6 +59,9 @@ export const latest: LatestFrames = {
   joints: {
     measured: {},
     estimate: {},
+    standard: {},
+    main: {},
+    overlays: {},
     target: {},
     teleopTarget: {},
     trim: {},

@@ -44,6 +44,7 @@ const TABS: { id: ViewName; label: string }[] = [
   { id: 'teleop', label: 'Teleop' },
   { id: 'setup', label: 'Setup' },
   { id: 'motors', label: 'Motors' },
+  { id: 'study', label: 'Study' },
 ]
 
 export function AppHeader() {
@@ -101,7 +102,7 @@ export function AppHeader() {
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            className={`view-tab ${view === tab.id ? 'active' : ''}`}
+            className={`view-tab ${view === tab.id || (tab.id === 'setup' && view === 'visual-calibration') ? 'active' : ''}`}
             onClick={() => setView(tab.id)}
           >
             {tab.label}

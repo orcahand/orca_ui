@@ -5,7 +5,7 @@
 
 import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls, Grid } from '@react-three/drei'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import type { URDFRobot } from 'urdf-loader'
 import type { FingertipEntry, SensorMounts } from '../../api/rest'
@@ -15,6 +15,7 @@ import type {
   ModelMetadata,
   TaxelGeometry,
 } from '../../api/types'
+import { autoColor, overlaySetting, useStudyMap } from '../../state/studyMapStore'
 import { useAppStore } from '../../state/appStore'
 import { isTeleopActive, useTeleopStore } from '../../state/teleopStore'
 import { subscribeFrames } from '../../state/streamStore'
@@ -22,6 +23,8 @@ import { ForceArrowLayer } from './ForceArrowLayer'
 import { JointGlowLayer } from './JointGlowLayer'
 import { JointPoseAdapter } from './JointPoseAdapter'
 import { FRONT_VIEW, standUpright } from './frontView'
+import { RigTwin, rigMountMatrix } from '../rig/RigTwin'
+import type { TwinInfo, TwinState } from '../visual/api'
 import { palette } from '../../theme/palette'
 import { usePalette } from '../../theme/themeStore'
 import {
@@ -47,6 +50,11 @@ interface Rig {
   adapter: JointPoseAdapter
   ghostAdapter: JointPoseAdapter | null
   teleopGhostAdapter: JointPoseAdapter | null
+  // One ghost per mapping overlay (study panel rows), made the first time a row is shown.
+  overlays: Map<string, { ghost: URDFRobot; adapter: JointPoseAdapter }>
+  overlayRoot: THREE.Group
+  // Pristine clone to make overlay ghosts from: the live robot later carries the glow/arrow layers.
+  template: URDFRobot
   glow: JointGlowLayer
   arrows: ForceArrowLayer
   // Measured from the bare robot BEFORE overlay layers attach: the arrow
@@ -55,14 +63,23 @@ interface Rig {
   bounds: THREE.Sphere
 }
 
+/** The calibration rig around the hand (docs/rig-dashboard.md); null: the hand alone. */
+export interface RigView {
+  twin: TwinInfo
+  state: TwinState | null
+  showTower: boolean
+}
+
 function HandRig({
   assets,
   joints,
   caps,
+  mount,
 }: {
   assets: HandAssets
   joints: JointInfo[]
   caps: Capabilities
+  mount: THREE.Matrix4 | null
 }) {
   const invalidate = useThree((s) => s.invalidate)
   const controls = useThree((s) => s.controls) as { target: THREE.Vector3; update: () => void } | null
@@ -91,6 +108,9 @@ function HandRig({
         })
         built = {
           robot,
+          overlays: new Map(),
+          overlayRoot: new THREE.Group(),
+          template: robot.clone(true) as URDFRobot,
           ghost,
           teleopGhost,
           adapter: new JointPoseAdapter(robot, joints),
@@ -144,8 +164,20 @@ function HandRig({
   // Frame the camera on the hand once it exists: fit the whole model with a
   // margin, looking at the palm from slightly above.
   const camera = useThree((s) => s.camera)
+  // On the rig the hand sits on the plate (scene matrix from the twin); off it, upright as loaded.
   useEffect(() => {
-    if (!rig || !controls) return
+    if (!rig) return
+    for (const r of [rig.robot, rig.ghost, rig.teleopGhost, ...[...rig.overlays.values()].map((o) => o.ghost)]) {
+      if (r) place(r, mount)
+    }
+    invalidate()
+  }, [rig, mount, invalidate])
+
+  const mountRef = useRef(mount)
+  mountRef.current = mount
+  const onRig = mount !== null
+  useEffect(() => {
+    if (!rig || !controls || onRig) return
     const sphere = rig.bounds
     const persp = camera as THREE.PerspectiveCamera
     const fovRad = (persp.fov * Math.PI) / 180
@@ -158,7 +190,7 @@ function HandRig({
     controls.target.copy(sphere.center)
     controls.update()
     invalidate()
-  }, [rig, controls, camera, invalidate])
+  }, [rig, controls, camera, invalidate, onRig])
 
   // Pose + overlay updates from the stream (outside React).
   useEffect(() => {
@@ -179,12 +211,16 @@ function HandRig({
         : useAppStore.getState().control?.effective_pose_source === 'estimate'
           ? {}
           : frames.joints.target
+      // Study map on: the server already publishes the estimate as the true angles (orca_core's
+      // own under `standard`), and commanded targets are true angles, so both layer on unchanged.
+      const study = useStudyMap.getState()
+      const studyOn = caps.motors && Object.keys(frames.joints.standard).length > 0
       rig.adapter.apply({ ...frames.joints.estimate, ...overlay })
 
       if (rig.ghost) {
         // Without encoders the main hand already shows the motor estimate,
         // so the ghost would just duplicate it — needs both to mean anything.
-        const showGhost = scene.ghost && caps.motors && caps.encoders
+        const showGhost = !studyOn && scene.ghost && caps.motors && caps.encoders
         rig.ghost.visible = showGhost
         if (showGhost) rig.ghostAdapter?.apply(frames.joints.estimate)
       }
@@ -201,6 +237,33 @@ function HandRig({
           rig.teleopGhostAdapter?.apply(frames.joints.teleopTarget)
         }
       }
+
+      // Mapping overlays: each row of the study panel the user shows, in its own colour + opacity.
+      const rows = study.state?.overlays ?? []
+      const seen = new Set<string>()
+      for (const row of rows) {
+        const set = overlaySetting(row.id, study.overlaySettings)
+        const pose = frames.joints.overlays[row.id]
+        if (!caps.motors || !set.visible || set.opacity <= 0 || !pose || !Object.keys(pose).length) continue
+        let o = rig.overlays.get(row.id)
+        if (!o) {
+          const ghost = makeGhost(rig.template, { opacity: set.opacity, hideLinks: ['tower', 'forearm'] })
+          if (!ghost) continue
+          place(ghost, mountRef.current)
+          o = { ghost, adapter: new JointPoseAdapter(ghost, joints) }
+          rig.overlays.set(row.id, o)
+          rig.overlayRoot.add(ghost)
+        }
+        seen.add(row.id)
+        o.ghost.visible = true
+        setGhostAppearance(o.ghost, {
+          color: parseInt((set.color ?? autoColor(rows, row.id)).slice(1), 16),
+          opacity: set.opacity,
+          emissiveIntensity: 0.3,
+        })
+        o.adapter.apply(pose)
+      }
+      for (const [id, o] of rig.overlays) if (!seen.has(id)) o.ghost.visible = false
 
       rig.glow.setVisible(scene.jointGlow && caps.encoders)
       if (scene.jointGlow && caps.encoders) {
@@ -236,8 +299,20 @@ function HandRig({
       <primitive object={rig.robot} />
       {rig.ghost && <primitive object={rig.ghost} />}
       {rig.teleopGhost && <primitive object={rig.teleopGhost} />}
+      <primitive object={rig.overlayRoot} />
     </>
   )
+}
+
+function place(r: THREE.Object3D, mount: THREE.Matrix4 | null) {
+  if (mount) {
+    r.matrixAutoUpdate = false
+    r.matrix.copy(mount)
+  } else {
+    r.matrixAutoUpdate = true
+    r.updateMatrix()
+  }
+  r.matrixWorldNeedsUpdate = true
 }
 
 // Three-point lighting parented to the camera, so the hand is lit from the
@@ -283,12 +358,16 @@ export function HandScene({
   assets,
   joints,
   caps,
+  rig = null,
 }: {
   assets: HandAssets
   joints: JointInfo[]
   caps: Capabilities
+  rig?: RigView | null
 }) {
   const { scene } = usePalette()
+  const rigFromHand = rig?.state?.hand?.rig_from_hand
+  const mount = useMemo(() => (rig && rigFromHand ? rigMountMatrix(rigFromHand) : null), [rig, rigFromHand])
   return (
     <Canvas
       frameloop="demand"
@@ -300,7 +379,7 @@ export function HandScene({
         args={[scene.hemiSky, scene.hemiGround, scene.hemiIntensity]}
       />
       <ViewerLights rig={scene.lights} />
-      <Grid
+      {!rig && <Grid
         position={[0, -0.001, 0]}
         args={[1.2, 1.2]}
         cellSize={0.025}
@@ -309,9 +388,10 @@ export function HandScene({
         sectionColor={scene.gridSection}
         fadeDistance={0.9}
         infiniteGrid
-      />
+      />}
       <OrbitControls makeDefault enableDamping={false} />
-      <HandRig assets={assets} joints={joints} caps={caps} />
+      {rig && <RigTwin twin={rig.twin} state={rig.state} showTower={rig.showTower} />}
+      <HandRig assets={assets} joints={joints} caps={caps} mount={mount} />
     </Canvas>
   )
 }

@@ -20,6 +20,8 @@ dependencies = [
     "mcp>=1.12,<2",
     "httpx>=0.27",
     "orca-core>=0.12.0,<0.13",
+    # Visual calibration: tile detection (orca_core[visual]).
+    "opencv-contrib-python-headless>=4.10,<6",
 ]
 
 [project.scripts]

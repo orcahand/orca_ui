@@ -2712,6 +2712,10 @@ header h1 {
   white-space: nowrap;
 }
 
+.visual-cal-note.warn {
+  color: var(--warn);
+}
+
 .gt-row-pct {
   text-align: right;
   font-weight: 700;
@@ -4961,3 +4965,826 @@ header h1 {
   background: rgb(var(--overlay-rgb) / 0.04);
   border-left: 3px solid var(--text-bright);
 }
+
+/* --- Setup sub-tabs and visual calibration --- */
+
+.setup-tabs {
+  align-self: flex-start;
+  width: fit-content;
+  margin-bottom: 12px;
+}
+
+.visual-cal {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  padding: 0;
+  height: calc(100vh - 176px);
+  min-height: 560px;
+}
+
+.visual-cal select {
+  padding: 4px 6px;
+  font: 10px var(--font);
+  color: var(--text);
+  background: var(--panel-strong);
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 0;
+}
+
+.gt-steps.visual-cal-nav {
+  gap: 2px;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.visual-cal-phase {
+  padding: 12px 8px 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--dimmer);
+}
+
+.visual-cal-nav-item:first-child .visual-cal-phase {
+  padding-top: 0;
+}
+
+.visual-cal-step {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  font: inherit;
+  transition: background 0.15s, color 0.15s;
+}
+
+.visual-cal-step.done:not(.active) {
+  color: var(--muted);
+}
+
+.gt-step.visual-cal-step.warn .gt-step-num {
+  color: var(--warn);
+  background: rgb(var(--warn-rgb) / 0.12);
+}
+
+.visual-cal-step.warn .gt-step-note {
+  color: var(--warn);
+}
+
+.visual-cal-session {
+  margin-top: auto;
+  padding-top: 12px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.visual-cal-session select {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+}
+
+.visual-cal-content {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  padding: 8px 10px 8px 12px;
+}
+
+.visual-cal-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.visual-cal-main {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+}
+
+.visual-cal-side .gt-actions {
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+
+.visual-cal-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.visual-cal-tag {
+  margin-left: 6px;
+  font-weight: 400;
+  color: var(--dimmer);
+}
+
+.visual-cal-turntable {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.visual-cal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  font-size: 10px;
+  color: var(--muted);
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 999px;
+}
+
+.visual-cal-chip i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dimmer);
+}
+
+.visual-cal-chip.ok i {
+  background: var(--ok);
+}
+
+.visual-cal-chip.warn i {
+  background: var(--warn);
+}
+
+.visual-cal-link {
+  padding: 0;
+  font: 10px var(--font);
+  color: var(--dim);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.visual-cal-link:hover:not(:disabled) {
+  color: var(--text-bright);
+}
+
+.visual-cal-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px 28px;
+  flex-wrap: wrap;
+}
+
+.visual-cal-overlay {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.visual-cal-overlay-source {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.visual-cal-overlay-source.warn {
+  color: var(--warn);
+}
+
+.visual-cal-hint {
+  margin: -8px 0 0;
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--dim);
+}
+
+.visual-cal-issue {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 82ch;
+}
+
+.visual-cal-mount {
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.visual-cal-mount th {
+  padding: 0 14px 4px 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-align: right;
+  color: var(--dim);
+}
+
+.visual-cal-mount td {
+  padding: 3px 14px 3px 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  border-top: 1px solid var(--panel-border);
+}
+
+.visual-cal-mount th:first-child,
+.visual-cal-mount td:first-child {
+  text-align: left;
+  color: var(--dim);
+}
+
+.visual-cal-mount td.warn {
+  color: var(--warn);
+  font-weight: 700;
+}
+
+.visual-cal-progress {
+  flex: 0 0 120px;
+}
+
+.visual-cal-count {
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--dimmer);
+}
+
+.visual-cal-stage {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.visual-cal-art {
+  width: 100%;
+  min-width: 0;
+}
+
+.visual-cal-art svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.visual-cal-art path,
+.visual-cal-art circle {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.visual-cal-art .n,
+.visual-cal-art .a {
+  stroke: var(--text-bright);
+  stroke-width: 1.4;
+}
+
+.visual-cal-art .n.i {
+  stroke-width: 0.7;
+}
+
+.visual-cal-art .o {
+  stroke: rgb(var(--overlay-rgb) / 0.32);
+  stroke-width: 1;
+}
+
+.visual-cal-art .o.i {
+  stroke-width: 0.5;
+}
+
+.visual-cal-art .a.d {
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+.visual-cal-art .f,
+.visual-cal-art .ah {
+  fill: var(--text-bright);
+  stroke: none;
+}
+
+.visual-cal-art .t {
+  fill: var(--text);
+  font-family: var(--font);
+}
+
+.visual-cal-dial {
+  flex: 0 0 180px;
+  width: 180px;
+  height: auto;
+  align-self: center;
+  font-family: var(--font);
+}
+
+.dial-plate {
+  fill: rgb(var(--overlay-rgb) / 0.03);
+  stroke: var(--panel-border-strong);
+}
+
+.dial-travel,
+.dial-gap {
+  fill: none;
+  stroke: rgb(var(--overlay-rgb) / 0.2);
+}
+
+.dial-gap {
+  stroke-dasharray: 2 3;
+}
+
+.dial-stop {
+  stroke: var(--text-bright);
+  stroke-width: 4;
+}
+
+.dial-needle {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.dial-object line {
+  stroke: var(--dim);
+  stroke-width: 1.5;
+  stroke-linecap: square;
+}
+
+.dial-object line.full {
+  stroke: var(--text-bright);
+  stroke-width: 3.5;
+}
+
+.dial-object text {
+  font-size: 9px;
+  font-weight: 700;
+  fill: var(--text-bright);
+  text-anchor: middle;
+}
+
+.dial-camera path {
+  fill: var(--muted);
+}
+
+.dial-camera text,
+.dial-dot text {
+  font-size: 9px;
+  fill: var(--dim);
+  text-anchor: middle;
+}
+
+.dial-camera text {
+  text-anchor: start;
+}
+
+.dial-dot circle {
+  fill: var(--bg);
+  stroke: var(--dim);
+  stroke-width: 1.2;
+  transition: stroke 0.15s;
+}
+
+.dial-dot circle.hit {
+  fill: transparent;
+  stroke: none;
+}
+
+.dial-dot.ok circle:not(.hit) {
+  fill: var(--ok);
+  stroke: var(--ok);
+}
+
+.dial-dot.weak circle:not(.hit) {
+  fill: var(--warn);
+  stroke: var(--warn);
+}
+
+.dial-dot.current circle:not(.hit) {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.dial-dot.current text {
+  fill: var(--accent);
+  font-weight: 700;
+}
+
+.dial-dot.pick {
+  cursor: pointer;
+}
+
+.dial-dot.pick:hover circle:not(.hit) {
+  stroke: var(--text-bright);
+}
+
+.dial-corr {
+  stroke: var(--ok);
+  stroke-width: 3;
+}
+
+.dial-corr.warn {
+  stroke: var(--warn);
+}
+
+.visual-cal-live {
+  flex: 1 1 0;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.visual-cal-source {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.visual-cal-video {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  display: block;
+  border: 1px solid var(--panel-border);
+  background: var(--letterbox);
+}
+
+.visual-cal-frame {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  cursor: zoom-in;
+}
+
+.visual-cal-zoom {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2vh 2vw;
+  background: rgb(0 0 0 / 0.88);
+  cursor: zoom-out;
+}
+
+.visual-cal-zoom .visual-cal-video {
+  max-width: 96vw;
+  max-height: 96vh;
+}
+
+.visual-cal-view {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  font: 11px var(--font);
+  color: #fff;
+  cursor: default;
+}
+
+.visual-cal-zoom .visual-cal-view {
+  top: 3vh;
+  right: 3vw;
+}
+
+.visual-cal-view-toggle,
+.visual-cal-view-reset {
+  padding: 3px 8px;
+  font: inherit;
+  color: #fff;
+  background: rgb(0 0 0 / 0.6);
+  border: 1px solid rgb(255 255 255 / 0.25);
+  cursor: pointer;
+}
+
+.visual-cal-view-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  background: rgb(0 0 0 / 0.72);
+  border: 1px solid rgb(255 255 255 / 0.2);
+}
+
+.visual-cal-view-row {
+  display: grid;
+  grid-template-columns: 76px 24px 96px 34px;
+  align-items: center;
+  gap: 6px;
+}
+
+.visual-cal-view-row:first-child {
+  grid-template-columns: 76px 126px 34px;
+  white-space: nowrap;
+}
+
+.visual-cal-view-row input[type="color"] {
+  width: 24px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.visual-cal-view-row input[type="range"] {
+  width: 100%;
+  margin: 0;
+}
+
+.visual-cal-view-val {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.visual-cal-view-reset {
+  align-self: flex-end;
+}
+
+.visual-cal-view-mode {
+  grid-template-columns: 76px 1fr !important;
+}
+
+.visual-cal-view-mode select {
+  font: inherit;
+  color: #fff;
+  background: rgb(0 0 0 / 0.6);
+  border: 1px solid rgb(255 255 255 / 0.25);
+}
+
+.visual-cal-seg-note {
+  position: absolute;
+  top: 40%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font: 12px var(--font);
+  color: #fff;
+  pointer-events: none;
+}
+
+.visual-cal-joints {
+  border-collapse: collapse;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.visual-cal-joints th,
+.visual-cal-joints td {
+  padding: 1px 6px 1px 0;
+  text-align: right;
+}
+
+.visual-cal-joints th:first-child,
+.visual-cal-joints td:first-child {
+  text-align: left;
+}
+
+.visual-cal-joints tr.good td:last-child {
+  color: var(--ok);
+}
+
+.visual-cal-joints tr.fair td:last-child {
+  color: var(--warn);
+}
+
+.visual-cal-joints tr.poor td {
+  color: var(--dim);
+}
+
+.visual-cal-joints tr.poor td:last-child {
+  color: var(--danger, #ef4444);
+}
+
+.visual-cal-zoom-caption {
+  position: fixed;
+  top: 3vh;
+  left: 3vw;
+  padding: 6px 10px;
+  font: 700 14px var(--font);
+  color: #fff;
+  background: rgb(0 0 0 / 0.6);
+  pointer-events: none;
+}
+
+.visual-cal-empty {
+  margin: 0;
+  max-width: 52ch;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--dim);
+}
+
+.visual-cal-empty.warn {
+  color: var(--warn);
+}
+
+.visual-cal-toolbar select {
+  max-width: 280px;
+}
+
+.visual-cal-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.visual-cal-actions {
+  align-items: center;
+}
+
+.visual-cal-note {
+  margin-right: auto;
+  min-width: 0;
+  font-size: 10px;
+  color: var(--dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visual-cal-results {
+  flex: 1 1 420px;
+  max-width: 560px;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-size: 11px;
+}
+
+.visual-cal-result-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+}
+
+.visual-cal-result-grid span {
+  color: var(--dim);
+}
+
+.visual-cal-result-grid b {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.visual-cal-result-grid b.ok {
+  color: var(--ok);
+}
+
+.visual-cal-result-grid b.warn {
+  color: var(--warn);
+}
+
+.visual-cal-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.visual-cal-bar {
+  display: grid;
+  grid-template-columns: 38px 1fr 38px;
+  gap: 6px;
+  align-items: center;
+}
+
+.visual-cal-bar span,
+.visual-cal-bar em {
+  color: var(--dim);
+  font-style: normal;
+}
+
+.visual-cal-bar i {
+  height: 6px;
+  background: var(--ok);
+}
+
+.visual-cal-bar i.warn {
+  background: var(--warn);
+}
+
+@media (max-width: 900px) {
+  .visual-cal {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .visual-cal-stage {
+    flex: none;
+    flex-direction: column;
+    align-items: center;
+  }
+  .visual-cal-stage > * {
+    flex: none;
+    width: 100%;
+  }
+  .visual-cal-stage > .visual-cal-dial {
+    width: 280px;
+  }
+  .visual-cal-art svg,
+  .visual-cal-video {
+    height: auto;
+    max-height: 70vh;
+  }
+  .gt-steps.visual-cal-nav {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--panel-border);
+  }
+  .visual-cal-phase,
+  .visual-cal-session,
+  .visual-cal-step .gt-step-note {
+    display: none;
+  }
+}
+
+.visual-cal-stage .visual-cal-dial {
+  flex: none;
+}
+
+.visual-cal-sandbox { display: grid; gap: 6px; }
+.visual-cal-sandbox-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.visual-cal-sandbox input[type="range"] { width: 120px; }
+.visual-cal-sandbox td.ok { color: var(--ok, #16a34a); }
+.visual-cal-sandbox td.warn { color: var(--warn, #d97706); }
+
+.study-cal { display: grid; gap: 6px; font-size: 11px; }
+.study-cal-note { margin: 0; color: var(--dim); }
+.study-cal table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.study-cal th, .study-cal td { padding: 2px 4px; text-align: right; }
+.study-cal th:first-child, .study-cal td:first-child { text-align: left; }
+.study-cal td.warn { color: var(--warn, #d97706); }
+.study-cal-low td { opacity: 0.55; }
+.study-cal-opacity { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.study-cal-opacity input[type=range] { width: 110px; }
+.study-cal-red { color: #dc2626; font-weight: 600; }
+.study-cal-active { margin: 0; padding: 4px 6px; border: 1px solid var(--border, rgb(127 127 127 / 0.3)); border-radius: 4px; }
+.study-cal-active span { color: var(--dim); }
+.study-cal-active-on { border-color: var(--ok); background: rgb(var(--ok-rgb) / 0.1); }
+.study-cal-active-on strong { color: var(--ok); }
+.study-cal-sel td { font-weight: 600; }
+.study-ov { display: grid; gap: 2px; }
+.study-ov-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 2px; }
+.study-ov-head span { display: flex; gap: 4px; }
+.study-ov-row { display: grid; grid-template-columns: auto 22px minmax(0, 1fr) 64px 30px; align-items: center; gap: 6px; padding: 3px 4px; border: 1px solid transparent; }
+.study-ov-row:not(.study-ov-on) .study-ov-text { opacity: 0.6; }
+.study-ov-drives { border-color: var(--ok); background: rgb(var(--ok-rgb) / 0.08); }
+.study-ov-row input[type=color] { width: 22px; height: 18px; padding: 0; border: 1px solid var(--panel-border-strong); background: none; cursor: pointer; }
+.study-ov-row input[type=range] { width: 64px; }
+.study-ov-text { min-width: 0; }
+.study-ov-text > div:first-child { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.study-ov-label { font-weight: 600; }
+.study-ov-kind { color: var(--dim); font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; }
+.study-ov-badge { color: var(--ok); font-size: 10px; font-weight: 600; }
+.study-ov-approach { color: var(--dim); font-size: 10px; overflow-wrap: anywhere; }
+.study-ov-pct { color: var(--dim); text-align: right; font-variant-numeric: tabular-nums; }
+.study-ov-text .btn-sm { padding: 0 5px; font-size: 10px; }
+
+/* Calibration rig on the dashboard (docs/rig-dashboard.md) */
+.rig-panel { display: flex; flex-direction: column; gap: 8px; font-size: 11px; }
+.rig-panel .dim { color: var(--dim); }
+.rig-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.rig-row label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.rig-angle { display: flex; align-items: baseline; gap: 10px; }
+.rig-angle-value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rig-board { overflow-wrap: anywhere; }
+.rig-warning { color: var(--warn, #d97706); }
+.rig-note { color: var(--dim); }
+.rig-input {
+  padding: 3px 6px;
+  font: inherit;
+  color: inherit;
+  background: var(--bg, transparent);
+  border: 1px solid var(--panel-border);
+}
+.rig-camera-frame { height: auto; max-height: 48vh; }
+.rig-camera-frame .visual-cal-video { max-height: 48vh; }

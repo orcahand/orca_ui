@@ -546,7 +546,7 @@ class TelemetryService:
         try:
             if not self._service.supervisor.status().torque_enabled:
                 return None
-            estimate, _currents = session.motor_snapshot()
+            estimate, _currents = session.motor_snapshot(raw=True)
         except Exception:
             return None
         return _clean_angles(estimate)
@@ -601,13 +601,11 @@ class TelemetryService:
     def _publish_motor_state(self, session) -> None:
         """Joint estimate and currents, from one read."""
         try:
-            estimate, currents = session.motor_snapshot()
+            estimate, currents = session.motor_snapshot(raw=True)
         except Exception:
             logger.debug("motor state read failed", exc_info=True)
             return
-        angles = _clean_angles(estimate)
-        if angles:
-            self._hub.publish(T.JOINTS_ESTIMATE, {"angles": angles})
+        self._publish_joint_estimate(estimate, session)
         if currents:
             self._motor_health["currents"] = {
                 int(k): round(float(v), 1) for k, v in currents.items()}
@@ -615,10 +613,40 @@ class TelemetryService:
                               self._motor_health_payload(session))
 
     def _publish_estimate(self, session) -> dict | None:
-        estimate = _clean_angles(session.estimate_joints())
-        if estimate:
-            self._hub.publish(T.JOINTS_ESTIMATE, {"angles": estimate})
-        return estimate
+        """Publishes the estimate; returns orca_core's own, which tracking
+        compares against the written (motor-space) targets."""
+        return self._publish_joint_estimate(session.estimate_joints(raw=True), session)
+
+    def _publish_joint_estimate(self, raw: dict | None, session=None) -> dict | None:
+        """``joints.estimate``: the true angles while a study map is selected,
+        with orca_core's own estimate under ``standard``; else orca_core's.
+        ``main``: orca_core's estimate with main's packaged hard stops, when the
+        hand's own stops differ. ``overlays``: every mapping's angles (ghost hands)."""
+        from orca_ui.hand import main_stops, overlays
+        from orca_ui.hand.study_map import STUDY_MAP
+
+        standard = _clean_angles(raw)
+        if not standard:
+            return standard
+        payload = {"angles": standard}
+        mapped = STUDY_MAP.estimate(standard)
+        if mapped is not standard:
+            payload = {"angles": _clean_angles(mapped), "standard": standard,
+                       "study_map": STUDY_MAP.mode}
+        try:
+            cfg = getattr(getattr(getattr(session, "hand", None), "config", None), "config_path", None)
+            main = main_stops.estimate(cfg, standard)
+        except Exception:
+            logger.debug("main-stops estimate failed", exc_info=True)
+            main = None
+        if main:
+            payload["main"] = _clean_angles(main)
+        try:
+            payload["overlays"] = {k: _clean_angles(v) for k, v in overlays.evaluate(cfg, standard).items()}
+        except Exception:
+            logger.debug("overlay estimates failed", exc_info=True)
+        self._hub.publish(T.JOINTS_ESTIMATE, payload)
+        return standard
 
     # ----- motor faults --------------------------------------------------------
 

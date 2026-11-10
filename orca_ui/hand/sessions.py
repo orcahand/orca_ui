@@ -145,7 +145,8 @@ class HandSession:
         """Joint angles for recording and pose capture, or ``None``.
 
         Encoder-measured when the hand has encoders, otherwise the
-        calibrated motor estimate from a single bus read."""
+        calibrated motor estimate from a single bus read (study-mapped, see
+        ``_joint_estimate``)."""
         if self.caps.encoders:
             return self.measured_joints()
         if self.caps.motors and self._estimate_allowed():
@@ -169,17 +170,23 @@ class HandSession:
                     "(run orca_core's calibration first)")
         return self._estimate_ok
 
-    def _joint_estimate(self, motor_pos) -> dict | None:
+    def _joint_estimate(self, motor_pos, raw: bool = False) -> dict | None:
+        """The motor-derived joint angles. The one place orca-ui reads orca_core's estimate: with a
+        visual calibration study map selected it comes back as the true angles (``raw``: orca_core's own)."""
         pos = self.hand._motor_to_joint_pos(motor_pos)
-        return {j: v for j, v in pos.items() if v is not None}
+        est = {j: v for j, v in pos.items() if v is not None}
+        if raw:
+            return est
+        from orca_ui.hand.study_map import STUDY_MAP
+        return STUDY_MAP.estimate(est)
 
-    def estimate_joints(self) -> dict | None:
-        """Naive motor-derived joint angles in degrees (the 'ghost' pose)."""
+    def estimate_joints(self, raw: bool = False) -> dict | None:
+        """Motor-derived joint angles in degrees (the 'ghost' pose)."""
         if not self.caps.motors or not self._estimate_allowed():
             return None
-        return self._joint_estimate(self.hand.get_motor_pos())
+        return self._joint_estimate(self.hand.get_motor_pos(), raw)
 
-    def motor_snapshot(self) -> tuple[dict | None, dict | None]:
+    def motor_snapshot(self, raw: bool = False) -> tuple[dict | None, dict | None]:
         """``(joint estimate, per-motor currents)`` from one bus read — they
         share a register block, so asking separately costs two round trips."""
         if not self.caps.motors:
@@ -188,7 +195,7 @@ class HandSession:
         currents = dict(zip(self.hand.config.motor_ids, state.current))
         if not self._estimate_allowed():
             return None, currents
-        return self._joint_estimate(state.position), currents
+        return self._joint_estimate(state.position, raw), currents
 
     def loop_correction(self) -> dict | None:
         return self.hand.get_loop_correction() if self.caps.feedback_loop else None

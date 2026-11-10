@@ -15,6 +15,7 @@ import { FingertipMismatches, FingertipNumbering } from '../setup/FingertipNumbe
 import type { StepState } from '../setup/FlowStep'
 import { OperationLogPane } from '../setup/OperationLogPane'
 import { RunInStep } from '../setup/RunInStep'
+import { SetupTabs } from '../setup/SetupTabs'
 import { readRunInDone, runInCompleted } from '../setup/setupUtils'
 import { TensionStep } from '../setup/TensionStep'
 import { WorkflowChart } from '../setup/WorkflowChart'
@@ -61,6 +62,7 @@ export function SetupView() {
 
   return (
     <>
+      <SetupTabs />
       <AssemblyCard />
       {caps !== null && !caps.motors && (
         <div className="flow-info warn">⚠ motor bus unavailable</div>

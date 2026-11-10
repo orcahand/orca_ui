@@ -60,10 +60,10 @@ class _Session:
         self.caps = _Caps(feedback_loop)
         self.hand = _Hand()
 
-    def estimate_joints(self):
+    def estimate_joints(self, raw=False):
         return self.hand.get_motor_pos()
 
-    def motor_snapshot(self):
+    def motor_snapshot(self, raw=False):
         state = self.hand.get_motor_state()
         return {"index_mcp": 5.0}, dict(zip(self.hand.config.motor_ids,
                                             state.current))

@@ -6,11 +6,13 @@
 // serves whichever hand it currently believes is plugged in, so a model swap
 // re-fetches rather than re-renders.
 
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { ErrorBoundary } from '../common/ErrorBoundary'
 import { api } from '../../api/rest'
 import { useAppStore } from '../../state/appStore'
 import { Panel } from '../common/Panel'
+import { useStudyMap } from '../../state/studyMapStore'
+import { rigConnected, useRig } from '../../state/rigStore'
 import type { HandAssets } from './HandScene'
 import { SceneControls } from './SceneControls'
 
@@ -21,7 +23,16 @@ const HandScene = lazy(() =>
   import('./HandScene').then((m) => ({ default: m.HandScene })),
 )
 
-export function HandScenePanel({ height }: { height: string | number }) {
+export function HandScenePanel({ height, withRig = false }: { height: string | number; withRig?: boolean }) {
+  const presence = useRig((s) => s.presence)
+  const twin = useRig((s) => s.twin)
+  const twinState = useRig((s) => s.twinState)
+  const showTower = useRig((s) => s.showTower)
+  const rigOn = withRig && rigConnected(presence) && !!twin
+  const rigView = useMemo(
+    () => (rigOn && twin ? { twin, state: twinState, showTower } : null),
+    [rigOn, twin, twinState, showTower],
+  )
   const status = useAppStore((s) => s.status)
   const handInfo = useAppStore((s) => s.handInfo)
   const side = handInfo?.side ?? null
@@ -51,6 +62,8 @@ export function HandScenePanel({ height }: { height: string | number }) {
   }, [side])
 
   const caps = status?.capabilities
+  const study = useStudyMap((s) => s.state)
+  const poseLabel = study?.available ? (study.enabled ? ' · pose: study-corrected' : ' · pose: standard') : ''
 
   if (assetError) {
     return (
@@ -78,7 +91,7 @@ export function HandScenePanel({ height }: { height: string | number }) {
 
   return (
     <Panel
-      title={`3D View · ${assets.metadata.side} hand`}
+      title={`3D View · ${assets.metadata.side} hand${rigOn ? ' on the calibration rig' : ''}${poseLabel}`}
       toolbar={<SceneControls />}
     >
       <div style={{ height, minHeight: 320 }}>
@@ -91,7 +104,7 @@ export function HandScenePanel({ height }: { height: string | number }) {
           <Suspense
             fallback={<div className="detecting-card">LOADING RENDERER</div>}
           >
-            <HandScene assets={assets} joints={handInfo.joints} caps={caps} />
+            <HandScene assets={assets} joints={handInfo.joints} caps={caps} rig={rigView} />
           </Suspense>
         </ErrorBoundary>
       </div>

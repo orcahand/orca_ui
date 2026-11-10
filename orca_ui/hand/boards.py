@@ -60,6 +60,8 @@ class BoardEntry:
     model_name: Optional[str]  # from the provisioned CFG code, when declared
     ports: tuple[str, ...]
     busy: bool
+    role: str = "hand"  # "rig": the calibration rig's board, never a hand (rig_detect)
+    rig_reason: str = ""
 
     def as_dict(self) -> dict:
         return {
@@ -72,6 +74,8 @@ class BoardEntry:
             "model_name": self.model_name,
             "ports": list(self.ports),
             "busy": self.busy,
+            "role": self.role,
+            "rig_reason": self.rig_reason,
         }
 
 
@@ -143,7 +147,41 @@ def scan_boards() -> list[BoardEntry]:
             device=port, kind="motor_adapter", side=None, hand_id=None, serial=None, board_id=None,
             model_name=None, ports=(port,), busy=port_in_use(port)))
     entries.sort(key=lambda entry: entry.device)
-    return entries
+    return [_with_role(e, infos.get(e.device)) for e in entries]
+
+
+def _usb_serials() -> dict[str, str]:
+    import serial.tools.list_ports
+    return {p.device: p.serial_number for p in serial.tools.list_ports.comports() if p.serial_number}
+
+
+def _with_role(entry: BoardEntry, info: Optional[OrcaBoardInfo]) -> BoardEntry:
+    """Mark the calibration rig's board (by USB serial or identity; no bus scan here)."""
+    from dataclasses import replace
+    from orca_ui.hand.rig_detect import classify, rig_serials
+    serials = _usb_serials()
+    known = rig_serials(*_rig_yaml())
+    for port in entry.ports:
+        v = classify(serials.get(port), info, serials=known)
+        if v.rig:
+            return replace(entry, role="rig", rig_reason=v.reason)
+    return entry
+
+
+def _rig_yaml() -> list[dict]:
+    """The rig's turntable.yaml and turntable_calibration.yaml, when the experiment is there."""
+    try:
+        from orca_ui.api.visual_calibration import rig_yaml
+        return rig_yaml()
+    except Exception:
+        return []
+
+
+def is_rig_board(device: str) -> Optional[str]:
+    """The reason when this device is on the rig's board (by USB serial), else None."""
+    from orca_ui.hand.rig_detect import classify, rig_serials
+    v = classify(_usb_serials().get(device), serials=rig_serials(*_rig_yaml()))
+    return v.reason if v.rig else None
 
 
 def _find_mate(pin: str, info: OrcaBoardInfo) -> tuple[Optional[str], list[str]]:
@@ -155,7 +193,7 @@ def _find_mate(pin: str, info: OrcaBoardInfo) -> tuple[Optional[str], list[str]]
     """
     busy: list[str] = []
     matches: list[str] = []
-    others = [p for p in oh_board_ports() if p != pin]
+    others = [p for p in oh_board_ports() if p != pin and not is_rig_board(p)]
     for _ in range(_PROBE_PASSES):
         for port in others:
             if port in matches or port in busy:
@@ -196,6 +234,10 @@ def detect_pinned_board(pin: str,
     session holds the pinned CDC it cannot be probed again, so a later probe
     for a sensing port that was busy at connect starts from that identity.
     """
+    rig = is_rig_board(pin)
+    if rig:
+        logger.warning("%s is the calibration rig's board (%s), not a hand: not connecting", pin, rig)
+        return None
     info: Optional[OrcaBoardInfo] = None
     for _ in range(_PROBE_PASSES):
         info = probe_orca_info(pin)
