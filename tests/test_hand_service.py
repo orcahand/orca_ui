@@ -539,3 +539,56 @@ def test_a_touch_tier_with_no_answering_sensor_falls_to_the_next_tier(monkeypatc
 
     assert session.tier == "motors" and not session.caps.tactile
     assert built[0].disconnected and session.hand is built[1]
+
+
+def test_fingertip_identities_are_read_once_and_never_from_a_request(monkeypatch):
+    """A request handler reading the board would race the session's own
+    register traffic, so hand info only serves what was read at connect."""
+    from types import SimpleNamespace
+
+    from orca_ui.hand import sessions
+    from orca_ui.hand.operations import hand_ops
+
+    reads = []
+
+    def unanswered(client):
+        reads.append(client)
+        raise OSError("Timed out waiting for register response")
+
+    monkeypatch.setattr(hand_ops, "fingertip_identities", unanswered)
+    session = sessions.HandSession(hand=SimpleNamespace(_tactile_client=object()),
+                                   caps=SimpleNamespace(tactile=True), tier="touch", message="")
+
+    session.read_fingertip_identities()
+    assert session.fingertip_identities() is None
+    assert session.fingertip_identities() is None
+    assert len(reads) == 1
+
+
+def test_a_session_is_ready_only_once_its_ready_hook_has_finished():
+    """The session is published before its ready hook starts the tactile stream;
+    anything that takes the hand away must wait for the hook, not the session."""
+    import threading
+
+    settings = UiSettings(config_path=materialize_mock_model(), mock=True,
+                          open_browser=False)
+    svc = HandService(settings, publish_status=lambda status: None,
+                      publish_error=lambda message: None)
+    hook_entered, release_hook = threading.Event(), threading.Event()
+    real_ready = svc.supervisor._on_session_ready
+
+    def held_ready(session):
+        hook_entered.set()
+        release_hook.wait(timeout=5.0)
+        real_ready(session)
+
+    svc.supervisor._on_session_ready = held_ready
+    svc.start()
+    try:
+        assert hook_entered.wait(timeout=5.0)
+        assert svc.session is not None and not svc.session_ready
+        release_hook.set()
+        assert _wait_for(lambda: svc.session_ready)
+    finally:
+        release_hook.set()
+        svc.stop()

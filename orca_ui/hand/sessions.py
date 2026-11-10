@@ -72,7 +72,6 @@ class HandSession:
     # supervisor must not treat finding the port as "it appeared".
     refused: tuple[str, ...] = ()
     _fingertips: dict | None = None
-    _fingertips_read: bool = False
 
     # ----- tactile ---------------------------------------------------------
 
@@ -99,17 +98,21 @@ class HandSession:
         tc = self.tactile_client
         return tc.get_stats() if tc else None
 
+    def read_fingertip_identities(self) -> None:
+        """Read which fingertip model sits in each slot, once, before the
+        session is published: nothing else talks to the board yet, and request
+        handlers only ever see the stored result."""
+        if self.tactile_client is None:
+            return
+        from orca_ui.hand.operations import hand_ops
+        try:
+            self._fingertips = hand_ops.fingertip_identities(self.tactile_client)
+        except Exception:
+            logger.warning("could not read fingertip identities", exc_info=True)
+
     def fingertip_identities(self) -> dict | None:
-        """Which fingertip model sits in each slot, and the mismatches; read
-        once per session; a failed read is retried on the next call (None when
-        the board firmware doesn't report it)."""
-        if not self._fingertips_read and self.tactile_client is not None:
-            from orca_ui.hand.operations import hand_ops
-            try:
-                self._fingertips = hand_ops.fingertip_identities(self.tactile_client)
-                self._fingertips_read = True
-            except Exception:
-                logger.warning("could not read fingertip identities", exc_info=True)
+        """Which fingertip model sits in each slot, and the mismatches, as read
+        at connect; None when unread or the board firmware doesn't report it."""
         return self._fingertips
 
     # ----- joints ----------------------------------------------------------
