@@ -1,6 +1,6 @@
 name: Run Tests on Pull Request
 
-# Two jobs, because main and a development branch promise different things.
+# Two test jobs, because main and a development branch promise different things.
 # Anything landing on main must work against the published orca_core, so that
 # job installs from the lock and nothing else. A development branch may need
 # core work that is not released yet, so that job checks orca_core out beside
@@ -97,3 +97,17 @@ jobs:
       - name: Run tests
         working-directory: orca_ui
         run: uv run --no-sync --with-editable ../orca_core pytest --timeout=120
+
+  # Read-only and needs no credentials: every file the guide's catalog names
+  # must be in the public bucket, and no guide media may be committed. Without
+  # a terminal the script only checks.
+  guide-media:
+    name: guide media
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the catalog against the bucket
+        run: python3 scripts/guide_media.py

@@ -398,6 +398,8 @@ Do not regenerate from older Touch archives. Generation includes downstream mesh
 
 ## Model archive update — 13 October
 
+> No longer applies: the model archives and their unpacking were removed, and the guide's media is now in the public bucket. See [DEVELOPMENT.md](DEVELOPMENT.md#assembly-guide-media).
+
 The user subsequently requested zipped model distribution and automatic extraction.
 The four complete assembly GLBs are now packaged separately under
 `orca_ui/models/assembly/` as `base-left-dynamixel.zip`, `base-right-dynamixel.zip`,
