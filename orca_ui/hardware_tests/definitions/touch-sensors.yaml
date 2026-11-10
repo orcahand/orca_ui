@@ -9,5 +9,7 @@ steps:
     applies_to: {requires: [tactile]}
     check: compare_tactile_health
     panels: [tactile]
-    instructions: The check reads the tactile link and fingertip health with main's and the branch's orca_core.
-    pass_rule: Same health on both, and live data arrives on both.
+    instructions: >
+      The check reads the tactile link and fingertip health with main's and the branch's orca_core,
+      then hands the hand back and counts the frames the console's own tactile stream receives.
+    pass_rule: Same health on both, and live data arrives on both and in the console.

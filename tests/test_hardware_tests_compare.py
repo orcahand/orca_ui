@@ -299,3 +299,17 @@ def test_compare_detect_puts_branch_and_main_side_by_side(tmp_path):
 
     result = check(_ctx(tmp_path, _Sides(results, {"main": "no main checkout"})))
     assert result.status == "error" and "no main checkout" in result.summary
+
+
+def test_console_tactile_frames_counts_what_the_consoles_own_stream_stores():
+    frames = iter([120, 220])
+    session = SimpleNamespace(tactile_stats=lambda: SimpleNamespace(frames_ok=next(frames)))
+    waited = []
+    assert compare.console_tactile_frames(SimpleNamespace(session=session), waited.append) == 100
+    assert waited == [compare.CONSOLE_TACTILE_WINDOW_S]
+
+
+def test_console_tactile_frames_is_none_without_a_tactile_stream():
+    no_tactile = SimpleNamespace(session=SimpleNamespace(tactile_stats=lambda: None))
+    assert compare.console_tactile_frames(no_tactile, lambda s: None) is None
+    assert compare.console_tactile_frames(SimpleNamespace(session=None), lambda s: None) is None

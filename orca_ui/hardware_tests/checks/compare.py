@@ -19,6 +19,7 @@ import json
 import math
 import re
 import statistics
+import time
 from pathlib import Path
 from typing import Iterable, Optional
 
@@ -857,6 +858,21 @@ def tactile_summary(result: dict) -> dict:
     }
 
 
+CONSOLE_TACTILE_WINDOW_S = 2.0
+
+
+def console_tactile_frames(service, wait, window_s: float = CONSOLE_TACTILE_WINDOW_S) -> Optional[int]:
+    """Tactile frames the console's own stream stored over ``window_s``, or None
+    when the console has no tactile stream to ask."""
+    session = getattr(service, "session", None)
+    before = session.tactile_stats() if session is not None else None
+    if before is None:
+        return None
+    wait(window_s)
+    after = session.tactile_stats()
+    return after.frames_ok - before.frames_ok if after is not None else None
+
+
 @register("compare_tactile_health")
 def compare_tactile_health(ctx: CheckContext) -> CheckResult:
     missing = _need_sides(ctx, SIDES)
@@ -872,6 +888,10 @@ def compare_tactile_health(ctx: CheckContext) -> CheckResult:
     failed = _failed_runs(ctx, results)
     if failed:
         return failed
+    # The sides read the board on their own; the console reads it beside every
+    # other request it serves, which is where a fragile link shows.
+    ctx.progress(1.0, "live tactile data in the console")
+    console_frames = console_tactile_frames(ctx.service, getattr(ctx, "wait", time.sleep))
     s = {side: tactile_summary(results[side]) for side in SIDES}
     live = {side: (s[side]["frames"] or 0) > 0 or s[side]["readings"] > 0 for side in SIDES}
     metrics = [
@@ -885,13 +905,17 @@ def compare_tactile_health(ctx: CheckContext) -> CheckResult:
                main=_round(s["main"]["rate_hz"], 1), ok=live["branch"] and live["main"]),
         Metric("link healthy", _text(s["branch"]["link_ok"]), main=_text(s["main"]["link_ok"]),
                ok=s["branch"]["link_ok"] and s["main"]["link_ok"]),
+        Metric("console: tactile frames per second",
+               _round(console_frames / CONSOLE_TACTILE_WINDOW_S, 1)
+               if console_frames is not None else "no tactile stream", "Hz",
+               ok=bool(console_frames)),
     ]
     differ = [m.name for m in metrics if m.ok is False]
-    summary = ("Same sensor health on both, and live data arrives on both" if not differ
-               else "Differs or fails: " + ", ".join(differ))
+    summary = ("Same sensor health on both, and live data arrives on both and in the console"
+               if not differ else "Differs or fails: " + ", ".join(differ))
     status, summary = _mock_caveat(ctx, "fail" if differ else "pass", summary, "tactile frames")
     return CheckResult(status, summary, metrics=metrics,
-                       details={"summary": s,
+                       details={"summary": s, "console_frames": console_frames,
                                 "runs": {side: _brief(ctx, r) for side, r in results.items()}})
 
 
