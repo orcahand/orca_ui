@@ -1,0 +1,21 @@
+id: classic-tensioning
+title: Classic tensioning
+group: existing
+summary: The original tensioning routine pulls every tendon and holds it.
+steps:
+  - id: B5
+    title: Tensioning holds the same way as on main
+    kind: compare
+    check: compare_tension_hold
+    params: {hold_s: 10, main_runs: 3, branch_runs: 2}
+    instructions: >
+      The check runs the tensioning hold for a few seconds, alternating main's orca_core and the branch's
+      (main, branch, main, branch, main), recording current and position, and where each wind stopped
+      every motor.
+    pass_rule: >
+      In every branch run, each motor's holding current lies within the span of main's runs, widened by
+      15 % of main's mean, 10 mA, or the median run-to-run spread of main's motors, whichever is largest;
+      its motion within main's span widened by 2° or that median spread. A motor whose wind stopped more
+      than 5° (or main's own spread) outside where main's winds stopped it is mechanically different in that
+      run: listed, not judged on its current. A motor no branch run could be judged on leaves the step
+      observed, for a person to look at.

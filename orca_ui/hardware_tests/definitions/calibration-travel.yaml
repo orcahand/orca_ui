@@ -1,0 +1,28 @@
+id: calibration-travel
+title: Calibration travel check and re-drive
+group: new
+summary: On v2.1, calibration compares each joint's travel with its baseline and re-drives a short joint.
+steps:
+  - id: A5
+    title: A short joint is re-driven
+    kind: auto
+    applies_to: {hardware_versions: [210, 211]}
+    check: calibration_redrive
+    params: {margin: 0.01}
+    instructions: >
+      The check picks the finger joint whose last measured travel is shortest against its baseline (the
+      hand's own joint_motor_travel wins over the shared v2.1 one; never the wrist), gives it a baseline of
+      1.2 times that measurement (3 times its baseline when the hand has no measured travel yet) in a copy
+      of this hand's config with a 1 % margin, so it is short on any hand, and calibrates that joint alone with the branch's orca_core. The hand's own config is not touched.
+    pass_rule: >
+      Travel is checked against the baseline, the joint is re-driven with non-decreasing currents at most
+      the configured number of times, the re-drive ends succeeded or exhausted, and the limits are saved in
+      the copy. A joint found within the margin or past its baseline is inconclusive (skipped), because the
+      re-drive was not exercised.
+  - id: A6
+    title: v2.0 or an unknown version gets one plain pass
+    kind: auto
+    check: calibration_plain_pass
+    params: {joint: index_mcp}
+    instructions: The check calibrates one joint on a copy of this hand's config pinned to v2.0.
+    pass_rule: One pass, with no travel check and no re-drive.

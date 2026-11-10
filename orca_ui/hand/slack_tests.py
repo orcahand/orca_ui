@@ -46,11 +46,16 @@ def save(config, report: dict, *, hand_key: str | None = None, motor_type: str |
     return key
 
 
-def latest_for_hand(config, hand_key: str | None) -> tuple[str, dict] | None:
-    """(key, test) of the newest slack test on ``hand_key``; with no hand key,
-    the newest test in the file (mock, or a board without an identity)."""
+def for_hand(config, hand_key: str | None) -> list[tuple[str, dict]]:
+    """(key, test) of every slack test on ``hand_key``; with no hand key, every
+    test in the file (mock, or a board without an identity)."""
     tests = _load(config)["tests"]
-    mine = [(k, t) for k, t in tests.items() if hand_key is None or t.get("hand_key") == hand_key]
+    return [(k, t) for k, t in tests.items() if hand_key is None or t.get("hand_key") == hand_key]
+
+
+def latest_for_hand(config, hand_key: str | None) -> tuple[str, dict] | None:
+    """(key, test) of the newest slack test on ``hand_key``."""
+    mine = for_hand(config, hand_key)
     if not mine:
         return None
     # Two tests within the same second differ only by the key's suffix.

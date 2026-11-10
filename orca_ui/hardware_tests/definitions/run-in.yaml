@@ -1,0 +1,12 @@
+id: run-in
+title: Tension after run-in
+group: observation
+summary: Whether tension holds after the hand has been run in.
+steps:
+  - id: C4
+    title: Slack test before and after a run-in
+    kind: observe
+    action: operation:slack_test
+    panels: [motor_positions, operation_log]
+    instructions: Run the slack test, run the hand in, and run the slack test again.
+    pass_rule: Recorded only. The run-in procedure is still to be defined with Kai.

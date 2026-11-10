@@ -1,0 +1,26 @@
+id: hardware-version
+title: Hardware version
+group: new
+summary: The version comes from the board, a pin, or the console's picker, and decides the v2.1 features.
+steps:
+  - id: A8a
+    title: Version and its source are reported
+    kind: auto
+    check: hardware_version_reported
+    instructions: The check reads the version the console resolved for this hand and where it came from.
+    pass_rule: A version is shown with its source (board, pin or picker).
+  - id: A8b
+    title: A pin wins and says so
+    kind: auto
+    check: hardware_version_pin
+    instructions: >
+      The check loads a copy of this hand's config with a pinned version that differs from the board's,
+      with the branch's orca_core.
+    pass_rule: The pin wins and a warning names both values; the packaged config is unchanged.
+  - id: A8c
+    title: The console asks on a plain adapter
+    kind: manual
+    instructions: |
+      Only for a hand on a plain adapter without a board to ask; otherwise mark this step skipped.
+      Connect it and see whether the console asks for the version.
+    pass_rule: The console asks, and the chosen version is saved in local_config.yaml beside the hand's config.

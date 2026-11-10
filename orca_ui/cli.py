@@ -96,6 +96,18 @@ def parse_args(argv=None) -> argparse.Namespace:
                              "(overrides --teleop-dir).")
     parser.add_argument("--no-teleop", action="store_true",
                         help="Disable the teleoperation subsystem entirely.")
+    parser.add_argument("--hardware-tests", action="store_true",
+                        help="Show the Tests tab (hardware tests for a plan) even "
+                             "with a released orca_core; it is always shown with "
+                             "a development one.")
+    parser.add_argument("--bench-dir", type=str, default=None,
+                        help="Root folder for hardware-test results "
+                             "(default ~/orca_bench).")
+    parser.add_argument("--main-core", type=str, default=None,
+                        help="orca_core checkout of main, for the Tests tab's "
+                             "main-vs-branch comparisons (default: "
+                             "$ORCA_CORE_MAIN, else worktrees/orca_core-main "
+                             "beside the branch's checkout).")
     return parser.parse_args(argv)
 
 
@@ -219,6 +231,9 @@ def build_settings(argv=None) -> UiSettings:
         teleop_enabled=not args.no_teleop,
         teleop_cmd=args.teleop_cmd,
         teleop_dir=args.teleop_dir,
+        hardware_tests=args.hardware_tests,
+        bench_dir=args.bench_dir,
+        main_core=args.main_core,
     )
 
 

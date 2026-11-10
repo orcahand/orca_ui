@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 from pathlib import Path
 
 from orca_ui.core_source import resolve_cached as resolve_core_source
+from orca_ui.hardware_tests import tab_enabled as hardware_tests_enabled
 from orca_ui.hand import zeroing
 from orca_ui.hand.commands import CommandWorker
 from orca_ui.hand.presets import BUILTIN_POSES, BUILTIN_SEQUENCES
@@ -487,6 +488,7 @@ class HandService:
             "slack_test": self._slack_test(config),
             "slack_current": self._slack_current(),
             "tension_sweep": self._tension_sweep(config),
+            "hardware_tests": hardware_tests_enabled(self.settings),
         }
         mapping = getattr(config, "finger_to_sensor_id", None)
         if mapping:

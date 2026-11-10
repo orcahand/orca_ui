@@ -1,0 +1,14 @@
+id: travel-baseline
+title: Travel baseline for guided tensioning
+group: new
+summary: Guided tensioning scores each joint's travel against the hand's baseline, the shipped reference hand, or the shared v2.1 block.
+steps:
+  - id: A13
+    title: Guided tensioning scores against a complete travel table
+    kind: auto
+    applies_to: {hardware_versions: [210, 211]}
+    check: guided_tension_baseline
+    instructions: >
+      The check resolves the travel table guided tensioning scores against for this hand and compares it
+      with what every guided run in this session logged. It moves nothing.
+    pass_rule: Every finger joint has an expected travel, and every guided run this session scored against that table.

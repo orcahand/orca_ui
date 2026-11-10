@@ -1,0 +1,36 @@
+id: merge-0.13
+title: Merge of feature/improve-calibration (orca_core 0.13, UI 0.4)
+summary: New tensioning and calibration features work as designed, and existing features still work as on main.
+features:
+  - slack-test
+  - tension-sweep
+  - guided-tensioning
+  - travel-baseline
+  - calibration-travel
+  - manual-calibration
+  - hardware-version
+  - left-thumb-map
+  - motor-reboot
+  - current-defaults
+  - console-flow
+  - simple-tensioning
+  - fault-popup
+  - console-identity
+  - assembly-guide
+  - connect-detect
+  - config-loading
+  - plain-calibration
+  - neutral-manual
+  - classic-tensioning
+  - joint-loop
+  - touch-sensors
+  - script-flags
+  - console-features
+  - scripts-on-hand
+  - teleop
+  - feetech-slack-current
+  - sweep-stalls
+  - ring-finger
+  - run-in
+  - encoder-stops
+  - software

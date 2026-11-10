@@ -1,0 +1,11 @@
+id: connect-detect
+title: Connect and autodetect
+group: existing
+summary: Detection picks the model, side, ports and sensors for the connected hand.
+steps:
+  - id: B1
+    title: Same detection on main and the branch
+    kind: compare
+    check: compare_detect
+    instructions: The check runs detection with main's orca_core, then with the branch's, while the console releases the hand.
+    pass_rule: Same model, side, motor family, ports and sensors on both.

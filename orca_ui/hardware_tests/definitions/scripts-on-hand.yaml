@@ -1,0 +1,29 @@
+id: scripts-on-hand
+title: Scripts on the hand
+group: existing
+summary: The terminal scripts calibrate and tension a real hand, with their tidied output.
+steps:
+  - id: B12
+    title: calibrate.py and guided_tension.py run on the hand
+    kind: manual
+    check: scripts_on_hand_logs
+    instructions: |
+      The console must be stopped, because the scripts open the hand's ports themselves.
+      1. Open this step, copy its step folder (the copy button below), then stop the console with Ctrl-C.
+         The session stays on disk.
+      2. In a terminal, with <model> the model on the session card (for example orcahand-touch-right):
+           cd ~/code/orca_core
+           D=<paste the step folder>
+           mkdir -p "$D"
+           PYTHONUNBUFFERED=1 UV_PYTHON=3.12 uv run python scripts/calibrate.py orca_core/models/v2/<model>/config.yaml 2>&1 | tee "$D/calibrate.log"
+           PYTHONUNBUFFERED=1 UV_PYTHON=3.12 uv run python scripts/guided_tension.py orca_core/models/v2/<model>/config.yaml --scoring slack 2>&1 | tee "$D/guided_tension.log"
+      3. In guided_tension.py: at each pose type 1 (Continue); drive the listed joints to both ends twice,
+         holding each end a moment, then press Enter and type 1 (Next, or Score on the last finger). At the
+         score choose Finish anyway (or Finish). Do not choose Tension.
+      4. Start the console again, resume the session, open this step and decide.
+      measure_travel.py is left out on purpose: it writes the measured travel into the packaged config.yaml,
+      which git tracks.
+    pass_rule: >
+      Both logs are in the step folder without an error; calibrate.py calibrated every finger joint and,
+      on v2.1, printed its travel checks; guided_tension.py scored with slack, froze the other fingers at
+      the tension current and finished.

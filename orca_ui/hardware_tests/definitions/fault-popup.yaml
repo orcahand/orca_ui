@@ -1,0 +1,15 @@
+id: fault-popup
+title: Latched-motor pop-up
+group: new
+summary: A motor that latches a hardware fault shows in a pop-up on every tab and can be rebooted from it.
+steps:
+  - id: A14
+    title: A latched motor is shown and cleared by a reboot
+    kind: manual
+    check: latched_motor_recovered
+    instructions: |
+      Do not provoke a fault. If a motor latched during this session, recall what you saw: the pop-up named
+      the motor and its joint on whichever tab was open, and Reboot in the pop-up (or in the dialog) cleared it.
+      Pass if that is what happened. Mark it skipped if no motor latched; the check lists every latch it
+      finds in this session's log.
+    pass_rule: Every latch was shown and cleared by a reboot, and the log shows each one followed by "cleared and holding again".

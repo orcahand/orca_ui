@@ -1,0 +1,11 @@
+id: ring-finger
+title: Ring finger during the thumb slack test
+group: observation
+summary: The ring finger was seen moving while the thumb was tested.
+steps:
+  - id: C3
+    title: Did the ring motor move?
+    kind: observe
+    check: ring_motor_during_thumb
+    instructions: The check reads the motor positions recorded during step A1 and looks for ring motor movement while thumb joints were tested.
+    pass_rule: Recorded only. Movement of the ring motor points to software; none points to the finger being pulled along.

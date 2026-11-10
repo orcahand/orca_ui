@@ -1,0 +1,16 @@
+id: manual-calibration
+title: Manual calibration with Back
+group: new
+summary: The operator moves each joint to its limits; Back undoes a step.
+steps:
+  - id: A7
+    title: Back undoes the right step
+    kind: manual
+    action: operation:calibrate_manual
+    panels: [motor_positions, operation_log]
+    instructions: |
+      Start manual calibration with the button. Press Back once in the middle of a joint, and once right
+      after finishing a joint. Then press Stop.
+    pass_rule: >
+      Back in the middle of a joint returns to that joint's previous step. What Back should do right after
+      a finished joint is not defined yet: write down what happened (does the saved limit stay?).

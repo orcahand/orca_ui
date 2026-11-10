@@ -1,0 +1,13 @@
+id: left-thumb-map
+title: Left v2.1 thumb map
+group: new
+summary: v2.1 left hands route the thumb MCP and DIP tendons the other way.
+steps:
+  - id: A9
+    title: Thumb bends the way the slider says
+    kind: manual
+    applies_to: {sides: [left], hardware_versions: [210, 211]}
+    action: jog:thumb_mcp,thumb_dip
+    panels: [motor_positions]
+    instructions: Use the buttons to bend thumb_mcp, then thumb_dip, and watch the thumb.
+    pass_rule: Both joints bend the thumb in the commanded direction.

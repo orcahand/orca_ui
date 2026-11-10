@@ -1,0 +1,24 @@
+id: slack-test
+title: Slack test
+group: new
+summary: Measures how far each finger motor turns while the operator holds its joint still.
+steps:
+  - id: A1
+    title: Slack test runs on every joint
+    kind: manual
+    action: operation:slack_test
+    panels: [motor_positions, motor_currents, operation_log]
+    check: slack_test_saved
+    instructions: |
+      Start the slack test with the button. At each joint, hold the joint still as the prompt asks.
+      At one hold prompt, press Back once, then continue. Finish with the review step.
+    pass_rule: >
+      Every joint gets a reading; Back returns to the previous prompt; the review lists all joints;
+      a new slack test is saved beside the calibration; the default current matches the motor family.
+  - id: A2
+    title: Slack test and sweep refuse while the joint loop runs
+    kind: auto
+    applies_to: {requires: [encoders]}
+    check: refused_while_joint_loop
+    instructions: The check starts the closed joint loop, tries both routines, stops the loop and tries again.
+    pass_rule: Both are refused with a message while the loop runs, and both may start once it is stopped.

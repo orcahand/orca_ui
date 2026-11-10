@@ -1,0 +1,11 @@
+id: current-defaults
+title: Per-family current defaults
+group: new
+summary: Current settings left on "default" resolve to the connected motor family's own values.
+steps:
+  - id: A11
+    title: Defaults match the motor family
+    kind: auto
+    check: current_defaults
+    instructions: The check reads the currents the session resolved after connecting.
+    pass_rule: Values left on default equal the family's own defaults (Dynamixel 300/300 mA, Feetech 900/900 mA).
