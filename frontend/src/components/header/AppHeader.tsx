@@ -5,6 +5,7 @@
 import type { HandState } from '../../api/types'
 import type { ViewName } from '../../state/appStore'
 import { useAppStore } from '../../state/appStore'
+import { useHardwareTestsFlag } from '../../state/hardwareTestsStore'
 import { BoardPicker } from './BoardPicker'
 import { EStopButton } from './EStopButton'
 import { HardwareVersionBadge } from './HardwareVersion'
@@ -44,6 +45,7 @@ const TABS: { id: ViewName; label: string }[] = [
   { id: 'teleop', label: 'Teleop' },
   { id: 'setup', label: 'Setup' },
   { id: 'motors', label: 'Motors' },
+  { id: 'tests', label: 'Tests' },
 ]
 
 export function AppHeader() {
@@ -59,9 +61,11 @@ export function AppHeader() {
   // hand to pose, no pose library worth keeping and nothing to calibrate, so
   // only the two tabs that act on motors are offered.
   const bare = status?.bare ?? false
-  const tabs = bare
-    ? TABS.filter((tab) => tab.id === 'dashboard' || tab.id === 'motors')
-    : TABS
+  // Tests only when the backend enables it; kept while open so a released hand can't hide it.
+  const testsTab = useHardwareTestsFlag() || view === 'tests'
+  const tabs = (
+    bare ? TABS.filter((tab) => tab.id === 'dashboard' || tab.id === 'motors') : TABS
+  ).filter((tab) => tab.id !== 'tests' || testsTab)
 
   const state: HandState = !wsConnected
     ? 'disconnected'

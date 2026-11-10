@@ -18,6 +18,7 @@ export type ViewName =
   | 'teleop'
   | 'setup'
   | 'motors'
+  | 'tests'
 
 export interface TactileSettings {
   displayMode: TaxelDisplayMode

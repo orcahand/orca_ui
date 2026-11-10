@@ -16,6 +16,7 @@ import { MotorsView } from './components/views/MotorsView'
 import { PosesView } from './components/views/PosesView'
 import { SetupView } from './components/views/SetupView'
 import { TeleopView } from './components/views/TeleopView'
+import { TestsView } from './components/views/TestsView'
 import { useAppStore } from './state/appStore'
 import { hasUnseenChangelog, useChangelogStore } from './state/changelogStore'
 import { useOperationActive } from './state/operationStore'
@@ -84,12 +85,15 @@ export default function App() {
         // Some tabs stay reachable while the backend is up but no hand
         // session exists: Teleop (test a camera/glove against the 3D ghost)
         // and Motors (chain configuration happens at ASSEMBLY time, when
-        // there is no connectable hand at all). Hardware actions remain
+        // there is no connectable hand at all), and Tests (compare checks
+        // release the hand while they run). Hardware actions remain
         // backend-gated.
-        wsConnected && (view === 'teleop' || view === 'motors') ? (
+        wsConnected &&
+        (view === 'teleop' || view === 'motors' || view === 'tests') ? (
           <>
             {view === 'teleop' && <TeleopView />}
             {view === 'motors' && <MotorsView />}
+            {view === 'tests' && <TestsView />}
           </>
         ) : (
           <BootHero />
@@ -111,6 +115,7 @@ export default function App() {
           {view === 'teleop' && <TeleopView />}
           {view === 'setup' && <SetupView />}
           {view === 'motors' && <MotorsView />}
+          {view === 'tests' && <TestsView />}
         </>
       )}
       <ErrorBoundary label="The tensioning dialog">
