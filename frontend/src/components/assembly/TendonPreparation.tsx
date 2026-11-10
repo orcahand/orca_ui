@@ -138,8 +138,17 @@ export function KnotConventions() {
     </section>
   )
 }
-export function KnotReinforcement({ count }: { count: 1 | 3 }) {
-  const [phase, setPhase] = useState(0),
+export function KnotReinforcement({
+  count,
+  phase: controlledPhase,
+  labelsOnly = false,
+}: {
+  count: 1 | 3
+  phase?: number
+  labelsOnly?: boolean
+}) {
+  const [localPhase, setPhase] = useState(0),
+    phase = controlledPhase ?? localPhase,
     id = useId(),
     ashley = `${id}-ashley`,
     single = `${id}-single`,
@@ -154,14 +163,16 @@ export function KnotReinforcement({ count }: { count: 1 | 3 }) {
       className="assembly-knot-reinforcement"
       aria-label={`One Ashley stopper plus ${count} single knots on top`}
     >
-      <div className="assembly-motion-phases">
-        {labels.map((label, i) => (
-          <button key={label} aria-pressed={phase === i} onClick={() => setPhase(i)}>
-            <span>{i + 1}</span>
-            {label}
-          </button>
-        ))}
-      </div>
+      {controlledPhase === undefined && (
+        <div className="assembly-motion-phases">
+          {labels.map((label, i) => (
+            <button key={label} aria-pressed={phase === i} onClick={() => setPhase(i)}>
+              <span>{i + 1}</span>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
       <svg viewBox="0 0 700 290" role="img" aria-label={labels[phase]}>
         <defs>
           <linearGradient
@@ -235,13 +246,15 @@ export function KnotReinforcement({ count }: { count: 1 | 3 }) {
             Single overhand knot
           </text>
         )}
-        <text x="350" y="278" textAnchor="middle" fontSize="14" fill="currentColor">
-          {phase === 0
-            ? 'Pull the Ashley firmly before tying the extra single knot.'
-            : phase === 1
-              ? 'Tie the ordinary single knot around the stopper, on top.'
-              : 'Pull snug against the Ashley to make one compact anchor.'}
-        </text>
+        {!labelsOnly && (
+          <text x="350" y="278" textAnchor="middle" fontSize="14" fill="currentColor">
+            {phase === 0
+              ? 'Pull the Ashley firmly before tying the extra single knot.'
+              : phase === 1
+                ? 'Tie the ordinary single knot around the stopper, on top.'
+                : 'Pull snug against the Ashley to make one compact anchor.'}
+          </text>
+        )}
       </svg>
       {count === 3 && (
         <p>

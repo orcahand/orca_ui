@@ -5244,6 +5244,46 @@
   "touch/wrap-start.webp": {
    "object": "guide/touch/wrap-start-425b4188548ec502.webp",
    "size": 115032
+  },
+  "upkeep/base-index-ap-replacement.png": {
+   "object": "guide/upkeep/base-index-ap-replacement-d02ed9783d64047b.png",
+   "size": 1929822
+  },
+  "upkeep/step-1.png": {
+   "object": "guide/upkeep/step-1-1e6daa489b9a6872.png",
+   "size": 118045
+  },
+  "upkeep/step-2.png": {
+   "object": "guide/upkeep/step-2-44b3f6c09f8b03c3.png",
+   "size": 138813
+  },
+  "upkeep/step-3.png": {
+   "object": "guide/upkeep/step-3-1d89c0e727931ce0.png",
+   "size": 268640
+  },
+  "upkeep/step-4.png": {
+   "object": "guide/upkeep/step-4-476268709ab946c1.png",
+   "size": 279957
+  },
+  "upkeep/step-5.png": {
+   "object": "guide/upkeep/step-5-e0d3fdd1a738d6f5.png",
+   "size": 108230
+  },
+  "upkeep/step-6.png": {
+   "object": "guide/upkeep/step-6-0aec4c5dc2f1f863.png",
+   "size": 67036
+  },
+  "upkeep/step-7.png": {
+   "object": "guide/upkeep/step-7-012e8f1f743d4282.png",
+   "size": 93972
+  },
+  "upkeep/step-8.png": {
+   "object": "guide/upkeep/step-8-e985ca88186a8c1f.png",
+   "size": 342265
+  },
+  "upkeep/step-9.png": {
+   "object": "guide/upkeep/step-9-f1d32c71f69550ca.png",
+   "size": 117424
   }
  }
 }

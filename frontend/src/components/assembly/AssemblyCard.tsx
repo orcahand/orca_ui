@@ -1,10 +1,10 @@
 import { Component, lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { EStopButton } from '../header/EStopButton'
-import { useAppStore } from '../../state/appStore'
 import './assembly-card.css'
 
 const Guide = lazy(() => import('./AssemblyGuide').then((m) => ({ default: m.AssemblyGuide })))
+const UpkeepGuide = lazy(() => import('./UpkeepGuide').then((m) => ({ default: m.UpkeepGuide })))
 class GuideBoundary extends Component<
   { children: ReactNode; onClose: () => void },
   { failed: boolean }
@@ -16,7 +16,8 @@ class GuideBoundary extends Component<
   render() {
     return this.state.failed ? (
       <div className="assembly-loading">
-        <p>The assembly guide could not load. Your saved progress is still available.</p>
+        <EStopButton />
+        <p>The guide could not load. Your saved progress is still available.</p>
         <button className="btn" onClick={this.props.onClose}>
           Return to Setup
         </button>
@@ -29,16 +30,19 @@ class GuideBoundary extends Component<
 
 function AssemblyPopup({ onClose }: { onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null)
-  const control = useAppStore((s) => s.control)
-  const needsStop = control && (control.torque_enabled || control.control_source !== 'manual')
   useEffect(() => {
     const node = dialog.current!
+    const previousFocus =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null
     const previousOverflow = document.body.style.overflow
     node.showModal()
     document.body.style.overflow = 'hidden'
     return () => {
       node.close()
       document.body.style.overflow = previousOverflow
+      requestAnimationFrame(() => {
+        if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true })
+      })
     }
   }, [])
   return createPortal(
@@ -57,14 +61,15 @@ function AssemblyPopup({ onClose }: { onClose: () => void }) {
         <Suspense
           fallback={
             <div className="assembly-loading">
-              <p>Opening your assembly workspace…</p>
+              <EStopButton />
+              <p>Opening your assembly guide…</p>
               <button className="btn" onClick={onClose}>
                 Close
               </button>
             </div>
           }
         >
-          <Guide onClose={onClose} safetyControl={needsStop ? <EStopButton /> : null} />
+          <Guide onClose={onClose} safetyControl={<EStopButton />} />
         </Suspense>
       </GuideBoundary>
     </dialog>,
@@ -72,12 +77,9 @@ function AssemblyPopup({ onClose }: { onClose: () => void }) {
   )
 }
 export function AssemblyCard() {
-  const [open, setOpen] = useState(false)
-  const launcher = useRef<HTMLButtonElement>(null)
-  function close() {
-    setOpen(false)
-    requestAnimationFrame(() => launcher.current?.focus())
-  }
+  const [open, setOpen] = useState(false),
+    [maintenance, setMaintenance] = useState(false)
+  const maintenanceButton = useRef<HTMLButtonElement>(null)
   return (
     <>
       <section className="assembly-launch">
@@ -92,11 +94,35 @@ export function AssemblyCard() {
             whenever you leave.
           </p>
         </div>
-        <button type="button" ref={launcher} className="btn btn-info" onClick={() => setOpen(true)}>
-          Open assembly guide
-        </button>
+        <div className="assembly-launch-actions">
+          <button type="button" className="btn btn-info" onClick={() => setOpen(true)}>
+            Open assembly guide
+          </button>
+          <button
+            type="button"
+            ref={maintenanceButton}
+            className="btn btn-info"
+            aria-expanded={maintenance}
+            aria-controls="maintenance"
+            onClick={() => setMaintenance((value) => !value)}
+          >
+            Maintenance
+          </button>
+        </div>
       </section>
-      {open && <AssemblyPopup onClose={close} />}
+      {maintenance && (
+        <GuideBoundary
+          onClose={() => {
+            setMaintenance(false)
+            maintenanceButton.current?.focus()
+          }}
+        >
+          <Suspense fallback={<p role="status">Opening maintenance…</p>}>
+            <UpkeepGuide onOpenAssembly={() => setOpen(true)} active={!open} />
+          </Suspense>
+        </GuideBoundary>
+      )}
+      {open && <AssemblyPopup onClose={() => setOpen(false)} />}
     </>
   )
 }
