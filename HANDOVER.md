@@ -10,6 +10,8 @@ The goal is a self-contained guide that makes building the hand straightforward 
 
 Read this document first, then [the assembly implementation notes](frontend/src/components/assembly/README.md), [DEVELOPMENT.md](DEVELOPMENT.md) and [CLAUDE.md](CLAUDE.md). The assembly README contains detailed historical development notes; some early statements are superseded. In particular, its opening statement that the guide never starts a hand operation predates the explicitly enabled connected-hand test described below.
 
+**Guide media is never committed.** Photos, videos, 3D models and PDFs are published to the public bucket with `scripts/guide_media.py` and loaded only through `mediaUrl`, `mediaImage` or `downloadMedia`. Before adding a new kind of file, follow the rules in [DEVELOPMENT.md](DEVELOPMENT.md#assembly-guide-media).
+
 ## Index tendon and skin sequence · 22 October
 
 Base-only follow-up in `orca_ui_merge` / `merge/assembly-calibration`:

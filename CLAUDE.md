@@ -128,6 +128,19 @@ Everything static the UI serves must live in `frontend/public/` — the build
 runs with `emptyOutDir`, so a file that exists only in `orca_ui/webui/` is
 deleted by the next build.
 
+### Assembly guide media
+
+The guide's photos, videos, 3D models and PDFs live in a public bucket, never in
+git ([DEVELOPMENT.md](DEVELOPMENT.md#assembly-guide-media)).
+
+- Publish guide media with `scripts/guide_media.py`; never commit it.
+- Every new file under `frontend/public/assembly/` is a media decision. If it is
+  media and its type is new, add the type to `CONTENT_TYPES` in
+  `scripts/guide_media.py`, to `.gitignore` (both assembly trees) and to the wheel
+  excludes in `pyproject.toml` before publishing.
+- Load media only through `mediaUrl`, `mediaImage` or `downloadMedia`
+  (`frontend/src/components/assembly/media.ts`), never by a hardcoded path.
+
 ## Versioning and the changelog
 
 **Trigger: the moment anyone proposes merging, releasing, or opening a PR for a

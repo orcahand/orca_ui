@@ -56,8 +56,9 @@ with sync_playwright() as p:
     expect(guide.locator('.upkeep-intro')).to_have_text(INTRO)
     expect(guide.locator('.upkeep-grid')).to_have_count(0)
     expect(guide.get_by_role('navigation', name='Repair steps').get_by_role('button')).to_have_count(9)
-    # Published previews must work from a fresh checkout with no local PNGs.
+    # Published previews and the PDF must work from a fresh checkout with no local copies.
     page.route(ORIGIN + '/assembly/upkeep/*.png', lambda route: route.abort())
+    page.route(ORIGIN + '/assembly/upkeep/*.pdf', lambda route: route.abort())
     for index in range(9):
         guide.locator('.upkeep-chapters button').nth(index).click()
         poster = guide.locator('.upkeep-stage > img')

@@ -1,7 +1,24 @@
 import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
+import { downloadMedia, mediaUrl } from './media'
 import { UPKEEP_STEPS } from './upkeepSteps'
 import './assembly.css'
 import './upkeep.css'
+
+const PDF = './assembly/upkeep/index-ap-maintenance.pdf'
+function PdfLink({ children }: { children: ReactNode }) {
+  return (
+    <a
+      href={mediaUrl(PDF)}
+      download
+      onClick={(e) => {
+        e.preventDefault()
+        downloadMedia(PDF)
+      }}
+    >
+      {children}
+    </a>
+  )
+}
 
 const Animation = lazy(() =>
   import('./UpkeepAnimation').then((m) => ({ default: m.UpkeepAnimation })),
@@ -15,9 +32,7 @@ class AnimationBoundary extends Component<{ children: ReactNode }, { failed: boo
     return this.state.failed ? (
       <p role="alert">
         The animation could not load.{' '}
-        <a href="./assembly/upkeep/index-ap-maintenance.pdf" download>
-          Download the illustrated PDF
-        </a>{' '}
+        <PdfLink>Download the illustrated PDF</PdfLink>{' '}
         or reload to try again.
       </p>
     ) : (
@@ -59,9 +74,7 @@ export function UpkeepGuide({
       <div className="upkeep-main">
         <div className="upkeep-section-heading">
           <span className="assembly-eyebrow">MAINTENANCE · BASE RIGHT · DYNAMIXEL</span>
-          <a href="./assembly/upkeep/index-ap-maintenance.pdf" download>
-            Download PDF ↓
-          </a>
+          <PdfLink>Download PDF ↓</PdfLink>
         </div>
         <p className="upkeep-intro">
           A finger has six tendon ends; the thumb has eight. Keep the other ends attached to their

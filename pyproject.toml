@@ -58,6 +58,7 @@ artifacts = [
     "!/orca_ui/webui/assembly/**/*.jpeg",
     "!/orca_ui/webui/assembly/**/*.glb",
     "!/orca_ui/webui/assembly/**/*.stl",
+    "!/orca_ui/webui/assembly/**/*.pdf",
 ]
 
 [tool.hatch.build.targets.wheel]

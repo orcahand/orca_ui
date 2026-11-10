@@ -50,11 +50,11 @@ are preserved but no longer displayed in the simplified walkthrough.
 `renderUpkeepFigure.ts` exports preview images and two print frames per chapter
 from the same geometry/timing. `scripts/render_upkeep_figure.py` builds the
 11-page landscape PDF, including the original knot reference, without a hardware
-backend. The PDF and provenance JSON ship in `frontend/public/assembly/upkeep/` and
-`orca_ui/webui/assembly/upkeep/`. Generated PNG previews are published through
-`scripts/guide_media.py` and `storedMedia.json`, like the existing assembly media.
-Both the preview and knot photos use `mediaImage`; the model uses the existing
-`loadBundle` bucket loader. The adjacent JSON records the CAD source hash.
+backend. The PDF and the generated PNG previews are published through
+`scripts/guide_media.py` and `storedMedia.json`, like the other guide media; only
+the provenance JSON, which records the CAD source hash, is in git. The PDF links use
+`downloadMedia`, the preview and knot photos use `mediaImage`, and the model uses the
+existing `loadBundle` bucket loader.
 Regenerate with Vite on port 5183:
 
 ```sh
@@ -88,7 +88,7 @@ both motor families and hand sides; no physical motor configuration was run.
 
 ## Model distribution
 
-The guide's photos, videos and 3D models, including the four complete Base/Touch
+The guide's photos, videos, 3D models and PDFs, including the four complete Base/Touch
 assembly GLBs, live in a public bucket, not in git. `storedMedia.json` maps each
 path under `frontend/public/assembly/` to its stored name. Every place that shows
 or loads media goes through `media.ts`: a published file comes from the bucket, and
@@ -97,6 +97,15 @@ locally before it is published. Images carry their guide path in `data-media`,
 which stylesheets match on instead of `src`. Generator scripts still write into
 `frontend/public/assembly/`, which Git ignores for media. Publishing is described
 in [DEVELOPMENT.md](../../../../DEVELOPMENT.md#assembly-guide-media).
+
+Rules for anyone adding to the guide, people and agents alike:
+
+- Guide media is published with `scripts/guide_media.py` and never committed.
+- Every new file under `frontend/public/assembly/` is a media decision. If it is
+  media and its type is new, add the type to `CONTENT_TYPES` in
+  `scripts/guide_media.py`, to `.gitignore` (both assembly trees) and to the wheel
+  excludes in `pyproject.toml` before publishing.
+- Load media only through `mediaUrl`, `mediaImage` or `downloadMedia` in `media.ts`.
 
 ## Workspace
 
