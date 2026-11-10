@@ -71,14 +71,15 @@ export function DashboardView() {
             alignItems: 'start',
           }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+          {/* The 3D view stays put while the right column scrolls, to compare mappings instantly. */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0, position: 'sticky', top: 8 }}>
             <HandScenePanel height="min(52vh, 560px)" withRig />
             <RigCamera />
           </div>
           {/* CameraPreview self-hides unless a camera teleop session is live. */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <RigPanel />
             {caps?.motors && <StudyCalibrationPanel />}
+            <RigPanel />
             {caps?.motors && <MotorPanel />}
             <CameraPreview />
           </div>
