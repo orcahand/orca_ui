@@ -113,11 +113,12 @@ def _family(service) -> Optional[str]:
 
 
 def _wait_connected(ctx: CheckContext, timeout_s: float = RECONNECT_TIMEOUT_S) -> None:
-    """Block until the console has a live session again (after a maintenance lease)."""
+    """Block until the console has a live, fully started session again (after a
+    maintenance lease)."""
     deadline = time.monotonic() + timeout_s
     while True:
         status = ctx.service.status()
-        if ctx.service.session is not None and status.get("state") in ("connected", "degraded"):
+        if ctx.service.session_ready and status.get("state") in ("connected", "degraded"):
             return
         if time.monotonic() >= deadline:
             raise TimeoutError(f"the hand did not reconnect within {timeout_s:g} s "

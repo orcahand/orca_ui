@@ -476,7 +476,9 @@ class SideRunner:
             except Exception as e:
                 self._log(f"reconnect failed: {e}")
             else:
-                if not self._wait(lambda: getattr(self.service, "session", None) is not None,
+                # Ready, not just connected: the next release must not land while
+                # the console is still starting its tactile stream.
+                if not self._wait(lambda: self.service.session_ready,
                                   RECONNECT_WAIT_S, stoppable=True):
                     self._log("the console has not reconnected yet; it keeps trying")
 

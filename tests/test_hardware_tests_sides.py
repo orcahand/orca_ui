@@ -192,6 +192,10 @@ class _Service:
         self.calls.append("reconnect")
         self.session = object()
 
+    @property
+    def session_ready(self):
+        return self.session is not None
+
 
 def _runner(tmp_path: Path, service, *, stop_event=None) -> sides.SideRunner:
     fake_uv = tmp_path / "uv"
@@ -243,3 +247,25 @@ def test_side_run_refuses_to_release_the_hand_while_an_operation_runs(tmp_path):
     with pytest.raises(StopRequested):
         _runner(tmp_path, _Service(console), stop_event=stopped).run(
             "branch", "load_configs", {}, tmp_path / "stopped")
+
+
+def test_the_hand_is_taken_back_only_once_the_console_has_finished_starting(tmp_path):
+    """A console that has a session may still be starting its tactile stream; the
+    next release must not land in the middle of that."""
+    console = Path(orca_core.__file__).parent / "models" / "v2" / "orcahand-right" / "config.yaml"
+
+    class Starting(_Service):
+        polls = 0
+
+        @property
+        def session_ready(self):
+            if self.session is None:
+                return False
+            Starting.polls += 1
+            return Starting.polls >= 3
+
+    service = Starting(console)
+    runner = _runner(tmp_path, service)
+    with runner.hand_released():
+        assert service.session is None
+    assert service.calls == ["disconnect", "reconnect"] and Starting.polls >= 3
