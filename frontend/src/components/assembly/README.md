@@ -1,5 +1,17 @@
 # Assembly workspace
 
+## Current state (UI 0.4.0, November 2026)
+
+- Builders choose Base or Full, left or right, Dynamixel or Feetech; the Touch
+  version and the internal edition are off in `editions.ts`. The maintenance walkthrough covers
+  the index AP tendon on Base right Dynamixel.
+- All media loads through `media.ts` from the public bucket; see
+  [Model distribution](#model-distribution) and
+  [DEVELOPMENT.md](../../../../DEVELOPMENT.md#assembly-guide-media).
+- The dated sections below are the development log. Branch names, archives and
+  paths in them are historical; where they disagree with this section, this
+  section is current.
+
 ## Maintenance
 
 Setup has a **Maintenance** button beside **Open assembly guide**. It expands an

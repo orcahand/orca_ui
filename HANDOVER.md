@@ -1,5 +1,16 @@
 # ORCA assembly guide — handover
 
+## Current state (UI 0.4.0, November 2026)
+
+- The guide and the maintenance walkthrough ship in the console on `main`. Open **Setup → Open assembly guide**, or **Setup → Maintenance** for the index AP tendon replacement (Base right, Dynamixel).
+- Builders choose Base or Full, left or right, Dynamixel or Feetech. The Touch version and the internal edition are switched off in `frontend/src/components/assembly/editions.ts`.
+- Photos, videos, 3D models and PDFs live in the public bucket, listed in `storedMedia.json`; publishing and the rules for new files are in [DEVELOPMENT.md](DEVELOPMENT.md#assembly-guide-media). Nothing is unpacked from archives any more.
+- Browser checks: `scripts/check_upkeep_guide.py` for the maintenance walkthrough; see [the assembly README](frontend/src/components/assembly/README.md) for the guide's own.
+
+The dated sections below are the working log the guide was built from. Branch names, checkout paths and file locations in them are historical; where they disagree with this section, this section is current.
+
+---
+
 Updated: 22 October 2026. Intended for the next Astra/Codex instance and human maintainers.
 
 ## Start here
