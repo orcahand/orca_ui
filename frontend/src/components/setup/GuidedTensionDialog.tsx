@@ -13,6 +13,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '../../api/rest'
+import { EStopButton } from '../header/EStopButton'
 import type {
   GuidedTensionExtra,
   ModelMetadata,
@@ -149,7 +150,9 @@ export function GuidedTensionDialog({
   // progress: resume=false makes the backend drop the scores it kept.
   const restart = async () => {
     setConfirmRestart(false)
-    const { defaults: _defaults, ...params } = (operation.params ?? {}) as Record<string, unknown>
+    // A restart opens at the first stage: the slack test's start step and clicks were for that run only.
+    const { defaults: _defaults, start_at: _startAt, ratchet_joints: _ratchet, ...params } =
+      (operation.params ?? {}) as Record<string, unknown>
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
     try {
       if (active) await api.operationStop()
@@ -184,7 +187,7 @@ export function GuidedTensionDialog({
     const onKey = (e: KeyboardEvent) => {
       if (sent) return
       // Fields take Enter themselves, and a focused button answers it.
-      if (e.key === 'Enter' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLButtonElement)) {
+      if (e.key === 'Enter' && !e.repeat && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLButtonElement)) {
         e.preventDefault()
         send(awaiting.options[0])
       }
@@ -271,6 +274,7 @@ export function GuidedTensionDialog({
             </span>
           )}
           <span className="gt-header-spacer" />
+          <EStopButton />
           {active ? (
             <>
               <button

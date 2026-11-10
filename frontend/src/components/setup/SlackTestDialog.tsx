@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '../../api/rest'
+import { EStopButton } from '../header/EStopButton'
 import type { OperationSnapshot, SlackJoint, SlackStatus, SlackTestExtra, SpreadStatus } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
 import { isOperationActive } from '../../state/operationStore'
@@ -107,6 +108,7 @@ export function SlackTestDialog({ operation, onClose }: { operation: OperationSn
           {active && joint && <span className="setup-badge">{label(joint)}</span>}
           {current != null && <span className="setup-badge auto">{current} mA</span>}
           <span className="gt-header-spacer" />
+          <EStopButton />
           {active && !reviewing ? (
             <>
               <button className="btn btn-secondary" title="Keeps the run going" onClick={onClose}>

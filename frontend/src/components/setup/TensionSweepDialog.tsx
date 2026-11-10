@@ -13,6 +13,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '../../api/rest'
+import { EStopButton } from '../header/EStopButton'
 import type { OperationSnapshot, SpreadStatus, SweepStatus, SweepVerdict, TensionSweepExtra } from '../../api/types'
 import { isOperationActive } from '../../state/operationStore'
 import { EXTRA_DEG, PULL_MORE, useTensionFlow } from '../../state/tensionFlow'
@@ -125,6 +126,7 @@ export function TensionSweepDialog({
           {done && extra?.saved && <span className="setup-badge manual">saved · {extra.saved}</span>}
           {refName && <span className="setup-badge auto">vs {refName}</span>}
           <span className="gt-header-spacer" />
+          <EStopButton />
           {done && extra?.saved && !holdAsked && (
             <button
               className="btn btn-secondary"

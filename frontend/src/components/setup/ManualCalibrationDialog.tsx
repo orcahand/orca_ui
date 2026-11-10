@@ -2,13 +2,15 @@
 // its end stop; Enter records the motor position there. The model shows the
 // end stop asked for, and the list on the left what has been captured.
 
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '../../api/rest'
 import type { ManualCalibrationExtra, ModelMetadata, OperationSnapshot } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
+import { estopsFired } from '../../state/estop'
 import { isOperationActive } from '../../state/operationStore'
 import { ErrorBoundary } from '../common/ErrorBoundary'
+import { EStopButton } from '../header/EStopButton'
 import { SWEEP_HINT, startTensionSweep } from './probeStart'
 
 const TensionPreview = lazy(() =>
@@ -64,12 +66,20 @@ export function ManualCalibrationDialog({
 
   const finished = !active && operation.state !== 'error' && operation.result != null
   const [moving, setMoving] = useState(false)
+  // Closing the dialog or an E-STOP abandons a move that has not started driving yet.
+  const closed = useRef(false)
+  useEffect(() => () => {
+    closed.current = true
+  }, [])
   // The hand reconnects after the run, so torque is retried until it is back.
   const moveToZero = async () => {
     setMoving(true)
+    const estops = estopsFired()
+    const abandoned = () => closed.current || estopsFired() !== estops
     try {
       let lastError: unknown = null
       for (let i = 0; i < 40; i++) {
+        if (abandoned()) return
         try {
           await api.torqueEnable()
           lastError = null
@@ -80,6 +90,7 @@ export function ManualCalibrationDialog({
         }
       }
       if (lastError) throw lastError
+      if (abandoned()) return
       await api.jointsZero()
       onClose()
     } catch (error) {
@@ -89,12 +100,12 @@ export function ManualCalibrationDialog({
   }
 
   useEffect(() => {
-    if ((!awaiting || sent) && !(finished && !moving)) return
+    if (!awaiting || sent) return
+    // A held key repeats: only a fresh press records, so one press is one hardstop.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) {
+      if (e.key === 'Enter' && !e.repeat && !(e.target instanceof HTMLButtonElement)) {
         e.preventDefault()
-        if (awaiting) send(RECORD)
-        else void moveToZero()
+        send(RECORD)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -128,6 +139,7 @@ export function ManualCalibrationDialog({
           <span className="gt-title">Manual calibration</span>
           {extra && <span className="setup-badge">{Math.min(done + (active ? 1 : 0), extra.total)} / {extra.total}</span>}
           <span className="gt-header-spacer" />
+          <EStopButton />
           {active ? (
             <>
               <button className="btn btn-secondary" title="Keeps the run going" onClick={onClose}>
@@ -254,7 +266,7 @@ export function ManualCalibrationDialog({
             {finished && (
               <div className="gt-actions">
                 <button className="btn btn-primary" disabled={moving} onClick={() => void moveToZero()}>
-                  {moving ? 'Moving to zero…' : 'Move to zero'} <span className="gt-key">↵</span>
+                  {moving ? 'Moving to zero…' : 'Move to zero'}
                 </button>
                 {operation.result && (
                   <button

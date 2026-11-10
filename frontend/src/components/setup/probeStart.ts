@@ -3,6 +3,7 @@
 
 import { api } from '../../api/rest'
 import { isOperationActive, useOperationStore } from '../../state/operationStore'
+import { estopsFired } from '../../state/estop'
 import { useSetupVariant } from '../../state/setupVariant'
 import { DEFAULT_OFFSET_DEG } from '../../state/tensionFlow'
 import { loadPassFractions, loadPassSlack } from './guidedSettings'
@@ -41,10 +42,16 @@ export async function startGuidedTension(params: Record<string, unknown> = {}): 
   })
 }
 
-// Start the next operation once the run `runId` has ended (it was just told to finish).
+// Start the next operation once the run `runId` has finished cleanly (it was just
+// told to finish); a run that ended in an error or an E-STOP starts nothing.
 export async function startAfter(runId: string, start: () => Promise<void>): Promise<void> {
+  const estops = estopsFired()
   for (let i = 0; i < 300; i++) {
+    if (estopsFired() !== estops) throw new Error('E-STOP pressed: the next step was not started')
     const op = useOperationStore.getState().operation
+    if (op && op.run_id === runId && op.state === 'error') {
+      throw new Error('the previous run ended with an error or E-STOP: the next step was not started')
+    }
     if (!op || op.run_id !== runId || !isOperationActive(op)) return start()
     await sleep(100)
   }
@@ -52,8 +59,10 @@ export async function startAfter(runId: string, start: () => Promise<void>): Pro
 }
 
 async function startWhenConnected(kind: string, params: Record<string, unknown>): Promise<void> {
+  const estops = estopsFired()
   let lastError: unknown = null
   for (let i = 0; i < 60; i++) {
+    if (estopsFired() !== estops) throw new Error(`E-STOP pressed: ${kind} was not started`)
     try {
       await api.operationStart(kind, params)
       return

@@ -6,12 +6,14 @@
 import { api } from '../../api/rest'
 import { useAppStore } from '../../state/appStore'
 import { useEventLogStore } from '../../state/eventLogStore'
+import { noteEstop } from '../../state/estop'
 
 export function EStopButton() {
   const wsConnected = useAppStore((s) => s.wsConnected)
   const setError = useAppStore((s) => s.setError)
 
   const fire = async () => {
+    noteEstop()
     try {
       const { report } = await api.estop()
       const summary = Object.entries(report)
