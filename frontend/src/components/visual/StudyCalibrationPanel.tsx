@@ -25,7 +25,7 @@ const optionText = (o: StudyMapOption) =>
 const KIND = { basic: 'orca_core', main: 'main', fitted: 'fitted', 'other-hand': 'other hand' } as const
 
 function OverlayList({ rows, active }: { rows: OverlayRow[]; active: string | null }) {
-  const { overlaySettings, setOverlay, setAllOverlays } = useStudyMap()
+  const { overlaySettings, setOverlay, setAllOverlays, setMode } = useStudyMap()
   return (
     <div className="study-ov">
       <div className="study-ov-head">
@@ -41,6 +41,14 @@ function OverlayList({ rows, active }: { rows: OverlayRow[]; active: string | nu
         const drives = active != null && r.mode === active
         return (
           <div key={r.id} className={'study-ov-row' + (o.visible ? ' study-ov-on' : '') + (drives ? ' study-ov-drives' : '')}>
+            <input
+              type="radio"
+              name="study-drive"
+              checked={drives}
+              disabled={r.mode == null}
+              title={r.mode == null ? 'overlay only: cannot drive the hand' : 'use this mapping for the hand and the solid render'}
+              onChange={() => r.mode != null && void setMode(r.mode)}
+            />
             <input
               type="checkbox"
               checked={o.visible}
@@ -86,7 +94,7 @@ function OverlayList({ rows, active }: { rows: OverlayRow[]; active: string | nu
 }
 
 export function StudyCalibrationPanel() {
-  const { state, error, load, setMode } = useStudyMap()
+  const { state, error, load } = useStudyMap()
   const [pose, setPose] = useState<{ std: Record<string, number>; cor: Record<string, number> }>({ std: {}, cor: {} })
 
   useEffect(() => {
@@ -115,21 +123,7 @@ export function StudyCalibrationPanel() {
   const std = state.standard ?? { label: 'Standard', approach: "orca_core linear map, this hand's config" }
   const stdAcc = state.options[0]?.heldout_standard
   return (
-    <Panel
-      title={`Visual calibration (study) · ${on ? shown?.label ?? state.mode : std.label} active`}
-      toolbar={
-        state.available && <label className="toggle-label" title="The hand's joint mapping for all of orca-ui">
-          <select value={state.mode} onChange={(e) => void setMode(e.target.value)} style={{ maxWidth: '36em' }}>
-            <option value="off">{`${std.label} — ${std.approach}${acc(stdAcc)}`}</option>
-            {state.options.map((o) => (
-              <option key={o.name} value={o.name}>
-                {optionText(o)}
-              </option>
-            ))}
-          </select>
-        </label>
-      }
-    >
+    <Panel title={`Visual calibration (study) · ${on ? shown?.label ?? state.mode : std.label} active`}>
       <div className="study-cal">
         <p className={on ? 'study-cal-active study-cal-active-on' : 'study-cal-active'}>
           <strong>Active joint mapping{state.hand ? ` (${state.hand})` : ''}: </strong>
@@ -150,7 +144,7 @@ export function StudyCalibrationPanel() {
             : 'Hysteresis is not corrected (up to 3–7° depending on the side a joint comes from).'} {state.hand ? `${state.hand}: ` : ''}study of {state.map.n_poses} poses, {state.map.created}.
           {(coupled || advanced) && !on && ' Coupled map: the readout shows each joint\'s own curve; once on, the full model.'}
         </p>}
-        {rows.length > 0 && <OverlayList rows={rows} active={state.mode} />}
+        {rows.length > 0 && <OverlayList rows={rows} active={on ? state.mode : 'off'} />}
         {error && <p className="warn">{error}</p>}
         {state.map && <table>
           <thead>
