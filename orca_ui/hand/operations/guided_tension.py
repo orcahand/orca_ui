@@ -116,6 +116,32 @@ def motor_family(service) -> str | None:
     return family if family in SUPPORTED_MOTOR_TYPES else None
 
 
+# A read-back within one register step of the asked limit is the same limit (Feetech: 6.5 mA).
+LIMIT_TOLERANCE_MA = 7.0
+
+
+def limits_line(event: dict) -> str:
+    """One operation-log line: per joint the limit asked for and the one the motor holds."""
+    limits = event.get("limits") or {}
+    stage = (event.get("stage") or {}).get("key")
+    phase = str(event.get("phase", "")).replace("_", " ") + (f", {stage}" if stage else "")
+    off = [j for j, v in limits.items()
+           if v.get("held") is not None and abs(v["held"] - v["asked"]) > LIMIT_TOLERANCE_MA]
+    cells = ", ".join(
+        f"{j} {v['asked']:g}→{'none' if v.get('held') is None else format(v['held'], 'g')}"
+        for j, v in limits.items())
+    flag = f" MISMATCH on {', '.join(off)};" if off else ""
+    return f"current limits ({phase}), asked→held mA:{flag} {cells}"
+
+
+def drawn_line(event: dict) -> str:
+    """One operation-log line: per joint the peak and mean current drawn during a range check."""
+    drawn = event.get("drawn") or {}
+    stage = (event.get("stage") or {}).get("key", "?")
+    cells = ", ".join(f"{j} {v['peak']:g}/{v['mean']:g}" for j, v in drawn.items())
+    return f"currents drawn while checking {stage}, peak/mean mA: {cells or 'no samples'}"
+
+
 def joint_group(joint: str) -> str:
     """ap: abductions (and the thumb's cmc), mcp: MCPs, pip: PIPs (and the thumb's dip)."""
     if joint.endswith("_abd") or joint == "thumb_cmc":
@@ -341,6 +367,10 @@ class _Presenter:
                 self._publish()
             elif kind == "cleanup_failed":
                 self._ctx.log(f"cleanup failed: {event.get('error')}")
+            elif kind == "current_limits":
+                self._ctx.log(limits_line(event))
+            elif kind == "currents_drawn":
+                self._ctx.log(drawn_line(event))
 
     def _with_clicks(self, motor: dict) -> dict:
         """Add the ratchet clicks the joint's slack still needs: its slack in
