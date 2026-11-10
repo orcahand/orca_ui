@@ -207,6 +207,7 @@ export function AssemblyGuide({
   if (!ready)
     return (
       <div className="assembly-loading">
+        {safetyControl}
         <p>
           <GuideText
             variant

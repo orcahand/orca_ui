@@ -1,5 +1,5 @@
 # Mission: Calibration UX — slack test, tensioning entry points, sweep with built-in ratchet
-Status: active
+Status: stopped (2026-11-06, by Kai; task 7 (hardware and visual pass on the real hand, check: user) was not run)
 
 ## Goal
 Make the Setup tab's slack test, tensioning and tension sweep match the 2026-10-30 feedback:
@@ -214,3 +214,4 @@ Done when: every task below is ticked with Log evidence, `./dev test` passes, th
   clean. orca_core comparison for the user: the merge base with origin/main is 6735e94
   (2026-10-12, #124 guided tensioning). The branch is 5 commits ahead plus the uncommitted slack
   change; origin/main is 64 ahead (0.7.0 → 0.12.0); 16 files changed on both sides
+- 2026-11-06 23:15 · mission stopped at Kai's request (asked in an Abyss session) · task 7 (hardware and visual pass on the real hand, check: user) was not run; nothing else changed

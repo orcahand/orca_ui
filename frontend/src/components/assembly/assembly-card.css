@@ -88,3 +88,13 @@
     border-radius: 0;
   }
 }
+
+.assembly-launch-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.assembly-launch-actions [aria-expanded='true'] {
+  background: var(--accent);
+  color: var(--bg);
+}

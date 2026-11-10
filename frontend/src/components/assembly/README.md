@@ -1,5 +1,78 @@
 # Assembly workspace
 
+## Maintenance
+
+Setup has a **Maintenance** button beside **Open assembly guide**. It expands an
+inline section; maintenance has no separate modal, window or launcher card. The
+assembly reference still opens the existing modal, pauses playback underneath,
+and restores focus when closed. The introductory paragraph gives the general
+six/eight-end rule. A single animation teaches index AP replacement (Base right,
+Dynamixel); nine numbered chapter buttons replace the duplicate image grid.
+Selecting a chapter shows its representative pose. Play starts that chapter;
+Play from start runs the complete repair. Instructions and knot cues sit below
+the scene. Inside it, text identifies parts only.
+
+`createRepairScene` is a repair-specific full-hand scene using the assembly CAD,
+not a reversed assembly explosion. Pins/bearings move rigidly with their finger
+sections and top spools. Removed holder hardware and lifted top spools have room
+between them. The scene shows motor identification, screw removal, opposite spool
+rotation, release of both affected spool ends, finger removal, broken-cord
+removal/replacement, tying, routing, re-spooling and final reassembly.
+
+Channel paths reuse `fingerApChannelRoutes`, `fingerCarpalRoutes` and
+`handTendonPath`. Measured channel polylines are preserved. Only exposed cord
+spans use tangent-matched curves: during withdrawal the tail retreats through the
+fixed route while loose cord collects outside the openings, then hangs free.
+The break uses a fixed distance from the AP anchor. Other cords are muted;
+replacement cord is teal, the broken cord red. The AP close-up fades context
+cords and hides distant spool coils. Free spans illustrate handling rather than
+simulate the physics of the full cord length.
+
+`spoolPaths` supplies the actual rim, anchor channels and opposite winding
+directions. Its source geometry is mirrored in z for this tower face (checked
+against CAD). Motor 4's pair unwinds and leaves its channels before the finger
+opens. Motors 2/3 keep their anchors. The shown top/bottom pairing is illustrative;
+operators preserve recorded assignments and winding directions.
+
+The Ashley portion reuses all eleven `KnotLesson` photographs/cues.
+`KnotReinforcement` provides the single-knot lesson, with action text below the
+scene in maintenance and its original captions retained in assembly. These are
+existing visual lessons, not a new knot-tying simulation.
+
+Playback supports pause, scrub, replay and ½×/1×/2× speed. It pauses offscreen,
+when hidden, and under the assembly reference. Reduced-motion users start paused.
+Model/WebGL/chunk failures retain the PDF link. Browsing/playback send no hardware
+commands. Actual tensioning and calibration remain in Setup. The last chapter
+calls for power off again before final mechanical tightening and holder refit.
+Only the selected chapter is saved to `orca-ui.upkeep.v3`; existing saved checks
+are preserved but no longer displayed in the simplified walkthrough.
+
+`renderUpkeepFigure.ts` exports preview images and two print frames per chapter
+from the same geometry/timing. `scripts/render_upkeep_figure.py` builds the
+11-page landscape PDF, including the original knot reference, without a hardware
+backend. The PDF and provenance JSON ship in `frontend/public/assembly/upkeep/` and
+`orca_ui/webui/assembly/upkeep/`. Generated PNG previews are published through
+`scripts/guide_media.py` and `storedMedia.json`, like the existing assembly media.
+Both the preview and knot photos use `mediaImage`; the model uses the existing
+`loadBundle` bucket loader. The adjacent JSON records the CAD source hash.
+Regenerate with Vite on port 5183:
+
+```sh
+uv run --no-project --with playwright python scripts/render_upkeep_figure.py --url http://127.0.0.1:5183
+```
+
+Browser review uses mocked APIs/WebSockets and covers inline navigation, PDF
+download, chapter selection, playback, knot text placement, responsive layout,
+storage failure, model/WebGL recovery and the assembly reference. Run against a
+served production build:
+
+```sh
+python3 -m http.server 5192 --bind 127.0.0.1 --directory orca_ui/webui
+uv run --no-project --with playwright python scripts/check_upkeep_guide.py
+```
+
+Software/CAD/visual checks do not replace a physical repair trial.
+
 ## Base motor setup · 30 October 2026
 
 Base steps `p98`, `p112` and `p115` include cable preparation, OH board and
