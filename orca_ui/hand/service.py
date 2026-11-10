@@ -296,6 +296,11 @@ class HandService:
     def session(self) -> HandSession | None:
         return self.supervisor.session
 
+    @property
+    def session_ready(self) -> bool:
+        """The session exists and has finished starting (tactile stream and all)."""
+        return self.supervisor.session_ready
+
     def status(self) -> dict:
         return self.supervisor.status().as_dict()
 

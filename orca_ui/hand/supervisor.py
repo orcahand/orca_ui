@@ -180,6 +180,7 @@ class HandSupervisor(threading.Thread):
 
         self._lock = threading.Lock()
         self._session: Optional[HandSession] = None
+        self._ready_session: Optional[HandSession] = None  # its ready hook has run
         self._state = HandState.DISCONNECTED
         self._message = "starting"
         self._ports: dict = {}
@@ -211,6 +212,13 @@ class HandSupervisor(threading.Thread):
     def session(self) -> Optional[HandSession]:
         with self._lock:
             return self._session
+
+    @property
+    def session_ready(self) -> bool:
+        """True once the current session's ready hook (stream autostart and
+        the like) has finished; a session is published before that runs."""
+        with self._lock:
+            return self._session is not None and self._ready_session is self._session
 
     @property
     def model_name(self) -> str:
@@ -743,6 +751,7 @@ class HandSupervisor(threading.Thread):
                 session.hand.disable_torque()
             except Exception:
                 logger.exception("post-connect torque disable failed")
+        session.read_fingertip_identities()
 
         with self._lock:
             self._session = session
@@ -778,6 +787,8 @@ class HandSupervisor(threading.Thread):
         except Exception as e:
             logger.exception("session-ready hook failed")
             self._on_error(f"session init: {e}")
+        with self._lock:
+            self._ready_session = session
         return HEALTH_PERIOD_S
 
     def _board_motor_bus_unresolved(self, detection: HandDetection | None) -> bool:
