@@ -107,9 +107,11 @@ sweep) and disables torque.
   whole session. Webcam sessions get a live annotated camera preview
   (landmarks green when the orientation gate passes).
   
-- **Setup** — This menu contains all functionality you will need to tension and
-  calibrate your ORCA Hand, hardware 2.1 hands additionally support a guided
-  tensioning procedure.
+- **Setup** — This menu contains all functionality you will need to build,
+  tension and calibrate your ORCA Hand: the step-by-step assembly guide, a
+  maintenance walkthrough, the slack test, tensioning (guided on hardware 2.1
+  hands), automatic or manual calibration, and the tension sweep that checks
+  the result. A chart shows the whole workflow and what to do at each step.
   
 - **Motors** — This menu will contain live feedback of motor temperatures
   and currents as well as a panel that allows you to tune every minute detail

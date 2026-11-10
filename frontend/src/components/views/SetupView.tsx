@@ -1,10 +1,14 @@
-// Setup tab: tension → calibrate → run-in, plus fingertip numbering under
-// Advanced. Each step can run on its own; the flow only marks which one is next.
-// Cross-tab control of a running operation lives in the TransportBar.
+// Setup tab: tension → calibrate → run, plus fingertip numbering under
+// Advanced. Each step can run on its own; the flow only marks which one is
+// next. Cross-tab control of a running operation lives in the TransportBar.
+// The flowchart under the steps spells the loop out; the operation log sits
+// collapsed at the bottom.
 
 import { useState } from 'react'
+import { AssemblyCard } from '../assembly/AssemblyCard'
 import { useAppStore } from '../../state/appStore'
 import { isOperationActive, useOperationStore } from '../../state/operationStore'
+import { useSetupVariant } from '../../state/setupVariant'
 import { HardwareVersionPrompt } from '../header/HardwareVersion'
 import { CalibrateStep } from '../setup/CalibrateStep'
 import { FingertipMismatches, FingertipNumbering } from '../setup/FingertipNumbering'
@@ -13,6 +17,7 @@ import { OperationLogPane } from '../setup/OperationLogPane'
 import { RunInStep } from '../setup/RunInStep'
 import { readRunInDone, runInCompleted } from '../setup/setupUtils'
 import { TensionStep } from '../setup/TensionStep'
+import { WorkflowChart } from '../setup/WorkflowChart'
 
 // Remembered across reloads and the view remounting when the hand reconnects.
 const ADVANCED_KEY = 'orca-ui.setup-advanced'
@@ -21,9 +26,11 @@ export function SetupView() {
   const handInfo = useAppStore((s) => s.handInfo)
   const caps = useAppStore((s) => s.status?.capabilities ?? null)
   const operation = useOperationStore((s) => s.operation)
+  const variant = useSetupVariant((s) => s.variant)
 
   const last = handInfo?.last_tension ?? null
-  const progress = handInfo?.tension_progress ?? null
+  const progress =
+    (variant === 'kai' ? handInfo?.tension_progress_slack : handInfo?.tension_progress) ?? null
   const tensioned =
     last !== null && (progress === null || progress.updated_at <= last.completed_at)
   const calibration = handInfo?.calibration
@@ -54,6 +61,7 @@ export function SetupView() {
 
   return (
     <>
+      <AssemblyCard />
       {caps !== null && !caps.motors && (
         <div className="flow-info warn">⚠ motor bus unavailable</div>
       )}
@@ -65,9 +73,9 @@ export function SetupView() {
       <FingertipMismatches mismatches={handInfo?.fingertips?.mismatches} />
       <HardwareVersionPrompt />
       <div className="flow">
-        <TensionStep state={tension} />
+        <TensionStep state={tension} variant={variant} />
         <span className="flow-arrow" aria-hidden="true">›</span>
-        <CalibrateStep state={calibrate} />
+        <CalibrateStep state={calibrate} variant={variant} />
         <span className="flow-arrow" aria-hidden="true">›</span>
         <RunInStep state={runIn} calibrated={calibrated} />
       </div>
@@ -85,7 +93,11 @@ export function SetupView() {
           <FingertipNumbering />
         </details>
       )}
-      <OperationLogPane />
+      <WorkflowChart />
+      <details className="log-collapse">
+        <summary>Operation log</summary>
+        <OperationLogPane />
+      </details>
     </>
   )
 }

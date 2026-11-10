@@ -1,14 +1,15 @@
-// Tensioning for hands without a travel baseline (v2.0, or forced): activate
+// Simple tensioning, the v2.0 protocol (the Tension step's third row): activate
 // the current so the motors hold every tendon taut, then ratchet the spools.
-// Nothing is scored. Shown for any running "tension" operation, wherever it
-// was started, so the same hand always gets the same steps.
+// Nothing is scored. Shown for any running "tension" operation not started
+// from the sweep dialog, so the same hand always gets the same steps.
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '../../api/rest'
+import { EStopButton } from '../header/EStopButton'
 import type { OperationSnapshot } from '../../api/types'
 import { isOperationActive, useStartGate } from '../../state/operationStore'
-import { EXTRA_DEG, PULL_MORE, useTensionFlow } from '../../state/tensionFlow'
+import { DEFAULT_OFFSET_DEG, EXTRA_DEG, PULL_MORE, useTensionFlow } from '../../state/tensionFlow'
 import { failToBanner } from './setupUtils'
 
 type HoldStep = 'activate' | 'ratchet' | 'done'
@@ -29,15 +30,34 @@ export function HoldTensionDialog({
   const gate = useStartGate('motors')
   const wind = useTensionFlow((s) => s.wind)
   const setWind = useTensionFlow((s) => s.setWind)
-  const offsetDeg = useTensionFlow((s) => s.offsetDeg)
+  const holdClicks = useTensionFlow((s) => s.holdClicks)
+  const listed = Object.entries(holdClicks ?? {}).sort(([, a], [, b]) => b - a)
   const active = operation !== null && isOperationActive(operation)
   const holding = active && operation.state === 'awaiting_input'
-  const step: HoldStep = operation === null ? 'activate' : active && holding ? 'ratchet' : active ? 'activate' : 'done'
+  const runStep: HoldStep = operation === null ? 'activate' : active && holding ? 'ratchet' : active ? 'activate' : 'done'
+  // Jumping back to "Tension the hand" re-activates: a holding run is released first.
+  const [again, setAgain] = useState(false)
+  const [restarting, setRestarting] = useState(false)
+  useEffect(() => setAgain(false), [operation?.run_id])
+  const step: HoldStep = again ? 'activate' : runStep
   const stepIndex = STEPS.findIndex((s) => s.key === step)
 
   const activate = () =>
-    void api.operationStart('tension', { move_motors: wind, offset_deg: offsetDeg }).catch(failToBanner)
+    void api.operationStart('tension', { move_motors: wind, offset_deg: DEFAULT_OFFSET_DEG }).catch(failToBanner)
   const release = () => void api.operationInput('Release').catch(failToBanner)
+  const activateAgain = () => {
+    setRestarting(true)
+    void api.operationStop().catch((error) => {
+      setRestarting(false)
+      failToBanner(error)
+    })
+  }
+  useEffect(() => {
+    if (restarting && !active) {
+      setRestarting(false)
+      activate()
+    }
+  }, [restarting, active])
   const pulled = (operation?.extra as { pulled_deg?: number } | null)?.pulled_deg ?? null
   // Locked until the pull it asked for has been reported, so a double click pulls once.
   const [pullSentAt, setPullSentAt] = useState<number | null | undefined>(undefined)
@@ -51,20 +71,23 @@ export function HoldTensionDialog({
   }
   // A cancelled hold also ends "done", but without a result.
   const released = (operation?.result as { released?: boolean } | null)?.released === true
-  const primary = step === 'activate' && !active ? activate : step === 'ratchet' ? release : null
+  const primary =
+    step === 'activate' && !active ? activate
+      : step === 'activate' && again && !restarting ? activateAgain
+        : step === 'ratchet' ? release : null
 
   useEffect(() => {
-    if (!primary || (step === 'activate' && gate.blocked)) return
+    if (!primary || (step === 'activate' && !active && gate.blocked)) return
     const onKey = (e: KeyboardEvent) => {
       // A focused button answers Enter itself.
-      if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) {
+      if (e.key === 'Enter' && !e.repeat && !(e.target instanceof HTMLButtonElement)) {
         e.preventDefault()
         primary()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [primary, step, gate.blocked])
+  }, [primary, step, active, gate.blocked])
 
   return createPortal(
     <div className="gt-overlay" role="dialog" aria-modal="true" aria-label="Tensioning">
@@ -72,30 +95,47 @@ export function HoldTensionDialog({
         <header className="gt-header">
           <span className="gt-title">Tensioning</span>
           <span className="gt-header-spacer" />
+          <EStopButton />
           {active ? (
-            <button className="btn btn-secondary" onClick={() => void api.operationStop().catch(failToBanner)}>
+            <button
+              className="btn btn-secondary"
+              title="Stop the run and close"
+              onClick={() => {
+                void api.operationStop().catch(failToBanner)
+                onClose()
+              }}
+            >
               Cancel
             </button>
           ) : (
-            <button className="btn btn-secondary" onClick={onClose}>
-              Close
+            <button className="gt-close" aria-label="Close" title="Close" onClick={onClose}>
+              ✕
             </button>
           )}
         </header>
         <div className="gt-body">
           <nav className="gt-steps">
-            {STEPS.map((s, i) => (
-              <div
-                key={s.key}
-                className={`gt-step${i === stepIndex ? ' active' : i < stepIndex ? ' done' : ''}`}
-              >
-                <span className="gt-step-num">{i < stepIndex ? '✓' : i + 1}</span>
-                <span>
-                  <div className="gt-step-title">{s.title}</div>
-                  <div className="gt-step-note">{s.note}</div>
-                </span>
-              </div>
-            ))}
+            {STEPS.map((s, i) => {
+              const jump =
+                s.key === 'activate' && runStep !== 'activate' && !again ? () => setAgain(true)
+                  : s.key === 'ratchet' && again && holding && !restarting ? () => setAgain(false)
+                    : null
+              return (
+                <div
+                  key={s.key}
+                  className={`gt-step${i === stepIndex ? ' active' : i < stepIndex ? ' done' : ''}${jump ? ' jump' : ''}`}
+                  role={jump ? 'button' : undefined}
+                  title={jump ? `Go to ${s.title.toLowerCase()}` : undefined}
+                  onClick={jump ?? undefined}
+                >
+                  <span className="gt-step-num">{i < stepIndex ? '✓' : i + 1}</span>
+                  <span>
+                    <div className="gt-step-title">{s.title}</div>
+                    <div className="gt-step-note">{s.note}</div>
+                  </span>
+                </div>
+              )
+            })}
           </nav>
           <section className="gt-content">
             {step === 'activate' && (
@@ -104,20 +144,23 @@ export function HoldTensionDialog({
                 <p className="setup-copy">
                   {wind
                     ? `Activating the current first winds every finger to its hard stops and back ` +
-                      `(the tendons seat), then slowly turns the finger motors ${offsetDeg}° ` +
+                      `(the tendons seat), then slowly turns the finger motors ${DEFAULT_OFFSET_DEG}° ` +
                       `counterclockwise and holds there, loading the bottom spools.`
-                    : `Activating the current makes every finger motor slowly turn ${offsetDeg}° ` +
+                    : `Activating the current makes every finger motor slowly turn ${DEFAULT_OFFSET_DEG}° ` +
                       `counterclockwise and hold there, loading the bottom spools. The fingers are not ` +
                       `wound first.`}{' '}
                   Keep fingers clear of the hand while it takes up the slack.
                 </p>
-                {!active && (
+                {(!active || again) && (
                   <label className="joint-check" title="Drive every finger to its hard stops and back before holding">
                     <input type="checkbox" checked={wind} onChange={(e) => setWind(e.target.checked)} />
                     wind the tendons to the hard stops first
                   </label>
                 )}
-                {active && (
+                {again && holding && (
+                  <p className="setup-copy">The motors are released first, then the current is activated again.</p>
+                )}
+                {active && !again && (
                   <p className="setup-copy">
                     {operation.phase ?? 'starting'}
                     {operation.detail ? ` — ${operation.detail}` : ''}…
@@ -137,6 +180,13 @@ export function HoldTensionDialog({
                   enough load on the bottom spools? Pull {EXTRA_DEG}° more. When every spool is
                   tight, release the motors.
                 </p>
+                {holdClicks && (
+                  <p className="setup-copy">
+                    {listed.length
+                      ? `The slack test lists ${listed.map(([j, n]) => `${j.replace('_', ' ')} ~${n} click${n === 1 ? '' : 's'}`).join(', ')}: turn those spools by that much first, stopping early if a tendon feels firm.`
+                      : 'The slack test lists no clicks: every spool is within one click.'}
+                  </p>
+                )}
               </div>
             )}
             {step === 'done' && operation && (
@@ -148,7 +198,7 @@ export function HoldTensionDialog({
                   {operation.state === 'error'
                     ? `${operation.error ?? 'the run ended with an error'} — torque is off.`
                     : released
-                      ? 'Motors released and torque is off. Calibrate next.'
+                      ? 'Motors released and torque is off. Next: calibrate, then the tension sweep says which spools still need the ratchet.'
                       : 'Torque is off. Nothing was recorded.'}
                 </p>
               </div>
@@ -162,11 +212,11 @@ export function HoldTensionDialog({
                 )}
                 <button
                   className="btn btn-primary"
-                  disabled={step === 'activate' && gate.blocked}
+                  disabled={step === 'activate' && !active && gate.blocked}
                   title={step === 'activate' ? (gate.reason ?? undefined) : undefined}
                   onClick={primary}
                 >
-                  {step === 'activate' ? 'Activate current' : 'Done — release motors'}
+                  {step === 'activate' ? (active ? 'Release & activate again' : 'Activate current') : 'Done — release motors'}
                   <span className="gt-key">↵</span>
                 </button>
               </div>

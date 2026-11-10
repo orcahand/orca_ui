@@ -307,6 +307,7 @@ class TelemetryService:
         # here means nothing is recovering motors.
         self._fault_poll_failures = 0
         self._last_hw_error_sweep = 0.0
+        self._was_driven = False
 
     def start(self) -> None:
         self._bus_errors.attach()
@@ -679,8 +680,15 @@ class TelemetryService:
         # mid-motion, where the sweep is not gated and the bus can least
         # spare one. Re-reading tells us nothing: the flags cannot change.
         news = any(int(mid) not in self._hw_errors for mid in alerted)
-        if not news and (self._hand_is_driven()
-                         or now - self._last_hw_error_sweep < HW_ERROR_SWEEP_S):
+        driven = self._hand_is_driven()
+        # An operation that held the bus may have rebooted a motor; re-read
+        # as soon as it lets go rather than showing its latch for another
+        # interval.
+        released = self._was_driven and not driven
+        self._was_driven = driven
+        if not news and not released and (
+            driven or now - self._last_hw_error_sweep < HW_ERROR_SWEEP_S
+        ):
             return
         self._last_hw_error_sweep = now
         raw = self._read_hardware_errors(client, hand)

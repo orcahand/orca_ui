@@ -1,0 +1,125 @@
+import type { AssemblyStep } from './guide'
+import type { Build } from './buildContent'
+
+export const BASE_REVIEW_STEPS: AssemblyStep[] = [
+  {
+    id: 'finger-parts',
+    chapter: 'Fingers',
+    section: 'Preparation',
+    title: 'Prepare the finger',
+    pages: [],
+    instructions: [
+      'Identify the DP, PP and AP, their skins, bearings and guide pins in the exploded model. Take two prepared 2 m tendons for the DP and PP, plus two unknotted 75 cm lengths for the AP. Keep the AP lengths unknotted until fitting them.',
+    ],
+    check:
+      'The finger parts, two prepared 2 m tendons and two unknotted 75 cm AP tendons are ready.',
+  },
+  {
+    id: 'motor-cable-covers',
+    chapter: 'Motors',
+    title: 'Fit cable covers A and B',
+    pages: [121],
+    instructions: [
+      'Switch the OH board OFF after all 17 motors have been configured. Identify two CableHolder-A covers and two CableHolder-B covers in the parts shown below.',
+      'Lay the motor-link cables into their tower recesses. Fit the matching A/B covers at the two top and two bottom positions shown in the assembly photo. Match each cover’s profile to its recess; keep the cables below the cover edges.',
+      'Check that all four covers are seated and that no motor lead is trapped or pulled tight. Keep the wrist motor lead free for joining the wrist and tower.',
+    ],
+    check: 'Both A covers and both B covers are seated with the motor leads clear.',
+  },
+]
+
+export function reviewInstructions(step: AssemblyStep, build: Build): string[] | undefined {
+  if (build.version !== 'base') return
+  switch (step.id) {
+    case 'p15':
+      return [
+        'Cut eight PTFE liners to 5–6 mm and insert two into each finger AP. Their ends should extend by about 1 mm on both sides.',
+        'Cut two PTFE liners to 18 mm and insert them into the thumb AP. Their ends should extend by about 1 mm on both sides.',
+      ]
+    case 'p31':
+      return [
+        'Prepare the printed DP, PP and AP parts for all four fingers, plus the thumb DP, PP, AP and TP. Remove supports, loose material and burrs from the tendon openings and joint seats.',
+        'File or sand the rough PP underside shown until smooth, preserving its curved profile. Check that the tendon passages are open.',
+      ]
+    case 'p26':
+      return [
+        'Cut ten tendons, each 2 m long: two for each of the four fingers and two for the thumb, 20 m in total. One length goes into each DP and one into each PP. This batch excludes the AP and TP tendons, which are cut and knotted separately to 75 cm when needed.',
+        'Near the middle of each of the ten lengths, tie two Ashley stopper knots 10 mm apart (±5 mm).',
+        'Tie one additional single knot over each Ashley stopper, around the stopper itself. Pull each single knot tight. Prepare all twenty Ashley stoppers this way.',
+      ]
+    case 'p29':
+      return [
+        'Thread both free ends of one prepared double-knot tendon through the DP housing, from the middle toward the outside.',
+        'Seat both Ashley stoppers, each with one additional single knot tied over it. Tuck the connecting loop fully inside the housing with an Allen key or screw bit.',
+        'Press one 4×8×3 mm bearing into each side of DP.',
+      ]
+    case 'prepare-pp':
+      return [
+        'Seat a prepared double-knot tendon in the PP housing. Pull both Ashley stoppers, each with one single knot over it, into their seats and tuck the connecting loop completely inside.',
+        'Insert a Ø2×8 mm pin in the middle slot and a Ø2×6 mm pin in the lower shaft slot.',
+      ]
+    case 'p33':
+      return [
+        'Route the DP tendon through the PP top hole. Draw both strands straight and check for crossings, then snap the joint together.',
+        'Fully seat the DP bearings in the PP joint.  Check that the DP–PP joint rotates freely.',
+        'Add the upper Ø2×6 mm pin. Keep the two DP tendons between the upper and lower pins, with the DP flexor tendon toward the middle of the part. Press the pin fully into its seat and then seat the PP bearings.',
+        'Slide the I-DP skin over the fingertip and seat its edges clear of the DP–PP joint.',
+      ]
+    case 'p42':
+      return [
+        'Pass all four DP and PP tendon ends through the I-PP skin, then slide the skin onto PP from its open base toward the fingertip.',
+        'Thread the four tendon ends through the AP in the order shown: 1 = PP extension; 2 = PP flexion; 3 = DP flexion; 4 = DP extension. Draw the ends straight, check for crossings, then join the finger. Add the two Ø2×8 mm AP guide pins with the tendons between them and fit both AP bearings, as shown in the animation.',
+        'Check that the joint moves freely and the skin clears it. Keep all six tendon ends free.',
+      ]
+    case 'p35':
+      return [
+        'Support the assembled index finger at its base. Pull each of the six tendon ends gently to check flexion and extension, leaving the other five slack.',
+      ]
+    case 'thumb-dp':
+      return [
+        step.instructions[0],
+        'Seat both Ashley stoppers, each with one single knot over it, and tuck the connecting loop fully inside.',
+        step.instructions[2],
+      ]
+    case 'thumb-pp':
+      return [
+        'Seat a prepared double-knot tendon in the PP housing, using the same method shown for the finger PP. Pull both Ashley stoppers, each with one single knot over it, into their seats and tuck the connecting loop completely inside.',
+        'Insert a Ø2×8 mm pin in the middle slot and a Ø2×6 mm pin in the lower shaft slot. Leave the upper pin until DP and PP are joined.',
+        'Pass the free tendon ends through the thumb PP skin and slide the skin onto PP from its open base toward the fingertip.',
+      ]
+    case 'p49':
+      return [
+        step.instructions[0],
+        'Pull 20 cm through. Tie one Ashley stopper and then tie three single knots over that stopper, around the stopper itself. Repeat for the second anchor.',
+        step.instructions[2],
+      ]
+    case 'p54':
+      return [
+        'Route the four DP and PP tendon ends through the thumb AP channels shown, keeping their order and drawing out slack. Press both PP bearings into the PP’s outer pockets as you join PP to AP.',
+        'Add both Ø2×10 mm AP guide pins with the tendons passing between them. Seat both AP bearings onto their shafts.',
+        'Check that the joint moves freely and the skin clears it. Keep all six tendon ends free.',
+      ]
+    case 'p62':
+      return [
+        step.instructions[0],
+        'Press two 4×8×3 mm bearings onto the TP shafts, one on each side. These are the TP bearings for attaching the thumb to the carpals.',
+        'Check that the AP–TP joint rotates freely and that all eight tendon ends remain accessible.',
+      ]
+    case 'p123':
+      return [
+        'Keep board power off. Identify the joint, motor and tendon for the bottom spool. Leave the opposing tendon free for the top spool.',
+        'Pass the tendon through the spool’s anchor channel and pull enough length through for three complete windings plus the knot. Tie one Ashley stopper at the free end before winding.',
+        'Pull the long tendon back to seat the stopper in the anchor pocket. Trim to a 5 mm tail and tuck it back into the channel.',
+        'Only after the knot is seated, wind three turns onto the spool rim. Keep a gentle pull on the tendon as you wind and fit it so it is already taut, with no loose turns or cord trapped behind the spool. Do not pull the joint against its stop.',
+        'Trace the tendon back to its joint and check the seated knot and three snug windings. Repeat for all sixteen bottom spools. If an existing tendon is too short for three turns, tie two additional single knots over its Ashley stopper as the short-tendon fallback.',
+      ]
+    case 'p126':
+      return [
+        'Support the loose top spool on the bench and press its 4×8×3 mm bearing into its seat. Select the opposing tendon from the same joint.',
+        'Pass enough tendon through the top spool’s anchor channel for three complete windings plus the knot. Tie one Ashley stopper at the free end, then pull the long tendon back to seat it. Trim to a 5 mm tail and tuck it into the channel.',
+        'With the knot seated, wind three turns onto the rim while keeping the tendon taut. Mount the prepared top spool with the tendon already under gentle tension; keep both tendons in their grooves and avoid forcing the joint against a stop.',
+        'Secure the spool with the matching supplied screw. With power off, gently turn the drive back and forth to check that the two tendons move only their joint in opposite directions.',
+        'Repeat for all sixteen top spools. For an existing tendon too short for three turns, tie two additional single knots over the Ashley stopper as the fallback.',
+      ]
+  }
+}

@@ -27,6 +27,9 @@ import type {
   TeleopSourceId,
   TeleopSourcesInfo,
   TrajectoryData,
+  TensionSweeps,
+  TravelBaseline,
+  TravelBaselines,
   TrajectoryEntry,
   ServoGains,
   PoseSource,
@@ -105,7 +108,7 @@ export const api = {
   // Pins hardware_version in the hand's config.yaml; null = take the board's.
   setHardwareVersion: (version: number | null) =>
     post<StatusSnapshot>('/api/hardware_version', { version }),
-  // Clears a latched hardware error. The motor returns with torque off.
+  // Clears a latched hardware error. The motor's torque is restored if the hand has torque.
   rebootMotor: (id: number) =>
     post<{
       motor: number
@@ -152,6 +155,19 @@ export const api = {
   selectModel: (name: string | null, version?: string | null) =>
     post<ModelsInfo>('/api/model/select', { name, version: version ?? null }),
 
+  sweeps: () => request<TensionSweeps>('/api/sweeps'),
+  sweepReference: (name: string | null) =>
+    post<{ reference: string | null }>('/api/sweeps/reference', { name }),
+  baselines: () => request<TravelBaselines>('/api/baselines'),
+  baselinePromote: (snapshot: string, name: string, note?: string, activate = true) =>
+    post<TravelBaseline & { name: string }>('/api/baselines/promote', {
+      snapshot,
+      name,
+      note: note || null,
+      activate,
+    }),
+  baselineActivate: (name: string | null) =>
+    post<{ active: string | null }>('/api/baselines/activate', { name }),
   operation: () =>
     request<{ operation: OperationSnapshot | null }>('/api/operation'),
   operationLog: () => request<OperationLogPayload>('/api/operation/log'),
@@ -175,6 +191,7 @@ export const api = {
   jointsTarget: (angles: Record<string, number>) =>
     post('/api/joints/target', { angles }),
   jointsNeutral: () => post('/api/joints/neutral'),
+  jointsZero: () => post('/api/joints/zero'),
   // joints omitted = every loop-controlled joint; a joint list writes
   // exactly those and leaves the rest as they are.
   setGains: (gains: {

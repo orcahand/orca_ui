@@ -4,6 +4,8 @@
 #   ./dev               which one is live, and offer to flip (in a terminal)
 #   ./dev local [DIR]   a local checkout, live-editable (default ../orca_core)
 #   ./dev release       the published package
+#   ./dev run [ARGS]    the console on the local checkout, for this one process
+#   ./dev test [ARGS]   the test suite, the same way
 #
 # `local` links the checkout into .venv/orca-core-dev, along with any of its
 # dependencies the venv does not satisfy, and puts that ahead of the installed
@@ -13,6 +15,27 @@
 
 here=$PWD
 cd "$(dirname "$0")" || exit 1
+
+# run/test layer the checkout over the project env for this one process, so
+# pyproject.toml and uv.lock keep the published pin. `python -m`, not the
+# console scripts: those are pinned to the base env's interpreter.
+case "${1:-}" in
+run | test)
+    CORE=${ORCA_CORE:-../orca_core}
+    if [ ! -f "$CORE/pyproject.toml" ]; then
+        echo "dev: no orca_core checkout at $CORE — clone it there or set ORCA_CORE=PATH." >&2
+        exit 1
+    fi
+    if [ "$1" = run ]; then
+        shift
+        set -- -m orca_ui "$@"
+    else
+        shift
+        set -- -m pytest tests/ "$@"
+    fi
+    exec uv run --with-editable "$CORE" python "$@"
+    ;;
+esac
 
 SHIM=.venv/orca-core-dev  # keep in sync with SHIM_DIR in orca_ui/core_source.py
 PY=.venv/bin/python
@@ -85,7 +108,7 @@ case "${1:-}" in
         fi
         ;;
     *)
-        sed -n '2,12s/^# \{0,1\}//p' "$0"
+        sed -n '2,14s/^# \{0,1\}//p' "$0"
         exit 2
         ;;
 esac

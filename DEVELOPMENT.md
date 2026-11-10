@@ -51,7 +51,20 @@ needed it goes quiet.
 ## Working against an unreleased orca_core
 
 `pyproject.toml` depends on the published `orca_core`, which is what a plain
-clone runs. To flip this checkout onto a local one:
+clone installs and what the wheel declares. To run a branch that needs an
+unreleased core, check the matching `orca_core` branch out beside this repo
+and use
+
+```bash
+./dev run [ARGS]     # the console, on whatever ../orca_core has checked out
+./dev test [ARGS]    # the suite, the same way
+```
+
+which layers the checkout over the project env for that one process
+(`uv run --with-editable`) and edits no tracked file, so there is nothing to
+switch back or keep out of a commit. `ORCA_CORE=PATH` points elsewhere.
+
+To flip this checkout onto a local one instead:
 
 ```bash
 ./dev local          # the sibling ../orca_core, live-editable
@@ -98,6 +111,38 @@ prints a per-joint ROM report cross-checking the URDF limits against
 orca_core's ROMs (orca_core degrees map onto the URDF 1:1 — there is no
 per-joint correction table). Verify joint directions with the mock sweep tool,
 one joint at a time.
+
+## Assembly guide media
+
+The guide's photos, videos, 3D models and PDFs live in the public bucket
+`orca-public-a5h6t`, not in git. Each file is stored under its guide path with
+a fingerprint of its contents added, such as
+`guide/clips/p35-329-review-1a2b3c4d5e6f7a8b.mp4`, so a changed file gets a new
+name and nothing stored is ever replaced.
+`frontend/src/components/assembly/storedMedia.json` tells the guide where each
+file is stored. After adding or changing media in `frontend/public/assembly/`,
+run from the repository root:
+
+```bash
+python3 scripts/guide_media.py
+```
+
+It first checks, with no login, that no guide media is committed and that
+every catalog entry is stored. It then asks for the media folder, lists what
+is new and asks before uploading. Commit `storedMedia.json` afterwards.
+Uploading needs upload rights on the bucket and the `gcloud` CLI signed in
+(`gcloud auth login`); Google Cloud Shell has it signed in already. CI runs
+the same command, which only checks when no one is at the terminal.
+
+Rules, for people and agents alike:
+
+- Guide media is published with this script and never committed.
+- Every new file under `frontend/public/assembly/` is a media decision. If it is
+  media and its type is new, add the type to `CONTENT_TYPES` in
+  `scripts/guide_media.py`, to `.gitignore` (both assembly trees) and to the
+  wheel excludes in `pyproject.toml` before publishing.
+- The guide loads media only through `mediaUrl`, `mediaImage` or
+  `downloadMedia` in `frontend/src/components/assembly/media.ts`.
 
 ## Releasing
 

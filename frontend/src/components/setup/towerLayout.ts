@@ -34,6 +34,11 @@ export function spoolJoint(side: 'left' | 'right', pos: string): string {
 }
 
 export const FACE_LABEL: Record<TowerFace, string> = {
-  F: 'Front · palm side',
+  F: 'Front',
   B: 'Back',
+}
+
+// Every spool position on one face, wrist end first, column 1 then column 2.
+export function spoolsOnFace(face: TowerFace): string[] {
+  return ['1', '2'].flatMap((col) => ['1', '2', '3', '4'].map((row) => `${face}${col}${row}`))
 }

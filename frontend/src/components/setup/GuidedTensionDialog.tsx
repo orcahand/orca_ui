@@ -3,10 +3,17 @@
 // round); this mirrors its snapshot and answers its prompts. Enter takes the
 // primary answer. The dialog outlives the run until closed, so the final
 // score stays readable.
+//
+// The run's scoring (extra.scoring) picks what the rows say: fraction scoring
+// shows percent of the expected travel with kept scores; slack scoring shows
+// the slack in motor degrees and the ends reached. The ratchet step lists the
+// clicks each joint's missing travel needs, rounded down, so a round aims a
+// little loose; the tension sweep after calibration counts the last clicks.
 
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '../../api/rest'
+import { EStopButton } from '../header/EStopButton'
 import type {
   GuidedTensionExtra,
   ModelMetadata,
@@ -21,24 +28,29 @@ import { ErrorBoundary } from '../common/ErrorBoundary'
 import { isOperationActive } from '../../state/operationStore'
 import { EXTRA_DEG, PULL_MORE } from '../../state/tensionFlow'
 import type { PreviewMode } from './TensionPreview'
+import { TowerFaces } from './TowerFaces'
 import {
   DEFAULT_PASS,
+  DEFAULT_PASS_SLACK,
+  PASS_BOUNDS_DEG,
   PASS_BOUNDS_PCT,
   PASS_GROUPS,
   savePassFractions,
+  savePassSlack,
   type PassFractions,
+  type PassSlack,
 } from './guidedSettings'
 
 const TensionPreview = lazy(() =>
   import('./TensionPreview').then((m) => ({ default: m.TensionPreview })),
 )
-const TowerPreview = lazy(() =>
-  import('./TowerPreview').then((m) => ({ default: m.TowerPreview })),
-)
 
+// The loop as the sidebar shows it: ratchet → move each finger → score, and round again.
+const BEFORE_STAGES: { key: TensionStep; title: string; note: string }[] = [
+  { key: 'tension', title: 'Ratchet', note: 'the listed spools' },
+]
 const AFTER_STAGES: { key: TensionStep; title: string; note: string }[] = [
-  { key: 'score', title: 'Score', note: 'Tensioning progress markers' },
-  { key: 'tension', title: 'Tension', note: 'ratchet tool' },
+  { key: 'score', title: 'Score', note: 'range check scored' },
 ]
 
 function fail(error: unknown) {
@@ -54,8 +66,41 @@ const previewUnavailable = (error: Error) => (
   </div>
 )
 
+function fixedHolds(extra: GuidedTensionExtra): string {
+  const fixed = Object.entries(extra.hold_fixed ?? {}).filter(([j]) => extra.stage?.joints.includes(j))
+  return fixed.map(([j, ma]) => `, ${j.replace('_', ' ')} at ${ma} mA`).join('')
+}
+
 function pct(fraction: number | null | undefined): string {
   return fraction == null ? '—' : `${Math.round(fraction * 100)}%`
+}
+
+const deg = (value: number | null | undefined, digits = 0) =>
+  value == null ? '—' : `${value.toFixed(digits)}°`
+
+// Slack scoring: a latched motor shows what it is, not a number it cannot have
+// earned; the others show the slack still in their tendons, in motor degrees.
+function slackCell(motor: MotorSpread): string {
+  if (motor.status === 'fault') return 'FAULT'
+  if (motor.slack_deg == null) return 'n/a'
+  return deg(Math.max(0, motor.slack_deg))
+}
+
+const clicksText = (clicks: number) => `~${clicks} click${clicks === 1 ? '' : 's'}`
+
+// What the ratchet step says for a joint: the clicks its missing travel
+// needs, or the travel itself while the degrees per click are unknown.
+function todoCell(motor: MotorSpread, slack: boolean): string {
+  if (motor.status === 'fault') return 'FAULT'
+  if (motor.clicks_left != null) return motor.clicks_left > 0 ? clicksText(motor.clicks_left) : 'under 1 click'
+  return slack ? `${deg(Math.max(0, motor.slack_deg ?? 0))} slack` : pct(motor.fraction)
+}
+
+// Thresholds the rows fall back on when a row carries none of its own.
+interface Thresholds {
+  slack: boolean
+  passFraction: number
+  passSlack: number
 }
 
 export function GuidedTensionDialog({
@@ -76,7 +121,12 @@ export function GuidedTensionDialog({
   const active = isOperationActive(operation)
   const step: TensionStep | null = active ? (extra?.step ?? null) : 'done'
   const awaiting = operation.state === 'awaiting_input' ? operation.awaiting : null
-  const passFraction = Math.min(...Object.values(extra?.pass_fractions ?? DEFAULT_PASS))
+  const slack = extra?.scoring === 'slack'
+  const thresholds: Thresholds = {
+    slack,
+    passFraction: Math.min(...Object.values(extra?.pass_fractions ?? DEFAULT_PASS)),
+    passSlack: Math.max(...Object.values(extra?.pass_slack_deg ?? DEFAULT_PASS_SLACK)),
+  }
   // One answer per prompt: the buttons lock until the next prompt arrives.
   const promptKey = awaiting
     ? [awaiting.prompt, extra?.step, extra?.stage?.key, extra?.round, extra?.pulled_deg].join('|')
@@ -100,7 +150,9 @@ export function GuidedTensionDialog({
   // progress: resume=false makes the backend drop the scores it kept.
   const restart = async () => {
     setConfirmRestart(false)
-    const { defaults: _defaults, ...params } = (operation.params ?? {}) as Record<string, unknown>
+    // A restart opens at the first stage: the slack test's start step and clicks were for that run only.
+    const { defaults: _defaults, start_at: _startAt, ratchet_joints: _ratchet, ...params } =
+      (operation.params ?? {}) as Record<string, unknown>
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
     try {
       if (active) await api.operationStop()
@@ -135,7 +187,7 @@ export function GuidedTensionDialog({
     const onKey = (e: KeyboardEvent) => {
       if (sent) return
       // Fields take Enter themselves, and a focused button answers it.
-      if (e.key === 'Enter' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLButtonElement)) {
+      if (e.key === 'Enter' && !e.repeat && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLButtonElement)) {
         e.preventDefault()
         send(awaiting.options[0])
       }
@@ -168,7 +220,7 @@ export function GuidedTensionDialog({
                 ? Object.fromEntries(Object.entries(statuses).filter(([j]) => stage.joints.includes(j)))
                 : statuses
             }
-            blackSkin={(caps?.declared?.tactile ?? caps?.tactile) === true}
+            blackSkin={(handInfo.tactile_skin ?? caps?.declared?.tactile ?? caps?.tactile) === true}
           />
         </Suspense>
       </ErrorBoundary>
@@ -179,12 +231,16 @@ export function GuidedTensionDialog({
   // Sidebar: one entry per finger stage, then score and tension.
   const stages = extra?.stages ?? []
   const steps = [
+    ...BEFORE_STAGES,
     ...stages.map((st) => ({ key: `stage:${st.key}`, title: st.title, note: 'pose, then move' })),
     ...AFTER_STAGES,
   ]
   const currentKey = stage ? `stage:${stage.key}` : step
   const buttons = awaiting?.options.filter((o) => !o.startsWith(GOTO)) ?? []
   const stepIndex = steps.findIndex((s) => s.key === currentKey)
+  const keptBefore = motors.filter(
+    (m) => m.kept != null && m.kept >= (m.pass_fraction ?? thresholds.passFraction),
+  ).length
 
   return createPortal(
     <div className="gt-overlay" role="dialog" aria-modal="true" aria-label="Guided tensioning">
@@ -192,14 +248,33 @@ export function GuidedTensionDialog({
         <header className="gt-header">
           <span className="gt-title">Guided tensioning</span>
           {extra && <span className="setup-badge">round {extra.round}</span>}
-          {extra?.resumed && (
+          {extra?.baseline && (
+            <span
+              className="setup-badge"
+              title={
+                extra.baseline.name
+                  ? `Expected travel per joint from baseline ${extra.baseline.name} (${extra.baseline.source}, ${extra.baseline.joints ?? '?'} joints)`
+                  : 'Expected travel per joint from the shared v2.1 block'
+              }
+            >
+              vs {extra.baseline.source === 'reference' ? 'reference hand' : (extra.baseline.name ?? 'v2.1 shared')}
+            </span>
+          )}
+          {extra?.resumed && !slack && (
             <span className="setup-badge" title="Joints that passed before stay passed">
-              resumed ·{' '}
-              {extra.motors.filter((m) => m.kept != null && m.kept >= (m.pass_fraction ?? DEFAULT_PASS.ap)).length}{' '}
-              passed before
+              resumed · {keptBefore} passed before
+            </span>
+          )}
+          {extra?.resumed && slack && (
+            <span
+              className="setup-badge"
+              title="Every joint is checked again this round; the earlier rounds only count towards the total"
+            >
+              round {extra.resumed.rounds} before · {extra.resumed.passed ?? 0}/{extra.resumed.joints} passed then
             </span>
           )}
           <span className="gt-header-spacer" />
+          <EStopButton />
           {active ? (
             <>
               <button
@@ -212,13 +287,20 @@ export function GuidedTensionDialog({
               <button className="btn btn-secondary" title="Keeps the run going" onClick={onClose}>
                 Hide
               </button>
-              <button className="btn btn-secondary" onClick={() => void api.operationStop().catch(fail)}>
+              <button
+                className="btn btn-secondary"
+                title="Stop the run and close"
+                onClick={() => {
+                  void api.operationStop().catch(fail)
+                  onClose()
+                }}
+              >
                 Cancel
               </button>
             </>
           ) : (
-            <button className="btn btn-secondary" onClick={onClose}>
-              Close
+            <button className="gt-close" aria-label="Close" title="Close" onClick={onClose}>
+              ✕
             </button>
           )}
         </header>
@@ -284,7 +366,7 @@ export function GuidedTensionDialog({
               extra={extra}
               step={step}
               preview={preview}
-              passFraction={passFraction}
+              thresholds={thresholds}
               recheck={recheck}
               onRecheck={sent ? undefined : send}
             />
@@ -324,7 +406,7 @@ function StepContent({
   extra,
   step,
   preview,
-  passFraction,
+  thresholds,
   recheck,
   onRecheck,
 }: {
@@ -332,7 +414,7 @@ function StepContent({
   extra: GuidedTensionExtra | null
   step: TensionStep | null
   preview: ReactNode
-  passFraction: number
+  thresholds: Thresholds
   recheck: { title: string; option: string }[]
   onRecheck?: (option: string) => void
 }) {
@@ -353,6 +435,7 @@ function StepContent({
     )
   }
   const motors = extra.motors
+  const { slack } = thresholds
   switch (step) {
     case 'pose':
       return (
@@ -389,21 +472,34 @@ function StepContent({
                 Move the {stageSubject(extra.stage)}, under tension, through{' '}
                 {stagePossessive(extra.stage)} full range of motion
               </h3>
-              <p className="setup-copy">
-                The motors hold this pose at {extra.hold_ap}/{extra.hold_mcp}/{extra.hold_pip} mA
-                (APs/MCPs/PIPs). Drive each highlighted joint by hand to both ends, one joint at a
-                time, like the model. You will have to apply a little force as the targeted joints
-                will be putting up some amount of resistance. A motor turns green once it has
-                followed its group's pass threshold ({passTargets(extra)}) of its travel; orange
-                past 30%. Do not
-                worry if you cannot hit the {Math.round(passFraction * 100)} percent target on the
-                first round. Simply press next after driving each joint to the maximum possible
-                value.
-              </p>
-              <ScoreLine extra={extra} />
+              {slack ? (
+                <p className="setup-copy">
+                  The motors hold this pose at {extra.hold_ap}/{extra.hold_mcp}/{extra.hold_pip} mA
+                  (APs/MCPs/PIPs){fixedHolds(extra)}. Drive each highlighted joint by hand to both ends, one joint at a
+                  time, like the model, and <b>hold each end still for a moment</b> — a fast flick
+                  does not count, so the motor cannot overshoot its way to a pass. Reach each end
+                  twice. A joint turns green once its sweep is within its tolerance
+                  ({passTargets(extra)} of slack) and both ends were reached twice; it shows
+                  "again" while an end has only been reached once. Orange means more than 30% of
+                  the travel was swept. Press next after driving each joint as far as it goes.
+                </p>
+              ) : (
+                <p className="setup-copy">
+                  The motors hold this pose at {extra.hold_ap}/{extra.hold_mcp}/{extra.hold_pip} mA
+                  (APs/MCPs/PIPs){fixedHolds(extra)}. Drive each highlighted joint by hand to both ends, one joint at a
+                  time, like the model. You will have to apply a little force as the targeted joints
+                  will be putting up some amount of resistance. A motor turns green once it has
+                  followed its group's pass threshold ({passTargets(extra)}) of its travel; orange
+                  past 30%. Do not
+                  worry if you cannot hit the {Math.round(thresholds.passFraction * 100)} percent target on the
+                  first round. Simply press next after driving each joint to the maximum possible
+                  value.
+                </p>
+              )}
+              <ScoreLine extra={extra} slack={slack} />
             </div>
           </div>
-          <MotorGrid motors={motors} passFraction={passFraction} focus={testing} />
+          <MotorGrid motors={motors} thresholds={thresholds} focus={testing} canRetest />
           <ExcludedNote excluded={extra.excluded} />
         </div>
       )
@@ -414,13 +510,28 @@ function StepContent({
           <div className="gt-score">
             <div className="gt-score-big">{pct(extra.fraction)}</div>
             <div>
-              <ScoreLine extra={extra} />
-              <p className="setup-copy">
-                {extra.passed === extra.scored
-                  ? 'Every motor follows its joint. Finish, then calibrate.'
-                  : `Joints under the tensioning target (${passTargets(extra)}) still have slack. ` +
-                    'We will now tension them and then proceed to the next round.'}
-              </p>
+              <ScoreLine extra={extra} slack={slack} />
+              {slack ? (
+                <p className="setup-copy">
+                  {extra.passed === extra.scored
+                    ? 'Every joint is within its slack tolerance and confirmed. Finish, then calibrate.'
+                    : `Joints with more slack than their tolerance (${passTargets(extra)}) are listed in red and orange. ` +
+                      'We will now tension them and then check every joint again.'}
+                </p>
+              ) : (
+                <p className="setup-copy">
+                  {extra.passed === extra.scored
+                    ? 'Every motor follows its joint. Finish, then calibrate.'
+                    : `Joints under the tensioning target (${passTargets(extra)}) still have slack. ` +
+                      'We will now tension them and then proceed to the next round.'}
+                </p>
+              )}
+              {slack && motors.some((m) => m.status === 'unconfirmed') && (
+                <p className="setup-copy">
+                  Joints marked "again" are within tolerance but one end was reached only once;
+                  they need no ratchet, just a repeated sweep next round.
+                </p>
+              )}
             </div>
           </div>
           {recheck.length > 0 && (
@@ -443,52 +554,55 @@ function StepContent({
               </div>
             </div>
           )}
-          <MotorGrid motors={motors} passFraction={passFraction} />
+          <MotorGrid motors={motors} thresholds={thresholds} canRetest />
           <ExcludedNote excluded={extra.excluded} />
         </div>
       )
     case 'tension': {
-      const todo = motors
-        .filter((m) => m.status !== 'pass' && m.status !== 'unscored')
-        .sort((a, b) => (a.fraction ?? 0) - (b.fraction ?? 0))
+      // From the slack test the run was opened with, or from this round's score;
+      // each listed spool carries its clicks on the tower.
+      const motorOf = Object.fromEntries(motors.map((m) => [m.joint, m.motor]))
+      const marks = extra.ratchet
+        ? Object.entries(extra.ratchet).map(([joint, r]) => ({
+            joint,
+            motor: motorOf[joint] ?? 0,
+            status: (r.clicks ? 'low' : 'partial') as SpreadStatus,
+            fraction: null,
+            tag: r.clicks ? clicksText(r.clicks) : 'under 1 click',
+          }))
+        : motors.map((m) => ({
+            joint: m.joint,
+            motor: m.motor,
+            status: m.status,
+            fraction: m.fraction,
+            tag: ['pass', 'unconfirmed', 'unscored'].includes(m.status) ? undefined : todoCell(m, slack),
+          }))
       return (
         <div className="gt-tension">
-          <ErrorBoundary label="The tower preview" fallback={previewUnavailable}>
-            <Suspense fallback={<div className="gt-preview">loading tower…</div>}>
-              <TowerPreview motors={motors} />
-            </Suspense>
-          </ErrorBoundary>
           <div className="gt-pane">
             <h3 className="gt-heading">Now use the ratchet tool</h3>
             <p className="setup-copy">
               Hulls off. The finger motors have slowly turned{' '}
               {extra.pulled_deg ?? extra.tension_offset_deg}° counterclockwise and are holding
               where they came to rest, at each motor's full available current, so the rotation
-              should have placed some tension on all tendons attached to the bottom spools.
+              should have placed some tension on all tendons attached to the bottom spools. If any
+              bottom spool tendons still feel loose, press "{PULL_MORE}" ({EXTRA_DEG}° more).
             </p>
             <p className="setup-copy">
-              If any bottom spool tendons still feel loose, press "{PULL_MORE}" ({EXTRA_DEG}° more).
+              Turn the top spool of each marked motor by the clicks shown next to it. The counts are rounded down on
+              purpose: stay a little loose here — the tension sweep after calibration counts the last clicks.
+              {extra.deg_per_click == null &&
+                ' The degrees one click takes up are not set yet, so the spools show the missing travel instead.'}
+              {extra.ratchet && Object.keys(extra.ratchet).length === 0 &&
+                ' The slack test lists no clicks: every spool is within one click. Check that each tendon feels firm, then press Done.'}
             </p>
-            <p className="setup-copy">
-              Now use your tensioning tool to turn the top spools of each red and then orange
-              highlighted motor.
-            </p>
-            <div className="gt-warning">
-              Tension carefully. Stop as soon as the tendon feels firm — overtensioning makes the
-              joint stall short of its range and wears the motor.
-            </div>
-            <div className="gt-todo">
-              <div className="gt-todo-title">
-                Still to tension · {todo.length}
-              </div>
-              {todo.map((m) => (
-                <div key={m.joint} className={`gt-todo-row ${m.status}`}>
-                  <b>M{m.motor}</b>
-                  <span>{m.joint}</span>
-                  <span>{pct(m.fraction)}</span>
-                </div>
-              ))}
-            </div>
+          </div>
+          <ErrorBoundary label="The tower preview" fallback={previewUnavailable}>
+            <TowerFaces withList={false} tags="full" marks={marks} head={[]} columns="" row={() => []} />
+          </ErrorBoundary>
+          <div className="gt-warning">
+            Tension carefully. Stop as soon as the tendon feels firm — overtensioning makes the joint stall short of
+            its range and wears the motor.
           </div>
         </div>
       )
@@ -512,42 +626,48 @@ function StepContent({
               </h3>
               <p className="setup-copy">
                 {extra.completed
-                  ? 'Saved as this hand’s last successful tension. Calibrate next — tensioning changes the tendon lengths.'
-                  : 'Not recorded as a successful tension. Calibrate before use.'}
+                  ? 'Saved as this hand’s last successful tension. Next: calibrate, then the tension sweep counts the clicks still missing.'
+                  : 'Not recorded as a successful tension. Calibrate (Calibrate step), then run the tension sweep.'}
               </p>
             </div>
           </div>
-          {motors.length > 0 && <MotorGrid motors={motors} passFraction={passFraction} />}
+          {motors.length > 0 && <MotorGrid motors={motors} thresholds={thresholds} />}
         </div>
       )
   }
 }
 
-// "thumb and index" keeps its title; a single finger is named as one.
+// The thumb is "the thumb"; any other stage is one finger.
 function stageSubject(stage?: RangeStage): string {
   if (!stage) return 'joints'
   const title = stage.title.toLowerCase()
-  return title.includes(' and ') ? title : `${title} finger`
+  return title === 'thumb' ? title : `${title} finger`
 }
 
 function stagePossessive(stage?: RangeStage): string {
   return stage && stage.title.toLowerCase().includes(' and ') ? 'their' : 'its'
 }
 
-// The pass target per joint group, e.g. "85% APs / 85% MCPs / 85% PIPs".
+// The pass target per joint group: "80% APs / 80% MCPs / 80% PIPs" under
+// fraction scoring, "3° APs / 5° MCPs / 5° PIPs" of slack under slack scoring.
 function passTargets(extra: GuidedTensionExtra): string {
+  if (extra.scoring === 'slack') {
+    const p = extra.pass_slack_deg
+    const show = (v: number | undefined, key: keyof PassSlack) => `${v ?? DEFAULT_PASS_SLACK[key]}°`
+    return `${show(p?.ap, 'ap')} APs / ${show(p?.mcp, 'mcp')} MCPs / ${show(p?.pip, 'pip')} PIPs`
+  }
   const p = extra.pass_fractions
-  const pct = (f: number | undefined) => `${Math.round((f ?? DEFAULT_PASS.ap) * 100)}%`
-  return `${pct(p?.ap)} APs / ${pct(p?.mcp)} MCPs / ${pct(p?.pip)} PIPs`
+  const show = (f: number | undefined) => `${Math.round((f ?? DEFAULT_PASS.ap) * 100)}%`
+  return `${show(p?.ap)} APs / ${show(p?.mcp)} MCPs / ${show(p?.pip)} PIPs`
 }
 
-function ScoreLine({ extra }: { extra: GuidedTensionExtra }) {
+function ScoreLine({ extra, slack }: { extra: GuidedTensionExtra; slack: boolean }) {
   return (
     <div className="gt-scoreline">
       <b>
         {extra.passed ?? 0}/{extra.scored ?? 0}
       </b>{' '}
-      motors at full travel
+      {slack ? 'joints within tolerance' : 'motors at full travel'}
     </div>
   )
 }
@@ -570,41 +690,61 @@ function ExcludedNote({ excluded }: { excluded?: GuidedTensionExtra['excluded'] 
 
 function MotorGrid({
   motors,
-  passFraction,
+  thresholds,
   focus,
+  canRetest = false,
 }: {
   motors: MotorSpread[]
-  passFraction: number
+  thresholds: Thresholds
   focus?: Set<string>
+  // A passed row gets a button that drops its pass so it is tested again.
+  canRetest?: boolean
 }) {
   // The stage's joints first; the rest stay visible but dimmed.
   const ordered = focus
     ? [...motors.filter((m) => focus.has(m.joint)), ...motors.filter((m) => !focus.has(m.joint))]
     : motors
+  const Row = thresholds.slack ? SlackRow : FractionRow
   return (
     <div className="gt-grid">
       {ordered.map((m) => (
-        <MotorRow
+        <Row
           key={m.joint}
           motor={m}
-          passFraction={passFraction}
+          thresholds={thresholds}
           dim={focus !== undefined && !focus.has(m.joint)}
+          canRetest={canRetest}
         />
       ))}
     </div>
   )
 }
 
-function MotorRow({
-  motor,
-  passFraction: fallback,
-  dim = false,
-}: {
+interface RowProps {
   motor: MotorSpread
-  passFraction: number
+  thresholds: Thresholds
   dim?: boolean
-}) {
-  const passFraction = motor.pass_fraction ?? fallback
+  canRetest?: boolean
+}
+
+// The last cell of a row: on a passed joint, a button that drops the pass so
+// the range check scores it again; empty otherwise, so the columns line up.
+function RetestCell({ motor, canRetest }: { motor: MotorSpread; canRetest?: boolean }) {
+  if (!canRetest || (motor.status !== 'pass' && motor.status !== 'unconfirmed')) return <span />
+  return (
+    <button
+      className="gt-retest"
+      title={`Test ${motor.joint.replace('_', ' ')} again: drop its pass and sweep it once more`}
+      onClick={() => answer(`again:${motor.joint}`)}
+    >
+      ↺
+    </button>
+  )
+}
+
+// Fraction scoring: percent of the expected travel, the pass band on the track.
+function FractionRow({ motor, thresholds, dim = false, canRetest }: RowProps) {
+  const passFraction = motor.pass_fraction ?? thresholds.passFraction
   // Passing on an earlier score rather than this check's movement.
   const keptPass =
     motor.kept != null && motor.kept >= passFraction && (motor.live_fraction ?? 0) < passFraction
@@ -629,9 +769,49 @@ function MotorRow({
         )}
       </span>
       <span className="gt-row-pct">
-        {motor.expected_deg == null ? 'n/a' : pct(motor.fraction)}
-        <small>/{Math.round(passFraction * 100)}</small>
+        {motor.status === 'fault' ? 'FAULT' : motor.expected_deg == null ? 'n/a' : pct(motor.fraction)}
+        {motor.status !== 'fault' && <small>/{Math.round(passFraction * 100)}</small>}
       </span>
+      <RetestCell motor={motor} canRetest={canRetest} />
+    </div>
+  )
+}
+
+// Slack scoring: slack in motor degrees, the goal band is the travel less the
+// tolerance, and the ends reached so far.
+function SlackRow({ motor, thresholds, dim = false, canRetest }: RowProps) {
+  const tolerance = motor.pass_slack_deg ?? thresholds.passSlack
+  const half = (motor.expected_deg ?? 1) / 2
+  const goal = Math.max(0, half - tolerance / 2)
+  const at = (deg: number) => `${50 + Math.max(-50, Math.min(50, (deg / half) * 50))}%`
+  const ends = `${motor.plus_hits}/${motor.minus_hits}`
+  const title =
+    `${motor.spread_deg.toFixed(0)}° swept of ${motor.expected_deg ?? '?'}° · slack ${deg(motor.slack_deg)} ` +
+    `(tolerance ${tolerance}°) · ends reached +${motor.plus_hits} / −${motor.minus_hits}`
+  return (
+    <div className={`gt-row ${motor.status}${dim ? ' dim' : ''}`} title={title}>
+      <span className="gt-row-id">M{motor.motor}</span>
+      <span className="gt-row-joint">
+        {motor.joint}
+        {motor.status === 'unconfirmed' && <em className="gt-again"> again</em>}
+      </span>
+      <span className="gt-track">
+        {motor.expected_deg != null && (
+          <>
+            <span className="gt-track-goal" style={{ left: at(-goal), right: `calc(100% - ${at(goal)})` }} />
+            <span className="gt-track-fill" style={{ left: at(motor.minus_deg), right: `calc(100% - ${at(motor.plus_deg)})` }} />
+            <span className="gt-track-centre" />
+            <span className="gt-track-now" style={{ left: at(motor.offset_deg) }} />
+          </>
+        )}
+      </span>
+      <span className="gt-row-pct">
+        {slackCell(motor)}
+        {motor.status !== 'fault' && motor.slack_deg != null && (
+          <small title="ends reached: + / −">/{tolerance}° · {ends}</small>
+        )}
+      </span>
+      <RetestCell motor={motor} canRetest={canRetest} />
     </div>
   )
 }
@@ -725,9 +905,36 @@ function CurrentField({
   )
 }
 
-// Pass thresholds per joint group, in percent of each joint's travel: live
-// during the range check, otherwise from the next check.
+// Pass thresholds per joint group: percent of each joint's travel (fraction
+// scoring) or a slack tolerance in motor degrees (slack scoring). Live during
+// the range check, otherwise from the next check.
 function PassEditor({ extra, step }: { extra: GuidedTensionExtra; step: TensionStep | null }) {
+  if (extra.scoring === 'slack') {
+    const passes = extra.pass_slack_deg
+    if (!passes) return null
+    return (
+      <div className="gt-currents">
+        <div className="gt-todo-title">Slack tolerance</div>
+        {PASS_GROUPS.map((g) => (
+          <CurrentField
+            key={g.key}
+            label={g.label}
+            hint={`${g.hint} · pass when the sweep falls short of the expected travel by at most this`}
+            unit="°"
+            live={step === 'range'}
+            value={passes[g.key]}
+            min={PASS_BOUNDS_DEG[0]}
+            max={PASS_BOUNDS_DEG[1]}
+            step={0.5}
+            onCommit={(v) => {
+              savePassSlack({ ...passes, [g.key]: v } as PassSlack)
+              answer(`pass:${g.key}=${v}`)
+            }}
+          />
+        ))}
+      </div>
+    )
+  }
   const passes = extra.pass_fractions
   if (!passes) return null
   return (

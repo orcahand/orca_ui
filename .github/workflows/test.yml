@@ -1,6 +1,6 @@
 name: Run Tests on Pull Request
 
-# Two jobs, because main and a development branch promise different things.
+# Two test jobs, because main and a development branch promise different things.
 # Anything landing on main must work against the published orca_core, so that
 # job installs from the lock and nothing else. A development branch may need
 # core work that is not released yet, so that job checks orca_core out beside
@@ -20,8 +20,14 @@ concurrency:
 
 jobs:
   published:
-    name: tests (published orca_core)
+    name: tests (published orca_core, Python ${{ matrix.python }})
     if: github.base_ref == 'main'
+    strategy:
+      fail-fast: false
+      matrix:
+        # The oldest Python this project supports, the one orca_core's CI also
+        # runs, and the newest release.
+        python: ['3.10', '3.15']
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -33,10 +39,9 @@ jobs:
 
       # --locked fails if pyproject.toml and uv.lock disagree, which is what a
       # committed orca_core override looks like however it is spelled.
-      # --python pins the oldest Python this project supports, the one
-      # orca_core's own CI runs; unpinned, the runner image would pick it.
+      # --python pins the matrix's Python; unpinned, the runner image would pick it.
       - name: Install dependencies
-        run: uv sync --locked --group dev --python 3.10
+        run: uv sync --locked --group dev --python ${{ matrix.python }}
 
       # --timeout turns a hung test into a named failure rather than a job
       # that times out fifteen minutes later with no culprit.
@@ -97,3 +102,17 @@ jobs:
       - name: Run tests
         working-directory: orca_ui
         run: uv run --no-sync --with-editable ../orca_core pytest --timeout=120
+
+  # Read-only and needs no credentials: every file the guide's catalog names
+  # must be in the public bucket, and no guide media may be committed. Without
+  # a terminal the script only checks.
+  guide-media:
+    name: guide media
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the catalog against the bucket
+        run: python3 scripts/guide_media.py

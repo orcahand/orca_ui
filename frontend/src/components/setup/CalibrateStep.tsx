@@ -1,4 +1,9 @@
-// Step 2: calibrate the whole hand, or a subset picked in the settings drawer.
+// Step 2, in two parts: the calibration itself, automatic or by hand (the
+// whole hand, or a subset picked in the settings drawer), and the tension sweep
+// that compares the hand with the reference and counts the ratchet clicks
+// still missing; the sweep window holds the motors for those clicks, then the
+// hand is calibrated and swept once more. The slack test the calibration needs
+// lives in the Tension step; a failed one still blocks calibrating here.
 // Per-joint readiness shows as a row of dots, the joint name on hover.
 
 import { useMemo, useState } from 'react'
@@ -10,8 +15,13 @@ import {
   useOperationStore,
   useStartGate,
 } from '../../state/operationStore'
-import { FlowProgress, FlowRunning, FlowStep, type StepState } from './FlowStep'
+import { FlowProgress, FlowRowTitle, FlowRunning, FlowStep, type StepState } from './FlowStep'
 import { failToBanner } from './setupUtils'
+import { BaselinePicker, CalibrationRecords, SnapshotPromoter, TravelCheck, SlackEstimate } from './TravelBaselines'
+import { SWEEP_HINT, startTensionSweep } from './probeStart'
+import type { SetupVariant } from '../../state/setupVariant'
+import { useTensionFlow } from '../../state/tensionFlow'
+import { shortDate } from './setupUtils'
 
 const GROUP_ORDER = ['wrist', 'thumb', 'index', 'middle', 'ring', 'pinky']
 function groupOf(jointId: string): string {
@@ -26,12 +36,16 @@ function jointMark(joint: JointInfo): 'ok' | 'bad' | 'na' {
   return joint.encoder_calibrated === true ? 'ok' : 'na'
 }
 
-export function CalibrateStep({ state }: { state: StepState }) {
+export function CalibrateStep({ state, variant }: { state: StepState; variant: SetupVariant }) {
+  // The kai page adds the travel snapshots and the slack estimate.
+  const kai = variant === 'kai'
   const gate = useStartGate('motors')
   const handInfo = useAppStore((s) => s.handInfo)
   const operation = useOperationStore((s) => s.operation)
   const active =
-    operation?.kind === 'calibrate' && isOperationActive(operation) ? operation : null
+    operation && isOperationActive(operation) && ['calibrate', 'slack_test', 'tension_sweep'].includes(operation.kind)
+      ? operation
+      : null
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [redoWrist, setRedoWrist] = useState(false)
@@ -51,6 +65,15 @@ export function CalibrateStep({ state }: { state: StepState }) {
   const missing = handInfo?.calibration.missing_anchors ?? []
   const needing = joints.filter((j) => jointMark(j) === 'bad').length
   const wristSelected = selected.has('wrist')
+  const calibrated = handInfo?.calibration.motors === true
+  // The newest slack test on this hand: a spool that turned half a turn blocks calibration.
+  const slackTest = handInfo?.slack_test ?? null
+  const slackBlock = slackTest?.block ?? null
+  const sweep = handInfo?.tension_sweep ?? null
+  const calibState = slackBlock ? 'warn' : calibrated ? 'done' : 'next'
+  const sweepState = sweep?.latest ? 'done' : calibrated ? 'next' : 'todo'
+  // Tendons the newest sweep says need clicks.
+  const loose = Object.entries(sweep?.verdict ?? {}).filter(([, v]) => (v.clicks ?? 0) > 0)
 
   const toggle = (ids: string[], on: boolean) =>
     setSelected((prev) => {
@@ -62,13 +85,15 @@ export function CalibrateStep({ state }: { state: StepState }) {
       return next
     })
 
-  const start = () =>
+  const start = (manual = false) =>
     void api
       .operationStart('calibrate', {
         joints: selected.size > 0 ? [...selected] : null,
         force_wrist: redoWrist || wristSelected,
+        ...(manual ? { manual: true } : {}),
       })
       .catch(failToBanner)
+  const manualActive = active?.kind === 'calibrate' && active.params?.manual === true
 
   const settings = (
     <>
@@ -127,6 +152,15 @@ export function CalibrateStep({ state }: { state: StepState }) {
           </label>
         )}
       </div>
+      <CalibrationRecords />
+      {kai && (
+        <>
+          <BaselinePicker />
+          <SnapshotPromoter />
+          <TravelCheck />
+          <SlackEstimate />
+        </>
+      )}
     </>
   )
 
@@ -136,23 +170,72 @@ export function CalibrateStep({ state }: { state: StepState }) {
       title="Calibrate"
       state={active ? 'running' : state}
       chip={needing > 0 ? `${needing} open` : joints.length ? 'all' : undefined}
-      info="Drives every joint to its hardstops at the console's current ceiling and records the range. Keep clear while it runs."
+      info="Drives each finger to its hardstops at the motor's own current ceiling, and the wrist at the console's current limit, then records the range. Keep clear while it runs."
       settings={settings}
     >
       {active ? (
         <>
           <FlowRunning phase={active.phase} detail={active.detail} />
           <FlowProgress value={active.progress} />
+          {manualActive && (
+            <button className="btn btn-secondary" onClick={() => useTensionFlow.getState().dismiss(null)}>
+              Show manual calibration
+            </button>
+          )}
         </>
       ) : (
-        <button
-          className="btn btn-primary"
-          disabled={gate.blocked}
-          title={gate.reason ?? undefined}
-          onClick={start}
-        >
-          {selected.size > 0 ? `Calibrate ${selected.size}` : 'Calibrate'}
-        </button>
+        <div className="calib-steps">
+          <div className={`calib-step ${calibState}`}>
+            <span className="calib-step-num">{calibState === 'done' ? '✓' : calibState === 'warn' ? '!' : 'a'}</span>
+            <span>
+              <div className="calib-step-title">Calibrate</div>
+              <div className="calib-step-note">
+                {slackBlock ? `${slackBlock} (Tension step)` : needing > 0 ? `${needing} joints open` : calibrated ? 'calibrated' : 'automatic: the motors drive every joint to its stops · manual: you hold each joint on its stops'}
+              </div>
+            </span>
+            <span className="calib-step-actions">
+              <button
+                className={`btn ${calibState === 'next' ? 'btn-primary' : 'btn-secondary'}`}
+                disabled={gate.blocked || !!slackBlock}
+                title={gate.reason ?? slackBlock ?? 'The motors drive every joint to its hard stops. Keep clear.'}
+                onClick={() => start()}
+              >
+                {selected.size > 0 ? `Automatic ${selected.size}` : 'Automatic'}
+              </button>
+              <button
+                className="btn btn-secondary"
+                disabled={gate.blocked || !!slackBlock}
+                title={gate.reason ?? slackBlock ?? 'Torque off: hold each joint on its end stops by hand and press Enter to record'}
+                onClick={() => start(true)}
+              >
+                {selected.size > 0 ? `Manual ${selected.size}` : 'Manual'}
+              </button>
+            </span>
+          </div>
+          <div className={`calib-step ${sweepState}`}>
+            <span className="calib-step-num">{sweepState === 'done' ? '✓' : 'b'}</span>
+            <span>
+              <FlowRowTitle title="Tension sweep" info={SWEEP_HINT} />
+              {(sweep?.latest || !calibrated) && (
+                <div className="calib-step-note">
+                  {sweep?.latest
+                    ? `${sweep.latest}${sweep.latest_at ? ` · ${shortDate(sweep.latest_at)}` : ''}${sweep.reference ? ` · vs ${sweep.reference}` : ' · no reference for this motor family'}${loose.length ? ` · ${loose.map(([j, v]) => `${j.replace('_', ' ')} ~${v.clicks}`).join(', ')}` : ''}`
+                    : 'needs a calibrated hand'}
+                </div>
+              )}
+            </span>
+            <span className="calib-step-actions">
+              <button
+                className={`btn ${sweepState === 'next' ? 'btn-primary' : 'btn-secondary'}`}
+                disabled={gate.blocked || !calibrated}
+                title={gate.reason ?? (calibrated ? SWEEP_HINT : 'calibrate first: the sweep runs between the calibrated limits')}
+                onClick={() => void startTensionSweep().catch(failToBanner)}
+              >
+                Tension sweep
+              </button>
+            </span>
+          </div>
+        </div>
       )}
       {joints.length > 0 && (
         <div className="flow-dots">

@@ -100,6 +100,8 @@ export interface BoardEntry {
   kind: 'oh_board' | 'motor_adapter'
   side: 'left' | 'right' | null
   hand_id: string | null
+  serial: string | null // null until the hand is provisioned
+  board_id: string | null
   // Model the board's provisioned config declares; null when it doesn't.
   model_name: string | null
   ports: string[]
@@ -248,6 +250,10 @@ export interface CoreSourceInfo {
 export interface HandInfo {
   model_name: string
   side: 'left' | 'right'
+  // The connected hand's identity (board serial), null in mock mode or before it is read.
+  hand_id?: string | null
+  // The model has a tactile skin (drawn black), connected or not.
+  tactile_skin?: boolean
   mock: boolean
   joints: JointInfo[]
   calibration: CalibrationInfo
@@ -263,8 +269,12 @@ export interface HandInfo {
   // False when the installed orca_core predates guided tensioning.
   guided_tension?: boolean
   last_tension?: LastTension | null
-  // Unfinished guided tensioning saved for this hand: best score per joint.
+  // Unfinished guided tensioning saved for this hand, per scoring: the best
+  // fraction per joint (ccc page) and the last round's slack scores (kai page).
   tension_progress?: TensionProgress | null
+  tension_progress_slack?: TensionProgress | null
+  // Present once this hand was calibrated after its last completed tensioning.
+  slack_estimate?: SlackEstimate | null
   // Fingertip model per slot and slots holding another finger's model; absent
   // when the connector-board firmware doesn't report fingertip identities.
   fingertips?: FingertipIdentities
@@ -275,12 +285,238 @@ export interface HandInfo {
     hold_mcp: number
     hold_pip: number
   }
+  // The named travel baseline guided tensioning scores against; null = the
+  // shared v2.1 block.
+  travel_baseline?: TravelBaselineSummary | null
+  // This hand's newest slack test; `block` is why calibration is refused, or null.
+  slack_test?: SlackTestSummary | null
+  // The motor family's slack test current and the choices around it (mA); null while it is unknown.
+  slack_current?: { default_ma: number; choices_ma: number[] } | null
+  // Which tension sweep is the reference and this hand's newest one, by name.
+  tension_sweep?: {
+    reference: string | null
+    latest: string | null
+    latest_at: string | null
+    // The newest sweep scored against the reference, per joint.
+    verdict?: SweepVerdict['joints'] | null
+  } | null
 }
+
+// ----- slack test -----------------------------------------------------------
+
+// pass: at most half a turn of free rotation with the joint held; fail: more;
+// skipped: the operator skipped the joint.
+export type SlackStatus = 'pass' | 'fail' | 'skipped'
+
+export interface SlackJoint {
+  motor: number | null
+  plus_deg: number | null
+  minus_deg: number | null
+  plus_sense?: 'flex' | 'extend' | string
+  minus_sense?: 'flex' | 'extend' | string
+  total_deg?: number | null
+  status: SlackStatus | null
+  // Ratchet clicks that take up this slack, rounded down; null while the
+  // degrees per click are unknown.
+  clicks?: number | null
+  // The reference hand's slack on this joint, motor degrees.
+  ref_deg?: number | null
+}
+
+export interface SlackTestExtra {
+  // hold: waiting for the operator to hold `joint`; testing: winding it;
+  // review: every joint tested, waiting for Finish (or Back to the last joint).
+  step: 'starting' | 'hold' | 'testing' | 'review' | 'done'
+  joint: string | null
+  // Which way the joint's motor is winding right now; null between phases.
+  direction: 1 | -1 | null
+  joints: string[]
+  // Degrees the joint's motor has turned so far in the running phase.
+  live: number | null
+  results: Record<string, SlackJoint>
+  blocked: boolean
+  // The hold prompt offers Back: discard the previous joint's result and test it again.
+  can_back?: boolean
+  settings?: Record<string, number>
+  saved?: string | null
+  deg_per_click?: number | null
+}
+
+export interface SlackTestSummary {
+  key: string
+  recorded_at: string
+  blocked: boolean
+  current_ma: number | null
+  deg_per_click?: number | null
+  results: Record<string, SlackJoint>
+  block: string | null
+}
+
+// ----- tension sweep ---------------------------------------------------------
+
+export interface SweepResult {
+  joint: string
+  motor_id: number
+  direction: 1 | -1
+  sense: 'flex' | 'extend'
+  run: number
+  travel_deg: number
+  start_deg: number
+  end_deg: number
+  mean_ma: number | null
+  end_ma: number | null
+  peak_ma: number | null
+  deadband_deg: number | null
+  short_deg: number
+  // The saved dataset carries the curve; the live snapshot only its length.
+  samples: [number, number][] | number
+  duration_s: number
+  skipped: string | null
+}
+
+// By the friction share of the reference: ok 90-110 %, under below 90 % (yellow,
+// no click), low below 40 % (red, clicks), over above 110 % (grey, left alone); slack:
+// dead band wider than the reference's.
+export type SweepStatus = 'none' | 'ok' | 'slack' | 'over' | 'under' | 'low'
+
+// A stretch of the travel (percent of it) where a curve departs from the reference.
+export interface SweepStretch {
+  kind: 'friction' | 'static'
+  from: number
+  to: number
+  diff_ma: number
+}
+
+// One joint scored by its curves: static load (I_flex + I_extend) / 2 and
+// friction (I_flex - I_extend) / 2 per bin along the travel, mine and the reference's.
+export interface SweepJointVerdict {
+  status: SweepStatus
+  travel_deg: number
+  static: (number | null)[]
+  friction: (number | null)[]
+  ref_static: (number | null)[] | null
+  ref_friction: (number | null)[] | null
+  static_ma: number | null
+  friction_ma: number | null
+  ref_static_ma: number | null
+  ref_friction_ma: number | null
+  static_diff_ma: number | null
+  friction_diff_ma: number | null
+  // Mean friction as a share of the reference's (1 = equal).
+  share?: number | null
+  // Ratchet clicks still needed, rounded toward fewer; 0 when none.
+  clicks?: number | null
+  tol_ma?: number
+  stretches: SweepStretch[]
+  deadband_deg: { flex: number | null; extend: number | null }
+}
+
+export interface SweepVerdict {
+  joints: Record<string, SweepJointVerdict>
+  bands: { tol_ma: number; tol_share: number; bins: number; slack_deg: number; low?: number; under?: number; over?: number }
+}
+
+export interface SweepLive {
+  joint: string
+  motor: number
+  direction: 1 | -1
+  sense: 'flex' | 'extend'
+  run: number
+  deg: number | null
+  current_ma: number | null
+  index?: number
+}
+
+export interface TensionSweepExtra {
+  step: 'starting' | 'sweeping' | 'done'
+  index: number
+  // Sweeps finished so far, of total; the joints of one kind run together.
+  done?: number
+  total: number
+  repeats: number
+  joints: string[]
+  groups?: string[][]
+  travel_deg: Record<string, number>
+  pose_short?: Record<string, number>
+  current: SweepLive | null
+  active?: SweepLive[]
+  results: SweepResult[]
+  reference: string | null
+  verdict: SweepVerdict | null
+  saved?: string | null
+}
+
+export interface SweepLevels {
+  [joint: string]: Record<'flex' | 'extend', { mean_ma: number | null; end_ma: number | null; deadband_deg: number | null; short_deg: number | null; n: number }>
+}
+
+export interface SweepListing {
+  recorded_at: string
+  hand_key?: string | null
+  motor_type?: string | null
+  note?: string | null
+  joints: string[]
+  repeats?: number
+  travel_deg: Record<string, number>
+  levels: SweepLevels
+}
+
+export interface TensionSweeps {
+  sweeps: Record<string, SweepListing>
+  reference: string | null
+  next_name: string
+  supported: boolean
+  motor_type: string | null
+  defaults: Record<string, number> | null
+}
+
+export interface TravelBaselineSummary {
+  name: string
+  source: 'manual' | 'auto' | 'import' | string
+  recorded_at: string
+  joints: number
+}
+
+// One saved calibration's travel table (motor degrees between hardstops).
+export interface TravelSnapshot {
+  recorded_at: string
+  source: 'manual' | 'auto' | 'import' | string
+  hand_key?: string | null
+  note?: string | null
+  // A run that did not calibrate every finger joint: the other values are older.
+  partial?: boolean
+  joints?: string[] | null
+  travel: Record<string, number>
+  ratios?: Record<string, number>
+  limits?: Record<string, [number, number]>
+}
+
+export interface TravelBaseline extends Omit<TravelSnapshot, 'ratios' | 'limits' | 'hand_key'> {
+  from_snapshot: string | null
+}
+
+// GET /api/baselines
+export interface TravelBaselines {
+  active: string | null
+  // The shared v2.1 block, for comparison.
+  shared: Record<string, number>
+  baselines: Record<string, TravelBaseline>
+  // Newest first.
+  snapshots: Record<string, TravelSnapshot>
+}
+
+// Which rule scored a guided tensioning run: 'fraction' is the committed
+// logic (share of the expected travel, best kept across rounds), 'slack' the
+// newer one (expected minus a settled, twice-reached spread, in degrees).
+export type TensionScoring = 'fraction' | 'slack'
 
 export interface TensionProgress {
   updated_at: string // ISO 8601
   rounds: number
-  best: Record<string, number>
+  // Fraction scoring: the best fraction per joint so far.
+  best?: Record<string, number>
+  // Slack scoring: the last scored round, per joint.
+  scores?: Record<string, { slack_deg: number | null; fraction: number | null; status: SpreadStatus }>
 }
 
 export interface LastTension {
@@ -288,8 +524,26 @@ export interface LastTension {
   // 'hold': a plain hold-and-ratchet, which has nothing to score.
   mode?: 'hold'
   rounds?: number
+  scoring?: TensionScoring
+  // Fraction scoring: the pass threshold per joint and the final spreads as fractions.
   pass_fraction?: Record<string, number>
   spreads?: Record<string, number | null>
+  // Slack scoring: tolerance per joint (motor degrees), the final round's
+  // slack, swept spread and expected travel.
+  pass_slack_deg?: Record<string, number>
+  slack_deg?: Record<string, number | null>
+  spread_deg?: Record<string, number>
+  expected_deg?: Record<string, number | null>
+}
+
+// Slack per joint from two sweeps of the same hand in the same state: the
+// motor-driven calibration (hardstops plus slack) against the hand sweep of the
+// final tensioning round (hardstops minus slack).
+export interface SlackEstimate {
+  snapshot: string
+  calibrated_at: string
+  tensioned_at: string
+  joints: Record<string, { sweep_deg: number; motor_deg: number; slack_deg: number; travel_deg: number }>
 }
 
 export type TactileMode = 'resultant' | 'taxels' | 'combined'
@@ -338,6 +592,31 @@ export interface OperationSnapshot {
   result: Record<string, unknown> | null
   error: string | null
   started_at: number
+}
+
+// ----- manual calibrate operation extra (orca_ui/hand/operations/calibrate.py) ----
+
+export type CaptureDirection = 'flex' | 'extend'
+
+export interface ManualCalibrationExtra {
+  manual: true
+  plan: { joint: string; direction: CaptureDirection }[]
+  index: number
+  total: number
+  // The hardstop asked for; the finger abductions come as one group (joints, motors).
+  current: {
+    joint: string
+    joints: string[]
+    motor: number
+    motors: Record<string, number>
+    direction: CaptureDirection
+  } | null
+  // Counts prompts, so re-asking a step after Back reads as a new prompt.
+  prompt_seq?: number
+  // Live motor position per joint while the operator moves it, and where it started.
+  position_deg: Record<string, number>
+  start_deg: Record<string, number>
+  captured: { joint: string; direction: CaptureDirection | null; outcome: 'recorded' | 'skipped'; position_deg: number | null }[]
 }
 
 // ----- fingertip numbering (orca_ui/hand/operations/fingertips.py) ----------
@@ -842,7 +1121,10 @@ export interface RangeStage {
   joints: string[]
   pose: string
 }
-export type SpreadStatus = 'pass' | 'partial' | 'low' | 'unscored'
+// 'fault': the motor has a latched hardware error and is not holding.
+// unconfirmed: within tolerance, but an end was reached only once; slack: a
+// tension probe measured slack above the tolerance, so the sweep cannot pass it.
+export type SpreadStatus = 'pass' | 'unconfirmed' | 'slack' | 'partial' | 'low' | 'unscored' | 'fault'
 
 export interface MotorSpread {
   joint: string
@@ -852,12 +1134,38 @@ export interface MotorSpread {
   plus_deg: number
   minus_deg: number
   spread_deg: number
-  fraction: number | null
   status: SpreadStatus
-  pass_fraction?: number
+  // Which rule scored this row; the matching threshold field is set.
+  scoring: TensionScoring
+  // Fraction scoring: the spread over the expected travel, best of this check
+  // and anything kept from earlier rounds; the live value and the kept one.
+  fraction: number | null
   live_fraction?: number | null
-  // Best score carried in from earlier rounds or a saved session.
   kept?: number | null
+  pass_fraction?: number | null
+  // Slack scoring: expected travel minus the swept spread, motor degrees,
+  // against a tolerance; each end wants two settled visits.
+  slack_deg: number | null
+  pass_slack_deg?: number | null
+  confirmed: boolean
+  plus_hits: number
+  minus_hits: number
+  // Slack a tension probe measured before this run (first round only).
+  probe_slack_deg?: number | null
+  // Ratchet clicks the joint's slack still needs (rounded down); null while
+  // the degrees per click are unknown.
+  clicks_left?: number | null
+  // Latched error bits while the motor is limp; null when it holds.
+  fault?: string[] | null
+}
+
+// A motor the routine found latched mid-run, classified like the dashboard's
+// faults. Cleared by a "reboot:<motor>" operation input.
+export interface OperationMotorFault extends HwErrorInfo {
+  motor: number
+  joint: string | null
+  // The reboot was tried and the fault came straight back.
+  relatched?: boolean
 }
 
 export interface GuidedTensionExtra {
@@ -871,11 +1179,21 @@ export interface GuidedTensionExtra {
   hold_ap?: number
   hold_mcp?: number
   hold_pip?: number
+  // Joints the hand's config holds at a fixed current (mA) instead of their group's.
+  hold_fixed?: Record<string, number>
   tension_offset_deg?: number
   pulled_deg?: number
+  // Which rule scores this run, and its thresholds per joint group: a pass
+  // fraction (fraction scoring) or a slack tolerance in motor degrees (slack).
+  scoring?: TensionScoring
   pass_fractions?: Record<'ap' | 'mcp' | 'pip', number>
+  pass_slack_deg?: Record<'ap' | 'mcp' | 'pip', number>
   completed?: boolean
-  resumed?: { rounds: number; updated_at?: string; joints: number }
+  resumed?: { rounds: number; updated_at?: string; joints: number; passed?: number }
+  // Motor degrees one ratchet click takes up (shipped reference); null = unknown.
+  deg_per_click?: number | null
+  // What the expected travel per joint comes from: a named baseline or the shared block.
+  baseline?: { name: string | null; source: string; label: string; joints?: number }
   // Every range-check stage, and the one in progress (pose / range steps).
   stages?: RangeStage[]
   stage?: RangeStage
@@ -885,6 +1203,11 @@ export interface GuidedTensionExtra {
   // exclusion list with a reason per joint.
   absent_joints?: string[]
   excluded?: { joint: string; motor: number; reason: string }[]
+  // Motors latched right now, keyed by motor id.
+  faults?: Record<string, OperationMotorFault>
+  // Tendons to ratchet when the run was opened from the slack test, with the
+  // clicks each needs (pct is unused there).
+  ratchet?: Record<string, { pct: number | null; clicks: number | null }>
 }
 
 // Per-motor shutdown threshold read from the motors (Temperature Limit).

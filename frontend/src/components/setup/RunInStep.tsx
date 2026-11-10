@@ -1,5 +1,5 @@
-// Step 3: loop the collision-free full-range sequence for a few minutes so the
-// freshly tensioned tendons settle. Needs a calibrated hand.
+// Step 3, "Run": loop the collision-free full-range sequence for a few minutes
+// so the freshly tensioned tendons settle. Needs a calibrated hand.
 
 import { useEffect, useState } from 'react'
 import { api } from '../../api/rest'
@@ -66,7 +66,7 @@ export function RunInStep({
   return (
     <FlowStep
       n={3}
-      title="Run-in"
+      title="Run"
       state={active ? 'running' : state}
       chip={doneAt ? shortDate(doneAt) : `${minutes} min · ×${speed}${cap !== null ? ` · ${cap} mA` : ''}`}
       info="Moves every joint through its full range in a collision-free loop. The first pass is slow (×1) so a collision can be stopped in time. Keep the hand free."

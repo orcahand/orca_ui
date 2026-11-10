@@ -60,6 +60,15 @@ export function FlowStep({
   )
 }
 
+// A row title inside a step, its explanation behind the (i) on hover.
+export function FlowRowTitle({ title, info }: { title: string; info: ReactNode }) {
+  return (
+    <div className="calib-step-title">
+      <HoverNote label={title}>{info}</HoverNote>
+    </div>
+  )
+}
+
 export function FlowProgress({ value }: { value: number | null }) {
   if (value === null) return null
   return (

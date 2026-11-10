@@ -7,12 +7,13 @@
 
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import * as THREE from 'three'
 import type { URDFRobot } from 'urdf-loader'
 import type { JointInfo, SpreadStatus } from '../../api/types'
 import { usePalette } from '../../theme/themeStore'
 import { FRONT_VIEW, standUpright } from '../three/frontView'
+import { StudioLights } from '../three/StudioLights'
 import { loadHandRobot, owningLinkName, setSkinTone } from '../three/loadHandRobot'
 import { fingerOf, stagePose, thumbOut, towardThumb, type TowardThumb } from './stagePoses'
 
@@ -24,7 +25,13 @@ export interface PreviewStage {
 
 const FINGERS = ['thumb', 'index', 'middle', 'ring', 'pinky'] as const
 const JOINT_PERIOD_S = 2.4
-const TINT: Partial<Record<SpreadStatus, number>> = { low: 0xe0565b, partial: 0xf29a38, pass: 0x34b37a }
+const TINT: Partial<Record<SpreadStatus, number>> = {
+  low: 0xe0565b,
+  slack: 0xe0565b,
+  partial: 0xf29a38,
+  unconfirmed: 0x22d3ee,
+  pass: 0x34b37a,
+}
 const DEG2RAD = Math.PI / 180
 const STATIC_LINKS = new Set(['tower', 'forearm'])
 
@@ -100,6 +107,7 @@ function PreviewRig({
   stage,
   statuses,
   blackSkin,
+  overrides,
   onJoint,
 }: {
   urdfUrl: string
@@ -108,6 +116,7 @@ function PreviewRig({
   stage?: PreviewStage | null
   statuses: Record<string, SpreadStatus>
   blackSkin: boolean
+  overrides?: Record<string, number>
   onJoint: (joint: string | null) => void
 }) {
   const [robot, setRobot] = useState<URDFRobot | null>(null)
@@ -134,6 +143,14 @@ function PreviewRig({
     if (!robot) return
     setSkinTone(robot, blackSkin ? 'black' : 'white')
     applyTints(robot, statuses)
+    robot.traverse((object) => {
+      const mesh = object as THREE.Mesh
+      if (mesh.isMesh) {
+        mesh.castShadow = true
+        const material = mesh.material as THREE.MeshStandardMaterial
+        if (material.isMeshStandardMaterial) material.envMapIntensity = 0.8
+      }
+    })
   }, [robot, blackSkin, statuses])
 
   useEffect(() => {
@@ -151,8 +168,8 @@ function PreviewRig({
   }, [robot, controls, camera, joints])
 
   const pose = useMemo(
-    () => stagePose(mode === 'still' ? null : (stage?.key ?? null), joints, toward),
-    [mode, stage?.key, joints, toward],
+    () => ({ ...stagePose(mode === 'still' ? null : (stage?.key ?? null), joints, toward), ...overrides }),
+    [mode, stage?.key, joints, toward, overrides],
   )
   const sweepJoints = useMemo(() => {
     const known = new Set(joints.map((j) => j.id))
@@ -191,22 +208,26 @@ export function TensionPreview(props: {
   stage?: PreviewStage | null
   statuses: Record<string, SpreadStatus>
   blackSkin: boolean
+  // Joint angles (deg) that replace the stage pose, e.g. one joint held at an end stop.
+  overrides?: Record<string, number>
+  caption?: ReactNode
 }) {
+  const { caption, ...rig } = props
   const { scene } = usePalette()
   const [joint, setJoint] = useState<string | null>(null)
   return (
     <div className="gt-preview">
       <Canvas
         dpr={[1, 2]}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
         camera={{ fov: 35, position: [0.28, 0.25, 0.3], near: 0.01, far: 10 }}
         style={{ background: scene.bg }}
       >
-        <hemisphereLight args={[scene.hemiSky, scene.hemiGround, scene.hemiIntensity]} />
-        <directionalLight position={[0.4, 0.8, 0.6]} intensity={1.6} />
-        <directionalLight position={[-0.5, 0.3, -0.4]} intensity={0.6} />
+        <StudioLights shadowScale={0.6} />
         <OrbitControls makeDefault enableDamping={false} />
-        <PreviewRig {...props} onJoint={setJoint} />
+        <PreviewRig {...rig} onJoint={setJoint} />
       </Canvas>
+      {caption}
       {props.mode === 'sweep' && joint && (
         <div className="gt-preview-caption"><b>{joint.replace('_', ' ')}</b> · full range</div>
       )}

@@ -1,0 +1,5293 @@
+{
+ "bucket": "orca-public-a5h6t",
+ "files": {
+  "clips/p112-3479-walkthrough.jpg": {
+   "object": "guide/clips/p112-3479-walkthrough-86674163b06cc6e8.jpg",
+   "size": 59706
+  },
+  "clips/p112-3479-walkthrough.mp4": {
+   "object": "guide/clips/p112-3479-walkthrough-a6a86af9dbebcb92.mp4",
+   "size": 771280
+  },
+  "clips/p117-3500.jpg": {
+   "object": "guide/clips/p117-3500-dcc9f04d54fcc903.jpg",
+   "size": 77606
+  },
+  "clips/p117-3500.mp4": {
+   "object": "guide/clips/p117-3500-a64b9697eab7609f.mp4",
+   "size": 6266556
+  },
+  "clips/p119-3690.jpg": {
+   "object": "guide/clips/p119-3690-2a1a4af9a7746694.jpg",
+   "size": 90478
+  },
+  "clips/p119-3690.mp4": {
+   "object": "guide/clips/p119-3690-7b46512a8a3bd297.mp4",
+   "size": 6002324
+  },
+  "clips/p122-2755-review.jpg": {
+   "object": "guide/clips/p122-2755-review-55c269b1fd127db2.jpg",
+   "size": 75478
+  },
+  "clips/p122-2755-review.mp4": {
+   "object": "guide/clips/p122-2755-review-62f6e3ca85bf65d2.mp4",
+   "size": 4364147
+  },
+  "clips/p122-2828-review.jpg": {
+   "object": "guide/clips/p122-2828-review-8a06a32fab9a7349.jpg",
+   "size": 84363
+  },
+  "clips/p122-2828-review.mp4": {
+   "object": "guide/clips/p122-2828-review-d6ffa8630a826bfd.mp4",
+   "size": 7375693
+  },
+  "clips/p122-3976-review.jpg": {
+   "object": "guide/clips/p122-3976-review-0124b2c5afa8bbf2.jpg",
+   "size": 60706
+  },
+  "clips/p122-3976-review.mp4": {
+   "object": "guide/clips/p122-3976-review-1ea34de50c58e338.mp4",
+   "size": 5462793
+  },
+  "clips/p122-3976.jpg": {
+   "object": "guide/clips/p122-3976-0124b2c5afa8bbf2.jpg",
+   "size": 60706
+  },
+  "clips/p122-3976.mp4": {
+   "object": "guide/clips/p122-3976-02be7a2d62327114.mp4",
+   "size": 11507462
+  },
+  "clips/p123-4146.jpg": {
+   "object": "guide/clips/p123-4146-20c6650085c21e49.jpg",
+   "size": 78125
+  },
+  "clips/p123-4146.mp4": {
+   "object": "guide/clips/p123-4146-ef0333f74c76b20d.mp4",
+   "size": 5965641
+  },
+  "clips/p123-4235.jpg": {
+   "object": "guide/clips/p123-4235-a79a4586d5387bef.jpg",
+   "size": 74896
+  },
+  "clips/p123-4235.mp4": {
+   "object": "guide/clips/p123-4235-7bbe803618e82471.mp4",
+   "size": 9062835
+  },
+  "clips/p126-4307-review.jpg": {
+   "object": "guide/clips/p126-4307-review-14aa886658a39c61.jpg",
+   "size": 68495
+  },
+  "clips/p126-4307-review.mp4": {
+   "object": "guide/clips/p126-4307-review-57a664d8fa2b8ccf.mp4",
+   "size": 10457728
+  },
+  "clips/p126-4307.jpg": {
+   "object": "guide/clips/p126-4307-14aa886658a39c61.jpg",
+   "size": 68495
+  },
+  "clips/p126-4307.mp4": {
+   "object": "guide/clips/p126-4307-1af9402300a5d57c.mp4",
+   "size": 7118132
+  },
+  "clips/p126-4448-review.jpg": {
+   "object": "guide/clips/p126-4448-review-62a2f94188a1b2c4.jpg",
+   "size": 83555
+  },
+  "clips/p126-4448-review.mp4": {
+   "object": "guide/clips/p126-4448-review-6460412ce35b790f.mp4",
+   "size": 20200481
+  },
+  "clips/p127-4617.jpg": {
+   "object": "guide/clips/p127-4617-8fe3cae0bb86b224.jpg",
+   "size": 71071
+  },
+  "clips/p127-4617.mp4": {
+   "object": "guide/clips/p127-4617-8b1783f53d2ee901.mp4",
+   "size": 8206685
+  },
+  "clips/p129-1940.jpg": {
+   "object": "guide/clips/p129-1940-a930b5b80606dd4c.jpg",
+   "size": 58672
+  },
+  "clips/p129-1940.mp4": {
+   "object": "guide/clips/p129-1940-3baa06aaf254e1ae.mp4",
+   "size": 5704853
+  },
+  "clips/p132-2100.jpg": {
+   "object": "guide/clips/p132-2100-20cc07331a0f36cd.jpg",
+   "size": 51294
+  },
+  "clips/p132-2100.mp4": {
+   "object": "guide/clips/p132-2100-1b22f5ac919759ff.mp4",
+   "size": 5260604
+  },
+  "clips/p135-5035-walkthrough.jpg": {
+   "object": "guide/clips/p135-5035-walkthrough-25b253715bda7ced.jpg",
+   "size": 71496
+  },
+  "clips/p135-5035-walkthrough.mp4": {
+   "object": "guide/clips/p135-5035-walkthrough-53cefe78033d6bb0.mp4",
+   "size": 7617421
+  },
+  "clips/p136-4880.jpg": {
+   "object": "guide/clips/p136-4880-2368feac293db375.jpg",
+   "size": 60392
+  },
+  "clips/p136-4880.mp4": {
+   "object": "guide/clips/p136-4880-90cfe7ca5f05f641.mp4",
+   "size": 6475090
+  },
+  "clips/p136-4985-walkthrough.jpg": {
+   "object": "guide/clips/p136-4985-walkthrough-52d64d887dbaff6f.jpg",
+   "size": 81761
+  },
+  "clips/p136-4985-walkthrough.mp4": {
+   "object": "guide/clips/p136-4985-walkthrough-ce362bdcee963ebe.mp4",
+   "size": 2427700
+  },
+  "clips/p18-1483-review.jpg": {
+   "object": "guide/clips/p18-1483-review-904bc35675f8d255.jpg",
+   "size": 39141
+  },
+  "clips/p18-1483-review.mp4": {
+   "object": "guide/clips/p18-1483-review-fded140fb72f1dd6.mp4",
+   "size": 2546586
+  },
+  "clips/p18-1483.jpg": {
+   "object": "guide/clips/p18-1483-904bc35675f8d255.jpg",
+   "size": 39141
+  },
+  "clips/p18-1483.mp4": {
+   "object": "guide/clips/p18-1483-dd20914417eec360.mp4",
+   "size": 3132812
+  },
+  "clips/p26-78-review.jpg": {
+   "object": "guide/clips/p26-78-review-a9663ac8185f3c0f.jpg",
+   "size": 76574
+  },
+  "clips/p26-78-review.mp4": {
+   "object": "guide/clips/p26-78-review-109aee16b034a319.mp4",
+   "size": 7036470
+  },
+  "clips/p26-78.jpg": {
+   "object": "guide/clips/p26-78-a9663ac8185f3c0f.jpg",
+   "size": 76574
+  },
+  "clips/p26-78.mp4": {
+   "object": "guide/clips/p26-78-cc9badfd25ec8901.mp4",
+   "size": 8274802
+  },
+  "clips/p29-153-review.jpg": {
+   "object": "guide/clips/p29-153-review-b32d841168210a63.jpg",
+   "size": 78280
+  },
+  "clips/p29-153-review.mp4": {
+   "object": "guide/clips/p29-153-review-5cd81eabc952fe8b.mp4",
+   "size": 6846273
+  },
+  "clips/p29-170.jpg": {
+   "object": "guide/clips/p29-170-1874bcce9167dbce.jpg",
+   "size": 54311
+  },
+  "clips/p29-170.mp4": {
+   "object": "guide/clips/p29-170-489cd2de47b6400a.mp4",
+   "size": 6062831
+  },
+  "clips/p33-239-review.jpg": {
+   "object": "guide/clips/p33-239-review-77f41c3b493f9c02.jpg",
+   "size": 87877
+  },
+  "clips/p33-239-review.mp4": {
+   "object": "guide/clips/p33-239-review-9d8b23fc0cb77e3c.mp4",
+   "size": 4586197
+  },
+  "clips/p33-250.jpg": {
+   "object": "guide/clips/p33-250-8690a6db86fca16b.jpg",
+   "size": 64180
+  },
+  "clips/p33-250.mp4": {
+   "object": "guide/clips/p33-250-1c8cf65efaa7129f.mp4",
+   "size": 4132391
+  },
+  "clips/p33-347-review.jpg": {
+   "object": "guide/clips/p33-347-review-7df41daeaaa19cc6.jpg",
+   "size": 55167
+  },
+  "clips/p33-347-review.mp4": {
+   "object": "guide/clips/p33-347-review-bec2aeacf8c418e1.mp4",
+   "size": 6679620
+  },
+  "clips/p35-329-review.jpg": {
+   "object": "guide/clips/p35-329-review-53c656515603ac9c.jpg",
+   "size": 80580
+  },
+  "clips/p35-329-review.mp4": {
+   "object": "guide/clips/p35-329-review-791aed8f8666d190.mp4",
+   "size": 1021818
+  },
+  "clips/p35-375.jpg": {
+   "object": "guide/clips/p35-375-1f372f09736a1175.jpg",
+   "size": 64576
+  },
+  "clips/p35-375.mp4": {
+   "object": "guide/clips/p35-375-bb67545f30d35929.mp4",
+   "size": 6901784
+  },
+  "clips/p35-416-review.jpg": {
+   "object": "guide/clips/p35-416-review-8540418d8364cb9b.jpg",
+   "size": 56600
+  },
+  "clips/p35-416-review.mp4": {
+   "object": "guide/clips/p35-416-review-bb7e71bbe5ebb5e8.mp4",
+   "size": 573092
+  },
+  "clips/p35-426-review.jpg": {
+   "object": "guide/clips/p35-426-review-845a22d2519791db.jpg",
+   "size": 56976
+  },
+  "clips/p35-426-review.mp4": {
+   "object": "guide/clips/p35-426-review-8128328c2ce9022a.mp4",
+   "size": 1059949
+  },
+  "clips/p37-475.jpg": {
+   "object": "guide/clips/p37-475-b2332c7a78e0863d.jpg",
+   "size": 77978
+  },
+  "clips/p37-475.mp4": {
+   "object": "guide/clips/p37-475-40c0d19b00bd5891.mp4",
+   "size": 5899574
+  },
+  "clips/p37-638-review.jpg": {
+   "object": "guide/clips/p37-638-review-de25963f5bc0a970.jpg",
+   "size": 73156
+  },
+  "clips/p37-638-review.mp4": {
+   "object": "guide/clips/p37-638-review-ffb074a159797e76.mp4",
+   "size": 3859198
+  },
+  "clips/p40-660.jpg": {
+   "object": "guide/clips/p40-660-1333e697b006ed91.jpg",
+   "size": 43546
+  },
+  "clips/p40-660.mp4": {
+   "object": "guide/clips/p40-660-c08bfff0712b042d.mp4",
+   "size": 5333072
+  },
+  "clips/p40-685-review.jpg": {
+   "object": "guide/clips/p40-685-review-dd06a56a48d73e54.jpg",
+   "size": 53783
+  },
+  "clips/p40-685-review.mp4": {
+   "object": "guide/clips/p40-685-review-1f1974943ec86c69.mp4",
+   "size": 3235150
+  },
+  "clips/p42-475-review.jpg": {
+   "object": "guide/clips/p42-475-review-b2332c7a78e0863d.jpg",
+   "size": 77978
+  },
+  "clips/p42-475-review.mp4": {
+   "object": "guide/clips/p42-475-review-30073ca7691033c0.mp4",
+   "size": 7357598
+  },
+  "clips/p42-558-review.jpg": {
+   "object": "guide/clips/p42-558-review-27fcf58f902adf23.jpg",
+   "size": 64979
+  },
+  "clips/p42-558-review.mp4": {
+   "object": "guide/clips/p42-558-review-caafe2fb2927d592.mp4",
+   "size": 6463722
+  },
+  "clips/p42-560.jpg": {
+   "object": "guide/clips/p42-560-2b7701c2f7402c52.jpg",
+   "size": 64239
+  },
+  "clips/p42-560.mp4": {
+   "object": "guide/clips/p42-560-8f7ed0439c38ba19.mp4",
+   "size": 7406717
+  },
+  "clips/p46-768-walkthrough.jpg": {
+   "object": "guide/clips/p46-768-walkthrough-ed6070b6dab47c2e.jpg",
+   "size": 68269
+  },
+  "clips/p46-768-walkthrough.mp4": {
+   "object": "guide/clips/p46-768-walkthrough-04f6ecf8714bf75e.mp4",
+   "size": 8482001
+  },
+  "clips/p46-888-walkthrough.jpg": {
+   "object": "guide/clips/p46-888-walkthrough-6aa310f381f735f2.jpg",
+   "size": 64878
+  },
+  "clips/p46-888-walkthrough.mp4": {
+   "object": "guide/clips/p46-888-walkthrough-476226ef6a6bf492.mp4",
+   "size": 9361020
+  },
+  "clips/p49-1108-walkthrough.jpg": {
+   "object": "guide/clips/p49-1108-walkthrough-82b1e17fe67a545c.jpg",
+   "size": 77461
+  },
+  "clips/p49-1108-walkthrough.mp4": {
+   "object": "guide/clips/p49-1108-walkthrough-be3e9f8d1345138e.mp4",
+   "size": 8904498
+  },
+  "clips/p52-1195-walkthrough.jpg": {
+   "object": "guide/clips/p52-1195-walkthrough-bec8047869c6999f.jpg",
+   "size": 73801
+  },
+  "clips/p52-1195-walkthrough.mp4": {
+   "object": "guide/clips/p52-1195-walkthrough-b0ca29486127a897.mp4",
+   "size": 2317846
+  },
+  "clips/p54-1006-walkthrough.jpg": {
+   "object": "guide/clips/p54-1006-walkthrough-5861f70ed2227ccc.jpg",
+   "size": 75109
+  },
+  "clips/p54-1006-walkthrough.mp4": {
+   "object": "guide/clips/p54-1006-walkthrough-4ea5c449bd53b161.mp4",
+   "size": 12036317
+  },
+  "clips/p56-1220-walkthrough.jpg": {
+   "object": "guide/clips/p56-1220-walkthrough-2d5f283d7633aa89.jpg",
+   "size": 84683
+  },
+  "clips/p56-1220-walkthrough.mp4": {
+   "object": "guide/clips/p56-1220-walkthrough-ca1565b75dcc71be.mp4",
+   "size": 6667983
+  },
+  "clips/p59-1305-walkthrough.jpg": {
+   "object": "guide/clips/p59-1305-walkthrough-00ca5545489f6904.jpg",
+   "size": 48024
+  },
+  "clips/p59-1305-walkthrough.mp4": {
+   "object": "guide/clips/p59-1305-walkthrough-00357d1faf0a4d41.mp4",
+   "size": 13397921
+  },
+  "clips/p6-86-walkthrough.jpg": {
+   "object": "guide/clips/p6-86-walkthrough-693f09fecab876f4.jpg",
+   "size": 66076
+  },
+  "clips/p6-86-walkthrough.mp4": {
+   "object": "guide/clips/p6-86-walkthrough-9742f0a658c8a632.mp4",
+   "size": 3507612
+  },
+  "clips/p62-1405-walkthrough.jpg": {
+   "object": "guide/clips/p62-1405-walkthrough-b80a4ae51d5f44e2.jpg",
+   "size": 96241
+  },
+  "clips/p62-1405-walkthrough.mp4": {
+   "object": "guide/clips/p62-1405-walkthrough-20eaa1b598f9b1d7.mp4",
+   "size": 9472851
+  },
+  "clips/p64-1510.jpg": {
+   "object": "guide/clips/p64-1510-d1d58143b6413319.jpg",
+   "size": 57469
+  },
+  "clips/p64-1510.mp4": {
+   "object": "guide/clips/p64-1510-15fcef3905b3c3d5.mp4",
+   "size": 11069280
+  },
+  "clips/p64-1635.jpg": {
+   "object": "guide/clips/p64-1635-f01322c8a8aad258.jpg",
+   "size": 55343
+  },
+  "clips/p64-1635.mp4": {
+   "object": "guide/clips/p64-1635-c9ea6da55306b943.mp4",
+   "size": 8685322
+  },
+  "clips/p68-1761.jpg": {
+   "object": "guide/clips/p68-1761-f3f8d952b95dcead.jpg",
+   "size": 78291
+  },
+  "clips/p68-1761.mp4": {
+   "object": "guide/clips/p68-1761-1734265f5a55d02e.mp4",
+   "size": 3899598
+  },
+  "clips/p73-1845-walkthrough.jpg": {
+   "object": "guide/clips/p73-1845-walkthrough-c66d49f221f0f0ca.jpg",
+   "size": 65012
+  },
+  "clips/p73-1845-walkthrough.mp4": {
+   "object": "guide/clips/p73-1845-walkthrough-d5871ab3190d6159.mp4",
+   "size": 4773226
+  },
+  "clips/p75-2330.jpg": {
+   "object": "guide/clips/p75-2330-6dad5663e7c7c114.jpg",
+   "size": 39185
+  },
+  "clips/p75-2330.mp4": {
+   "object": "guide/clips/p75-2330-484e0668d278a206.mp4",
+   "size": 7636340
+  },
+  "clips/p77-2486.jpg": {
+   "object": "guide/clips/p77-2486-5dad3f0172a35118.jpg",
+   "size": 57976
+  },
+  "clips/p77-2486.mp4": {
+   "object": "guide/clips/p77-2486-3a032a1593874600.mp4",
+   "size": 8839625
+  },
+  "clips/p77-2590.jpg": {
+   "object": "guide/clips/p77-2590-2c01869cd578f5cd.jpg",
+   "size": 65654
+  },
+  "clips/p77-2590.mp4": {
+   "object": "guide/clips/p77-2590-e859822a82d64bbe.mp4",
+   "size": 8198226
+  },
+  "clips/p89-2660.jpg": {
+   "object": "guide/clips/p89-2660-67d09b6ae03a4991.jpg",
+   "size": 76020
+  },
+  "clips/p89-2660.mp4": {
+   "object": "guide/clips/p89-2660-0967b5e2bcfce9ac.mp4",
+   "size": 11257944
+  },
+  "clips/p89-2678-review.jpg": {
+   "object": "guide/clips/p89-2678-review-0ba216e096a37b34.jpg",
+   "size": 73724
+  },
+  "clips/p89-2678-review.mp4": {
+   "object": "guide/clips/p89-2678-review-e512bd13d5892456.mp4",
+   "size": 8258025
+  },
+  "clips/p89-2775.jpg": {
+   "object": "guide/clips/p89-2775-4785cfe94d01e5fa.jpg",
+   "size": 79884
+  },
+  "clips/p89-2775.mp4": {
+   "object": "guide/clips/p89-2775-7b64490e7a62f146.mp4",
+   "size": 10193661
+  },
+  "clips/p93-2917.jpg": {
+   "object": "guide/clips/p93-2917-581a047fac320a09.jpg",
+   "size": 65225
+  },
+  "clips/p93-2917.mp4": {
+   "object": "guide/clips/p93-2917-a43da5b6dfc6c56f.mp4",
+   "size": 7676867
+  },
+  "clips/p93-3045.jpg": {
+   "object": "guide/clips/p93-3045-928241f965577ca1.jpg",
+   "size": 74833
+  },
+  "clips/p93-3045.mp4": {
+   "object": "guide/clips/p93-3045-6970b0091ba3e973.mp4",
+   "size": 8585286
+  },
+  "clips/p98-3403.jpg": {
+   "object": "guide/clips/p98-3403-f33d85b472f55367.jpg",
+   "size": 72064
+  },
+  "clips/p98-3403.mp4": {
+   "object": "guide/clips/p98-3403-5262b59b83a75e06.mp4",
+   "size": 1899187
+  },
+  "clips/p99-3238.jpg": {
+   "object": "guide/clips/p99-3238-419a6f528d693aa2.jpg",
+   "size": 76409
+  },
+  "clips/p99-3238.mp4": {
+   "object": "guide/clips/p99-3238-0650b9bf293302bb.mp4",
+   "size": 8977396
+  },
+  "details/oh-board-reference.jpeg": {
+   "object": "guide/details/oh-board-reference-7e5a338e69a19ba6.jpeg",
+   "size": 126384
+  },
+  "details/touch-connector-board.glb": {
+   "object": "guide/details/touch-connector-board-f622706d789b7161.glb",
+   "size": 6923472,
+   "encoding": "gzip"
+  },
+  "media/ashley-1.jpg": {
+   "object": "guide/media/ashley-1-0a70f8a1156d47ed.jpg",
+   "size": 11361
+  },
+  "media/ashley-10.jpg": {
+   "object": "guide/media/ashley-10-1af407992357737f.jpg",
+   "size": 6945
+  },
+  "media/ashley-11.jpg": {
+   "object": "guide/media/ashley-11-4e8f5c395a76a2bd.jpg",
+   "size": 6318
+  },
+  "media/ashley-2.jpg": {
+   "object": "guide/media/ashley-2-87e6803bc15d0ca8.jpg",
+   "size": 11431
+  },
+  "media/ashley-3.jpg": {
+   "object": "guide/media/ashley-3-c640044a055034e4.jpg",
+   "size": 10231
+  },
+  "media/ashley-4.jpg": {
+   "object": "guide/media/ashley-4-d6ea4842e08af461.jpg",
+   "size": 9902
+  },
+  "media/ashley-5.jpg": {
+   "object": "guide/media/ashley-5-7152209726402815.jpg",
+   "size": 10044
+  },
+  "media/ashley-6.jpg": {
+   "object": "guide/media/ashley-6-fc7f690ba78fde0d.jpg",
+   "size": 9891
+  },
+  "media/ashley-7.jpg": {
+   "object": "guide/media/ashley-7-cfae7c2c7cf7aa00.jpg",
+   "size": 10020
+  },
+  "media/ashley-8.jpg": {
+   "object": "guide/media/ashley-8-3cf77f432c8db260.jpg",
+   "size": 9100
+  },
+  "media/ashley-9.jpg": {
+   "object": "guide/media/ashley-9-708f4ef4c7c912ea.jpg",
+   "size": 7638
+  },
+  "media/board-connectors.png": {
+   "object": "guide/media/board-connectors-0e948169dd103fdf.png",
+   "size": 529760
+  },
+  "media/detail-008.jpg": {
+   "object": "guide/media/detail-008-de924d735312bb84.jpg",
+   "size": 121135
+  },
+  "media/detail-010.jpg": {
+   "object": "guide/media/detail-010-6593d695103bed49.jpg",
+   "size": 80613
+  },
+  "media/detail-011.jpg": {
+   "object": "guide/media/detail-011-3859a261b84d740b.jpg",
+   "size": 21272
+  },
+  "media/detail-014.jpg": {
+   "object": "guide/media/detail-014-6f32ba5b40ac492d.jpg",
+   "size": 154735
+  },
+  "media/detail-015.jpg": {
+   "object": "guide/media/detail-015-b82e692d5a1a42a2.jpg",
+   "size": 28745
+  },
+  "media/detail-017.jpg": {
+   "object": "guide/media/detail-017-1017ea34bd75b07b.jpg",
+   "size": 89107
+  },
+  "media/detail-019.jpg": {
+   "object": "guide/media/detail-019-bbb13cda9de0354d.jpg",
+   "size": 103397
+  },
+  "media/detail-021.jpg": {
+   "object": "guide/media/detail-021-32a1a9d7b62aa02a.jpg",
+   "size": 85143
+  },
+  "media/detail-023.jpg": {
+   "object": "guide/media/detail-023-b891b454701b77ad.jpg",
+   "size": 77223
+  },
+  "media/detail-027.jpg": {
+   "object": "guide/media/detail-027-8ecde2751e523644.jpg",
+   "size": 66121
+  },
+  "media/detail-030.jpg": {
+   "object": "guide/media/detail-030-24e0add930a9e54c.jpg",
+   "size": 68511
+  },
+  "media/detail-032.jpg": {
+   "object": "guide/media/detail-032-b2e8bb16df4ae1db.jpg",
+   "size": 145747
+  },
+  "media/detail-034.jpg": {
+   "object": "guide/media/detail-034-5cb370022a9a13bc.jpg",
+   "size": 91449
+  },
+  "media/detail-036.jpg": {
+   "object": "guide/media/detail-036-85ca44f73c3e8555.jpg",
+   "size": 81904
+  },
+  "media/detail-039.jpg": {
+   "object": "guide/media/detail-039-2b461314577aad8e.jpg",
+   "size": 70600
+  },
+  "media/detail-041.jpg": {
+   "object": "guide/media/detail-041-bba8cce42c4ffefe.jpg",
+   "size": 113897
+  },
+  "media/detail-044.jpg": {
+   "object": "guide/media/detail-044-c74ef514c62b9e78.jpg",
+   "size": 90340
+  },
+  "media/detail-045.jpg": {
+   "object": "guide/media/detail-045-7f5675efbe293c56.jpg",
+   "size": 35571
+  },
+  "media/detail-048.jpg": {
+   "object": "guide/media/detail-048-c085375a7ccf97fe.jpg",
+   "size": 62841
+  },
+  "media/detail-051.jpg": {
+   "object": "guide/media/detail-051-72e81c2b4d046109.jpg",
+   "size": 69537
+  },
+  "media/detail-053.jpg": {
+   "object": "guide/media/detail-053-faea50903b602c14.jpg",
+   "size": 112900
+  },
+  "media/detail-055.jpg": {
+   "object": "guide/media/detail-055-3ea892a575815d75.jpg",
+   "size": 104578
+  },
+  "media/detail-058.jpg": {
+   "object": "guide/media/detail-058-26d6c700f958c533.jpg",
+   "size": 71426
+  },
+  "media/detail-059.jpg": {
+   "object": "guide/media/detail-059-4e34d3758c8775e1.jpg",
+   "size": 17858
+  },
+  "media/detail-060.jpg": {
+   "object": "guide/media/detail-060-c4382231e9a1b362.jpg",
+   "size": 106703
+  },
+  "media/detail-061.jpg": {
+   "object": "guide/media/detail-061-175f80b35d8bfb0b.jpg",
+   "size": 108169
+  },
+  "media/detail-063.jpg": {
+   "object": "guide/media/detail-063-6caab5b538ab9d1c.jpg",
+   "size": 145432
+  },
+  "media/detail-066.jpg": {
+   "object": "guide/media/detail-066-83df8b59f39fec6c.jpg",
+   "size": 107972
+  },
+  "media/detail-067.jpg": {
+   "object": "guide/media/detail-067-dd018e801cc0c498.jpg",
+   "size": 129174
+  },
+  "media/detail-069.jpg": {
+   "object": "guide/media/detail-069-113699b3eb559d2f.jpg",
+   "size": 83254
+  },
+  "media/detail-072.jpg": {
+   "object": "guide/media/detail-072-65cc97186d828d82.jpg",
+   "size": 102225
+  },
+  "media/detail-074.jpg": {
+   "object": "guide/media/detail-074-9b93eef0f8b4de15.jpg",
+   "size": 119845
+  },
+  "media/detail-076.jpg": {
+   "object": "guide/media/detail-076-3ea2791b1f31fab2.jpg",
+   "size": 86574
+  },
+  "media/detail-079.jpg": {
+   "object": "guide/media/detail-079-fb45e7ec7349db9a.jpg",
+   "size": 129537
+  },
+  "media/detail-081.jpg": {
+   "object": "guide/media/detail-081-6747770759690f2d.jpg",
+   "size": 215956
+  },
+  "media/detail-082.jpg": {
+   "object": "guide/media/detail-082-fa0449daf9f43793.jpg",
+   "size": 132785
+  },
+  "media/detail-084.jpg": {
+   "object": "guide/media/detail-084-77b1fd9ab4297fa6.jpg",
+   "size": 274361
+  },
+  "media/detail-085.jpg": {
+   "object": "guide/media/detail-085-a4831152adee22cd.jpg",
+   "size": 272795
+  },
+  "media/detail-089.jpg": {
+   "object": "guide/media/detail-089-7719100427439c2e.jpg",
+   "size": 17597
+  },
+  "media/detail-091.jpg": {
+   "object": "guide/media/detail-091-9bc224cca5f825bd.jpg",
+   "size": 51420
+  },
+  "media/detail-092.jpg": {
+   "object": "guide/media/detail-092-7d9ad26f386fc3c3.jpg",
+   "size": 100682
+  },
+  "media/detail-095.jpg": {
+   "object": "guide/media/detail-095-2c27aa775bd9e4e8.jpg",
+   "size": 73403
+  },
+  "media/detail-096.jpg": {
+   "object": "guide/media/detail-096-e8b17445f8ad6f8a.jpg",
+   "size": 132085
+  },
+  "media/detail-098.jpg": {
+   "object": "guide/media/detail-098-fafdc6bbe58d0434.jpg",
+   "size": 39780
+  },
+  "media/detail-100.jpg": {
+   "object": "guide/media/detail-100-987efc4484089d52.jpg",
+   "size": 47308
+  },
+  "media/detail-101.jpg": {
+   "object": "guide/media/detail-101-fdd5b5cc3d3113c9.jpg",
+   "size": 128905
+  },
+  "media/detail-103.jpg": {
+   "object": "guide/media/detail-103-60141d126a25acef.jpg",
+   "size": 40837
+  },
+  "media/detail-104.jpg": {
+   "object": "guide/media/detail-104-532192f9fd8cc4b4.jpg",
+   "size": 18916
+  },
+  "media/detail-105.jpg": {
+   "object": "guide/media/detail-105-ad351edcaabdadd6.jpg",
+   "size": 67868
+  },
+  "media/detail-106.jpg": {
+   "object": "guide/media/detail-106-9494c8240dabb27e.jpg",
+   "size": 55489
+  },
+  "media/detail-107.jpg": {
+   "object": "guide/media/detail-107-7add94076a757fa6.jpg",
+   "size": 77707
+  },
+  "media/detail-108.jpg": {
+   "object": "guide/media/detail-108-c74d54799e987d3c.jpg",
+   "size": 120934
+  },
+  "media/detail-109.jpg": {
+   "object": "guide/media/detail-109-874690aa8383d3d1.jpg",
+   "size": 103738
+  },
+  "media/detail-110.jpg": {
+   "object": "guide/media/detail-110-bbd0065c3e1e8999.jpg",
+   "size": 66903
+  },
+  "media/detail-111.jpg": {
+   "object": "guide/media/detail-111-c7aeced87fb53671.jpg",
+   "size": 83402
+  },
+  "media/detail-114.jpg": {
+   "object": "guide/media/detail-114-a160f6854d2a3e32.jpg",
+   "size": 141435
+  },
+  "media/detail-116.jpg": {
+   "object": "guide/media/detail-116-6df5c83c7ef98966.jpg",
+   "size": 54447
+  },
+  "media/detail-118.jpg": {
+   "object": "guide/media/detail-118-f28d33de8873a6b1.jpg",
+   "size": 196477
+  },
+  "media/detail-121.jpg": {
+   "object": "guide/media/detail-121-72617040e6f37c0d.jpg",
+   "size": 151449
+  },
+  "media/detail-122.jpg": {
+   "object": "guide/media/detail-122-e7016aa7a8419f12.jpg",
+   "size": 42398
+  },
+  "media/detail-124.jpg": {
+   "object": "guide/media/detail-124-a6420f6bb97c5004.jpg",
+   "size": 104436
+  },
+  "media/detail-125.jpg": {
+   "object": "guide/media/detail-125-826fa5860dd8a2d5.jpg",
+   "size": 49628
+  },
+  "media/detail-126.jpg": {
+   "object": "guide/media/detail-126-fa2c923fa5ed9ea7.jpg",
+   "size": 94853
+  },
+  "media/detail-127.jpg": {
+   "object": "guide/media/detail-127-5fcb0813601a8f58.jpg",
+   "size": 52226
+  },
+  "media/detail-128.jpg": {
+   "object": "guide/media/detail-128-0fdaa188a253c3a5.jpg",
+   "size": 74476
+  },
+  "media/detail-131.jpg": {
+   "object": "guide/media/detail-131-dd71fd5d6a652846.jpg",
+   "size": 61285
+  },
+  "media/detail-134.jpg": {
+   "object": "guide/media/detail-134-6ed637d9419477eb.jpg",
+   "size": 23767
+  },
+  "media/detail-135.jpg": {
+   "object": "guide/media/detail-135-e08fec9b1c04edb5.jpg",
+   "size": 33192
+  },
+  "media/detail-138.jpg": {
+   "object": "guide/media/detail-138-acc082208386ac92.jpg",
+   "size": 119760
+  },
+  "media/detail-140.jpg": {
+   "object": "guide/media/detail-140-56df15ade60cfb39.jpg",
+   "size": 23449
+  },
+  "media/detail-151.jpg": {
+   "object": "guide/media/detail-151-e59e51591733db4b.jpg",
+   "size": 78345
+  },
+  "media/detail-152.jpg": {
+   "object": "guide/media/detail-152-15772fe9ca2c4020.jpg",
+   "size": 49122
+  },
+  "media/detail-156.jpg": {
+   "object": "guide/media/detail-156-305b6276bbc25374.jpg",
+   "size": 84906
+  },
+  "media/feetech-1.jpg": {
+   "object": "guide/media/feetech-1-b0fe352dde416fb3.jpg",
+   "size": 111859
+  },
+  "media/feetech-2.jpg": {
+   "object": "guide/media/feetech-2-ea2e1f39375ec20d.jpg",
+   "size": 26783
+  },
+  "media/feetech-3.jpg": {
+   "object": "guide/media/feetech-3-4352fc31e8913b71.jpg",
+   "size": 153374
+  },
+  "media/feetech-4.jpg": {
+   "object": "guide/media/feetech-4-0c8f8f1257fb1159.jpg",
+   "size": 311049
+  },
+  "media/feetech-5.jpg": {
+   "object": "guide/media/feetech-5-74b076bde336cf7b.jpg",
+   "size": 410668
+  },
+  "media/feetech-6.jpg": {
+   "object": "guide/media/feetech-6-725c99a4fb85bd66.jpg",
+   "size": 321869
+  },
+  "media/feetech-video-1-poster.jpg": {
+   "object": "guide/media/feetech-video-1-poster-edbb816d5b28b49f.jpg",
+   "size": 50964
+  },
+  "media/feetech-video-1.mp4": {
+   "object": "guide/media/feetech-video-1-220844e8d7122f65.mp4",
+   "size": 7029405
+  },
+  "media/feetech-video-2-poster.jpg": {
+   "object": "guide/media/feetech-video-2-poster-e148c8efbb20a03b.jpg",
+   "size": 56241
+  },
+  "media/feetech-video-2.mp4": {
+   "object": "guide/media/feetech-video-2-451fd3fef3fe18ff.mp4",
+   "size": 8674776
+  },
+  "media/feetech-video-3-poster.jpg": {
+   "object": "guide/media/feetech-video-3-poster-296526a149ac1942.jpg",
+   "size": 59096
+  },
+  "media/feetech-video-3.mp4": {
+   "object": "guide/media/feetech-video-3-a70b9803fb90f434.mp4",
+   "size": 7426623
+  },
+  "media/hires/board-connectors.webp": {
+   "object": "guide/media/hires/board-connectors-6800c166033315ad.webp",
+   "size": 448354
+  },
+  "media/hires/panel-008-1.webp": {
+   "object": "guide/media/hires/panel-008-1-5d6cca2b26ef6383.webp",
+   "size": 112378
+  },
+  "media/hires/panel-008-2.webp": {
+   "object": "guide/media/hires/panel-008-2-cba7603e63269cad.webp",
+   "size": 131978
+  },
+  "media/hires/panel-008-3.webp": {
+   "object": "guide/media/hires/panel-008-3-0ddc21154e81390e.webp",
+   "size": 169376
+  },
+  "media/hires/panel-010-1.webp": {
+   "object": "guide/media/hires/panel-010-1-e9ccfb38a3fec536.webp",
+   "size": 181602
+  },
+  "media/hires/panel-011-1.webp": {
+   "object": "guide/media/hires/panel-011-1-133633cca2c90e25.webp",
+   "size": 44322
+  },
+  "media/hires/panel-014-1.webp": {
+   "object": "guide/media/hires/panel-014-1-8f0f693deca7cd11.webp",
+   "size": 67042
+  },
+  "media/hires/panel-014-2.webp": {
+   "object": "guide/media/hires/panel-014-2-9acb0a97ccd79043.webp",
+   "size": 118902
+  },
+  "media/hires/panel-014-3.webp": {
+   "object": "guide/media/hires/panel-014-3-6a829186570e3f6f.webp",
+   "size": 207598
+  },
+  "media/hires/panel-014-4.webp": {
+   "object": "guide/media/hires/panel-014-4-3edae3df29c1a1b3.webp",
+   "size": 72644
+  },
+  "media/hires/panel-014-5.webp": {
+   "object": "guide/media/hires/panel-014-5-cf39861eb442140c.webp",
+   "size": 82394
+  },
+  "media/hires/panel-015-1.webp": {
+   "object": "guide/media/hires/panel-015-1-747d3368180e432b.webp",
+   "size": 44388
+  },
+  "media/hires/panel-015-2.webp": {
+   "object": "guide/media/hires/panel-015-2-ea22f49e38bedaa5.webp",
+   "size": 36956
+  },
+  "media/hires/panel-017-1.webp": {
+   "object": "guide/media/hires/panel-017-1-943ecd69e67c0e63.webp",
+   "size": 98764
+  },
+  "media/hires/panel-017-2.webp": {
+   "object": "guide/media/hires/panel-017-2-31f505cb43156f10.webp",
+   "size": 102580
+  },
+  "media/hires/panel-017-3.webp": {
+   "object": "guide/media/hires/panel-017-3-40c2e7a131e23ce3.webp",
+   "size": 109402
+  },
+  "media/hires/panel-017-4.webp": {
+   "object": "guide/media/hires/panel-017-4-9b36492b31f8096e.webp",
+   "size": 146648
+  },
+  "media/hires/panel-017-5.webp": {
+   "object": "guide/media/hires/panel-017-5-224ae7ea76581cc2.webp",
+   "size": 68776
+  },
+  "media/hires/panel-019-1.webp": {
+   "object": "guide/media/hires/panel-019-1-b43efc88c7edd0e0.webp",
+   "size": 119940
+  },
+  "media/hires/panel-019-2.webp": {
+   "object": "guide/media/hires/panel-019-2-e05eed699b4985e8.webp",
+   "size": 128054
+  },
+  "media/hires/panel-019-3.webp": {
+   "object": "guide/media/hires/panel-019-3-9c13234143f8a686.webp",
+   "size": 145174
+  },
+  "media/hires/panel-019-4.webp": {
+   "object": "guide/media/hires/panel-019-4-de3df6ed3bd52624.webp",
+   "size": 103610
+  },
+  "media/hires/panel-021-1.webp": {
+   "object": "guide/media/hires/panel-021-1-181fe6fcb11761d9.webp",
+   "size": 93182
+  },
+  "media/hires/panel-021-2.webp": {
+   "object": "guide/media/hires/panel-021-2-0f2c95d0e76f2213.webp",
+   "size": 54108
+  },
+  "media/hires/panel-021-3.webp": {
+   "object": "guide/media/hires/panel-021-3-01698ae5e343aac9.webp",
+   "size": 84158
+  },
+  "media/hires/panel-023-1.webp": {
+   "object": "guide/media/hires/panel-023-1-e5b7585a3711a138.webp",
+   "size": 170210
+  },
+  "media/hires/panel-027-1.webp": {
+   "object": "guide/media/hires/panel-027-1-de6b14380e00870d.webp",
+   "size": 68350
+  },
+  "media/hires/panel-027-2.webp": {
+   "object": "guide/media/hires/panel-027-2-dbf1317613e07dbe.webp",
+   "size": 27098
+  },
+  "media/hires/panel-027-3.webp": {
+   "object": "guide/media/hires/panel-027-3-66cf9c268e0e8c24.webp",
+   "size": 25962
+  },
+  "media/hires/panel-030-1.webp": {
+   "object": "guide/media/hires/panel-030-1-bafa346b131a4341.webp",
+   "size": 39872
+  },
+  "media/hires/panel-030-2.webp": {
+   "object": "guide/media/hires/panel-030-2-ecef5bbf0d04dfcb.webp",
+   "size": 29122
+  },
+  "media/hires/panel-030-3.webp": {
+   "object": "guide/media/hires/panel-030-3-bb26cb06c4894a49.webp",
+   "size": 33786
+  },
+  "media/hires/panel-030-4.webp": {
+   "object": "guide/media/hires/panel-030-4-da5b8291ada5d0cf.webp",
+   "size": 37372
+  },
+  "media/hires/panel-032-1.webp": {
+   "object": "guide/media/hires/panel-032-1-a7689a2a7f21500b.webp",
+   "size": 109284
+  },
+  "media/hires/panel-032-2.webp": {
+   "object": "guide/media/hires/panel-032-2-1e784e4d80a935ea.webp",
+   "size": 165404
+  },
+  "media/hires/panel-032-3.webp": {
+   "object": "guide/media/hires/panel-032-3-5981bad99decd72b.webp",
+   "size": 167570
+  },
+  "media/hires/panel-034-1.webp": {
+   "object": "guide/media/hires/panel-034-1-3d2818d5fdf1bfae.webp",
+   "size": 21780
+  },
+  "media/hires/panel-034-2.webp": {
+   "object": "guide/media/hires/panel-034-2-f38c940db8f33a3f.webp",
+   "size": 26394
+  },
+  "media/hires/panel-034-3.webp": {
+   "object": "guide/media/hires/panel-034-3-8b3c80f87d44fc36.webp",
+   "size": 44448
+  },
+  "media/hires/panel-034-4.webp": {
+   "object": "guide/media/hires/panel-034-4-dea43d241767064a.webp",
+   "size": 30108
+  },
+  "media/hires/panel-034-5.webp": {
+   "object": "guide/media/hires/panel-034-5-d34076704f21340e.webp",
+   "size": 53240
+  },
+  "media/hires/panel-034-6.webp": {
+   "object": "guide/media/hires/panel-034-6-c75da7daf2b74248.webp",
+   "size": 18084
+  },
+  "media/hires/panel-036-1.webp": {
+   "object": "guide/media/hires/panel-036-1-c84a8f9beef0b2b7.webp",
+   "size": 29234
+  },
+  "media/hires/panel-036-2.webp": {
+   "object": "guide/media/hires/panel-036-2-ef2d52380c67b5ba.webp",
+   "size": 37510
+  },
+  "media/hires/panel-036-3.webp": {
+   "object": "guide/media/hires/panel-036-3-6363a66c6e002893.webp",
+   "size": 35762
+  },
+  "media/hires/panel-036-4.webp": {
+   "object": "guide/media/hires/panel-036-4-008f5d20b5f3337b.webp",
+   "size": 34178
+  },
+  "media/hires/panel-036-5.webp": {
+   "object": "guide/media/hires/panel-036-5-72fb0d2e613cc9bf.webp",
+   "size": 71146
+  },
+  "media/hires/panel-039-1.webp": {
+   "object": "guide/media/hires/panel-039-1-5a98246ce1c4dfc4.webp",
+   "size": 20016
+  },
+  "media/hires/panel-039-2.webp": {
+   "object": "guide/media/hires/panel-039-2-4b8e314dff7789d3.webp",
+   "size": 35926
+  },
+  "media/hires/panel-041-1.webp": {
+   "object": "guide/media/hires/panel-041-1-f4158d8cb2ba04af.webp",
+   "size": 127236
+  },
+  "media/hires/panel-041-2.webp": {
+   "object": "guide/media/hires/panel-041-2-93496e2c8f63dc84.webp",
+   "size": 91174
+  },
+  "media/hires/panel-041-3.webp": {
+   "object": "guide/media/hires/panel-041-3-4b6256ae6152df6a.webp",
+   "size": 80102
+  },
+  "media/hires/panel-041-4.webp": {
+   "object": "guide/media/hires/panel-041-4-39e6780648fa525d.webp",
+   "size": 72944
+  },
+  "media/hires/panel-041-5.webp": {
+   "object": "guide/media/hires/panel-041-5-82395c3a96c009ef.webp",
+   "size": 64234
+  },
+  "media/hires/panel-044-1.webp": {
+   "object": "guide/media/hires/panel-044-1-033661b6a093da54.webp",
+   "size": 134774
+  },
+  "media/hires/panel-044-2.webp": {
+   "object": "guide/media/hires/panel-044-2-7f7085423fe708fa.webp",
+   "size": 55682
+  },
+  "media/hires/panel-045-1.webp": {
+   "object": "guide/media/hires/panel-045-1-c537d00637d00c3b.webp",
+   "size": 120412
+  },
+  "media/hires/panel-048-1.webp": {
+   "object": "guide/media/hires/panel-048-1-1f04731ce24b5886.webp",
+   "size": 142480
+  },
+  "media/hires/panel-051-1.webp": {
+   "object": "guide/media/hires/panel-051-1-226bb926a1d93701.webp",
+   "size": 40322
+  },
+  "media/hires/panel-051-2.webp": {
+   "object": "guide/media/hires/panel-051-2-cd4ea3e9aa8b330a.webp",
+   "size": 29714
+  },
+  "media/hires/panel-053-1.webp": {
+   "object": "guide/media/hires/panel-053-1-f4158d8cb2ba04af.webp",
+   "size": 127236
+  },
+  "media/hires/panel-053-2.webp": {
+   "object": "guide/media/hires/panel-053-2-209089d0698939ff.webp",
+   "size": 91198
+  },
+  "media/hires/panel-053-3.webp": {
+   "object": "guide/media/hires/panel-053-3-054dc8456d8f3b1c.webp",
+   "size": 80142
+  },
+  "media/hires/panel-053-4.webp": {
+   "object": "guide/media/hires/panel-053-4-39e6780648fa525d.webp",
+   "size": 72944
+  },
+  "media/hires/panel-053-5.webp": {
+   "object": "guide/media/hires/panel-053-5-1f4b4dd875a6589c.webp",
+   "size": 64246
+  },
+  "media/hires/panel-055-1.webp": {
+   "object": "guide/media/hires/panel-055-1-cc755ae8db8d05fd.webp",
+   "size": 167654
+  },
+  "media/hires/panel-055-2.webp": {
+   "object": "guide/media/hires/panel-055-2-9d554485ee3c7121.webp",
+   "size": 61094
+  },
+  "media/hires/panel-055-3.webp": {
+   "object": "guide/media/hires/panel-055-3-2d5f32d8d8e35978.webp",
+   "size": 60212
+  },
+  "media/hires/panel-058-1.webp": {
+   "object": "guide/media/hires/panel-058-1-6a5529c2f545ae4c.webp",
+   "size": 36812
+  },
+  "media/hires/panel-058-2.webp": {
+   "object": "guide/media/hires/panel-058-2-932a2e1bc8ea1df4.webp",
+   "size": 24524
+  },
+  "media/hires/panel-059-1.webp": {
+   "object": "guide/media/hires/panel-059-1-84e951ad6d38bd24.webp",
+   "size": 62154
+  },
+  "media/hires/panel-060-1.webp": {
+   "object": "guide/media/hires/panel-060-1-f0481daf00a0a437.webp",
+   "size": 142360
+  },
+  "media/hires/panel-060-2.webp": {
+   "object": "guide/media/hires/panel-060-2-262b2e7f631cc114.webp",
+   "size": 75326
+  },
+  "media/hires/panel-061-1.webp": {
+   "object": "guide/media/hires/panel-061-1-b9ea48cb7a559748.webp",
+   "size": 140510
+  },
+  "media/hires/panel-061-2.webp": {
+   "object": "guide/media/hires/panel-061-2-a362e0ea538c8fb8.webp",
+   "size": 76846
+  },
+  "media/hires/panel-063-1.webp": {
+   "object": "guide/media/hires/panel-063-1-279b928f3e249385.webp",
+   "size": 236114
+  },
+  "media/hires/panel-063-2.webp": {
+   "object": "guide/media/hires/panel-063-2-4cfe3f97f6208b94.webp",
+   "size": 164578
+  },
+  "media/hires/panel-063-3.webp": {
+   "object": "guide/media/hires/panel-063-3-41307264a1c84970.webp",
+   "size": 69414
+  },
+  "media/hires/panel-066-1.webp": {
+   "object": "guide/media/hires/panel-066-1-45733e879d60d5c7.webp",
+   "size": 116406
+  },
+  "media/hires/panel-066-2.webp": {
+   "object": "guide/media/hires/panel-066-2-51639265aed3a1a1.webp",
+   "size": 112622
+  },
+  "media/hires/panel-066-3.webp": {
+   "object": "guide/media/hires/panel-066-3-6b338697bb79152a.webp",
+   "size": 51092
+  },
+  "media/hires/panel-067-1.webp": {
+   "object": "guide/media/hires/panel-067-1-0219358e2cb7845b.webp",
+   "size": 178894
+  },
+  "media/hires/panel-067-2.webp": {
+   "object": "guide/media/hires/panel-067-2-51639265aed3a1a1.webp",
+   "size": 112622
+  },
+  "media/hires/panel-067-3.webp": {
+   "object": "guide/media/hires/panel-067-3-6b338697bb79152a.webp",
+   "size": 51092
+  },
+  "media/hires/panel-069-1.webp": {
+   "object": "guide/media/hires/panel-069-1-ac7b0cc43431c416.webp",
+   "size": 170980
+  },
+  "media/hires/panel-069-2.webp": {
+   "object": "guide/media/hires/panel-069-2-6e2324cb8938988d.webp",
+   "size": 138534
+  },
+  "media/hires/panel-072-1.webp": {
+   "object": "guide/media/hires/panel-072-1-cc15bf0395ec3815.webp",
+   "size": 301538
+  },
+  "media/hires/panel-074-1.webp": {
+   "object": "guide/media/hires/panel-074-1-5189e62fbd950b7f.webp",
+   "size": 116648
+  },
+  "media/hires/panel-074-2.webp": {
+   "object": "guide/media/hires/panel-074-2-ac42040a3f1dc113.webp",
+   "size": 116584
+  },
+  "media/hires/panel-074-3.webp": {
+   "object": "guide/media/hires/panel-074-3-dfee6de092421065.webp",
+   "size": 208172
+  },
+  "media/hires/panel-074-4.webp": {
+   "object": "guide/media/hires/panel-074-4-aa8e7c386d52380c.webp",
+   "size": 98872
+  },
+  "media/hires/panel-076-1.webp": {
+   "object": "guide/media/hires/panel-076-1-c16db2bb0c4b0bad.webp",
+   "size": 64174
+  },
+  "media/hires/panel-076-2.webp": {
+   "object": "guide/media/hires/panel-076-2-820bba1072c5a1ce.webp",
+   "size": 81776
+  },
+  "media/hires/panel-076-3.webp": {
+   "object": "guide/media/hires/panel-076-3-bb21b8a438b34926.webp",
+   "size": 189956
+  },
+  "media/hires/panel-079-1.webp": {
+   "object": "guide/media/hires/panel-079-1-fe68693a8e0b7f08.webp",
+   "size": 156438
+  },
+  "media/hires/panel-079-2.webp": {
+   "object": "guide/media/hires/panel-079-2-88ad72148c2555c7.webp",
+   "size": 301474
+  },
+  "media/hires/panel-081-1.webp": {
+   "object": "guide/media/hires/panel-081-1-b4b0b34cb1acc076.webp",
+   "size": 201742
+  },
+  "media/hires/panel-081-2.webp": {
+   "object": "guide/media/hires/panel-081-2-1690e3824a8d5b4f.webp",
+   "size": 224364
+  },
+  "media/hires/panel-081-3.webp": {
+   "object": "guide/media/hires/panel-081-3-4712e0d90a2c6b72.webp",
+   "size": 175502
+  },
+  "media/hires/panel-081-4.webp": {
+   "object": "guide/media/hires/panel-081-4-4455be594d105b4b.webp",
+   "size": 203418
+  },
+  "media/hires/panel-081-5.webp": {
+   "object": "guide/media/hires/panel-081-5-7a01a7092e2d83e4.webp",
+   "size": 166980
+  },
+  "media/hires/panel-081-6.webp": {
+   "object": "guide/media/hires/panel-081-6-ad05b49834c756df.webp",
+   "size": 105034
+  },
+  "media/hires/panel-082-1.webp": {
+   "object": "guide/media/hires/panel-082-1-f41fe283885c4afe.webp",
+   "size": 287662
+  },
+  "media/hires/panel-082-2.webp": {
+   "object": "guide/media/hires/panel-082-2-787db197138b6728.webp",
+   "size": 158552
+  },
+  "media/hires/panel-089-1.webp": {
+   "object": "guide/media/hires/panel-089-1-e3755331a85e8b2d.webp",
+   "size": 82110
+  },
+  "media/hires/panel-091-1.webp": {
+   "object": "guide/media/hires/panel-091-1-0f095d191eab8d61.webp",
+   "size": 59686
+  },
+  "media/hires/panel-091-2.webp": {
+   "object": "guide/media/hires/panel-091-2-a5ef95303b6afe68.webp",
+   "size": 62798
+  },
+  "media/hires/panel-092-1.webp": {
+   "object": "guide/media/hires/panel-092-1-7cb3fae6f8440ca0.webp",
+   "size": 166838
+  },
+  "media/hires/panel-092-2.webp": {
+   "object": "guide/media/hires/panel-092-2-ea905b4db704b583.webp",
+   "size": 218064
+  },
+  "media/hires/panel-092-3.webp": {
+   "object": "guide/media/hires/panel-092-3-3f884e281f34bd74.webp",
+   "size": 92058
+  },
+  "media/hires/panel-095-1.webp": {
+   "object": "guide/media/hires/panel-095-1-18f31023598ff336.webp",
+   "size": 384746
+  },
+  "media/hires/panel-096-1.webp": {
+   "object": "guide/media/hires/panel-096-1-a3ac80123152d81c.webp",
+   "size": 60522
+  },
+  "media/hires/panel-096-2.webp": {
+   "object": "guide/media/hires/panel-096-2-655de5be33152dec.webp",
+   "size": 151178
+  },
+  "media/hires/panel-096-3.webp": {
+   "object": "guide/media/hires/panel-096-3-0283f00b21b45bbc.webp",
+   "size": 141378
+  },
+  "media/hires/panel-098-1.webp": {
+   "object": "guide/media/hires/panel-098-1-1cc20ea442f33325.webp",
+   "size": 95270
+  },
+  "media/hires/panel-098-2.webp": {
+   "object": "guide/media/hires/panel-098-2-93cabcb59bf98d8a.webp",
+   "size": 77380
+  },
+  "media/hires/panel-100-1.webp": {
+   "object": "guide/media/hires/panel-100-1-c7f08059b3c27532.webp",
+   "size": 322738
+  },
+  "media/hires/panel-103-1.webp": {
+   "object": "guide/media/hires/panel-103-1-57a62bb994957093.webp",
+   "size": 172532
+  },
+  "media/hires/panel-104-1.webp": {
+   "object": "guide/media/hires/panel-104-1-ab7f7ba9a66c77b3.webp",
+   "size": 77986
+  },
+  "media/hires/panel-105-1.webp": {
+   "object": "guide/media/hires/panel-105-1-338e56daa11558ff.webp",
+   "size": 218970
+  },
+  "media/hires/panel-106-1.webp": {
+   "object": "guide/media/hires/panel-106-1-e4e5a53f01012544.webp",
+   "size": 49590
+  },
+  "media/hires/panel-106-2.webp": {
+   "object": "guide/media/hires/panel-106-2-de6ac49b6b8c694e.webp",
+   "size": 30350
+  },
+  "media/hires/panel-107-1.webp": {
+   "object": "guide/media/hires/panel-107-1-4e9dd319f29c296b.webp",
+   "size": 232426
+  },
+  "media/hires/panel-108-1.webp": {
+   "object": "guide/media/hires/panel-108-1-f336193564870e12.webp",
+   "size": 197680
+  },
+  "media/hires/panel-108-2.webp": {
+   "object": "guide/media/hires/panel-108-2-6c239f4909046496.webp",
+   "size": 229464
+  },
+  "media/hires/panel-108-3.webp": {
+   "object": "guide/media/hires/panel-108-3-e99fa0f0c4e30b5d.webp",
+   "size": 36210
+  },
+  "media/hires/panel-108-4.webp": {
+   "object": "guide/media/hires/panel-108-4-7f3f9e716d719600.webp",
+   "size": 72638
+  },
+  "media/hires/panel-109-1.webp": {
+   "object": "guide/media/hires/panel-109-1-54b1162c85c8d470.webp",
+   "size": 288928
+  },
+  "media/hires/panel-110-1.webp": {
+   "object": "guide/media/hires/panel-110-1-09d212496592306a.webp",
+   "size": 97348
+  },
+  "media/hires/panel-110-2.webp": {
+   "object": "guide/media/hires/panel-110-2-712e8da7cb1bf2bf.webp",
+   "size": 84748
+  },
+  "media/hires/panel-111-1.webp": {
+   "object": "guide/media/hires/panel-111-1-05195a543d160607.webp",
+   "size": 162520
+  },
+  "media/hires/panel-111-2.webp": {
+   "object": "guide/media/hires/panel-111-2-5c10fb2b2d15a4ec.webp",
+   "size": 98736
+  },
+  "media/hires/panel-111-3.webp": {
+   "object": "guide/media/hires/panel-111-3-cb1af5d3b31f12ec.webp",
+   "size": 126180
+  },
+  "media/hires/panel-114-1.webp": {
+   "object": "guide/media/hires/panel-114-1-e72af9e193700fbe.webp",
+   "size": 314764
+  },
+  "media/hires/panel-114-2.webp": {
+   "object": "guide/media/hires/panel-114-2-51a97559a810d493.webp",
+   "size": 190826
+  },
+  "media/hires/panel-116-1.webp": {
+   "object": "guide/media/hires/panel-116-1-ab66431105656bed.webp",
+   "size": 138168
+  },
+  "media/hires/panel-116-2.webp": {
+   "object": "guide/media/hires/panel-116-2-0504b2bcbb8a39ce.webp",
+   "size": 124842
+  },
+  "media/hires/panel-118-1.webp": {
+   "object": "guide/media/hires/panel-118-1-728275554a074bb1.webp",
+   "size": 247986
+  },
+  "media/hires/panel-118-2.webp": {
+   "object": "guide/media/hires/panel-118-2-2f0e45a37c9f9700.webp",
+   "size": 211976
+  },
+  "media/hires/panel-118-3.webp": {
+   "object": "guide/media/hires/panel-118-3-08274c41888b56d4.webp",
+   "size": 145084
+  },
+  "media/hires/panel-121-1.webp": {
+   "object": "guide/media/hires/panel-121-1-da3138c898c0d8e6.webp",
+   "size": 120980
+  },
+  "media/hires/panel-121-2.webp": {
+   "object": "guide/media/hires/panel-121-2-921f89a0f2b301ee.webp",
+   "size": 89354
+  },
+  "media/hires/panel-121-3.webp": {
+   "object": "guide/media/hires/panel-121-3-e1ffe11b10bfe4c3.webp",
+   "size": 125850
+  },
+  "media/hires/panel-121-4.webp": {
+   "object": "guide/media/hires/panel-121-4-f73ee53c706ce3f6.webp",
+   "size": 132920
+  },
+  "media/hires/panel-122-1.webp": {
+   "object": "guide/media/hires/panel-122-1-2347ca33a6618a85.webp",
+   "size": 213840
+  },
+  "media/hires/panel-124-1.webp": {
+   "object": "guide/media/hires/panel-124-1-e9c46ff21e171e52.webp",
+   "size": 194314
+  },
+  "media/hires/panel-124-2.webp": {
+   "object": "guide/media/hires/panel-124-2-a62d7c88235eef9f.webp",
+   "size": 183716
+  },
+  "media/hires/panel-125-1.webp": {
+   "object": "guide/media/hires/panel-125-1-c14f20f287e908f4.webp",
+   "size": 122562
+  },
+  "media/hires/panel-125-2.webp": {
+   "object": "guide/media/hires/panel-125-2-f731ec5650e9ba13.webp",
+   "size": 108722
+  },
+  "media/hires/panel-126-1.webp": {
+   "object": "guide/media/hires/panel-126-1-75673c6895e224e4.webp",
+   "size": 153616
+  },
+  "media/hires/panel-126-2.webp": {
+   "object": "guide/media/hires/panel-126-2-ed7825b7102c053d.webp",
+   "size": 215840
+  },
+  "media/hires/panel-127-1.webp": {
+   "object": "guide/media/hires/panel-127-1-25a20bb7365775ab.webp",
+   "size": 151660
+  },
+  "media/hires/panel-128-1.webp": {
+   "object": "guide/media/hires/panel-128-1-9a444f0f3fb57771.webp",
+   "size": 297442
+  },
+  "media/hires/panel-131-1.webp": {
+   "object": "guide/media/hires/panel-131-1-b4060d14fe3d3bee.webp",
+   "size": 181062
+  },
+  "media/hires/panel-134-1.webp": {
+   "object": "guide/media/hires/panel-134-1-9af57b5ece7f7411.webp",
+   "size": 61682
+  },
+  "media/hires/panel-135-1.webp": {
+   "object": "guide/media/hires/panel-135-1-b44b94731635880f.webp",
+   "size": 157180
+  },
+  "media/hires/panel-138-1.webp": {
+   "object": "guide/media/hires/panel-138-1-52982528c49178e9.webp",
+   "size": 123000
+  },
+  "media/hires/panel-138-2.webp": {
+   "object": "guide/media/hires/panel-138-2-2a0255a791100549.webp",
+   "size": 212314
+  },
+  "media/hires/panel-138-3.webp": {
+   "object": "guide/media/hires/panel-138-3-9d1558a657d970c2.webp",
+   "size": 235366
+  },
+  "media/hires/panel-138-4.webp": {
+   "object": "guide/media/hires/panel-138-4-774958248a9fd848.webp",
+   "size": 140300
+  },
+  "media/hires/panel-138-5.webp": {
+   "object": "guide/media/hires/panel-138-5-176a26204bb652b3.webp",
+   "size": 110572
+  },
+  "media/hires/panel-140-1.webp": {
+   "object": "guide/media/hires/panel-140-1-bd3af3320f299cee.webp",
+   "size": 107530
+  },
+  "media/hires/panel-151-1.webp": {
+   "object": "guide/media/hires/panel-151-1-7f87a50bed4865ee.webp",
+   "size": 238854
+  },
+  "media/hires/panel-152-1.webp": {
+   "object": "guide/media/hires/panel-152-1-63e1bdfe6594d5e1.webp",
+   "size": 196026
+  },
+  "media/hires/panel-156-1.webp": {
+   "object": "guide/media/hires/panel-156-1-40911bb7fa62b84c.webp",
+   "size": 311714
+  },
+  "media/hires/panel-156-2.webp": {
+   "object": "guide/media/hires/panel-156-2-3035b3694d9da65d.webp",
+   "size": 255480
+  },
+  "media/mapping-left-1.jpg": {
+   "object": "guide/media/mapping-left-1-1c69aceec3877d6e.jpg",
+   "size": 98238
+  },
+  "media/mapping-left-2.jpg": {
+   "object": "guide/media/mapping-left-2-0b60107505081c0a.jpg",
+   "size": 140174
+  },
+  "media/mapping-left-3.jpg": {
+   "object": "guide/media/mapping-left-3-c6aa2b92b006ad29.jpg",
+   "size": 161577
+  },
+  "media/mapping-right-1.jpg": {
+   "object": "guide/media/mapping-right-1-1da5adeef3cacfc1.jpg",
+   "size": 105114
+  },
+  "media/mapping-right-2.jpg": {
+   "object": "guide/media/mapping-right-2-0e03a0171e93bbb3.jpg",
+   "size": 140186
+  },
+  "media/mapping-right-3.jpg": {
+   "object": "guide/media/mapping-right-3-46d67a4206279cd1.jpg",
+   "size": 165386
+  },
+  "media/mount-1.png": {
+   "object": "guide/media/mount-1-2fdf50295eba67a4.png",
+   "size": 977257
+  },
+  "media/mount-2.png": {
+   "object": "guide/media/mount-2-1d9387316257063d.png",
+   "size": 680787
+  },
+  "media/mount-3.png": {
+   "object": "guide/media/mount-3-e6de1dbe1e04daed.png",
+   "size": 794466
+  },
+  "media/mount-4.png": {
+   "object": "guide/media/mount-4-b40df8c2e8020355.png",
+   "size": 1035308
+  },
+  "media/mount-5.png": {
+   "object": "guide/media/mount-5-42026557933c5894.png",
+   "size": 704876
+  },
+  "media/panel-008-1.png": {
+   "object": "guide/media/panel-008-1-0c0dd22307433aac.png",
+   "size": 232804
+  },
+  "media/panel-008-2.png": {
+   "object": "guide/media/panel-008-2-436d4f109b9c73e4.png",
+   "size": 290023
+  },
+  "media/panel-008-3.png": {
+   "object": "guide/media/panel-008-3-99eafb6959ee5996.png",
+   "size": 467746
+  },
+  "media/panel-010-1.png": {
+   "object": "guide/media/panel-010-1-1f6f6f540d23b2ff.png",
+   "size": 412623
+  },
+  "media/panel-011-1.png": {
+   "object": "guide/media/panel-011-1-f1da38ac71327cef.png",
+   "size": 99116
+  },
+  "media/panel-014-1.png": {
+   "object": "guide/media/panel-014-1-f997a00d2f766897.png",
+   "size": 134212
+  },
+  "media/panel-014-2.png": {
+   "object": "guide/media/panel-014-2-e545dbae3fc8918a.png",
+   "size": 247439
+  },
+  "media/panel-014-3.png": {
+   "object": "guide/media/panel-014-3-74e7ff8436cc3ee6.png",
+   "size": 458602
+  },
+  "media/panel-014-4.png": {
+   "object": "guide/media/panel-014-4-800983b79a2eabdf.png",
+   "size": 132193
+  },
+  "media/panel-014-5.png": {
+   "object": "guide/media/panel-014-5-08f5abf1c7f095ff.png",
+   "size": 141661
+  },
+  "media/panel-015-1.png": {
+   "object": "guide/media/panel-015-1-95878abd9cc4ae6d.png",
+   "size": 109668
+  },
+  "media/panel-015-2.png": {
+   "object": "guide/media/panel-015-2-5303af0c3b243443.png",
+   "size": 103017
+  },
+  "media/panel-017-1.png": {
+   "object": "guide/media/panel-017-1-7c8dbc4a9f440ce0.png",
+   "size": 124401
+  },
+  "media/panel-017-2.png": {
+   "object": "guide/media/panel-017-2-75844b2e5cb8886e.png",
+   "size": 148916
+  },
+  "media/panel-017-3.png": {
+   "object": "guide/media/panel-017-3-07e4fd4f8245e086.png",
+   "size": 109889
+  },
+  "media/panel-017-4.png": {
+   "object": "guide/media/panel-017-4-eeaffcfeeb8dc822.png",
+   "size": 116442
+  },
+  "media/panel-017-5.png": {
+   "object": "guide/media/panel-017-5-c7af4f0b6cf63ac1.png",
+   "size": 101294
+  },
+  "media/panel-019-1.png": {
+   "object": "guide/media/panel-019-1-3a3c6dbe36177fc6.png",
+   "size": 169346
+  },
+  "media/panel-019-2.png": {
+   "object": "guide/media/panel-019-2-516cc2c974d0f797.png",
+   "size": 204185
+  },
+  "media/panel-019-3.png": {
+   "object": "guide/media/panel-019-3-019956e2d869c901.png",
+   "size": 154219
+  },
+  "media/panel-019-4.png": {
+   "object": "guide/media/panel-019-4-4c88fac6ed7ca1c5.png",
+   "size": 219930
+  },
+  "media/panel-021-1.png": {
+   "object": "guide/media/panel-021-1-baf9ae9ee74871d0.png",
+   "size": 191438
+  },
+  "media/panel-021-2.png": {
+   "object": "guide/media/panel-021-2-ce221432478ebbe1.png",
+   "size": 135966
+  },
+  "media/panel-021-3.png": {
+   "object": "guide/media/panel-021-3-afdb977d2ffe9d2f.png",
+   "size": 210739
+  },
+  "media/panel-023-1.png": {
+   "object": "guide/media/panel-023-1-d4ea42b92697c614.png",
+   "size": 456045
+  },
+  "media/panel-027-1.png": {
+   "object": "guide/media/panel-027-1-1029844a9c92303d.png",
+   "size": 167487
+  },
+  "media/panel-027-2.png": {
+   "object": "guide/media/panel-027-2-f98e8c2a8143134f.png",
+   "size": 53452
+  },
+  "media/panel-027-3.png": {
+   "object": "guide/media/panel-027-3-339a97e315e435ea.png",
+   "size": 46400
+  },
+  "media/panel-027-4.png": {
+   "object": "guide/media/panel-027-4-efc028eba0dcca23.png",
+   "size": 18995
+  },
+  "media/panel-030-1.png": {
+   "object": "guide/media/panel-030-1-929f58607591af09.png",
+   "size": 71086
+  },
+  "media/panel-030-2.png": {
+   "object": "guide/media/panel-030-2-2dab2042a1e2188c.png",
+   "size": 45539
+  },
+  "media/panel-030-3.png": {
+   "object": "guide/media/panel-030-3-2bfe1429c708b8c9.png",
+   "size": 63241
+  },
+  "media/panel-030-4.png": {
+   "object": "guide/media/panel-030-4-fc8f77d22fba177e.png",
+   "size": 82101
+  },
+  "media/panel-032-1.png": {
+   "object": "guide/media/panel-032-1-396b869164afcca0.png",
+   "size": 263012
+  },
+  "media/panel-032-2.png": {
+   "object": "guide/media/panel-032-2-9b0cecb0a0cca09c.png",
+   "size": 375289
+  },
+  "media/panel-032-3.png": {
+   "object": "guide/media/panel-032-3-0d1f828a83cd13ea.png",
+   "size": 406399
+  },
+  "media/panel-034-1.png": {
+   "object": "guide/media/panel-034-1-bd35beb924daf8e1.png",
+   "size": 33826
+  },
+  "media/panel-034-2.png": {
+   "object": "guide/media/panel-034-2-ceeaeae8237a526b.png",
+   "size": 56099
+  },
+  "media/panel-034-3.png": {
+   "object": "guide/media/panel-034-3-62955ecb6003365d.png",
+   "size": 97467
+  },
+  "media/panel-034-4.png": {
+   "object": "guide/media/panel-034-4-9c144cb483684a86.png",
+   "size": 64531
+  },
+  "media/panel-034-5.png": {
+   "object": "guide/media/panel-034-5-0b5d7d02ae52202a.png",
+   "size": 137000
+  },
+  "media/panel-034-6.png": {
+   "object": "guide/media/panel-034-6-49abb0999701d825.png",
+   "size": 24810
+  },
+  "media/panel-036-1.png": {
+   "object": "guide/media/panel-036-1-e5c4bbb7a33a16e0.png",
+   "size": 50327
+  },
+  "media/panel-036-2.png": {
+   "object": "guide/media/panel-036-2-eb8626bfe159fe1d.png",
+   "size": 68508
+  },
+  "media/panel-036-3.png": {
+   "object": "guide/media/panel-036-3-47573a9f9b62cb06.png",
+   "size": 76344
+  },
+  "media/panel-036-4.png": {
+   "object": "guide/media/panel-036-4-4019d27ebb6d80e9.png",
+   "size": 39683
+  },
+  "media/panel-036-5.png": {
+   "object": "guide/media/panel-036-5-1192db003e9ba1a4.png",
+   "size": 74513
+  },
+  "media/panel-039-1.png": {
+   "object": "guide/media/panel-039-1-dac21417e19d9fdf.png",
+   "size": 30315
+  },
+  "media/panel-039-2.png": {
+   "object": "guide/media/panel-039-2-f8d9d63941a05631.png",
+   "size": 69998
+  },
+  "media/panel-041-1.png": {
+   "object": "guide/media/panel-041-1-d119323a86dbfa45.png",
+   "size": 174862
+  },
+  "media/panel-041-2.png": {
+   "object": "guide/media/panel-041-2-1ff26444b60a67e4.png",
+   "size": 140933
+  },
+  "media/panel-041-3.png": {
+   "object": "guide/media/panel-041-3-e18c430dc911091b.png",
+   "size": 144347
+  },
+  "media/panel-041-4.png": {
+   "object": "guide/media/panel-041-4-ad3aafd80266854d.png",
+   "size": 116908
+  },
+  "media/panel-041-5.png": {
+   "object": "guide/media/panel-041-5-790a92d1de1f0679.png",
+   "size": 145811
+  },
+  "media/panel-044-1.png": {
+   "object": "guide/media/panel-044-1-384315b23b474a92.png",
+   "size": 342767
+  },
+  "media/panel-044-2.png": {
+   "object": "guide/media/panel-044-2-bf5e73f03f1a6490.png",
+   "size": 111241
+  },
+  "media/panel-045-1.png": {
+   "object": "guide/media/panel-045-1-387888938bdf89fc.png",
+   "size": 184683
+  },
+  "media/panel-048-1.png": {
+   "object": "guide/media/panel-048-1-60f99ae7053d5f95.png",
+   "size": 257754
+  },
+  "media/panel-048-2.png": {
+   "object": "guide/media/panel-048-2-60f99ae7053d5f95.png",
+   "size": 257754
+  },
+  "media/panel-051-1.png": {
+   "object": "guide/media/panel-051-1-53731439b920910b.png",
+   "size": 51424
+  },
+  "media/panel-051-2.png": {
+   "object": "guide/media/panel-051-2-60e7abccf055d420.png",
+   "size": 42494
+  },
+  "media/panel-053-1.png": {
+   "object": "guide/media/panel-053-1-d119323a86dbfa45.png",
+   "size": 174862
+  },
+  "media/panel-053-2.png": {
+   "object": "guide/media/panel-053-2-eee3005d21664bc4.png",
+   "size": 140957
+  },
+  "media/panel-053-3.png": {
+   "object": "guide/media/panel-053-3-e18c430dc911091b.png",
+   "size": 144347
+  },
+  "media/panel-053-4.png": {
+   "object": "guide/media/panel-053-4-634c071a0cb64af6.png",
+   "size": 117037
+  },
+  "media/panel-053-5.png": {
+   "object": "guide/media/panel-053-5-ffb70ec813df4685.png",
+   "size": 145952
+  },
+  "media/panel-055-1.png": {
+   "object": "guide/media/panel-055-1-49037c28b12de55c.png",
+   "size": 238546
+  },
+  "media/panel-055-2.png": {
+   "object": "guide/media/panel-055-2-c1364f0c74a2ab3e.png",
+   "size": 79771
+  },
+  "media/panel-055-3.png": {
+   "object": "guide/media/panel-055-3-e9d3e6686cc05714.png",
+   "size": 62649
+  },
+  "media/panel-058-1.png": {
+   "object": "guide/media/panel-058-1-2f9150ebc3da5d59.png",
+   "size": 63047
+  },
+  "media/panel-058-2.png": {
+   "object": "guide/media/panel-058-2-730844fc01f2abe8.png",
+   "size": 41247
+  },
+  "media/panel-059-1.png": {
+   "object": "guide/media/panel-059-1-65d250fdab03b1be.png",
+   "size": 120004
+  },
+  "media/panel-060-1.png": {
+   "object": "guide/media/panel-060-1-d2f8f52841970f86.png",
+   "size": 274191
+  },
+  "media/panel-060-2.png": {
+   "object": "guide/media/panel-060-2-39a13a7a5bf383f9.png",
+   "size": 151711
+  },
+  "media/panel-060-3.png": {
+   "object": "guide/media/panel-060-3-9737d233080362ef.png",
+   "size": 502
+  },
+  "media/panel-061-1.png": {
+   "object": "guide/media/panel-061-1-a3801e7cc07f3889.png",
+   "size": 274299
+  },
+  "media/panel-061-2.png": {
+   "object": "guide/media/panel-061-2-57964936eeab6036.png",
+   "size": 161961
+  },
+  "media/panel-061-3.png": {
+   "object": "guide/media/panel-061-3-9737d233080362ef.png",
+   "size": 502
+  },
+  "media/panel-063-1.png": {
+   "object": "guide/media/panel-063-1-f1065133c70cc21a.png",
+   "size": 559287
+  },
+  "media/panel-063-2.png": {
+   "object": "guide/media/panel-063-2-3854f1b96393d023.png",
+   "size": 436075
+  },
+  "media/panel-063-3.png": {
+   "object": "guide/media/panel-063-3-f5afd01b0ce6510b.png",
+   "size": 85467
+  },
+  "media/panel-066-1.png": {
+   "object": "guide/media/panel-066-1-61450f8a3462be26.png",
+   "size": 269865
+  },
+  "media/panel-066-2.png": {
+   "object": "guide/media/panel-066-2-25e2b6081f197a8f.png",
+   "size": 135765
+  },
+  "media/panel-066-3.png": {
+   "object": "guide/media/panel-066-3-9ddf8c40a8c21f32.png",
+   "size": 66238
+  },
+  "media/panel-067-1.png": {
+   "object": "guide/media/panel-067-1-50a4dd920c3a7e69.png",
+   "size": 292423
+  },
+  "media/panel-067-2.png": {
+   "object": "guide/media/panel-067-2-25e2b6081f197a8f.png",
+   "size": 135765
+  },
+  "media/panel-067-3.png": {
+   "object": "guide/media/panel-067-3-9ddf8c40a8c21f32.png",
+   "size": 66238
+  },
+  "media/panel-069-1.png": {
+   "object": "guide/media/panel-069-1-7c9330e2474ec217.png",
+   "size": 230177
+  },
+  "media/panel-069-2.png": {
+   "object": "guide/media/panel-069-2-8f81263a40cee600.png",
+   "size": 181558
+  },
+  "media/panel-072-1.png": {
+   "object": "guide/media/panel-072-1-7201884c88256ed8.png",
+   "size": 672493
+  },
+  "media/panel-074-1.png": {
+   "object": "guide/media/panel-074-1-ff51c0d7135bc2b7.png",
+   "size": 120550
+  },
+  "media/panel-074-2.png": {
+   "object": "guide/media/panel-074-2-046f31e998f460b0.png",
+   "size": 148488
+  },
+  "media/panel-074-3.png": {
+   "object": "guide/media/panel-074-3-e139b2003a5f8219.png",
+   "size": 347469
+  },
+  "media/panel-074-4.png": {
+   "object": "guide/media/panel-074-4-47579324078f4821.png",
+   "size": 228292
+  },
+  "media/panel-076-1.png": {
+   "object": "guide/media/panel-076-1-6196469da849fe85.png",
+   "size": 126684
+  },
+  "media/panel-076-2.png": {
+   "object": "guide/media/panel-076-2-b062565bc80e6dd5.png",
+   "size": 111343
+  },
+  "media/panel-076-3.png": {
+   "object": "guide/media/panel-076-3-9c928278053fc922.png",
+   "size": 285209
+  },
+  "media/panel-079-1.png": {
+   "object": "guide/media/panel-079-1-61baebe3b1fb7f73.png",
+   "size": 125872
+  },
+  "media/panel-079-2.png": {
+   "object": "guide/media/panel-079-2-7201884c88256ed8.png",
+   "size": 672493
+  },
+  "media/panel-081-1.png": {
+   "object": "guide/media/panel-081-1-3b76290c52654464.png",
+   "size": 249078
+  },
+  "media/panel-081-2.png": {
+   "object": "guide/media/panel-081-2-fa688a221e2b937e.png",
+   "size": 272155
+  },
+  "media/panel-081-3.png": {
+   "object": "guide/media/panel-081-3-73aebe087816d462.png",
+   "size": 253036
+  },
+  "media/panel-081-4.png": {
+   "object": "guide/media/panel-081-4-b4c81ff80b929d01.png",
+   "size": 272927
+  },
+  "media/panel-081-5.png": {
+   "object": "guide/media/panel-081-5-625e42ded2364869.png",
+   "size": 299633
+  },
+  "media/panel-081-6.png": {
+   "object": "guide/media/panel-081-6-98e0dd0175470c56.png",
+   "size": 262981
+  },
+  "media/panel-082-1.png": {
+   "object": "guide/media/panel-082-1-c66f65702812d65b.png",
+   "size": 656542
+  },
+  "media/panel-082-2.png": {
+   "object": "guide/media/panel-082-2-655fb53729e5a769.png",
+   "size": 519409
+  },
+  "media/panel-089-1.png": {
+   "object": "guide/media/panel-089-1-0b90c670d6b7b036.png",
+   "size": 127779
+  },
+  "media/panel-091-1.png": {
+   "object": "guide/media/panel-091-1-6a29db4d765d9241.png",
+   "size": 171453
+  },
+  "media/panel-091-2.png": {
+   "object": "guide/media/panel-091-2-7b73bdde71d4c290.png",
+   "size": 92749
+  },
+  "media/panel-092-1.png": {
+   "object": "guide/media/panel-092-1-3d0b4171eead40c7.png",
+   "size": 268929
+  },
+  "media/panel-092-2.png": {
+   "object": "guide/media/panel-092-2-a236d26aa3c66c8e.png",
+   "size": 308594
+  },
+  "media/panel-092-3.png": {
+   "object": "guide/media/panel-092-3-38ab593c0f01b997.png",
+   "size": 183171
+  },
+  "media/panel-095-1.png": {
+   "object": "guide/media/panel-095-1-54ad228e03ff6313.png",
+   "size": 605918
+  },
+  "media/panel-096-1.png": {
+   "object": "guide/media/panel-096-1-c803767317f169c6.png",
+   "size": 83274
+  },
+  "media/panel-096-2.png": {
+   "object": "guide/media/panel-096-2-afe6ca8e12276195.png",
+   "size": 305275
+  },
+  "media/panel-096-3.png": {
+   "object": "guide/media/panel-096-3-acca6e5cf42c9f7b.png",
+   "size": 314708
+  },
+  "media/panel-098-1.png": {
+   "object": "guide/media/panel-098-1-ddb9332b5b6ea5d5.png",
+   "size": 148313
+  },
+  "media/panel-098-2.png": {
+   "object": "guide/media/panel-098-2-6babe11ba4f6d972.png",
+   "size": 106588
+  },
+  "media/panel-100-1.png": {
+   "object": "guide/media/panel-100-1-7caf715aee258bfa.png",
+   "size": 260798
+  },
+  "media/panel-101-1.png": {
+   "object": "guide/media/panel-101-1-1a66d3488c1fdd0f.png",
+   "size": 480870
+  },
+  "media/panel-103-1.png": {
+   "object": "guide/media/panel-103-1-951d00b051c4ac6b.png",
+   "size": 313808
+  },
+  "media/panel-104-1.png": {
+   "object": "guide/media/panel-104-1-6947a8adcaf28b07.png",
+   "size": 122184
+  },
+  "media/panel-105-1.png": {
+   "object": "guide/media/panel-105-1-7d5f831b99d8d759.png",
+   "size": 176133
+  },
+  "media/panel-106-1.png": {
+   "object": "guide/media/panel-106-1-3311c7d38672d6f6.png",
+   "size": 59316
+  },
+  "media/panel-106-2.png": {
+   "object": "guide/media/panel-106-2-5348cd52f702ac05.png",
+   "size": 39330
+  },
+  "media/panel-107-1.png": {
+   "object": "guide/media/panel-107-1-89adfb6900af13a2.png",
+   "size": 191209
+  },
+  "media/panel-108-1.png": {
+   "object": "guide/media/panel-108-1-6e4e326ade7276e1.png",
+   "size": 223722
+  },
+  "media/panel-108-2.png": {
+   "object": "guide/media/panel-108-2-b27057c732a26f7f.png",
+   "size": 366799
+  },
+  "media/panel-108-3.png": {
+   "object": "guide/media/panel-108-3-5bbc9ecb2a310422.png",
+   "size": 30100
+  },
+  "media/panel-108-4.png": {
+   "object": "guide/media/panel-108-4-99801f0cf25c4f2c.png",
+   "size": 62337
+  },
+  "media/panel-109-1.png": {
+   "object": "guide/media/panel-109-1-7352841e866f0e29.png",
+   "size": 283895
+  },
+  "media/panel-110-1.png": {
+   "object": "guide/media/panel-110-1-21253f16021bd3ef.png",
+   "size": 109629
+  },
+  "media/panel-110-2.png": {
+   "object": "guide/media/panel-110-2-0b2f5e771afec063.png",
+   "size": 107413
+  },
+  "media/panel-111-1.png": {
+   "object": "guide/media/panel-111-1-ebcdc43eeebce601.png",
+   "size": 129153
+  },
+  "media/panel-111-2.png": {
+   "object": "guide/media/panel-111-2-5396b34916cddbc9.png",
+   "size": 115229
+  },
+  "media/panel-111-3.png": {
+   "object": "guide/media/panel-111-3-30895c5b06c6817c.png",
+   "size": 266217
+  },
+  "media/panel-114-1.png": {
+   "object": "guide/media/panel-114-1-3ee28956b253cc51.png",
+   "size": 668700
+  },
+  "media/panel-114-2.png": {
+   "object": "guide/media/panel-114-2-b07c6e4c45fc7276.png",
+   "size": 396300
+  },
+  "media/panel-116-1.png": {
+   "object": "guide/media/panel-116-1-f5ce268b589ed7bb.png",
+   "size": 150584
+  },
+  "media/panel-116-2.png": {
+   "object": "guide/media/panel-116-2-f03542587b91333f.png",
+   "size": 141035
+  },
+  "media/panel-118-1.png": {
+   "object": "guide/media/panel-118-1-33948cbdeb73e0dd.png",
+   "size": 613177
+  },
+  "media/panel-118-2.png": {
+   "object": "guide/media/panel-118-2-a4caf5b3ef750a07.png",
+   "size": 567568
+  },
+  "media/panel-118-3.png": {
+   "object": "guide/media/panel-118-3-c95148f9c0d79f5c.png",
+   "size": 330525
+  },
+  "media/panel-121-1.png": {
+   "object": "guide/media/panel-121-1-5201947699e2ab19.png",
+   "size": 296638
+  },
+  "media/panel-121-2.png": {
+   "object": "guide/media/panel-121-2-3bfa00989cee7f41.png",
+   "size": 214490
+  },
+  "media/panel-121-3.png": {
+   "object": "guide/media/panel-121-3-203019b870c31529.png",
+   "size": 298421
+  },
+  "media/panel-121-4.png": {
+   "object": "guide/media/panel-121-4-e3f7697804399274.png",
+   "size": 392799
+  },
+  "media/panel-122-1.png": {
+   "object": "guide/media/panel-122-1-5c364498dc708a96.png",
+   "size": 211911
+  },
+  "media/panel-124-1.png": {
+   "object": "guide/media/panel-124-1-5ced05b894d3cc48.png",
+   "size": 237166
+  },
+  "media/panel-124-2.png": {
+   "object": "guide/media/panel-124-2-6b8cc6116ee255dc.png",
+   "size": 215519
+  },
+  "media/panel-125-1.png": {
+   "object": "guide/media/panel-125-1-38bb10d3f228ea68.png",
+   "size": 322526
+  },
+  "media/panel-125-2.png": {
+   "object": "guide/media/panel-125-2-1968200d416c1e31.png",
+   "size": 320473
+  },
+  "media/panel-126-1.png": {
+   "object": "guide/media/panel-126-1-607177763049606c.png",
+   "size": 160438
+  },
+  "media/panel-126-2.png": {
+   "object": "guide/media/panel-126-2-a0441ccde76a98c4.png",
+   "size": 270198
+  },
+  "media/panel-127-1.png": {
+   "object": "guide/media/panel-127-1-4f5547ad22fcd2e2.png",
+   "size": 256546
+  },
+  "media/panel-128-1.png": {
+   "object": "guide/media/panel-128-1-8e012994adad4fca.png",
+   "size": 370569
+  },
+  "media/panel-131-1.png": {
+   "object": "guide/media/panel-131-1-9f99b9dd88108f56.png",
+   "size": 307440
+  },
+  "media/panel-134-1.png": {
+   "object": "guide/media/panel-134-1-bc2bb012ee29c4ff.png",
+   "size": 81384
+  },
+  "media/panel-135-1.png": {
+   "object": "guide/media/panel-135-1-cdb06b3e80b761f8.png",
+   "size": 166068
+  },
+  "media/panel-138-1.png": {
+   "object": "guide/media/panel-138-1-e97dad97d0b46330.png",
+   "size": 164203
+  },
+  "media/panel-138-2.png": {
+   "object": "guide/media/panel-138-2-f1f48896eb2604f3.png",
+   "size": 217484
+  },
+  "media/panel-138-3.png": {
+   "object": "guide/media/panel-138-3-e30afbdb89b00b14.png",
+   "size": 312053
+  },
+  "media/panel-138-4.png": {
+   "object": "guide/media/panel-138-4-62dfc28ee9f83120.png",
+   "size": 171654
+  },
+  "media/panel-138-5.png": {
+   "object": "guide/media/panel-138-5-0639cbf93ef7c8ee.png",
+   "size": 134001
+  },
+  "media/panel-140-1.png": {
+   "object": "guide/media/panel-140-1-e4b873862e854799.png",
+   "size": 116125
+  },
+  "media/panel-151-1.png": {
+   "object": "guide/media/panel-151-1-c9dc122c8b6391e0.png",
+   "size": 288080
+  },
+  "media/panel-152-1.png": {
+   "object": "guide/media/panel-152-1-a524eca85d6926c1.png",
+   "size": 381570
+  },
+  "media/panel-156-1.png": {
+   "object": "guide/media/panel-156-1-34be0215f243b6ec.png",
+   "size": 356912
+  },
+  "media/panel-156-2.png": {
+   "object": "guide/media/panel-156-2-0408ce5c48617562.png",
+   "size": 430987
+  },
+  "molds/base-plate-2.png": {
+   "object": "guide/molds/base-plate-2-132a0384864c5ac9.png",
+   "size": 16177
+  },
+  "molds/base-plate-3.png": {
+   "object": "guide/molds/base-plate-3-b7010f3a62909608.png",
+   "size": 13138
+  },
+  "molds/base-plate-4.png": {
+   "object": "guide/molds/base-plate-4-1ffc86d69fd53668.png",
+   "size": 24565
+  },
+  "molds/base-plate-5.png": {
+   "object": "guide/molds/base-plate-5-b094daac297b85b0.png",
+   "size": 10149
+  },
+  "molds/base-plate-6.png": {
+   "object": "guide/molds/base-plate-6-3bd3672e52dc424f.png",
+   "size": 27003
+  },
+  "molds/base-plate-7.png": {
+   "object": "guide/molds/base-plate-7-304f4cc77ad0c059.png",
+   "size": 22856
+  },
+  "molds/base-plate-8.png": {
+   "object": "guide/molds/base-plate-8-b9e185c47b56ec5b.png",
+   "size": 9880
+  },
+  "molds/base-plate-9.png": {
+   "object": "guide/molds/base-plate-9-90de805cbc02a790.png",
+   "size": 28909
+  },
+  "molds/touch-plate-2.png": {
+   "object": "guide/molds/touch-plate-2-132a0384864c5ac9.png",
+   "size": 16177
+  },
+  "molds/touch-plate-3.png": {
+   "object": "guide/molds/touch-plate-3-b7010f3a62909608.png",
+   "size": 13138
+  },
+  "molds/touch-plate-4.png": {
+   "object": "guide/molds/touch-plate-4-1ffc86d69fd53668.png",
+   "size": 24565
+  },
+  "molds/touch-plate-5.png": {
+   "object": "guide/molds/touch-plate-5-b094daac297b85b0.png",
+   "size": 10149
+  },
+  "molds/touch-plate-6.png": {
+   "object": "guide/molds/touch-plate-6-3bd3672e52dc424f.png",
+   "size": 27003
+  },
+  "molds/touch-plate-7.png": {
+   "object": "guide/molds/touch-plate-7-90de805cbc02a790.png",
+   "size": 28909
+  },
+  "navigation/base-right.webp": {
+   "object": "guide/navigation/base-right-6e822a2154cf1b1e.webp",
+   "size": 30118
+  },
+  "navigation/touch-right.webp": {
+   "object": "guide/navigation/touch-right-70ac848865c87673.webp",
+   "size": 32280
+  },
+  "parts/base-left-dynamixel/02db127025.png": {
+   "object": "guide/parts/base-left-dynamixel/02db127025-f3d8a09f42d82711.png",
+   "size": 104050
+  },
+  "parts/base-left-dynamixel/08f5283ed3.png": {
+   "object": "guide/parts/base-left-dynamixel/08f5283ed3-ebb734e8bb1c4c7e.png",
+   "size": 87355
+  },
+  "parts/base-left-dynamixel/0f4e5dc8e8.png": {
+   "object": "guide/parts/base-left-dynamixel/0f4e5dc8e8-047bc340e2b7b0be.png",
+   "size": 59508
+  },
+  "parts/base-left-dynamixel/1c628876b9.png": {
+   "object": "guide/parts/base-left-dynamixel/1c628876b9-e25c9c57f2a849bd.png",
+   "size": 42644
+  },
+  "parts/base-left-dynamixel/23667c6bcd.png": {
+   "object": "guide/parts/base-left-dynamixel/23667c6bcd-839c0cda35932e24.png",
+   "size": 36146
+  },
+  "parts/base-left-dynamixel/28a0b69d6b.png": {
+   "object": "guide/parts/base-left-dynamixel/28a0b69d6b-38fdf584e905cd26.png",
+   "size": 49312
+  },
+  "parts/base-left-dynamixel/2d16844065.png": {
+   "object": "guide/parts/base-left-dynamixel/2d16844065-57a78d91231941a4.png",
+   "size": 176357
+  },
+  "parts/base-left-dynamixel/2e2a34aa2d.png": {
+   "object": "guide/parts/base-left-dynamixel/2e2a34aa2d-44e2bfe93219013b.png",
+   "size": 119011
+  },
+  "parts/base-left-dynamixel/2f9839c628.png": {
+   "object": "guide/parts/base-left-dynamixel/2f9839c628-b4c08c0dab01f031.png",
+   "size": 70165
+  },
+  "parts/base-left-dynamixel/2fe308f9c0.png": {
+   "object": "guide/parts/base-left-dynamixel/2fe308f9c0-82157113830cca06.png",
+   "size": 66249
+  },
+  "parts/base-left-dynamixel/30d3151b3c.png": {
+   "object": "guide/parts/base-left-dynamixel/30d3151b3c-67944c53cd6ce513.png",
+   "size": 121186
+  },
+  "parts/base-left-dynamixel/33e3c9a582.png": {
+   "object": "guide/parts/base-left-dynamixel/33e3c9a582-62abb5b888b6a00e.png",
+   "size": 92654
+  },
+  "parts/base-left-dynamixel/3e8c8cf2e7.png": {
+   "object": "guide/parts/base-left-dynamixel/3e8c8cf2e7-6c69bc5383639e36.png",
+   "size": 84829
+  },
+  "parts/base-left-dynamixel/410473b9c0.png": {
+   "object": "guide/parts/base-left-dynamixel/410473b9c0-c5724ef5dd1117a9.png",
+   "size": 166235
+  },
+  "parts/base-left-dynamixel/41114d15dc.png": {
+   "object": "guide/parts/base-left-dynamixel/41114d15dc-abc34ba5c32b5d6b.png",
+   "size": 177734
+  },
+  "parts/base-left-dynamixel/43652f0e7d.png": {
+   "object": "guide/parts/base-left-dynamixel/43652f0e7d-aba7b3a8aea10b58.png",
+   "size": 138356
+  },
+  "parts/base-left-dynamixel/483f2dd91e.png": {
+   "object": "guide/parts/base-left-dynamixel/483f2dd91e-9927388f0f2500cb.png",
+   "size": 163415
+  },
+  "parts/base-left-dynamixel/4d55977bb5.png": {
+   "object": "guide/parts/base-left-dynamixel/4d55977bb5-7a08b946657c44a6.png",
+   "size": 202734
+  },
+  "parts/base-left-dynamixel/4f845c5944.png": {
+   "object": "guide/parts/base-left-dynamixel/4f845c5944-547b2c6a1bf7170b.png",
+   "size": 103786
+  },
+  "parts/base-left-dynamixel/57db7c2147.png": {
+   "object": "guide/parts/base-left-dynamixel/57db7c2147-f8780904a613fa19.png",
+   "size": 81716
+  },
+  "parts/base-left-dynamixel/57e3af0e10.png": {
+   "object": "guide/parts/base-left-dynamixel/57e3af0e10-2ec7e51ce2b05842.png",
+   "size": 68215
+  },
+  "parts/base-left-dynamixel/5985d6a280.png": {
+   "object": "guide/parts/base-left-dynamixel/5985d6a280-25f1e895971f7534.png",
+   "size": 151784
+  },
+  "parts/base-left-dynamixel/5e5fa71d2d.png": {
+   "object": "guide/parts/base-left-dynamixel/5e5fa71d2d-5d00ab5bec1eed7b.png",
+   "size": 138535
+  },
+  "parts/base-left-dynamixel/656e35008b.png": {
+   "object": "guide/parts/base-left-dynamixel/656e35008b-800161db8ed9128e.png",
+   "size": 78292
+  },
+  "parts/base-left-dynamixel/69959118bc.png": {
+   "object": "guide/parts/base-left-dynamixel/69959118bc-f173aff3afda1af5.png",
+   "size": 88059
+  },
+  "parts/base-left-dynamixel/6a15a621ca.png": {
+   "object": "guide/parts/base-left-dynamixel/6a15a621ca-21a95c24fc634b52.png",
+   "size": 128360
+  },
+  "parts/base-left-dynamixel/6b74f66dfc.png": {
+   "object": "guide/parts/base-left-dynamixel/6b74f66dfc-f5cfe160a144024b.png",
+   "size": 86610
+  },
+  "parts/base-left-dynamixel/6dd7167777.png": {
+   "object": "guide/parts/base-left-dynamixel/6dd7167777-bf4ad33eb405ed7c.png",
+   "size": 91202
+  },
+  "parts/base-left-dynamixel/70234a9a39.png": {
+   "object": "guide/parts/base-left-dynamixel/70234a9a39-858bebcdbbb8eb8f.png",
+   "size": 93457
+  },
+  "parts/base-left-dynamixel/7315a2bfdf.png": {
+   "object": "guide/parts/base-left-dynamixel/7315a2bfdf-2670e9d279ee5143.png",
+   "size": 77877
+  },
+  "parts/base-left-dynamixel/788f157ef6.png": {
+   "object": "guide/parts/base-left-dynamixel/788f157ef6-b0ea6a4ee9d5c9b7.png",
+   "size": 54682
+  },
+  "parts/base-left-dynamixel/79361f7d71.png": {
+   "object": "guide/parts/base-left-dynamixel/79361f7d71-a84c9a2f855f18a2.png",
+   "size": 136031
+  },
+  "parts/base-left-dynamixel/79c6e3a0f1.png": {
+   "object": "guide/parts/base-left-dynamixel/79c6e3a0f1-a1a56c34301690db.png",
+   "size": 104654
+  },
+  "parts/base-left-dynamixel/8dbef51f40.png": {
+   "object": "guide/parts/base-left-dynamixel/8dbef51f40-cafa1c0292e0599f.png",
+   "size": 55844
+  },
+  "parts/base-left-dynamixel/92be502e02.png": {
+   "object": "guide/parts/base-left-dynamixel/92be502e02-fdf5afb1c6649052.png",
+   "size": 38150
+  },
+  "parts/base-left-dynamixel/938b8cdb6c.png": {
+   "object": "guide/parts/base-left-dynamixel/938b8cdb6c-cc13391b76dea2e6.png",
+   "size": 85569
+  },
+  "parts/base-left-dynamixel/952754b102.png": {
+   "object": "guide/parts/base-left-dynamixel/952754b102-1dc758a645156f44.png",
+   "size": 142342
+  },
+  "parts/base-left-dynamixel/97123e1bdb.png": {
+   "object": "guide/parts/base-left-dynamixel/97123e1bdb-b9d39d4b7a716e70.png",
+   "size": 79333
+  },
+  "parts/base-left-dynamixel/982c714a48.png": {
+   "object": "guide/parts/base-left-dynamixel/982c714a48-3868eb0a84d2784b.png",
+   "size": 101388
+  },
+  "parts/base-left-dynamixel/9b9c4faa40.png": {
+   "object": "guide/parts/base-left-dynamixel/9b9c4faa40-bbb68eb7b17a8501.png",
+   "size": 72335
+  },
+  "parts/base-left-dynamixel/a10b5dd957.png": {
+   "object": "guide/parts/base-left-dynamixel/a10b5dd957-c4fa5ca68b5827ce.png",
+   "size": 70051
+  },
+  "parts/base-left-dynamixel/a2179afbf8.png": {
+   "object": "guide/parts/base-left-dynamixel/a2179afbf8-679978a7db280a68.png",
+   "size": 72487
+  },
+  "parts/base-left-dynamixel/a4a0f1b6f0.png": {
+   "object": "guide/parts/base-left-dynamixel/a4a0f1b6f0-c336cd9c64141204.png",
+   "size": 99848
+  },
+  "parts/base-left-dynamixel/a4ba641ca1.png": {
+   "object": "guide/parts/base-left-dynamixel/a4ba641ca1-8fa57128bea61e64.png",
+   "size": 196984
+  },
+  "parts/base-left-dynamixel/a4bb6570ae.png": {
+   "object": "guide/parts/base-left-dynamixel/a4bb6570ae-596eb00b56924473.png",
+   "size": 83138
+  },
+  "parts/base-left-dynamixel/a76d7abae0.png": {
+   "object": "guide/parts/base-left-dynamixel/a76d7abae0-cabc5121d2e65750.png",
+   "size": 75466
+  },
+  "parts/base-left-dynamixel/a8270cf704.png": {
+   "object": "guide/parts/base-left-dynamixel/a8270cf704-a04a69f21ec15d84.png",
+   "size": 107980
+  },
+  "parts/base-left-dynamixel/a8aab80846.png": {
+   "object": "guide/parts/base-left-dynamixel/a8aab80846-69c39a474587dfe3.png",
+   "size": 82830
+  },
+  "parts/base-left-dynamixel/ad98c67c72.png": {
+   "object": "guide/parts/base-left-dynamixel/ad98c67c72-a24d95549a10fa3c.png",
+   "size": 84800
+  },
+  "parts/base-left-dynamixel/assembly.glb": {
+   "object": "guide/parts/base-left-dynamixel/assembly-370d8ece12d472ff.glb",
+   "size": 126106708,
+   "encoding": "gzip"
+  },
+  "parts/base-left-dynamixel/b1d61c8dd7.png": {
+   "object": "guide/parts/base-left-dynamixel/b1d61c8dd7-cf39ee019e7ce065.png",
+   "size": 25339
+  },
+  "parts/base-left-dynamixel/b846feafee.png": {
+   "object": "guide/parts/base-left-dynamixel/b846feafee-45cbb6557957e86a.png",
+   "size": 87329
+  },
+  "parts/base-left-dynamixel/b914b6e7d1.png": {
+   "object": "guide/parts/base-left-dynamixel/b914b6e7d1-364fc3231808e1a8.png",
+   "size": 163899
+  },
+  "parts/base-left-dynamixel/bbbb180d24.png": {
+   "object": "guide/parts/base-left-dynamixel/bbbb180d24-ef07cc2ca2bfa0e8.png",
+   "size": 47386
+  },
+  "parts/base-left-dynamixel/bc31b71d8b.png": {
+   "object": "guide/parts/base-left-dynamixel/bc31b71d8b-56071747c2ef8ac1.png",
+   "size": 60975
+  },
+  "parts/base-left-dynamixel/bfccb91fbd.png": {
+   "object": "guide/parts/base-left-dynamixel/bfccb91fbd-13fc8853931b5bc8.png",
+   "size": 101962
+  },
+  "parts/base-left-dynamixel/c0dd3a2ee5.png": {
+   "object": "guide/parts/base-left-dynamixel/c0dd3a2ee5-4c710ff2550ebcd6.png",
+   "size": 93422
+  },
+  "parts/base-left-dynamixel/c2ae471791.png": {
+   "object": "guide/parts/base-left-dynamixel/c2ae471791-004f33354533f343.png",
+   "size": 106644
+  },
+  "parts/base-left-dynamixel/c2c18370de.png": {
+   "object": "guide/parts/base-left-dynamixel/c2c18370de-11aaea734d0ae181.png",
+   "size": 84258
+  },
+  "parts/base-left-dynamixel/c8000db55b.png": {
+   "object": "guide/parts/base-left-dynamixel/c8000db55b-1a40f5f148db39a2.png",
+   "size": 95278
+  },
+  "parts/base-left-dynamixel/cc87355d7b.png": {
+   "object": "guide/parts/base-left-dynamixel/cc87355d7b-04ef690b8a87524e.png",
+   "size": 132610
+  },
+  "parts/base-left-dynamixel/d1b7310480.png": {
+   "object": "guide/parts/base-left-dynamixel/d1b7310480-84a53b49b61a06d7.png",
+   "size": 141448
+  },
+  "parts/base-left-dynamixel/d3f520538b.png": {
+   "object": "guide/parts/base-left-dynamixel/d3f520538b-a60b4fea3a5997dc.png",
+   "size": 141049
+  },
+  "parts/base-left-dynamixel/d7812c0263.png": {
+   "object": "guide/parts/base-left-dynamixel/d7812c0263-f46914ac77730ccf.png",
+   "size": 97669
+  },
+  "parts/base-left-dynamixel/da8a9270c0.png": {
+   "object": "guide/parts/base-left-dynamixel/da8a9270c0-c95f290790e76a6b.png",
+   "size": 181195
+  },
+  "parts/base-left-dynamixel/daa2bf3246.png": {
+   "object": "guide/parts/base-left-dynamixel/daa2bf3246-a51ff879349b03a2.png",
+   "size": 69686
+  },
+  "parts/base-left-dynamixel/dd0a0791f1.png": {
+   "object": "guide/parts/base-left-dynamixel/dd0a0791f1-416102669b808a4c.png",
+   "size": 76520
+  },
+  "parts/base-left-dynamixel/df220860a1.png": {
+   "object": "guide/parts/base-left-dynamixel/df220860a1-aa9db4ca3c2e16b7.png",
+   "size": 103230
+  },
+  "parts/base-left-dynamixel/e2fd92904c.png": {
+   "object": "guide/parts/base-left-dynamixel/e2fd92904c-90e6c8cd20ad6ec4.png",
+   "size": 103253
+  },
+  "parts/base-left-dynamixel/e4c33ea040.png": {
+   "object": "guide/parts/base-left-dynamixel/e4c33ea040-88dd4eb628001968.png",
+   "size": 76019
+  },
+  "parts/base-left-dynamixel/e6ecc025ea.png": {
+   "object": "guide/parts/base-left-dynamixel/e6ecc025ea-4b26f51a885097bf.png",
+   "size": 88387
+  },
+  "parts/base-left-dynamixel/f0c9a4e32c.png": {
+   "object": "guide/parts/base-left-dynamixel/f0c9a4e32c-d60ebe40149bb40d.png",
+   "size": 81806
+  },
+  "parts/base-left-dynamixel/f1efd004fd.png": {
+   "object": "guide/parts/base-left-dynamixel/f1efd004fd-a3e69f45bee3f63c.png",
+   "size": 163974
+  },
+  "parts/base-left-dynamixel/fea2650845.png": {
+   "object": "guide/parts/base-left-dynamixel/fea2650845-7f1274f5f5e4f133.png",
+   "size": 189814
+  },
+  "parts/base-left-dynamixel/ffad82075d.png": {
+   "object": "guide/parts/base-left-dynamixel/ffad82075d-020d43c62df280db.png",
+   "size": 58789
+  },
+  "parts/base-right-dynamixel/02db127025.png": {
+   "object": "guide/parts/base-right-dynamixel/02db127025-d07b1fd0320feaf6.png",
+   "size": 119790
+  },
+  "parts/base-right-dynamixel/08f5283ed3.png": {
+   "object": "guide/parts/base-right-dynamixel/08f5283ed3-ebb734e8bb1c4c7e.png",
+   "size": 87355
+  },
+  "parts/base-right-dynamixel/0f4e5dc8e8.png": {
+   "object": "guide/parts/base-right-dynamixel/0f4e5dc8e8-86de1a57dddc0f31.png",
+   "size": 52674
+  },
+  "parts/base-right-dynamixel/1c628876b9.png": {
+   "object": "guide/parts/base-right-dynamixel/1c628876b9-e25c9c57f2a849bd.png",
+   "size": 42644
+  },
+  "parts/base-right-dynamixel/23667c6bcd.png": {
+   "object": "guide/parts/base-right-dynamixel/23667c6bcd-839c0cda35932e24.png",
+   "size": 36146
+  },
+  "parts/base-right-dynamixel/28a0b69d6b.png": {
+   "object": "guide/parts/base-right-dynamixel/28a0b69d6b-38fdf584e905cd26.png",
+   "size": 49312
+  },
+  "parts/base-right-dynamixel/2d16844065.png": {
+   "object": "guide/parts/base-right-dynamixel/2d16844065-57a78d91231941a4.png",
+   "size": 176357
+  },
+  "parts/base-right-dynamixel/2e2a34aa2d.png": {
+   "object": "guide/parts/base-right-dynamixel/2e2a34aa2d-8bd83c587b935e57.png",
+   "size": 119083
+  },
+  "parts/base-right-dynamixel/2f9839c628.png": {
+   "object": "guide/parts/base-right-dynamixel/2f9839c628-9f38cc5b5bedf7de.png",
+   "size": 71387
+  },
+  "parts/base-right-dynamixel/2fe308f9c0.png": {
+   "object": "guide/parts/base-right-dynamixel/2fe308f9c0-54d5308d0409c879.png",
+   "size": 51448
+  },
+  "parts/base-right-dynamixel/30d3151b3c.png": {
+   "object": "guide/parts/base-right-dynamixel/30d3151b3c-67944c53cd6ce513.png",
+   "size": 121186
+  },
+  "parts/base-right-dynamixel/33e3c9a582.png": {
+   "object": "guide/parts/base-right-dynamixel/33e3c9a582-30036d22f391ad9d.png",
+   "size": 94582
+  },
+  "parts/base-right-dynamixel/3f17ebfb0b.png": {
+   "object": "guide/parts/base-right-dynamixel/3f17ebfb0b-dfe0315ee36f83e0.png",
+   "size": 68368
+  },
+  "parts/base-right-dynamixel/410473b9c0.png": {
+   "object": "guide/parts/base-right-dynamixel/410473b9c0-05ce5af867163ed2.png",
+   "size": 124057
+  },
+  "parts/base-right-dynamixel/41114d15dc.png": {
+   "object": "guide/parts/base-right-dynamixel/41114d15dc-abc34ba5c32b5d6b.png",
+   "size": 177734
+  },
+  "parts/base-right-dynamixel/43652f0e7d.png": {
+   "object": "guide/parts/base-right-dynamixel/43652f0e7d-aba7b3a8aea10b58.png",
+   "size": 138356
+  },
+  "parts/base-right-dynamixel/483f2dd91e.png": {
+   "object": "guide/parts/base-right-dynamixel/483f2dd91e-9927388f0f2500cb.png",
+   "size": 163415
+  },
+  "parts/base-right-dynamixel/4d55977bb5.png": {
+   "object": "guide/parts/base-right-dynamixel/4d55977bb5-eb16715605879eed.png",
+   "size": 131456
+  },
+  "parts/base-right-dynamixel/4f845c5944.png": {
+   "object": "guide/parts/base-right-dynamixel/4f845c5944-b703f0dd30b4dd9a.png",
+   "size": 96683
+  },
+  "parts/base-right-dynamixel/57db7c2147.png": {
+   "object": "guide/parts/base-right-dynamixel/57db7c2147-9c62e09c24f099b9.png",
+   "size": 100003
+  },
+  "parts/base-right-dynamixel/57e3af0e10.png": {
+   "object": "guide/parts/base-right-dynamixel/57e3af0e10-ddc22a5edf311d77.png",
+   "size": 59466
+  },
+  "parts/base-right-dynamixel/5985d6a280.png": {
+   "object": "guide/parts/base-right-dynamixel/5985d6a280-25f1e895971f7534.png",
+   "size": 151784
+  },
+  "parts/base-right-dynamixel/5e5fa71d2d.png": {
+   "object": "guide/parts/base-right-dynamixel/5e5fa71d2d-73d37605846ce789.png",
+   "size": 143708
+  },
+  "parts/base-right-dynamixel/63372a6a0b.png": {
+   "object": "guide/parts/base-right-dynamixel/63372a6a0b-3e40c96dfa4a4299.png",
+   "size": 126037
+  },
+  "parts/base-right-dynamixel/656e35008b.png": {
+   "object": "guide/parts/base-right-dynamixel/656e35008b-8c70a8f0d3fb2c49.png",
+   "size": 74348
+  },
+  "parts/base-right-dynamixel/69959118bc.png": {
+   "object": "guide/parts/base-right-dynamixel/69959118bc-59b468ad694c7d79.png",
+   "size": 93512
+  },
+  "parts/base-right-dynamixel/6b74f66dfc.png": {
+   "object": "guide/parts/base-right-dynamixel/6b74f66dfc-f5cfe160a144024b.png",
+   "size": 86610
+  },
+  "parts/base-right-dynamixel/6dd7167777.png": {
+   "object": "guide/parts/base-right-dynamixel/6dd7167777-bf4ad33eb405ed7c.png",
+   "size": 91202
+  },
+  "parts/base-right-dynamixel/70234a9a39.png": {
+   "object": "guide/parts/base-right-dynamixel/70234a9a39-7bca1c311f274ec8.png",
+   "size": 147771
+  },
+  "parts/base-right-dynamixel/7315a2bfdf.png": {
+   "object": "guide/parts/base-right-dynamixel/7315a2bfdf-4d4a6a812263c673.png",
+   "size": 57494
+  },
+  "parts/base-right-dynamixel/788f157ef6.png": {
+   "object": "guide/parts/base-right-dynamixel/788f157ef6-b0ea6a4ee9d5c9b7.png",
+   "size": 54682
+  },
+  "parts/base-right-dynamixel/79361f7d71.png": {
+   "object": "guide/parts/base-right-dynamixel/79361f7d71-a84c9a2f855f18a2.png",
+   "size": 136031
+  },
+  "parts/base-right-dynamixel/79c6e3a0f1.png": {
+   "object": "guide/parts/base-right-dynamixel/79c6e3a0f1-54ba8f926b28fddf.png",
+   "size": 129640
+  },
+  "parts/base-right-dynamixel/8dbef51f40.png": {
+   "object": "guide/parts/base-right-dynamixel/8dbef51f40-cafa1c0292e0599f.png",
+   "size": 55844
+  },
+  "parts/base-right-dynamixel/92be502e02.png": {
+   "object": "guide/parts/base-right-dynamixel/92be502e02-fdf5afb1c6649052.png",
+   "size": 38150
+  },
+  "parts/base-right-dynamixel/938b8cdb6c.png": {
+   "object": "guide/parts/base-right-dynamixel/938b8cdb6c-cc13391b76dea2e6.png",
+   "size": 85569
+  },
+  "parts/base-right-dynamixel/952754b102.png": {
+   "object": "guide/parts/base-right-dynamixel/952754b102-84316e544781ecb5.png",
+   "size": 144976
+  },
+  "parts/base-right-dynamixel/97123e1bdb.png": {
+   "object": "guide/parts/base-right-dynamixel/97123e1bdb-9dfc59b19a011eed.png",
+   "size": 120861
+  },
+  "parts/base-right-dynamixel/982c714a48.png": {
+   "object": "guide/parts/base-right-dynamixel/982c714a48-bd64742c497cb358.png",
+   "size": 99455
+  },
+  "parts/base-right-dynamixel/9b9c4faa40.png": {
+   "object": "guide/parts/base-right-dynamixel/9b9c4faa40-31b83a348ff3ba1e.png",
+   "size": 77375
+  },
+  "parts/base-right-dynamixel/a10b5dd957.png": {
+   "object": "guide/parts/base-right-dynamixel/a10b5dd957-c4fa5ca68b5827ce.png",
+   "size": 70051
+  },
+  "parts/base-right-dynamixel/a2179afbf8.png": {
+   "object": "guide/parts/base-right-dynamixel/a2179afbf8-679978a7db280a68.png",
+   "size": 72487
+  },
+  "parts/base-right-dynamixel/a4a0f1b6f0.png": {
+   "object": "guide/parts/base-right-dynamixel/a4a0f1b6f0-859d45832b03a8a3.png",
+   "size": 100456
+  },
+  "parts/base-right-dynamixel/a4ba641ca1.png": {
+   "object": "guide/parts/base-right-dynamixel/a4ba641ca1-eaf1d8f878b6d549.png",
+   "size": 116900
+  },
+  "parts/base-right-dynamixel/a76d7abae0.png": {
+   "object": "guide/parts/base-right-dynamixel/a76d7abae0-f06f06a67e2edee0.png",
+   "size": 65582
+  },
+  "parts/base-right-dynamixel/a8270cf704.png": {
+   "object": "guide/parts/base-right-dynamixel/a8270cf704-a04a69f21ec15d84.png",
+   "size": 107980
+  },
+  "parts/base-right-dynamixel/a8aab80846.png": {
+   "object": "guide/parts/base-right-dynamixel/a8aab80846-78bf74362352b0e9.png",
+   "size": 79635
+  },
+  "parts/base-right-dynamixel/ad98c67c72.png": {
+   "object": "guide/parts/base-right-dynamixel/ad98c67c72-b6cb958db1c59660.png",
+   "size": 94760
+  },
+  "parts/base-right-dynamixel/assembly.glb": {
+   "object": "guide/parts/base-right-dynamixel/assembly-6f6294928e8056f5.glb",
+   "size": 126266476,
+   "encoding": "gzip"
+  },
+  "parts/base-right-dynamixel/b1d61c8dd7.png": {
+   "object": "guide/parts/base-right-dynamixel/b1d61c8dd7-cf39ee019e7ce065.png",
+   "size": 25339
+  },
+  "parts/base-right-dynamixel/b846feafee.png": {
+   "object": "guide/parts/base-right-dynamixel/b846feafee-55ae95d8ed919884.png",
+   "size": 82730
+  },
+  "parts/base-right-dynamixel/b914b6e7d1.png": {
+   "object": "guide/parts/base-right-dynamixel/b914b6e7d1-364fc3231808e1a8.png",
+   "size": 163899
+  },
+  "parts/base-right-dynamixel/bbbb180d24.png": {
+   "object": "guide/parts/base-right-dynamixel/bbbb180d24-bc8632cba3bab401.png",
+   "size": 45893
+  },
+  "parts/base-right-dynamixel/bc31b71d8b.png": {
+   "object": "guide/parts/base-right-dynamixel/bc31b71d8b-56071747c2ef8ac1.png",
+   "size": 60975
+  },
+  "parts/base-right-dynamixel/bfccb91fbd.png": {
+   "object": "guide/parts/base-right-dynamixel/bfccb91fbd-13fc8853931b5bc8.png",
+   "size": 101962
+  },
+  "parts/base-right-dynamixel/c0dd3a2ee5.png": {
+   "object": "guide/parts/base-right-dynamixel/c0dd3a2ee5-ef3e647e04deab67.png",
+   "size": 93490
+  },
+  "parts/base-right-dynamixel/c2ae471791.png": {
+   "object": "guide/parts/base-right-dynamixel/c2ae471791-004f33354533f343.png",
+   "size": 106644
+  },
+  "parts/base-right-dynamixel/c2c18370de.png": {
+   "object": "guide/parts/base-right-dynamixel/c2c18370de-cc66be7cc4ccea1f.png",
+   "size": 94073
+  },
+  "parts/base-right-dynamixel/c8000db55b.png": {
+   "object": "guide/parts/base-right-dynamixel/c8000db55b-d71c8591a9ebbf0a.png",
+   "size": 91549
+  },
+  "parts/base-right-dynamixel/cc87355d7b.png": {
+   "object": "guide/parts/base-right-dynamixel/cc87355d7b-04ef690b8a87524e.png",
+   "size": 132610
+  },
+  "parts/base-right-dynamixel/d19016624b.png": {
+   "object": "guide/parts/base-right-dynamixel/d19016624b-9e28cc00e052d456.png",
+   "size": 125087
+  },
+  "parts/base-right-dynamixel/d1b7310480.png": {
+   "object": "guide/parts/base-right-dynamixel/d1b7310480-84a53b49b61a06d7.png",
+   "size": 141448
+  },
+  "parts/base-right-dynamixel/d3f520538b.png": {
+   "object": "guide/parts/base-right-dynamixel/d3f520538b-a60b4fea3a5997dc.png",
+   "size": 141049
+  },
+  "parts/base-right-dynamixel/d7812c0263.png": {
+   "object": "guide/parts/base-right-dynamixel/d7812c0263-f46914ac77730ccf.png",
+   "size": 97669
+  },
+  "parts/base-right-dynamixel/da8a9270c0.png": {
+   "object": "guide/parts/base-right-dynamixel/da8a9270c0-c95f290790e76a6b.png",
+   "size": 181195
+  },
+  "parts/base-right-dynamixel/daa2bf3246.png": {
+   "object": "guide/parts/base-right-dynamixel/daa2bf3246-a51ff879349b03a2.png",
+   "size": 69686
+  },
+  "parts/base-right-dynamixel/dd0a0791f1.png": {
+   "object": "guide/parts/base-right-dynamixel/dd0a0791f1-416102669b808a4c.png",
+   "size": 76520
+  },
+  "parts/base-right-dynamixel/df220860a1.png": {
+   "object": "guide/parts/base-right-dynamixel/df220860a1-aa9db4ca3c2e16b7.png",
+   "size": 103230
+  },
+  "parts/base-right-dynamixel/e2fd92904c.png": {
+   "object": "guide/parts/base-right-dynamixel/e2fd92904c-90e6c8cd20ad6ec4.png",
+   "size": 103253
+  },
+  "parts/base-right-dynamixel/e4c33ea040.png": {
+   "object": "guide/parts/base-right-dynamixel/e4c33ea040-88dd4eb628001968.png",
+   "size": 76019
+  },
+  "parts/base-right-dynamixel/e6ecc025ea.png": {
+   "object": "guide/parts/base-right-dynamixel/e6ecc025ea-722949b476d2fcb9.png",
+   "size": 92532
+  },
+  "parts/base-right-dynamixel/f0c9a4e32c.png": {
+   "object": "guide/parts/base-right-dynamixel/f0c9a4e32c-d60ebe40149bb40d.png",
+   "size": 81806
+  },
+  "parts/base-right-dynamixel/f1efd004fd.png": {
+   "object": "guide/parts/base-right-dynamixel/f1efd004fd-a3e69f45bee3f63c.png",
+   "size": 163974
+  },
+  "parts/base-right-dynamixel/fea2650845.png": {
+   "object": "guide/parts/base-right-dynamixel/fea2650845-7f1274f5f5e4f133.png",
+   "size": 189814
+  },
+  "parts/base-right-dynamixel/ffad82075d.png": {
+   "object": "guide/parts/base-right-dynamixel/ffad82075d-020d43c62df280db.png",
+   "size": 58789
+  },
+  "parts/touch-left-dynamixel/003dd2d7f4.png": {
+   "object": "guide/parts/touch-left-dynamixel/003dd2d7f4-4868f268e8bb32c6.png",
+   "size": 169341
+  },
+  "parts/touch-left-dynamixel/02db127025.png": {
+   "object": "guide/parts/touch-left-dynamixel/02db127025-564ad7a2a17cac16.png",
+   "size": 95562
+  },
+  "parts/touch-left-dynamixel/0597aae10c.png": {
+   "object": "guide/parts/touch-left-dynamixel/0597aae10c-d52587339b5bcf19.png",
+   "size": 112457
+  },
+  "parts/touch-left-dynamixel/08f5283ed3.png": {
+   "object": "guide/parts/touch-left-dynamixel/08f5283ed3-ebb734e8bb1c4c7e.png",
+   "size": 87355
+  },
+  "parts/touch-left-dynamixel/0f4e5dc8e8.png": {
+   "object": "guide/parts/touch-left-dynamixel/0f4e5dc8e8-6bf0a69cdc6364e3.png",
+   "size": 58912
+  },
+  "parts/touch-left-dynamixel/16ec3918a3.png": {
+   "object": "guide/parts/touch-left-dynamixel/16ec3918a3-ddc5c0a2a1d903a6.png",
+   "size": 158533
+  },
+  "parts/touch-left-dynamixel/1c628876b9.png": {
+   "object": "guide/parts/touch-left-dynamixel/1c628876b9-e25c9c57f2a849bd.png",
+   "size": 42644
+  },
+  "parts/touch-left-dynamixel/23667c6bcd.png": {
+   "object": "guide/parts/touch-left-dynamixel/23667c6bcd-839c0cda35932e24.png",
+   "size": 36146
+  },
+  "parts/touch-left-dynamixel/28a0b69d6b.png": {
+   "object": "guide/parts/touch-left-dynamixel/28a0b69d6b-38fdf584e905cd26.png",
+   "size": 49312
+  },
+  "parts/touch-left-dynamixel/2d16844065.png": {
+   "object": "guide/parts/touch-left-dynamixel/2d16844065-57a78d91231941a4.png",
+   "size": 176357
+  },
+  "parts/touch-left-dynamixel/2e2a34aa2d.png": {
+   "object": "guide/parts/touch-left-dynamixel/2e2a34aa2d-900e87ab76dbe8c5.png",
+   "size": 119399
+  },
+  "parts/touch-left-dynamixel/2fe308f9c0.png": {
+   "object": "guide/parts/touch-left-dynamixel/2fe308f9c0-cbbd3211c1f53451.png",
+   "size": 72298
+  },
+  "parts/touch-left-dynamixel/30d3151b3c.png": {
+   "object": "guide/parts/touch-left-dynamixel/30d3151b3c-67944c53cd6ce513.png",
+   "size": 121186
+  },
+  "parts/touch-left-dynamixel/33e3c9a582.png": {
+   "object": "guide/parts/touch-left-dynamixel/33e3c9a582-fb80ea41ba1eb1aa.png",
+   "size": 113305
+  },
+  "parts/touch-left-dynamixel/37770c0cf9.png": {
+   "object": "guide/parts/touch-left-dynamixel/37770c0cf9-d685f327adf96ec4.png",
+   "size": 79738
+  },
+  "parts/touch-left-dynamixel/393b6fdd8c.png": {
+   "object": "guide/parts/touch-left-dynamixel/393b6fdd8c-6f453823ff03eb3b.png",
+   "size": 109601
+  },
+  "parts/touch-left-dynamixel/410473b9c0.png": {
+   "object": "guide/parts/touch-left-dynamixel/410473b9c0-801ed6d68f3969c6.png",
+   "size": 172075
+  },
+  "parts/touch-left-dynamixel/41114d15dc.png": {
+   "object": "guide/parts/touch-left-dynamixel/41114d15dc-abc34ba5c32b5d6b.png",
+   "size": 177734
+  },
+  "parts/touch-left-dynamixel/43652f0e7d.png": {
+   "object": "guide/parts/touch-left-dynamixel/43652f0e7d-aba7b3a8aea10b58.png",
+   "size": 138356
+  },
+  "parts/touch-left-dynamixel/43dcdfbb25.png": {
+   "object": "guide/parts/touch-left-dynamixel/43dcdfbb25-5824eeef24d1d811.png",
+   "size": 172198
+  },
+  "parts/touch-left-dynamixel/483f2dd91e.png": {
+   "object": "guide/parts/touch-left-dynamixel/483f2dd91e-9927388f0f2500cb.png",
+   "size": 163415
+  },
+  "parts/touch-left-dynamixel/4d55977bb5.png": {
+   "object": "guide/parts/touch-left-dynamixel/4d55977bb5-43ea07df746bc465.png",
+   "size": 175197
+  },
+  "parts/touch-left-dynamixel/4f845c5944.png": {
+   "object": "guide/parts/touch-left-dynamixel/4f845c5944-c615b6a24801d3ce.png",
+   "size": 98910
+  },
+  "parts/touch-left-dynamixel/57db7c2147.png": {
+   "object": "guide/parts/touch-left-dynamixel/57db7c2147-da28a1e87b10a7e1.png",
+   "size": 92930
+  },
+  "parts/touch-left-dynamixel/57e3af0e10.png": {
+   "object": "guide/parts/touch-left-dynamixel/57e3af0e10-b7906a8c3d82dfdc.png",
+   "size": 81048
+  },
+  "parts/touch-left-dynamixel/5985d6a280.png": {
+   "object": "guide/parts/touch-left-dynamixel/5985d6a280-25f1e895971f7534.png",
+   "size": 151784
+  },
+  "parts/touch-left-dynamixel/5e5fa71d2d.png": {
+   "object": "guide/parts/touch-left-dynamixel/5e5fa71d2d-3062402f1ec98ee7.png",
+   "size": 135300
+  },
+  "parts/touch-left-dynamixel/656e35008b.png": {
+   "object": "guide/parts/touch-left-dynamixel/656e35008b-8c05f37cd57d2b4a.png",
+   "size": 82112
+  },
+  "parts/touch-left-dynamixel/69959118bc.png": {
+   "object": "guide/parts/touch-left-dynamixel/69959118bc-3fb5ba2999009df3.png",
+   "size": 99380
+  },
+  "parts/touch-left-dynamixel/6b74f66dfc.png": {
+   "object": "guide/parts/touch-left-dynamixel/6b74f66dfc-f5cfe160a144024b.png",
+   "size": 86610
+  },
+  "parts/touch-left-dynamixel/6d51a43225.png": {
+   "object": "guide/parts/touch-left-dynamixel/6d51a43225-f50950d3900fe050.png",
+   "size": 69241
+  },
+  "parts/touch-left-dynamixel/6dd7167777.png": {
+   "object": "guide/parts/touch-left-dynamixel/6dd7167777-bf4ad33eb405ed7c.png",
+   "size": 91202
+  },
+  "parts/touch-left-dynamixel/70234a9a39.png": {
+   "object": "guide/parts/touch-left-dynamixel/70234a9a39-0d6bc1023c2ec5a9.png",
+   "size": 96605
+  },
+  "parts/touch-left-dynamixel/7315a2bfdf.png": {
+   "object": "guide/parts/touch-left-dynamixel/7315a2bfdf-14ba5f60a28cb0ce.png",
+   "size": 77891
+  },
+  "parts/touch-left-dynamixel/788f157ef6.png": {
+   "object": "guide/parts/touch-left-dynamixel/788f157ef6-b0ea6a4ee9d5c9b7.png",
+   "size": 54682
+  },
+  "parts/touch-left-dynamixel/79361f7d71.png": {
+   "object": "guide/parts/touch-left-dynamixel/79361f7d71-a84c9a2f855f18a2.png",
+   "size": 136031
+  },
+  "parts/touch-left-dynamixel/79c6e3a0f1.png": {
+   "object": "guide/parts/touch-left-dynamixel/79c6e3a0f1-f9e392f0447d0608.png",
+   "size": 103032
+  },
+  "parts/touch-left-dynamixel/81a6d7b2a3.png": {
+   "object": "guide/parts/touch-left-dynamixel/81a6d7b2a3-b32639d9ed942b19.png",
+   "size": 102925
+  },
+  "parts/touch-left-dynamixel/8c3e194e83.png": {
+   "object": "guide/parts/touch-left-dynamixel/8c3e194e83-202324db4b772d90.png",
+   "size": 107439
+  },
+  "parts/touch-left-dynamixel/8dbef51f40.png": {
+   "object": "guide/parts/touch-left-dynamixel/8dbef51f40-cafa1c0292e0599f.png",
+   "size": 55844
+  },
+  "parts/touch-left-dynamixel/92be502e02.png": {
+   "object": "guide/parts/touch-left-dynamixel/92be502e02-fdf5afb1c6649052.png",
+   "size": 38150
+  },
+  "parts/touch-left-dynamixel/938b8cdb6c.png": {
+   "object": "guide/parts/touch-left-dynamixel/938b8cdb6c-cc13391b76dea2e6.png",
+   "size": 85569
+  },
+  "parts/touch-left-dynamixel/952754b102.png": {
+   "object": "guide/parts/touch-left-dynamixel/952754b102-afac641e699371bd.png",
+   "size": 144512
+  },
+  "parts/touch-left-dynamixel/982c714a48.png": {
+   "object": "guide/parts/touch-left-dynamixel/982c714a48-63d80e50a20d88df.png",
+   "size": 99910
+  },
+  "parts/touch-left-dynamixel/9b9c4faa40.png": {
+   "object": "guide/parts/touch-left-dynamixel/9b9c4faa40-3d3cfebb9e81a919.png",
+   "size": 77864
+  },
+  "parts/touch-left-dynamixel/a10b5dd957.png": {
+   "object": "guide/parts/touch-left-dynamixel/a10b5dd957-3aa65fcc21e2e0b5.png",
+   "size": 70008
+  },
+  "parts/touch-left-dynamixel/a2179afbf8.png": {
+   "object": "guide/parts/touch-left-dynamixel/a2179afbf8-679978a7db280a68.png",
+   "size": 72487
+  },
+  "parts/touch-left-dynamixel/a4a0f1b6f0.png": {
+   "object": "guide/parts/touch-left-dynamixel/a4a0f1b6f0-51b65e8df57a1562.png",
+   "size": 101327
+  },
+  "parts/touch-left-dynamixel/a4ba641ca1.png": {
+   "object": "guide/parts/touch-left-dynamixel/a4ba641ca1-6def13cd7a91c2d6.png",
+   "size": 162765
+  },
+  "parts/touch-left-dynamixel/a4bb6570ae.png": {
+   "object": "guide/parts/touch-left-dynamixel/a4bb6570ae-cc7a9b74daa46000.png",
+   "size": 95122
+  },
+  "parts/touch-left-dynamixel/a8270cf704.png": {
+   "object": "guide/parts/touch-left-dynamixel/a8270cf704-a04a69f21ec15d84.png",
+   "size": 107980
+  },
+  "parts/touch-left-dynamixel/a8aab80846.png": {
+   "object": "guide/parts/touch-left-dynamixel/a8aab80846-b7541131e55d1ed7.png",
+   "size": 82343
+  },
+  "parts/touch-left-dynamixel/ad98c67c72.png": {
+   "object": "guide/parts/touch-left-dynamixel/ad98c67c72-fa28068bb34764b4.png",
+   "size": 95737
+  },
+  "parts/touch-left-dynamixel/assembly.glb": {
+   "object": "guide/parts/touch-left-dynamixel/assembly-5481e4fe27c992ea.glb",
+   "size": 138690284,
+   "encoding": "gzip"
+  },
+  "parts/touch-left-dynamixel/b1d61c8dd7.png": {
+   "object": "guide/parts/touch-left-dynamixel/b1d61c8dd7-cf39ee019e7ce065.png",
+   "size": 25339
+  },
+  "parts/touch-left-dynamixel/b846feafee.png": {
+   "object": "guide/parts/touch-left-dynamixel/b846feafee-f578ed93dce3ad31.png",
+   "size": 95913
+  },
+  "parts/touch-left-dynamixel/b914b6e7d1.png": {
+   "object": "guide/parts/touch-left-dynamixel/b914b6e7d1-364fc3231808e1a8.png",
+   "size": 163899
+  },
+  "parts/touch-left-dynamixel/bbbb180d24.png": {
+   "object": "guide/parts/touch-left-dynamixel/bbbb180d24-c211c540a3479dc1.png",
+   "size": 48610
+  },
+  "parts/touch-left-dynamixel/bc31b71d8b.png": {
+   "object": "guide/parts/touch-left-dynamixel/bc31b71d8b-56071747c2ef8ac1.png",
+   "size": 60975
+  },
+  "parts/touch-left-dynamixel/bfccb91fbd.png": {
+   "object": "guide/parts/touch-left-dynamixel/bfccb91fbd-13fc8853931b5bc8.png",
+   "size": 101962
+  },
+  "parts/touch-left-dynamixel/c0dd3a2ee5.png": {
+   "object": "guide/parts/touch-left-dynamixel/c0dd3a2ee5-f36c43eb55499783.png",
+   "size": 94091
+  },
+  "parts/touch-left-dynamixel/c2ae471791.png": {
+   "object": "guide/parts/touch-left-dynamixel/c2ae471791-004f33354533f343.png",
+   "size": 106644
+  },
+  "parts/touch-left-dynamixel/c2c18370de.png": {
+   "object": "guide/parts/touch-left-dynamixel/c2c18370de-9e38b7c0f4594296.png",
+   "size": 89164
+  },
+  "parts/touch-left-dynamixel/c8000db55b.png": {
+   "object": "guide/parts/touch-left-dynamixel/c8000db55b-84c2d5c811290c47.png",
+   "size": 102114
+  },
+  "parts/touch-left-dynamixel/cc87355d7b.png": {
+   "object": "guide/parts/touch-left-dynamixel/cc87355d7b-04ef690b8a87524e.png",
+   "size": 132610
+  },
+  "parts/touch-left-dynamixel/cf879d2174.png": {
+   "object": "guide/parts/touch-left-dynamixel/cf879d2174-b7e3c54ea96a2b62.png",
+   "size": 82893
+  },
+  "parts/touch-left-dynamixel/d1b7310480.png": {
+   "object": "guide/parts/touch-left-dynamixel/d1b7310480-84a53b49b61a06d7.png",
+   "size": 141448
+  },
+  "parts/touch-left-dynamixel/d3f520538b.png": {
+   "object": "guide/parts/touch-left-dynamixel/d3f520538b-a60b4fea3a5997dc.png",
+   "size": 141049
+  },
+  "parts/touch-left-dynamixel/d7812c0263.png": {
+   "object": "guide/parts/touch-left-dynamixel/d7812c0263-f46914ac77730ccf.png",
+   "size": 97669
+  },
+  "parts/touch-left-dynamixel/da8a9270c0.png": {
+   "object": "guide/parts/touch-left-dynamixel/da8a9270c0-c95f290790e76a6b.png",
+   "size": 181195
+  },
+  "parts/touch-left-dynamixel/daa2bf3246.png": {
+   "object": "guide/parts/touch-left-dynamixel/daa2bf3246-a51ff879349b03a2.png",
+   "size": 69686
+  },
+  "parts/touch-left-dynamixel/dd0a0791f1.png": {
+   "object": "guide/parts/touch-left-dynamixel/dd0a0791f1-416102669b808a4c.png",
+   "size": 76520
+  },
+  "parts/touch-left-dynamixel/df220860a1.png": {
+   "object": "guide/parts/touch-left-dynamixel/df220860a1-aa9db4ca3c2e16b7.png",
+   "size": 103230
+  },
+  "parts/touch-left-dynamixel/e2fd92904c.png": {
+   "object": "guide/parts/touch-left-dynamixel/e2fd92904c-3a3cfebd758466bf.png",
+   "size": 102885
+  },
+  "parts/touch-left-dynamixel/e4c33ea040.png": {
+   "object": "guide/parts/touch-left-dynamixel/e4c33ea040-88dd4eb628001968.png",
+   "size": 76019
+  },
+  "parts/touch-left-dynamixel/e6ecc025ea.png": {
+   "object": "guide/parts/touch-left-dynamixel/e6ecc025ea-349b61dade59d316.png",
+   "size": 93853
+  },
+  "parts/touch-left-dynamixel/eb86bce488.png": {
+   "object": "guide/parts/touch-left-dynamixel/eb86bce488-a4e6ba5d811f911f.png",
+   "size": 103907
+  },
+  "parts/touch-left-dynamixel/f0c9a4e32c.png": {
+   "object": "guide/parts/touch-left-dynamixel/f0c9a4e32c-d60ebe40149bb40d.png",
+   "size": 81806
+  },
+  "parts/touch-left-dynamixel/f115b9e984.png": {
+   "object": "guide/parts/touch-left-dynamixel/f115b9e984-967f70931a6ac9fd.png",
+   "size": 136507
+  },
+  "parts/touch-left-dynamixel/f1efd004fd.png": {
+   "object": "guide/parts/touch-left-dynamixel/f1efd004fd-a3e69f45bee3f63c.png",
+   "size": 163974
+  },
+  "parts/touch-left-dynamixel/fea2650845.png": {
+   "object": "guide/parts/touch-left-dynamixel/fea2650845-7f1274f5f5e4f133.png",
+   "size": 189814
+  },
+  "parts/touch-left-dynamixel/ffad82075d.png": {
+   "object": "guide/parts/touch-left-dynamixel/ffad82075d-020d43c62df280db.png",
+   "size": 58789
+  },
+  "parts/touch-right-dynamixel/003dd2d7f4.png": {
+   "object": "guide/parts/touch-right-dynamixel/003dd2d7f4-4868f268e8bb32c6.png",
+   "size": 169341
+  },
+  "parts/touch-right-dynamixel/02db127025.png": {
+   "object": "guide/parts/touch-right-dynamixel/02db127025-d707816615f78929.png",
+   "size": 99889
+  },
+  "parts/touch-right-dynamixel/0597aae10c.png": {
+   "object": "guide/parts/touch-right-dynamixel/0597aae10c-a1e8d3013fe3ae31.png",
+   "size": 90262
+  },
+  "parts/touch-right-dynamixel/08f5283ed3.png": {
+   "object": "guide/parts/touch-right-dynamixel/08f5283ed3-ebb734e8bb1c4c7e.png",
+   "size": 87355
+  },
+  "parts/touch-right-dynamixel/0f4e5dc8e8.png": {
+   "object": "guide/parts/touch-right-dynamixel/0f4e5dc8e8-884a94d35cddf6cc.png",
+   "size": 76028
+  },
+  "parts/touch-right-dynamixel/16ec3918a3.png": {
+   "object": "guide/parts/touch-right-dynamixel/16ec3918a3-aee7899d10662866.png",
+   "size": 158447
+  },
+  "parts/touch-right-dynamixel/1c628876b9.png": {
+   "object": "guide/parts/touch-right-dynamixel/1c628876b9-e25c9c57f2a849bd.png",
+   "size": 42644
+  },
+  "parts/touch-right-dynamixel/23667c6bcd.png": {
+   "object": "guide/parts/touch-right-dynamixel/23667c6bcd-839c0cda35932e24.png",
+   "size": 36146
+  },
+  "parts/touch-right-dynamixel/28a0b69d6b.png": {
+   "object": "guide/parts/touch-right-dynamixel/28a0b69d6b-38fdf584e905cd26.png",
+   "size": 49312
+  },
+  "parts/touch-right-dynamixel/2d16844065.png": {
+   "object": "guide/parts/touch-right-dynamixel/2d16844065-57a78d91231941a4.png",
+   "size": 176357
+  },
+  "parts/touch-right-dynamixel/2e2a34aa2d.png": {
+   "object": "guide/parts/touch-right-dynamixel/2e2a34aa2d-900e87ab76dbe8c5.png",
+   "size": 119399
+  },
+  "parts/touch-right-dynamixel/2fe308f9c0.png": {
+   "object": "guide/parts/touch-right-dynamixel/2fe308f9c0-30f3ad5c2fe494a2.png",
+   "size": 86859
+  },
+  "parts/touch-right-dynamixel/30d3151b3c.png": {
+   "object": "guide/parts/touch-right-dynamixel/30d3151b3c-67944c53cd6ce513.png",
+   "size": 121186
+  },
+  "parts/touch-right-dynamixel/33e3c9a582.png": {
+   "object": "guide/parts/touch-right-dynamixel/33e3c9a582-7e97d8909d79fc10.png",
+   "size": 135928
+  },
+  "parts/touch-right-dynamixel/37770c0cf9.png": {
+   "object": "guide/parts/touch-right-dynamixel/37770c0cf9-b7a178cb790960bc.png",
+   "size": 79850
+  },
+  "parts/touch-right-dynamixel/393b6fdd8c.png": {
+   "object": "guide/parts/touch-right-dynamixel/393b6fdd8c-7d7213efb3cd2df1.png",
+   "size": 72529
+  },
+  "parts/touch-right-dynamixel/410473b9c0.png": {
+   "object": "guide/parts/touch-right-dynamixel/410473b9c0-b8f67ed8df183463.png",
+   "size": 119085
+  },
+  "parts/touch-right-dynamixel/41114d15dc.png": {
+   "object": "guide/parts/touch-right-dynamixel/41114d15dc-abc34ba5c32b5d6b.png",
+   "size": 177734
+  },
+  "parts/touch-right-dynamixel/43652f0e7d.png": {
+   "object": "guide/parts/touch-right-dynamixel/43652f0e7d-aba7b3a8aea10b58.png",
+   "size": 138356
+  },
+  "parts/touch-right-dynamixel/43dcdfbb25.png": {
+   "object": "guide/parts/touch-right-dynamixel/43dcdfbb25-5824eeef24d1d811.png",
+   "size": 172198
+  },
+  "parts/touch-right-dynamixel/483f2dd91e.png": {
+   "object": "guide/parts/touch-right-dynamixel/483f2dd91e-9927388f0f2500cb.png",
+   "size": 163415
+  },
+  "parts/touch-right-dynamixel/4d55977bb5.png": {
+   "object": "guide/parts/touch-right-dynamixel/4d55977bb5-23a67a30b1937da5.png",
+   "size": 138878
+  },
+  "parts/touch-right-dynamixel/4f845c5944.png": {
+   "object": "guide/parts/touch-right-dynamixel/4f845c5944-d5f728e023834dad.png",
+   "size": 104653
+  },
+  "parts/touch-right-dynamixel/57db7c2147.png": {
+   "object": "guide/parts/touch-right-dynamixel/57db7c2147-459c99f474d71614.png",
+   "size": 117540
+  },
+  "parts/touch-right-dynamixel/57e3af0e10.png": {
+   "object": "guide/parts/touch-right-dynamixel/57e3af0e10-77890daf08db50f6.png",
+   "size": 93649
+  },
+  "parts/touch-right-dynamixel/5985d6a280.png": {
+   "object": "guide/parts/touch-right-dynamixel/5985d6a280-25f1e895971f7534.png",
+   "size": 151784
+  },
+  "parts/touch-right-dynamixel/5e5fa71d2d.png": {
+   "object": "guide/parts/touch-right-dynamixel/5e5fa71d2d-385d3c71227920b4.png",
+   "size": 140097
+  },
+  "parts/touch-right-dynamixel/656e35008b.png": {
+   "object": "guide/parts/touch-right-dynamixel/656e35008b-1cda42002aa76241.png",
+   "size": 86211
+  },
+  "parts/touch-right-dynamixel/69959118bc.png": {
+   "object": "guide/parts/touch-right-dynamixel/69959118bc-562b37dc6d0138d6.png",
+   "size": 111326
+  },
+  "parts/touch-right-dynamixel/6b74f66dfc.png": {
+   "object": "guide/parts/touch-right-dynamixel/6b74f66dfc-f5cfe160a144024b.png",
+   "size": 86610
+  },
+  "parts/touch-right-dynamixel/6d51a43225.png": {
+   "object": "guide/parts/touch-right-dynamixel/6d51a43225-9b4203f6f26c7c59.png",
+   "size": 105628
+  },
+  "parts/touch-right-dynamixel/6dd7167777.png": {
+   "object": "guide/parts/touch-right-dynamixel/6dd7167777-bf4ad33eb405ed7c.png",
+   "size": 91202
+  },
+  "parts/touch-right-dynamixel/70234a9a39.png": {
+   "object": "guide/parts/touch-right-dynamixel/70234a9a39-2f6b06ffadd12da5.png",
+   "size": 130364
+  },
+  "parts/touch-right-dynamixel/7315a2bfdf.png": {
+   "object": "guide/parts/touch-right-dynamixel/7315a2bfdf-98322594dce9ce75.png",
+   "size": 102888
+  },
+  "parts/touch-right-dynamixel/788f157ef6.png": {
+   "object": "guide/parts/touch-right-dynamixel/788f157ef6-b0ea6a4ee9d5c9b7.png",
+   "size": 54682
+  },
+  "parts/touch-right-dynamixel/79361f7d71.png": {
+   "object": "guide/parts/touch-right-dynamixel/79361f7d71-a84c9a2f855f18a2.png",
+   "size": 136031
+  },
+  "parts/touch-right-dynamixel/79c6e3a0f1.png": {
+   "object": "guide/parts/touch-right-dynamixel/79c6e3a0f1-d08ab990b7897fee.png",
+   "size": 114197
+  },
+  "parts/touch-right-dynamixel/81a6d7b2a3.png": {
+   "object": "guide/parts/touch-right-dynamixel/81a6d7b2a3-62faf81e7781ad45.png",
+   "size": 107033
+  },
+  "parts/touch-right-dynamixel/8c3e194e83.png": {
+   "object": "guide/parts/touch-right-dynamixel/8c3e194e83-c2f51e0ac9f8d356.png",
+   "size": 157797
+  },
+  "parts/touch-right-dynamixel/8dbef51f40.png": {
+   "object": "guide/parts/touch-right-dynamixel/8dbef51f40-cafa1c0292e0599f.png",
+   "size": 55844
+  },
+  "parts/touch-right-dynamixel/92be502e02.png": {
+   "object": "guide/parts/touch-right-dynamixel/92be502e02-fdf5afb1c6649052.png",
+   "size": 38150
+  },
+  "parts/touch-right-dynamixel/938b8cdb6c.png": {
+   "object": "guide/parts/touch-right-dynamixel/938b8cdb6c-cc13391b76dea2e6.png",
+   "size": 85569
+  },
+  "parts/touch-right-dynamixel/952754b102.png": {
+   "object": "guide/parts/touch-right-dynamixel/952754b102-b2c63abc7523bfbe.png",
+   "size": 144570
+  },
+  "parts/touch-right-dynamixel/982c714a48.png": {
+   "object": "guide/parts/touch-right-dynamixel/982c714a48-8d8daa556a17edec.png",
+   "size": 98522
+  },
+  "parts/touch-right-dynamixel/9b9c4faa40.png": {
+   "object": "guide/parts/touch-right-dynamixel/9b9c4faa40-f54d56c93a048930.png",
+   "size": 83115
+  },
+  "parts/touch-right-dynamixel/a10b5dd957.png": {
+   "object": "guide/parts/touch-right-dynamixel/a10b5dd957-3aa65fcc21e2e0b5.png",
+   "size": 70008
+  },
+  "parts/touch-right-dynamixel/a2179afbf8.png": {
+   "object": "guide/parts/touch-right-dynamixel/a2179afbf8-679978a7db280a68.png",
+   "size": 72487
+  },
+  "parts/touch-right-dynamixel/a4a0f1b6f0.png": {
+   "object": "guide/parts/touch-right-dynamixel/a4a0f1b6f0-cb647dc63ff55979.png",
+   "size": 97956
+  },
+  "parts/touch-right-dynamixel/a4ba641ca1.png": {
+   "object": "guide/parts/touch-right-dynamixel/a4ba641ca1-9eb4ab8b0b01614f.png",
+   "size": 134914
+  },
+  "parts/touch-right-dynamixel/a4bb6570ae.png": {
+   "object": "guide/parts/touch-right-dynamixel/a4bb6570ae-c55a28529985f670.png",
+   "size": 157142
+  },
+  "parts/touch-right-dynamixel/a8270cf704.png": {
+   "object": "guide/parts/touch-right-dynamixel/a8270cf704-a04a69f21ec15d84.png",
+   "size": 107980
+  },
+  "parts/touch-right-dynamixel/a8aab80846.png": {
+   "object": "guide/parts/touch-right-dynamixel/a8aab80846-9c2bbda4d661bbbf.png",
+   "size": 100051
+  },
+  "parts/touch-right-dynamixel/ad98c67c72.png": {
+   "object": "guide/parts/touch-right-dynamixel/ad98c67c72-e111da35bcc4ec66.png",
+   "size": 107667
+  },
+  "parts/touch-right-dynamixel/assembly.glb": {
+   "object": "guide/parts/touch-right-dynamixel/assembly-58a02d6bf25d5549.glb",
+   "size": 136867768,
+   "encoding": "gzip"
+  },
+  "parts/touch-right-dynamixel/b1d61c8dd7.png": {
+   "object": "guide/parts/touch-right-dynamixel/b1d61c8dd7-cf39ee019e7ce065.png",
+   "size": 25339
+  },
+  "parts/touch-right-dynamixel/b846feafee.png": {
+   "object": "guide/parts/touch-right-dynamixel/b846feafee-4adbf5b565ed12a8.png",
+   "size": 102192
+  },
+  "parts/touch-right-dynamixel/b914b6e7d1.png": {
+   "object": "guide/parts/touch-right-dynamixel/b914b6e7d1-364fc3231808e1a8.png",
+   "size": 163899
+  },
+  "parts/touch-right-dynamixel/bbbb180d24.png": {
+   "object": "guide/parts/touch-right-dynamixel/bbbb180d24-00e6804812c1b0ac.png",
+   "size": 87973
+  },
+  "parts/touch-right-dynamixel/bc31b71d8b.png": {
+   "object": "guide/parts/touch-right-dynamixel/bc31b71d8b-56071747c2ef8ac1.png",
+   "size": 60975
+  },
+  "parts/touch-right-dynamixel/bfccb91fbd.png": {
+   "object": "guide/parts/touch-right-dynamixel/bfccb91fbd-13fc8853931b5bc8.png",
+   "size": 101962
+  },
+  "parts/touch-right-dynamixel/c0dd3a2ee5.png": {
+   "object": "guide/parts/touch-right-dynamixel/c0dd3a2ee5-f36c43eb55499783.png",
+   "size": 94091
+  },
+  "parts/touch-right-dynamixel/c2ae471791.png": {
+   "object": "guide/parts/touch-right-dynamixel/c2ae471791-004f33354533f343.png",
+   "size": 106644
+  },
+  "parts/touch-right-dynamixel/c2c18370de.png": {
+   "object": "guide/parts/touch-right-dynamixel/c2c18370de-fab4aa845eb35935.png",
+   "size": 90017
+  },
+  "parts/touch-right-dynamixel/c8000db55b.png": {
+   "object": "guide/parts/touch-right-dynamixel/c8000db55b-6097db017f84c973.png",
+   "size": 108829
+  },
+  "parts/touch-right-dynamixel/cc87355d7b.png": {
+   "object": "guide/parts/touch-right-dynamixel/cc87355d7b-04ef690b8a87524e.png",
+   "size": 132610
+  },
+  "parts/touch-right-dynamixel/cf879d2174.png": {
+   "object": "guide/parts/touch-right-dynamixel/cf879d2174-b440267c051e0427.png",
+   "size": 97296
+  },
+  "parts/touch-right-dynamixel/d1b7310480.png": {
+   "object": "guide/parts/touch-right-dynamixel/d1b7310480-84a53b49b61a06d7.png",
+   "size": 141448
+  },
+  "parts/touch-right-dynamixel/d3f520538b.png": {
+   "object": "guide/parts/touch-right-dynamixel/d3f520538b-a60b4fea3a5997dc.png",
+   "size": 141049
+  },
+  "parts/touch-right-dynamixel/d7812c0263.png": {
+   "object": "guide/parts/touch-right-dynamixel/d7812c0263-f46914ac77730ccf.png",
+   "size": 97669
+  },
+  "parts/touch-right-dynamixel/da8a9270c0.png": {
+   "object": "guide/parts/touch-right-dynamixel/da8a9270c0-c95f290790e76a6b.png",
+   "size": 181195
+  },
+  "parts/touch-right-dynamixel/daa2bf3246.png": {
+   "object": "guide/parts/touch-right-dynamixel/daa2bf3246-a51ff879349b03a2.png",
+   "size": 69686
+  },
+  "parts/touch-right-dynamixel/dd0a0791f1.png": {
+   "object": "guide/parts/touch-right-dynamixel/dd0a0791f1-416102669b808a4c.png",
+   "size": 76520
+  },
+  "parts/touch-right-dynamixel/df220860a1.png": {
+   "object": "guide/parts/touch-right-dynamixel/df220860a1-aa9db4ca3c2e16b7.png",
+   "size": 103230
+  },
+  "parts/touch-right-dynamixel/e2fd92904c.png": {
+   "object": "guide/parts/touch-right-dynamixel/e2fd92904c-3a3cfebd758466bf.png",
+   "size": 102885
+  },
+  "parts/touch-right-dynamixel/e4c33ea040.png": {
+   "object": "guide/parts/touch-right-dynamixel/e4c33ea040-88dd4eb628001968.png",
+   "size": 76019
+  },
+  "parts/touch-right-dynamixel/e6ecc025ea.png": {
+   "object": "guide/parts/touch-right-dynamixel/e6ecc025ea-48dd0d0fc4485ea5.png",
+   "size": 99764
+  },
+  "parts/touch-right-dynamixel/eb86bce488.png": {
+   "object": "guide/parts/touch-right-dynamixel/eb86bce488-312f087c261f03b0.png",
+   "size": 94028
+  },
+  "parts/touch-right-dynamixel/f0c9a4e32c.png": {
+   "object": "guide/parts/touch-right-dynamixel/f0c9a4e32c-d60ebe40149bb40d.png",
+   "size": 81806
+  },
+  "parts/touch-right-dynamixel/f115b9e984.png": {
+   "object": "guide/parts/touch-right-dynamixel/f115b9e984-1b7165fb88a364b0.png",
+   "size": 128030
+  },
+  "parts/touch-right-dynamixel/f1efd004fd.png": {
+   "object": "guide/parts/touch-right-dynamixel/f1efd004fd-a3e69f45bee3f63c.png",
+   "size": 163974
+  },
+  "parts/touch-right-dynamixel/fea2650845.png": {
+   "object": "guide/parts/touch-right-dynamixel/fea2650845-7f1274f5f5e4f133.png",
+   "size": 189814
+  },
+  "parts/touch-right-dynamixel/ffad82075d.png": {
+   "object": "guide/parts/touch-right-dynamixel/ffad82075d-020d43c62df280db.png",
+   "size": 58789
+  },
+  "renders/base-left-dynamixel/mount-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/mount-1-f04b3929439c7e6d.webp",
+   "size": 40356
+  },
+  "renders/base-left-dynamixel/mount-2.webp": {
+   "object": "guide/renders/base-left-dynamixel/mount-2-91fa6be70489d130.webp",
+   "size": 158744
+  },
+  "renders/base-left-dynamixel/mount-3.webp": {
+   "object": "guide/renders/base-left-dynamixel/mount-3-0916d534e39c6a78.webp",
+   "size": 92378
+  },
+  "renders/base-left-dynamixel/panel-015-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-015-1-d304608a0ef48736.webp",
+   "size": 76474
+  },
+  "renders/base-left-dynamixel/panel-015-2.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-015-2-6d2b26dc4b70d094.webp",
+   "size": 79004
+  },
+  "renders/base-left-dynamixel/panel-017-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-017-1-049156f3742aaa1f.webp",
+   "size": 55706
+  },
+  "renders/base-left-dynamixel/panel-017-2.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-017-2-5a501bb41cb3a6ae.webp",
+   "size": 80476
+  },
+  "renders/base-left-dynamixel/panel-017-3.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-017-3-b105f1cb4b0bbfd7.webp",
+   "size": 71706
+  },
+  "renders/base-left-dynamixel/panel-017-4.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-017-4-1726d174d2555429.webp",
+   "size": 41170
+  },
+  "renders/base-left-dynamixel/panel-017-5.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-017-5-29bd2878b9aaecd2.webp",
+   "size": 50900
+  },
+  "renders/base-left-dynamixel/panel-019-4.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-019-4-f4b3b914dabfaa15.webp",
+   "size": 63798
+  },
+  "renders/base-left-dynamixel/panel-021-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-021-1-fdfade46b0564afb.webp",
+   "size": 35826
+  },
+  "renders/base-left-dynamixel/panel-021-2.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-021-2-7225f537ad617087.webp",
+   "size": 59962
+  },
+  "renders/base-left-dynamixel/panel-021-3.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-021-3-1bdb19786a7b37d2.webp",
+   "size": 59826
+  },
+  "renders/base-left-dynamixel/panel-030-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-030-1-0c6987cef678f92b.webp",
+   "size": 43972
+  },
+  "renders/base-left-dynamixel/panel-030-2.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-030-2-9a9bc2a0d0324001.webp",
+   "size": 46152
+  },
+  "renders/base-left-dynamixel/panel-030-3.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-030-3-d5498d56e29fbadf.webp",
+   "size": 30236
+  },
+  "renders/base-left-dynamixel/panel-030-4.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-030-4-73a4779b6b65e105.webp",
+   "size": 48584
+  },
+  "renders/base-left-dynamixel/panel-032-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-032-1-12963e3b663056f4.webp",
+   "size": 54882
+  },
+  "renders/base-left-dynamixel/panel-032-3.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-032-3-aaf345b16855395a.webp",
+   "size": 58310
+  },
+  "renders/base-left-dynamixel/panel-034-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-034-1-d2d3925c66afd059.webp",
+   "size": 43180
+  },
+  "renders/base-left-dynamixel/panel-034-2.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-034-2-c679ac355ce75882.webp",
+   "size": 30540
+  },
+  "renders/base-left-dynamixel/panel-034-3.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-034-3-9d4ba573841ea0d4.webp",
+   "size": 51330
+  },
+  "renders/base-left-dynamixel/panel-034-4.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-034-4-77a49155f7646183.webp",
+   "size": 39590
+  },
+  "renders/base-left-dynamixel/panel-034-5.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-034-5-c0399d701ad3c60f.webp",
+   "size": 42818
+  },
+  "renders/base-left-dynamixel/panel-034-6.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-034-6-f61f97969d34a34a.webp",
+   "size": 40518
+  },
+  "renders/base-left-dynamixel/panel-036-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-036-1-2d64912b7a65f591.webp",
+   "size": 105310
+  },
+  "renders/base-left-dynamixel/panel-036-2.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-036-2-e116eb5c2062b040.webp",
+   "size": 107134
+  },
+  "renders/base-left-dynamixel/panel-039-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-039-1-f88276fc22cd9b29.webp",
+   "size": 74064
+  },
+  "renders/base-left-dynamixel/panel-039-2.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-039-2-4f31ac930c1c04dd.webp",
+   "size": 79334
+  },
+  "renders/base-left-dynamixel/panel-041-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-041-1-f05619dab14824f8.webp",
+   "size": 148488
+  },
+  "renders/base-left-dynamixel/panel-041-3.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-041-3-f50db670971288a7.webp",
+   "size": 78686
+  },
+  "renders/base-left-dynamixel/panel-041-5.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-041-5-cb1af25b61fa6e8e.webp",
+   "size": 138812
+  },
+  "renders/base-left-dynamixel/panel-048-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-048-1-28323f5430aca59b.webp",
+   "size": 42008
+  },
+  "renders/base-left-dynamixel/panel-051-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-051-1-b3e12b535bd49309.webp",
+   "size": 52858
+  },
+  "renders/base-left-dynamixel/panel-051-2.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-051-2-103c6ae109e098bf.webp",
+   "size": 59402
+  },
+  "renders/base-left-dynamixel/panel-053-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-053-1-e7b1c1b0e49ff425.webp",
+   "size": 116864
+  },
+  "renders/base-left-dynamixel/panel-053-3.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-053-3-9f3ef4ad92de6fac.webp",
+   "size": 58842
+  },
+  "renders/base-left-dynamixel/panel-053-5.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-053-5-0635296e8d189f1c.webp",
+   "size": 125894
+  },
+  "renders/base-left-dynamixel/panel-058-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-058-1-58aa81524bb387c3.webp",
+   "size": 50432
+  },
+  "renders/base-left-dynamixel/panel-058-2.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-058-2-e0afc72a42a82576.webp",
+   "size": 60368
+  },
+  "renders/base-left-dynamixel/panel-063-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-063-1-af0a6c4cbc080407.webp",
+   "size": 179800
+  },
+  "renders/base-left-dynamixel/panel-063-2.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-063-2-f48e40038cfe8419.webp",
+   "size": 124420
+  },
+  "renders/base-left-dynamixel/panel-063-3.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-063-3-55c3fcac2777657b.webp",
+   "size": 64666
+  },
+  "renders/base-left-dynamixel/panel-069-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-069-1-c7b93be9b046856a.webp",
+   "size": 92412
+  },
+  "renders/base-left-dynamixel/panel-069-2.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-069-2-470b835d4af6022b.webp",
+   "size": 96398
+  },
+  "renders/base-left-dynamixel/panel-072-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-072-1-d597bff2023ddd16.webp",
+   "size": 78242
+  },
+  "renders/base-left-dynamixel/panel-076-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-076-1-7969ccd9680cb334.webp",
+   "size": 82764
+  },
+  "renders/base-left-dynamixel/panel-076-2.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-076-2-5d08bbec609aa050.webp",
+   "size": 208314
+  },
+  "renders/base-left-dynamixel/panel-076-3.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-076-3-5ad14b3f3a0d6240.webp",
+   "size": 319906
+  },
+  "renders/base-left-dynamixel/panel-079-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-079-1-a7012198280c6c6f.webp",
+   "size": 261110
+  },
+  "renders/base-left-dynamixel/panel-089-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-089-1-3d61437cd86d7bc4.webp",
+   "size": 296658
+  },
+  "renders/base-left-dynamixel/panel-091-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-091-1-5280b8c144acb6ab.webp",
+   "size": 94654
+  },
+  "renders/base-left-dynamixel/panel-091-2.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-091-2-756ad82fc4cefb5e.webp",
+   "size": 88044
+  },
+  "renders/base-left-dynamixel/panel-092-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-092-1-8be5a729ddea4169.webp",
+   "size": 129386
+  },
+  "renders/base-left-dynamixel/panel-092-2.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-092-2-88d1aade8c6076ce.webp",
+   "size": 122764
+  },
+  "renders/base-left-dynamixel/panel-092-3.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-092-3-ff6049a6bea1f154.webp",
+   "size": 106574
+  },
+  "renders/base-left-dynamixel/panel-095-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-095-1-bd3378d33e3db1be.webp",
+   "size": 111946
+  },
+  "renders/base-left-dynamixel/panel-096-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-096-1-58eb722f6559e138.webp",
+   "size": 60040
+  },
+  "renders/base-left-dynamixel/panel-096-2.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-096-2-c4e977264a47efe0.webp",
+   "size": 170580
+  },
+  "renders/base-left-dynamixel/panel-096-3.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-096-3-5b5401d2bd31b1ae.webp",
+   "size": 120176
+  },
+  "renders/base-left-dynamixel/panel-122-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-122-1-25a4722256a6b2e1.webp",
+   "size": 109004
+  },
+  "renders/base-left-dynamixel/panel-124-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-124-1-93f0b51af62ad728.webp",
+   "size": 249992
+  },
+  "renders/base-left-dynamixel/panel-124-2.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-124-2-2274e1d05c48a0f7.webp",
+   "size": 69432
+  },
+  "renders/base-left-dynamixel/panel-125-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-125-1-67c604c61b8c18ec.webp",
+   "size": 40650
+  },
+  "renders/base-left-dynamixel/panel-125-2.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-125-2-d842b9c3a2fab791.webp",
+   "size": 50854
+  },
+  "renders/base-left-dynamixel/panel-126-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-126-1-77cd6685ab743826.webp",
+   "size": 53568
+  },
+  "renders/base-left-dynamixel/panel-126-2.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-126-2-d624075d5b714112.webp",
+   "size": 70774
+  },
+  "renders/base-left-dynamixel/panel-134-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-134-1-4f87fba12d2157d1.webp",
+   "size": 46986
+  },
+  "renders/base-left-dynamixel/panel-138-1.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-138-1-b592dcef8b254a15.webp",
+   "size": 27316
+  },
+  "renders/base-left-dynamixel/panel-138-4.webp": {
+   "object": "guide/renders/base-left-dynamixel/panel-138-4-5d18d0828e9f4888.webp",
+   "size": 40928
+  },
+  "renders/base-left-dynamixel/route-p35-pair.webp": {
+   "object": "guide/renders/base-left-dynamixel/route-p35-pair-d5bdeec966f9adda.webp",
+   "size": 39546
+  },
+  "renders/base-left-dynamixel/route-p42-entry.webp": {
+   "object": "guide/renders/base-left-dynamixel/route-p42-entry-ed9db8e96926ae5e.webp",
+   "size": 59228
+  },
+  "renders/base-left-dynamixel/route-p42-exit.webp": {
+   "object": "guide/renders/base-left-dynamixel/route-p42-exit-9d436fd953e55339.webp",
+   "size": 62458
+  },
+  "renders/base-left-dynamixel/route-p54-entry.webp": {
+   "object": "guide/renders/base-left-dynamixel/route-p54-entry-84aa8a3004fb89c6.webp",
+   "size": 60808
+  },
+  "renders/base-left-dynamixel/route-p54-exit.webp": {
+   "object": "guide/renders/base-left-dynamixel/route-p54-exit-80fe153135bdfe95.webp",
+   "size": 66370
+  },
+  "renders/base-left-dynamixel/route-p59-entry.webp": {
+   "object": "guide/renders/base-left-dynamixel/route-p59-entry-65f32950e4d29368.webp",
+   "size": 45512
+  },
+  "renders/base-left-dynamixel/route-p59-exit.webp": {
+   "object": "guide/renders/base-left-dynamixel/route-p59-exit-07c7dfa21015937a.webp",
+   "size": 31268
+  },
+  "renders/base-left-dynamixel/route-p62-entry.webp": {
+   "object": "guide/renders/base-left-dynamixel/route-p62-entry-65f32950e4d29368.webp",
+   "size": 45512
+  },
+  "renders/base-left-dynamixel/route-p62-exit.webp": {
+   "object": "guide/renders/base-left-dynamixel/route-p62-exit-07c7dfa21015937a.webp",
+   "size": 31268
+  },
+  "renders/base-left-dynamixel/route-p64-entry.webp": {
+   "object": "guide/renders/base-left-dynamixel/route-p64-entry-be92a45fa8f54391.webp",
+   "size": 69596
+  },
+  "renders/base-left-dynamixel/route-p64-exit.webp": {
+   "object": "guide/renders/base-left-dynamixel/route-p64-exit-9d436fd953e55339.webp",
+   "size": 62458
+  },
+  "renders/base-left-dynamixel/route-p77-groups.webp": {
+   "object": "guide/renders/base-left-dynamixel/route-p77-groups-183d90a6c7bc2d18.webp",
+   "size": 56762
+  },
+  "renders/base-left-dynamixel/thumb-dp-feed.webp": {
+   "object": "guide/renders/base-left-dynamixel/thumb-dp-feed-0f9364bd69d8e760.webp",
+   "size": 42434
+  },
+  "renders/base-left-dynamixel/thumb-dp-seat.webp": {
+   "object": "guide/renders/base-left-dynamixel/thumb-dp-seat-62cf54f95819c9cd.webp",
+   "size": 45190
+  },
+  "renders/base-left-dynamixel/thumb-dp-tuck.webp": {
+   "object": "guide/renders/base-left-dynamixel/thumb-dp-tuck-3284e60d5710a7d3.webp",
+   "size": 28022
+  },
+  "renders/base-left-dynamixel/thumb-pp-part.webp": {
+   "object": "guide/renders/base-left-dynamixel/thumb-pp-part-2c410be90c61a300.webp",
+   "size": 35174
+  },
+  "renders/base-right-dynamixel/mount-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/mount-1-f04b3929439c7e6d.webp",
+   "size": 40356
+  },
+  "renders/base-right-dynamixel/mount-2.webp": {
+   "object": "guide/renders/base-right-dynamixel/mount-2-91fa6be70489d130.webp",
+   "size": 158744
+  },
+  "renders/base-right-dynamixel/mount-3.webp": {
+   "object": "guide/renders/base-right-dynamixel/mount-3-0916d534e39c6a78.webp",
+   "size": 92378
+  },
+  "renders/base-right-dynamixel/panel-015-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-015-1-05adc8f0cdf35d12.webp",
+   "size": 74124
+  },
+  "renders/base-right-dynamixel/panel-015-2.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-015-2-84f1ab9fd92eba8f.webp",
+   "size": 84388
+  },
+  "renders/base-right-dynamixel/panel-017-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-017-1-0c53d092e12bc4d8.webp",
+   "size": 63682
+  },
+  "renders/base-right-dynamixel/panel-017-2.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-017-2-f85cc51ae10c6151.webp",
+   "size": 83512
+  },
+  "renders/base-right-dynamixel/panel-017-3.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-017-3-b105f1cb4b0bbfd7.webp",
+   "size": 71706
+  },
+  "renders/base-right-dynamixel/panel-017-4.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-017-4-1726d174d2555429.webp",
+   "size": 41170
+  },
+  "renders/base-right-dynamixel/panel-017-5.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-017-5-29bd2878b9aaecd2.webp",
+   "size": 50900
+  },
+  "renders/base-right-dynamixel/panel-019-4.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-019-4-59154493418ee70f.webp",
+   "size": 63334
+  },
+  "renders/base-right-dynamixel/panel-021-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-021-1-abd95d62b246479d.webp",
+   "size": 34854
+  },
+  "renders/base-right-dynamixel/panel-021-2.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-021-2-1f545937172e8d33.webp",
+   "size": 51722
+  },
+  "renders/base-right-dynamixel/panel-021-3.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-021-3-357aebdd6756900e.webp",
+   "size": 51460
+  },
+  "renders/base-right-dynamixel/panel-030-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-030-1-6843ac3fd295ed28.webp",
+   "size": 47548
+  },
+  "renders/base-right-dynamixel/panel-030-2.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-030-2-733943c208042e01.webp",
+   "size": 47062
+  },
+  "renders/base-right-dynamixel/panel-030-3.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-030-3-c4dd1dedbf53aced.webp",
+   "size": 31140
+  },
+  "renders/base-right-dynamixel/panel-030-4.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-030-4-0edf066b89dc1064.webp",
+   "size": 43266
+  },
+  "renders/base-right-dynamixel/panel-032-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-032-1-5ac3aab87e2e7ae1.webp",
+   "size": 56384
+  },
+  "renders/base-right-dynamixel/panel-032-3.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-032-3-3bb891103aa25cfd.webp",
+   "size": 59254
+  },
+  "renders/base-right-dynamixel/panel-034-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-034-1-91f56041de28fda8.webp",
+   "size": 44832
+  },
+  "renders/base-right-dynamixel/panel-034-2.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-034-2-291b26bf2e0f4985.webp",
+   "size": 31580
+  },
+  "renders/base-right-dynamixel/panel-034-3.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-034-3-5d5232b3d711bf9f.webp",
+   "size": 39228
+  },
+  "renders/base-right-dynamixel/panel-034-4.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-034-4-ef5408b9f3cd8846.webp",
+   "size": 29764
+  },
+  "renders/base-right-dynamixel/panel-034-5.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-034-5-14984620be46231f.webp",
+   "size": 34008
+  },
+  "renders/base-right-dynamixel/panel-034-6.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-034-6-959839577256af80.webp",
+   "size": 32674
+  },
+  "renders/base-right-dynamixel/panel-036-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-036-1-5b718ff5eb76f001.webp",
+   "size": 103900
+  },
+  "renders/base-right-dynamixel/panel-036-2.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-036-2-338b3d4661cec0bd.webp",
+   "size": 107058
+  },
+  "renders/base-right-dynamixel/panel-039-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-039-1-17945580b79b7831.webp",
+   "size": 74604
+  },
+  "renders/base-right-dynamixel/panel-039-2.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-039-2-608031bea234f0ef.webp",
+   "size": 80164
+  },
+  "renders/base-right-dynamixel/panel-041-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-041-1-2ba3e8b4f94ae1e3.webp",
+   "size": 149102
+  },
+  "renders/base-right-dynamixel/panel-041-3.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-041-3-35c05edcd4cdb0c2.webp",
+   "size": 79470
+  },
+  "renders/base-right-dynamixel/panel-041-5.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-041-5-7f987467465e753b.webp",
+   "size": 139208
+  },
+  "renders/base-right-dynamixel/panel-048-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-048-1-a373d07279844a00.webp",
+   "size": 52682
+  },
+  "renders/base-right-dynamixel/panel-051-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-051-1-9050ee493a180a1b.webp",
+   "size": 58122
+  },
+  "renders/base-right-dynamixel/panel-051-2.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-051-2-03c940adfd45575b.webp",
+   "size": 64950
+  },
+  "renders/base-right-dynamixel/panel-053-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-053-1-a4774156681e622e.webp",
+   "size": 122790
+  },
+  "renders/base-right-dynamixel/panel-053-3.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-053-3-c15a61b8ed4cf50c.webp",
+   "size": 65398
+  },
+  "renders/base-right-dynamixel/panel-053-5.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-053-5-a7a796c387ead122.webp",
+   "size": 131936
+  },
+  "renders/base-right-dynamixel/panel-058-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-058-1-1ca544db07906538.webp",
+   "size": 50692
+  },
+  "renders/base-right-dynamixel/panel-058-2.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-058-2-a8f3313a90b6cbdd.webp",
+   "size": 60698
+  },
+  "renders/base-right-dynamixel/panel-063-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-063-1-f773ab0d5e6dce05.webp",
+   "size": 171448
+  },
+  "renders/base-right-dynamixel/panel-063-2.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-063-2-e94befbea43936b1.webp",
+   "size": 128406
+  },
+  "renders/base-right-dynamixel/panel-063-3.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-063-3-a8150af7dd2b6797.webp",
+   "size": 79484
+  },
+  "renders/base-right-dynamixel/panel-069-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-069-1-a7e8861ac5d6cf34.webp",
+   "size": 92886
+  },
+  "renders/base-right-dynamixel/panel-069-2.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-069-2-43bdf53e72bb10af.webp",
+   "size": 97574
+  },
+  "renders/base-right-dynamixel/panel-072-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-072-1-d4df21e090c1f1c6.webp",
+   "size": 71448
+  },
+  "renders/base-right-dynamixel/panel-076-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-076-1-7969ccd9680cb334.webp",
+   "size": 82764
+  },
+  "renders/base-right-dynamixel/panel-076-2.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-076-2-5d08bbec609aa050.webp",
+   "size": 208314
+  },
+  "renders/base-right-dynamixel/panel-076-3.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-076-3-5ad14b3f3a0d6240.webp",
+   "size": 319906
+  },
+  "renders/base-right-dynamixel/panel-079-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-079-1-6d39c87b07db720f.webp",
+   "size": 234992
+  },
+  "renders/base-right-dynamixel/panel-089-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-089-1-07fb4600e5b3278c.webp",
+   "size": 297446
+  },
+  "renders/base-right-dynamixel/panel-091-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-091-1-5280b8c144acb6ab.webp",
+   "size": 94654
+  },
+  "renders/base-right-dynamixel/panel-091-2.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-091-2-756ad82fc4cefb5e.webp",
+   "size": 88044
+  },
+  "renders/base-right-dynamixel/panel-092-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-092-1-a304eccd946d1288.webp",
+   "size": 129210
+  },
+  "renders/base-right-dynamixel/panel-092-2.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-092-2-75572f154a74b548.webp",
+   "size": 130078
+  },
+  "renders/base-right-dynamixel/panel-092-3.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-092-3-6da6f8d692237c36.webp",
+   "size": 102918
+  },
+  "renders/base-right-dynamixel/panel-095-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-095-1-bd3378d33e3db1be.webp",
+   "size": 111946
+  },
+  "renders/base-right-dynamixel/panel-096-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-096-1-58eb722f6559e138.webp",
+   "size": 60040
+  },
+  "renders/base-right-dynamixel/panel-096-2.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-096-2-c4e977264a47efe0.webp",
+   "size": 170580
+  },
+  "renders/base-right-dynamixel/panel-096-3.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-096-3-5b5401d2bd31b1ae.webp",
+   "size": 120176
+  },
+  "renders/base-right-dynamixel/panel-122-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-122-1-9204b6898936be8d.webp",
+   "size": 104652
+  },
+  "renders/base-right-dynamixel/panel-124-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-124-1-a571bdc2423e8d4c.webp",
+   "size": 253076
+  },
+  "renders/base-right-dynamixel/panel-124-2.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-124-2-2274e1d05c48a0f7.webp",
+   "size": 69432
+  },
+  "renders/base-right-dynamixel/panel-125-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-125-1-67c604c61b8c18ec.webp",
+   "size": 40650
+  },
+  "renders/base-right-dynamixel/panel-125-2.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-125-2-d842b9c3a2fab791.webp",
+   "size": 50854
+  },
+  "renders/base-right-dynamixel/panel-126-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-126-1-77cd6685ab743826.webp",
+   "size": 53568
+  },
+  "renders/base-right-dynamixel/panel-126-2.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-126-2-d624075d5b714112.webp",
+   "size": 70774
+  },
+  "renders/base-right-dynamixel/panel-134-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-134-1-4f87fba12d2157d1.webp",
+   "size": 46986
+  },
+  "renders/base-right-dynamixel/panel-138-1.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-138-1-b592dcef8b254a15.webp",
+   "size": 27316
+  },
+  "renders/base-right-dynamixel/panel-138-4.webp": {
+   "object": "guide/renders/base-right-dynamixel/panel-138-4-5d18d0828e9f4888.webp",
+   "size": 40928
+  },
+  "renders/base-right-dynamixel/route-p35-pair.webp": {
+   "object": "guide/renders/base-right-dynamixel/route-p35-pair-53658b43d0408df9.webp",
+   "size": 46314
+  },
+  "renders/base-right-dynamixel/route-p42-entry.webp": {
+   "object": "guide/renders/base-right-dynamixel/route-p42-entry-a16a324cd737c04f.webp",
+   "size": 55554
+  },
+  "renders/base-right-dynamixel/route-p42-exit.webp": {
+   "object": "guide/renders/base-right-dynamixel/route-p42-exit-3ddf8c72b7d0bdb1.webp",
+   "size": 68514
+  },
+  "renders/base-right-dynamixel/route-p54-entry.webp": {
+   "object": "guide/renders/base-right-dynamixel/route-p54-entry-73f0275b0537dc8c.webp",
+   "size": 64446
+  },
+  "renders/base-right-dynamixel/route-p54-exit.webp": {
+   "object": "guide/renders/base-right-dynamixel/route-p54-exit-3a20b96f0e0461a3.webp",
+   "size": 68008
+  },
+  "renders/base-right-dynamixel/route-p59-entry.webp": {
+   "object": "guide/renders/base-right-dynamixel/route-p59-entry-e69f61bd58173b02.webp",
+   "size": 45468
+  },
+  "renders/base-right-dynamixel/route-p59-exit.webp": {
+   "object": "guide/renders/base-right-dynamixel/route-p59-exit-8e84d22b3b2de3b8.webp",
+   "size": 30366
+  },
+  "renders/base-right-dynamixel/route-p62-entry.webp": {
+   "object": "guide/renders/base-right-dynamixel/route-p62-entry-e69f61bd58173b02.webp",
+   "size": 45468
+  },
+  "renders/base-right-dynamixel/route-p62-exit.webp": {
+   "object": "guide/renders/base-right-dynamixel/route-p62-exit-8e84d22b3b2de3b8.webp",
+   "size": 30366
+  },
+  "renders/base-right-dynamixel/route-p64-entry.webp": {
+   "object": "guide/renders/base-right-dynamixel/route-p64-entry-79c794641ee6cd1f.webp",
+   "size": 65756
+  },
+  "renders/base-right-dynamixel/route-p64-exit.webp": {
+   "object": "guide/renders/base-right-dynamixel/route-p64-exit-3ddf8c72b7d0bdb1.webp",
+   "size": 68514
+  },
+  "renders/base-right-dynamixel/route-p77-groups.webp": {
+   "object": "guide/renders/base-right-dynamixel/route-p77-groups-7850c48c33865127.webp",
+   "size": 51162
+  },
+  "renders/base-right-dynamixel/thumb-dp-feed.webp": {
+   "object": "guide/renders/base-right-dynamixel/thumb-dp-feed-fb33af1b2b9b944a.webp",
+   "size": 45058
+  },
+  "renders/base-right-dynamixel/thumb-dp-seat.webp": {
+   "object": "guide/renders/base-right-dynamixel/thumb-dp-seat-45976507831744ce.webp",
+   "size": 45622
+  },
+  "renders/base-right-dynamixel/thumb-dp-tuck.webp": {
+   "object": "guide/renders/base-right-dynamixel/thumb-dp-tuck-f5384bd0753dba00.webp",
+   "size": 28732
+  },
+  "renders/base-right-dynamixel/thumb-pp-part.webp": {
+   "object": "guide/renders/base-right-dynamixel/thumb-pp-part-8a434e501ad6b156.webp",
+   "size": 30382
+  },
+  "renders/touch-left-dynamixel/mount-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/mount-1-f04b3929439c7e6d.webp",
+   "size": 40356
+  },
+  "renders/touch-left-dynamixel/mount-2.webp": {
+   "object": "guide/renders/touch-left-dynamixel/mount-2-91fa6be70489d130.webp",
+   "size": 158744
+  },
+  "renders/touch-left-dynamixel/mount-3.webp": {
+   "object": "guide/renders/touch-left-dynamixel/mount-3-a7ea5a48d50b1ee9.webp",
+   "size": 93154
+  },
+  "renders/touch-left-dynamixel/panel-015-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-015-1-fe6237232807045a.webp",
+   "size": 77582
+  },
+  "renders/touch-left-dynamixel/panel-015-2.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-015-2-04f90066d361b21c.webp",
+   "size": 83538
+  },
+  "renders/touch-left-dynamixel/panel-017-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-017-1-289d09d28b62d632.webp",
+   "size": 62914
+  },
+  "renders/touch-left-dynamixel/panel-017-2.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-017-2-d05da46b7716f008.webp",
+   "size": 89712
+  },
+  "renders/touch-left-dynamixel/panel-017-3.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-017-3-b105f1cb4b0bbfd7.webp",
+   "size": 71706
+  },
+  "renders/touch-left-dynamixel/panel-017-4.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-017-4-1726d174d2555429.webp",
+   "size": 41170
+  },
+  "renders/touch-left-dynamixel/panel-017-5.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-017-5-29bd2878b9aaecd2.webp",
+   "size": 50900
+  },
+  "renders/touch-left-dynamixel/panel-019-4.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-019-4-6a66e62026cfc4fd.webp",
+   "size": 67300
+  },
+  "renders/touch-left-dynamixel/panel-021-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-021-1-e3dbcc2b8ffbce03.webp",
+   "size": 34366
+  },
+  "renders/touch-left-dynamixel/panel-021-2.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-021-2-b5e9f126bc764444.webp",
+   "size": 56922
+  },
+  "renders/touch-left-dynamixel/panel-021-3.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-021-3-3f4f699dc9ad2efc.webp",
+   "size": 56816
+  },
+  "renders/touch-left-dynamixel/panel-030-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-030-1-b4a7a0696c8f5f3f.webp",
+   "size": 43966
+  },
+  "renders/touch-left-dynamixel/panel-030-2.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-030-2-afdeccd1b88c6dc5.webp",
+   "size": 41702
+  },
+  "renders/touch-left-dynamixel/panel-030-3.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-030-3-d34ab5d7d4fec925.webp",
+   "size": 30728
+  },
+  "renders/touch-left-dynamixel/panel-030-4.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-030-4-13208d87051b561b.webp",
+   "size": 54962
+  },
+  "renders/touch-left-dynamixel/panel-032-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-032-1-73f3240e6c50222b.webp",
+   "size": 58164
+  },
+  "renders/touch-left-dynamixel/panel-032-3.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-032-3-e4240f5c27455219.webp",
+   "size": 61420
+  },
+  "renders/touch-left-dynamixel/panel-034-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-034-1-747941204acf90cd.webp",
+   "size": 44736
+  },
+  "renders/touch-left-dynamixel/panel-034-2.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-034-2-09e8fb8da18c5455.webp",
+   "size": 31900
+  },
+  "renders/touch-left-dynamixel/panel-034-3.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-034-3-11a1392af7c980fb.webp",
+   "size": 51674
+  },
+  "renders/touch-left-dynamixel/panel-034-4.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-034-4-f4989d0736bf2b99.webp",
+   "size": 40810
+  },
+  "renders/touch-left-dynamixel/panel-034-5.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-034-5-0e2a3ac2525ee268.webp",
+   "size": 44532
+  },
+  "renders/touch-left-dynamixel/panel-034-6.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-034-6-d10846974c17f589.webp",
+   "size": 43286
+  },
+  "renders/touch-left-dynamixel/panel-036-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-036-1-363420d3719f16e4.webp",
+   "size": 94172
+  },
+  "renders/touch-left-dynamixel/panel-036-2.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-036-2-b26ee620a96a36f2.webp",
+   "size": 91502
+  },
+  "renders/touch-left-dynamixel/panel-039-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-039-1-27bafaff825fcf91.webp",
+   "size": 86256
+  },
+  "renders/touch-left-dynamixel/panel-039-2.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-039-2-fffdce7f0cea3090.webp",
+   "size": 80820
+  },
+  "renders/touch-left-dynamixel/panel-041-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-041-1-49e3b7ffda615343.webp",
+   "size": 145450
+  },
+  "renders/touch-left-dynamixel/panel-041-3.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-041-3-0824556832dd18a9.webp",
+   "size": 77920
+  },
+  "renders/touch-left-dynamixel/panel-041-5.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-041-5-28a92282a00fb8a2.webp",
+   "size": 132730
+  },
+  "renders/touch-left-dynamixel/panel-048-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-048-1-ff4330994b6e6824.webp",
+   "size": 46276
+  },
+  "renders/touch-left-dynamixel/panel-051-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-051-1-0a78fe20a3c1a6c8.webp",
+   "size": 62908
+  },
+  "renders/touch-left-dynamixel/panel-051-2.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-051-2-bc78cee7d6d0c98e.webp",
+   "size": 59778
+  },
+  "renders/touch-left-dynamixel/panel-053-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-053-1-d97f6b864f9484e9.webp",
+   "size": 107650
+  },
+  "renders/touch-left-dynamixel/panel-053-3.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-053-3-3eed6ec3fb3724c9.webp",
+   "size": 56726
+  },
+  "renders/touch-left-dynamixel/panel-053-5.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-053-5-5874cdb98d1faf1c.webp",
+   "size": 118922
+  },
+  "renders/touch-left-dynamixel/panel-058-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-058-1-eb26b01dfc3e0536.webp",
+   "size": 53436
+  },
+  "renders/touch-left-dynamixel/panel-058-2.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-058-2-0b90fdaa271c0784.webp",
+   "size": 62630
+  },
+  "renders/touch-left-dynamixel/panel-063-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-063-1-34c2a1158db58a1d.webp",
+   "size": 187006
+  },
+  "renders/touch-left-dynamixel/panel-063-2.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-063-2-1ffdcec49362a424.webp",
+   "size": 126342
+  },
+  "renders/touch-left-dynamixel/panel-063-3.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-063-3-f9b48a14b03ceeca.webp",
+   "size": 74022
+  },
+  "renders/touch-left-dynamixel/panel-069-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-069-1-9e72db2f019046fb.webp",
+   "size": 103004
+  },
+  "renders/touch-left-dynamixel/panel-069-2.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-069-2-866d466dee72bc95.webp",
+   "size": 91894
+  },
+  "renders/touch-left-dynamixel/panel-072-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-072-1-2f45cfb01b58c9b0.webp",
+   "size": 84572
+  },
+  "renders/touch-left-dynamixel/panel-076-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-076-1-bbea2c7c104d7f67.webp",
+   "size": 82760
+  },
+  "renders/touch-left-dynamixel/panel-076-2.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-076-2-5d08bbec609aa050.webp",
+   "size": 208314
+  },
+  "renders/touch-left-dynamixel/panel-076-3.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-076-3-5ad14b3f3a0d6240.webp",
+   "size": 319906
+  },
+  "renders/touch-left-dynamixel/panel-079-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-079-1-fbdb89e0e2ceaa37.webp",
+   "size": 265360
+  },
+  "renders/touch-left-dynamixel/panel-089-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-089-1-4546a071434f7344.webp",
+   "size": 295582
+  },
+  "renders/touch-left-dynamixel/panel-091-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-091-1-5280b8c144acb6ab.webp",
+   "size": 94654
+  },
+  "renders/touch-left-dynamixel/panel-091-2.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-091-2-a3c27c380874f4fa.webp",
+   "size": 87620
+  },
+  "renders/touch-left-dynamixel/panel-092-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-092-1-4fff2ce4840c3429.webp",
+   "size": 234888
+  },
+  "renders/touch-left-dynamixel/panel-092-2.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-092-2-e5e691f61905cfa4.webp",
+   "size": 231746
+  },
+  "renders/touch-left-dynamixel/panel-092-3.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-092-3-63bb57cc198da7d7.webp",
+   "size": 76780
+  },
+  "renders/touch-left-dynamixel/panel-095-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-095-1-bd3378d33e3db1be.webp",
+   "size": 111946
+  },
+  "renders/touch-left-dynamixel/panel-096-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-096-1-58eb722f6559e138.webp",
+   "size": 60040
+  },
+  "renders/touch-left-dynamixel/panel-096-2.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-096-2-e1c39da52ab5a38d.webp",
+   "size": 169962
+  },
+  "renders/touch-left-dynamixel/panel-096-3.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-096-3-5b5401d2bd31b1ae.webp",
+   "size": 120176
+  },
+  "renders/touch-left-dynamixel/panel-122-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-122-1-6cabba329f08f93d.webp",
+   "size": 79314
+  },
+  "renders/touch-left-dynamixel/panel-124-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-124-1-93f0b51af62ad728.webp",
+   "size": 249992
+  },
+  "renders/touch-left-dynamixel/panel-124-2.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-124-2-d376ff20fd4e7086.webp",
+   "size": 65924
+  },
+  "renders/touch-left-dynamixel/panel-125-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-125-1-9272c9d93e70cc8b.webp",
+   "size": 50436
+  },
+  "renders/touch-left-dynamixel/panel-125-2.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-125-2-f8967ee6737b8dae.webp",
+   "size": 50868
+  },
+  "renders/touch-left-dynamixel/panel-126-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-126-1-79c255bd727291e1.webp",
+   "size": 53542
+  },
+  "renders/touch-left-dynamixel/panel-126-2.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-126-2-1a1a28401b1d9244.webp",
+   "size": 70768
+  },
+  "renders/touch-left-dynamixel/panel-134-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-134-1-59379ad4836e35ac.webp",
+   "size": 46986
+  },
+  "renders/touch-left-dynamixel/panel-138-1.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-138-1-b592dcef8b254a15.webp",
+   "size": 27316
+  },
+  "renders/touch-left-dynamixel/panel-138-4.webp": {
+   "object": "guide/renders/touch-left-dynamixel/panel-138-4-ac9e330636a4c0b5.webp",
+   "size": 41044
+  },
+  "renders/touch-left-dynamixel/route-p35-pair.webp": {
+   "object": "guide/renders/touch-left-dynamixel/route-p35-pair-3c9fd21a5514030a.webp",
+   "size": 42132
+  },
+  "renders/touch-left-dynamixel/route-p42-entry.webp": {
+   "object": "guide/renders/touch-left-dynamixel/route-p42-entry-bba559f742080581.webp",
+   "size": 58954
+  },
+  "renders/touch-left-dynamixel/route-p42-exit.webp": {
+   "object": "guide/renders/touch-left-dynamixel/route-p42-exit-6ecd198bd3042131.webp",
+   "size": 68712
+  },
+  "renders/touch-left-dynamixel/route-p54-entry.webp": {
+   "object": "guide/renders/touch-left-dynamixel/route-p54-entry-6dcd1dcba722d5e9.webp",
+   "size": 61748
+  },
+  "renders/touch-left-dynamixel/route-p54-exit.webp": {
+   "object": "guide/renders/touch-left-dynamixel/route-p54-exit-dfe02f1b41837d73.webp",
+   "size": 61628
+  },
+  "renders/touch-left-dynamixel/route-p59-entry.webp": {
+   "object": "guide/renders/touch-left-dynamixel/route-p59-entry-d23fcab6a40ef253.webp",
+   "size": 50504
+  },
+  "renders/touch-left-dynamixel/route-p59-exit.webp": {
+   "object": "guide/renders/touch-left-dynamixel/route-p59-exit-b4b53a420ed5e7df.webp",
+   "size": 37992
+  },
+  "renders/touch-left-dynamixel/route-p62-entry.webp": {
+   "object": "guide/renders/touch-left-dynamixel/route-p62-entry-d23fcab6a40ef253.webp",
+   "size": 50504
+  },
+  "renders/touch-left-dynamixel/route-p62-exit.webp": {
+   "object": "guide/renders/touch-left-dynamixel/route-p62-exit-b4b53a420ed5e7df.webp",
+   "size": 37992
+  },
+  "renders/touch-left-dynamixel/route-p64-entry.webp": {
+   "object": "guide/renders/touch-left-dynamixel/route-p64-entry-2371dc2b55d23aec.webp",
+   "size": 75400
+  },
+  "renders/touch-left-dynamixel/route-p64-exit.webp": {
+   "object": "guide/renders/touch-left-dynamixel/route-p64-exit-6ecd198bd3042131.webp",
+   "size": 68712
+  },
+  "renders/touch-left-dynamixel/route-p77-groups.webp": {
+   "object": "guide/renders/touch-left-dynamixel/route-p77-groups-213dd1f5c1f2cbd8.webp",
+   "size": 62264
+  },
+  "renders/touch-left-dynamixel/thumb-dp-feed.webp": {
+   "object": "guide/renders/touch-left-dynamixel/thumb-dp-feed-864aa30b9afc8c71.webp",
+   "size": 44954
+  },
+  "renders/touch-left-dynamixel/thumb-dp-seat.webp": {
+   "object": "guide/renders/touch-left-dynamixel/thumb-dp-seat-ec4ae4c97f0fdf83.webp",
+   "size": 45186
+  },
+  "renders/touch-left-dynamixel/thumb-dp-tuck.webp": {
+   "object": "guide/renders/touch-left-dynamixel/thumb-dp-tuck-30f13b844aee017b.webp",
+   "size": 30670
+  },
+  "renders/touch-left-dynamixel/thumb-pp-part.webp": {
+   "object": "guide/renders/touch-left-dynamixel/thumb-pp-part-dd44e2f113b5ea5b.webp",
+   "size": 36856
+  },
+  "renders/touch-right-dynamixel/mount-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/mount-1-f04b3929439c7e6d.webp",
+   "size": 40356
+  },
+  "renders/touch-right-dynamixel/mount-2.webp": {
+   "object": "guide/renders/touch-right-dynamixel/mount-2-91fa6be70489d130.webp",
+   "size": 158744
+  },
+  "renders/touch-right-dynamixel/mount-3.webp": {
+   "object": "guide/renders/touch-right-dynamixel/mount-3-a7ea5a48d50b1ee9.webp",
+   "size": 93154
+  },
+  "renders/touch-right-dynamixel/panel-015-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-015-1-3ac7ec4ab446c29c.webp",
+   "size": 78068
+  },
+  "renders/touch-right-dynamixel/panel-015-2.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-015-2-b215e4b040bca882.webp",
+   "size": 84466
+  },
+  "renders/touch-right-dynamixel/panel-017-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-017-1-d2a160fb787922cc.webp",
+   "size": 61870
+  },
+  "renders/touch-right-dynamixel/panel-017-2.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-017-2-a87a9f6b587b3298.webp",
+   "size": 91236
+  },
+  "renders/touch-right-dynamixel/panel-017-3.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-017-3-b105f1cb4b0bbfd7.webp",
+   "size": 71706
+  },
+  "renders/touch-right-dynamixel/panel-017-4.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-017-4-1726d174d2555429.webp",
+   "size": 41170
+  },
+  "renders/touch-right-dynamixel/panel-017-5.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-017-5-29bd2878b9aaecd2.webp",
+   "size": 50900
+  },
+  "renders/touch-right-dynamixel/panel-019-4.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-019-4-4b518cfdf75f22df.webp",
+   "size": 67896
+  },
+  "renders/touch-right-dynamixel/panel-021-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-021-1-c38a10ee8ad3df56.webp",
+   "size": 39342
+  },
+  "renders/touch-right-dynamixel/panel-021-2.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-021-2-49deca93303e5da6.webp",
+   "size": 57930
+  },
+  "renders/touch-right-dynamixel/panel-021-3.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-021-3-8cd05d3d392c9bf8.webp",
+   "size": 58104
+  },
+  "renders/touch-right-dynamixel/panel-030-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-030-1-826b3c55734cdc54.webp",
+   "size": 44426
+  },
+  "renders/touch-right-dynamixel/panel-030-2.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-030-2-8a59c8016ac042df.webp",
+   "size": 41736
+  },
+  "renders/touch-right-dynamixel/panel-030-3.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-030-3-2513d6a14fa3bce5.webp",
+   "size": 31576
+  },
+  "renders/touch-right-dynamixel/panel-030-4.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-030-4-aa3ebca4b3c5a5a2.webp",
+   "size": 61428
+  },
+  "renders/touch-right-dynamixel/panel-032-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-032-1-5749a26e9ace8c38.webp",
+   "size": 56812
+  },
+  "renders/touch-right-dynamixel/panel-032-3.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-032-3-a07cb7c6ab147a1b.webp",
+   "size": 59784
+  },
+  "renders/touch-right-dynamixel/panel-034-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-034-1-daba1ccce08a6fcb.webp",
+   "size": 45716
+  },
+  "renders/touch-right-dynamixel/panel-034-2.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-034-2-1c7aa6653c56f9ba.webp",
+   "size": 31872
+  },
+  "renders/touch-right-dynamixel/panel-034-3.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-034-3-f2726843537d4b8d.webp",
+   "size": 52012
+  },
+  "renders/touch-right-dynamixel/panel-034-4.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-034-4-496f27cba1f1ca82.webp",
+   "size": 42634
+  },
+  "renders/touch-right-dynamixel/panel-034-5.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-034-5-3cb1ae01afd002a6.webp",
+   "size": 46178
+  },
+  "renders/touch-right-dynamixel/panel-034-6.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-034-6-3fb94070d6e26ab1.webp",
+   "size": 45626
+  },
+  "renders/touch-right-dynamixel/panel-036-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-036-1-5a31a21cd958c2c0.webp",
+   "size": 90620
+  },
+  "renders/touch-right-dynamixel/panel-036-2.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-036-2-9ccaaa48c48c9ff3.webp",
+   "size": 96934
+  },
+  "renders/touch-right-dynamixel/panel-039-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-039-1-4afffe7a9f62974d.webp",
+   "size": 86570
+  },
+  "renders/touch-right-dynamixel/panel-039-2.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-039-2-fc310d5e62d6e982.webp",
+   "size": 80716
+  },
+  "renders/touch-right-dynamixel/panel-041-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-041-1-ff83237297ccd61d.webp",
+   "size": 145384
+  },
+  "renders/touch-right-dynamixel/panel-041-3.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-041-3-e07b71a1d70f7493.webp",
+   "size": 78008
+  },
+  "renders/touch-right-dynamixel/panel-041-5.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-041-5-fdabb8353b640cd7.webp",
+   "size": 131812
+  },
+  "renders/touch-right-dynamixel/panel-048-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-048-1-9f6ecfda603bdf48.webp",
+   "size": 47404
+  },
+  "renders/touch-right-dynamixel/panel-051-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-051-1-14e5d57b3803405d.webp",
+   "size": 68344
+  },
+  "renders/touch-right-dynamixel/panel-051-2.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-051-2-76fed4b291bf311d.webp",
+   "size": 66388
+  },
+  "renders/touch-right-dynamixel/panel-053-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-053-1-70f8e1f2307e3f67.webp",
+   "size": 119432
+  },
+  "renders/touch-right-dynamixel/panel-053-3.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-053-3-eb8579224b2f3fd6.webp",
+   "size": 63710
+  },
+  "renders/touch-right-dynamixel/panel-053-5.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-053-5-e915007f4bfe531d.webp",
+   "size": 129900
+  },
+  "renders/touch-right-dynamixel/panel-058-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-058-1-91d0e127c0b6532c.webp",
+   "size": 54086
+  },
+  "renders/touch-right-dynamixel/panel-058-2.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-058-2-a3de417734033f61.webp",
+   "size": 63870
+  },
+  "renders/touch-right-dynamixel/panel-063-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-063-1-bd11c098c3ab33c2.webp",
+   "size": 190382
+  },
+  "renders/touch-right-dynamixel/panel-063-2.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-063-2-e8ce0fe00cedef28.webp",
+   "size": 133234
+  },
+  "renders/touch-right-dynamixel/panel-063-3.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-063-3-f036ecb4d84ac3b4.webp",
+   "size": 70280
+  },
+  "renders/touch-right-dynamixel/panel-069-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-069-1-1553f5cb451c8b5d.webp",
+   "size": 108098
+  },
+  "renders/touch-right-dynamixel/panel-069-2.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-069-2-cc9e934606a495bb.webp",
+   "size": 98206
+  },
+  "renders/touch-right-dynamixel/panel-072-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-072-1-5dcce2793daebb1e.webp",
+   "size": 84144
+  },
+  "renders/touch-right-dynamixel/panel-076-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-076-1-bbea2c7c104d7f67.webp",
+   "size": 82760
+  },
+  "renders/touch-right-dynamixel/panel-076-2.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-076-2-5d08bbec609aa050.webp",
+   "size": 208314
+  },
+  "renders/touch-right-dynamixel/panel-076-3.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-076-3-5ad14b3f3a0d6240.webp",
+   "size": 319906
+  },
+  "renders/touch-right-dynamixel/panel-079-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-079-1-ccbbb8ca628823af.webp",
+   "size": 245318
+  },
+  "renders/touch-right-dynamixel/panel-089-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-089-1-35b094fe106052c0.webp",
+   "size": 296108
+  },
+  "renders/touch-right-dynamixel/panel-091-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-091-1-5280b8c144acb6ab.webp",
+   "size": 94654
+  },
+  "renders/touch-right-dynamixel/panel-091-2.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-091-2-a3c27c380874f4fa.webp",
+   "size": 87620
+  },
+  "renders/touch-right-dynamixel/panel-092-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-092-1-f41e58089b6951c1.webp",
+   "size": 234532
+  },
+  "renders/touch-right-dynamixel/panel-092-2.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-092-2-eb4cb846c0882ad1.webp",
+   "size": 216230
+  },
+  "renders/touch-right-dynamixel/panel-092-3.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-092-3-b5f373ed7c0ddf66.webp",
+   "size": 76336
+  },
+  "renders/touch-right-dynamixel/panel-095-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-095-1-bd3378d33e3db1be.webp",
+   "size": 111946
+  },
+  "renders/touch-right-dynamixel/panel-096-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-096-1-58eb722f6559e138.webp",
+   "size": 60040
+  },
+  "renders/touch-right-dynamixel/panel-096-2.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-096-2-e1c39da52ab5a38d.webp",
+   "size": 169962
+  },
+  "renders/touch-right-dynamixel/panel-096-3.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-096-3-5b5401d2bd31b1ae.webp",
+   "size": 120176
+  },
+  "renders/touch-right-dynamixel/panel-122-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-122-1-a6205a6b943f0493.webp",
+   "size": 76896
+  },
+  "renders/touch-right-dynamixel/panel-124-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-124-1-a571bdc2423e8d4c.webp",
+   "size": 253076
+  },
+  "renders/touch-right-dynamixel/panel-124-2.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-124-2-d376ff20fd4e7086.webp",
+   "size": 65924
+  },
+  "renders/touch-right-dynamixel/panel-125-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-125-1-9272c9d93e70cc8b.webp",
+   "size": 50436
+  },
+  "renders/touch-right-dynamixel/panel-125-2.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-125-2-f8967ee6737b8dae.webp",
+   "size": 50868
+  },
+  "renders/touch-right-dynamixel/panel-126-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-126-1-79c255bd727291e1.webp",
+   "size": 53542
+  },
+  "renders/touch-right-dynamixel/panel-126-2.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-126-2-1a1a28401b1d9244.webp",
+   "size": 70768
+  },
+  "renders/touch-right-dynamixel/panel-134-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-134-1-59379ad4836e35ac.webp",
+   "size": 46986
+  },
+  "renders/touch-right-dynamixel/panel-138-1.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-138-1-b592dcef8b254a15.webp",
+   "size": 27316
+  },
+  "renders/touch-right-dynamixel/panel-138-4.webp": {
+   "object": "guide/renders/touch-right-dynamixel/panel-138-4-ac9e330636a4c0b5.webp",
+   "size": 41044
+  },
+  "renders/touch-right-dynamixel/route-p35-pair.webp": {
+   "object": "guide/renders/touch-right-dynamixel/route-p35-pair-ba2e710176af3252.webp",
+   "size": 49592
+  },
+  "renders/touch-right-dynamixel/route-p42-entry.webp": {
+   "object": "guide/renders/touch-right-dynamixel/route-p42-entry-abe2da7412d0fe68.webp",
+   "size": 59952
+  },
+  "renders/touch-right-dynamixel/route-p42-exit.webp": {
+   "object": "guide/renders/touch-right-dynamixel/route-p42-exit-997343d798ffbbaa.webp",
+   "size": 67488
+  },
+  "renders/touch-right-dynamixel/route-p54-entry.webp": {
+   "object": "guide/renders/touch-right-dynamixel/route-p54-entry-faeb7a382b54dd5d.webp",
+   "size": 57318
+  },
+  "renders/touch-right-dynamixel/route-p54-exit.webp": {
+   "object": "guide/renders/touch-right-dynamixel/route-p54-exit-6898cec164cbc340.webp",
+   "size": 67876
+  },
+  "renders/touch-right-dynamixel/route-p59-entry.webp": {
+   "object": "guide/renders/touch-right-dynamixel/route-p59-entry-ca855280bd4b8ef1.webp",
+   "size": 50050
+  },
+  "renders/touch-right-dynamixel/route-p59-exit.webp": {
+   "object": "guide/renders/touch-right-dynamixel/route-p59-exit-4488527d9d6b6f58.webp",
+   "size": 34894
+  },
+  "renders/touch-right-dynamixel/route-p62-entry.webp": {
+   "object": "guide/renders/touch-right-dynamixel/route-p62-entry-ca855280bd4b8ef1.webp",
+   "size": 50050
+  },
+  "renders/touch-right-dynamixel/route-p62-exit.webp": {
+   "object": "guide/renders/touch-right-dynamixel/route-p62-exit-4488527d9d6b6f58.webp",
+   "size": 34894
+  },
+  "renders/touch-right-dynamixel/route-p64-entry.webp": {
+   "object": "guide/renders/touch-right-dynamixel/route-p64-entry-ffe5cbcae3da3458.webp",
+   "size": 80370
+  },
+  "renders/touch-right-dynamixel/route-p64-exit.webp": {
+   "object": "guide/renders/touch-right-dynamixel/route-p64-exit-997343d798ffbbaa.webp",
+   "size": 67488
+  },
+  "renders/touch-right-dynamixel/route-p77-groups.webp": {
+   "object": "guide/renders/touch-right-dynamixel/route-p77-groups-697e24c2a3c932b9.webp",
+   "size": 62224
+  },
+  "renders/touch-right-dynamixel/thumb-dp-feed.webp": {
+   "object": "guide/renders/touch-right-dynamixel/thumb-dp-feed-433ff9fb1fdedded.webp",
+   "size": 46518
+  },
+  "renders/touch-right-dynamixel/thumb-dp-seat.webp": {
+   "object": "guide/renders/touch-right-dynamixel/thumb-dp-seat-18e0ac7ca89d552b.webp",
+   "size": 44230
+  },
+  "renders/touch-right-dynamixel/thumb-dp-tuck.webp": {
+   "object": "guide/renders/touch-right-dynamixel/thumb-dp-tuck-5bd078abc39beae0.webp",
+   "size": 30202
+  },
+  "renders/touch-right-dynamixel/thumb-pp-part.webp": {
+   "object": "guide/renders/touch-right-dynamixel/thumb-pp-part-7d6d7edf90a76b9d.webp",
+   "size": 30084
+  },
+  "supplies/board-cover.glb": {
+   "object": "guide/supplies/board-cover-314a271aa9eafffb.glb",
+   "size": 8688,
+   "encoding": "gzip"
+  },
+  "supplies/board-cover.png": {
+   "object": "guide/supplies/board-cover-013b0ff3b544594b.png",
+   "size": 33271
+  },
+  "supplies/board-cover.stl": {
+   "object": "guide/supplies/board-cover-9ee6ad6d3f2d5c29.stl",
+   "size": 16084,
+   "encoding": "gzip"
+  },
+  "supplies/carpal-cover-left.stl": {
+   "object": "guide/supplies/carpal-cover-left-c4c15c50b7d185ba.stl",
+   "size": 1026484,
+   "encoding": "gzip"
+  },
+  "supplies/carpal-cover-right.stl": {
+   "object": "guide/supplies/carpal-cover-right-e03978bbdfeb8ae8.stl",
+   "size": 759884,
+   "encoding": "gzip"
+  },
+  "supplies/chain-a.glb": {
+   "object": "guide/supplies/chain-a-e6fcab80bc59839c.glb",
+   "size": 3884,
+   "encoding": "gzip"
+  },
+  "supplies/chain-a.png": {
+   "object": "guide/supplies/chain-a-5a331ab654a01cc4.png",
+   "size": 30553
+  },
+  "supplies/chain-a.stl": {
+   "object": "guide/supplies/chain-a-0f85a46b9d3cb85c.stl",
+   "size": 6084,
+   "encoding": "gzip"
+  },
+  "supplies/chain-b.glb": {
+   "object": "guide/supplies/chain-b-8328dd38efc802b9.glb",
+   "size": 13588,
+   "encoding": "gzip"
+  },
+  "supplies/chain-b.png": {
+   "object": "guide/supplies/chain-b-11d3c3fcd4df17ee.png",
+   "size": 32664
+  },
+  "supplies/chain-b.stl": {
+   "object": "guide/supplies/chain-b-4fcc3120c0bd274a.stl",
+   "size": 26284,
+   "encoding": "gzip"
+  },
+  "supplies/feetech-motor-tower.png": {
+   "object": "guide/supplies/feetech-motor-tower-8c66631932001079.png",
+   "size": 106310
+  },
+  "supplies/feetech-motor-tower.stl": {
+   "object": "guide/supplies/feetech-motor-tower-03a2d071ec98d95e.stl",
+   "size": 844484,
+   "encoding": "gzip"
+  },
+  "supplies/feetech-motor.webp": {
+   "object": "guide/supplies/feetech-motor-c19db1b0e12a4727.webp",
+   "size": 14012
+  },
+  "supplies/feetech-wrist-adapter.png": {
+   "object": "guide/supplies/feetech-wrist-adapter-cadcc153b35ccad6.png",
+   "size": 52250
+  },
+  "supplies/feetech-wrist-adapter.stl": {
+   "object": "guide/supplies/feetech-wrist-adapter-bc9050ab400a1b1c.stl",
+   "size": 156684,
+   "encoding": "gzip"
+  },
+  "supplies/feetech-wrist-frame.png": {
+   "object": "guide/supplies/feetech-wrist-frame-437fe28dbe0fb494.png",
+   "size": 150253
+  },
+  "supplies/feetech-wrist-frame.stl": {
+   "object": "guide/supplies/feetech-wrist-frame-c350c907c3419ba6.stl",
+   "size": 13899884,
+   "encoding": "gzip"
+  },
+  "supplies/feetech-wrist-motor.webp": {
+   "object": "guide/supplies/feetech-wrist-motor-ddfe68e733b2d9c9.webp",
+   "size": 9436
+  },
+  "touch/board-correct.png": {
+   "object": "guide/touch/board-correct-27acfbb5b6c887f1.png",
+   "size": 306456
+  },
+  "touch/board-correct.webp": {
+   "object": "guide/touch/board-correct-caa9c19231be40ad.webp",
+   "size": 220282
+  },
+  "touch/board-map.png": {
+   "object": "guide/touch/board-map-3c918f0f8b59bce6.png",
+   "size": 641033
+  },
+  "touch/board-map.webp": {
+   "object": "guide/touch/board-map-f17a1a1d3091a718.webp",
+   "size": 233170
+  },
+  "touch/board-mount.png": {
+   "object": "guide/touch/board-mount-64d828b804991d48.png",
+   "size": 929401
+  },
+  "touch/board-mount.webp": {
+   "object": "guide/touch/board-mount-013f291122be7ead.webp",
+   "size": 279116
+  },
+  "touch/board-wrong.png": {
+   "object": "guide/touch/board-wrong-e22254b05d3b4d58.png",
+   "size": 337451
+  },
+  "touch/board-wrong.webp": {
+   "object": "guide/touch/board-wrong-377221ea5dd9530e.webp",
+   "size": 215626
+  },
+  "touch/clove-hitch.png": {
+   "object": "guide/touch/clove-hitch-b4540a335e48cd15.png",
+   "size": 102297
+  },
+  "touch/clove-hitch.webp": {
+   "object": "guide/touch/clove-hitch-490261493cd26921.webp",
+   "size": 62366
+  },
+  "touch/paint-after.png": {
+   "object": "guide/touch/paint-after-b507e9dcbfa6e701.png",
+   "size": 566279
+  },
+  "touch/paint-after.webp": {
+   "object": "guide/touch/paint-after-78a30c93ac180e8d.webp",
+   "size": 464590
+  },
+  "touch/paint-before.png": {
+   "object": "guide/touch/paint-before-c286b93cec72bff1.png",
+   "size": 569854
+  },
+  "touch/paint-before.webp": {
+   "object": "guide/touch/paint-before-ceec8c538a1104f9.webp",
+   "size": 354528
+  },
+  "touch/parts-cables.png": {
+   "object": "guide/touch/parts-cables-9682ba218a3ab739.png",
+   "size": 510375
+  },
+  "touch/parts-cables.webp": {
+   "object": "guide/touch/parts-cables-0422df258ea35b59.webp",
+   "size": 243552
+  },
+  "touch/parts-sensors.png": {
+   "object": "guide/touch/parts-sensors-ee24c091e8498907.png",
+   "size": 776877
+  },
+  "touch/parts-sensors.webp": {
+   "object": "guide/touch/parts-sensors-1fe1fdb217f97398.webp",
+   "size": 413042
+  },
+  "touch/route-finger.png": {
+   "object": "guide/touch/route-finger-9b1010661c330bcb.png",
+   "size": 599442
+  },
+  "touch/route-finger.webp": {
+   "object": "guide/touch/route-finger-84d8860d909a3e66.webp",
+   "size": 425496
+  },
+  "touch/route-thumb.png": {
+   "object": "guide/touch/route-thumb-cec2b956fae02c66.png",
+   "size": 477171
+  },
+  "touch/route-thumb.webp": {
+   "object": "guide/touch/route-thumb-ac075e1f5cd5ad79.webp",
+   "size": 306630
+  },
+  "touch/screws-fingers.png": {
+   "object": "guide/touch/screws-fingers-0d2041a6423e0c10.png",
+   "size": 399241
+  },
+  "touch/screws-fingers.webp": {
+   "object": "guide/touch/screws-fingers-06850839e556c75b.webp",
+   "size": 194968
+  },
+  "touch/screws-thumb.png": {
+   "object": "guide/touch/screws-thumb-03502b2ddd95e3d4.png",
+   "size": 266586
+  },
+  "touch/screws-thumb.webp": {
+   "object": "guide/touch/screws-thumb-c77f21adac48e521.webp",
+   "size": 166726
+  },
+  "touch/sensor-correct-angle.png": {
+   "object": "guide/touch/sensor-correct-angle-9d3323073b09e7fd.png",
+   "size": 234656
+  },
+  "touch/sensor-correct-angle.webp": {
+   "object": "guide/touch/sensor-correct-angle-6604a6fc3921a954.webp",
+   "size": 186954
+  },
+  "touch/sensor-correct.png": {
+   "object": "guide/touch/sensor-correct-c6174f222f619605.png",
+   "size": 279453
+  },
+  "touch/sensor-correct.webp": {
+   "object": "guide/touch/sensor-correct-d29ff1972e98c07b.webp",
+   "size": 227518
+  },
+  "touch/sensor-flush.png": {
+   "object": "guide/touch/sensor-flush-7dc73ac8bd0ec02a.png",
+   "size": 300508
+  },
+  "touch/sensor-flush.webp": {
+   "object": "guide/touch/sensor-flush-62f826a96fbd64f4.webp",
+   "size": 268424
+  },
+  "touch/sensor-plug-face.png": {
+   "object": "guide/touch/sensor-plug-face-c4d5700446337812.png",
+   "size": 187802
+  },
+  "touch/sensor-plug-face.webp": {
+   "object": "guide/touch/sensor-plug-face-39b8b0688b4d30f0.webp",
+   "size": 158810
+  },
+  "touch/sensor-seat.png": {
+   "object": "guide/touch/sensor-seat-9823f6c96540d8fe.png",
+   "size": 317034
+  },
+  "touch/sensor-seat.webp": {
+   "object": "guide/touch/sensor-seat-e2559f8d15905b73.webp",
+   "size": 226200
+  },
+  "touch/sensor-wrong.png": {
+   "object": "guide/touch/sensor-wrong-2b65b578d5044221.png",
+   "size": 297968
+  },
+  "touch/sensor-wrong.webp": {
+   "object": "guide/touch/sensor-wrong-59f9f7d14821a737.webp",
+   "size": 248334
+  },
+  "touch/wrap-short.png": {
+   "object": "guide/touch/wrap-short-87b62de5f7919065.png",
+   "size": 600470
+  },
+  "touch/wrap-short.webp": {
+   "object": "guide/touch/wrap-short-959edbeac56b44ac.webp",
+   "size": 364524
+  },
+  "touch/wrap-start.png": {
+   "object": "guide/touch/wrap-start-b012cb351616b5e1.png",
+   "size": 107695
+  },
+  "touch/wrap-start.webp": {
+   "object": "guide/touch/wrap-start-425b4188548ec502.webp",
+   "size": 115032
+  },
+  "upkeep/base-index-ap-replacement.png": {
+   "object": "guide/upkeep/base-index-ap-replacement-d02ed9783d64047b.png",
+   "size": 1929822
+  },
+  "upkeep/index-ap-maintenance.pdf": {
+   "object": "guide/upkeep/index-ap-maintenance-2722e13b0d888f17.pdf",
+   "size": 6084947
+  },
+  "upkeep/step-1.png": {
+   "object": "guide/upkeep/step-1-1e6daa489b9a6872.png",
+   "size": 118045
+  },
+  "upkeep/step-2.png": {
+   "object": "guide/upkeep/step-2-44b3f6c09f8b03c3.png",
+   "size": 138813
+  },
+  "upkeep/step-3.png": {
+   "object": "guide/upkeep/step-3-1d89c0e727931ce0.png",
+   "size": 268640
+  },
+  "upkeep/step-4.png": {
+   "object": "guide/upkeep/step-4-476268709ab946c1.png",
+   "size": 279957
+  },
+  "upkeep/step-5.png": {
+   "object": "guide/upkeep/step-5-e0d3fdd1a738d6f5.png",
+   "size": 108230
+  },
+  "upkeep/step-6.png": {
+   "object": "guide/upkeep/step-6-0aec4c5dc2f1f863.png",
+   "size": 67036
+  },
+  "upkeep/step-7.png": {
+   "object": "guide/upkeep/step-7-012e8f1f743d4282.png",
+   "size": 93972
+  },
+  "upkeep/step-8.png": {
+   "object": "guide/upkeep/step-8-e985ca88186a8c1f.png",
+   "size": 342265
+  },
+  "upkeep/step-9.png": {
+   "object": "guide/upkeep/step-9-f1d32c71f69550ca.png",
+   "size": 117424
+  }
+ }
+}

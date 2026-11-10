@@ -72,6 +72,51 @@
 
 =========================================================================== -->
 
+## UI 0.4.0 — 2026-11-10
+Core: 0.13.0
+
+## Features
+
+### Assembly guide
+
+- *Setup → Open assembly guide* walks you through building a Base or Full hand, left or right, with Dynamixel or Feetech motors, step by step with photos, videos and 3D models.
+
+- Your choices, position and checked steps are saved, so you can close the console and carry on later. Media downloads the first time you open a step and is cached after that. Feetech builds have no 3D model yet.
+
+### Maintenance: replacing the index AP tendon
+
+- *Setup → Maintenance* shows an animated, step-by-step repair of the index AP tendon on a Base right Dynamixel hand.
+
+### Slack test
+
+- You hold one joint at a time while the motor winds each way at low current. The remaining slack is then shown in motor degrees. It also shows how many ratchet clicks are needed to remove the remaining slack.
+
+### Tension sweep
+
+- After calibration, the tension sweep measures how tight each tendon is by feeling how hard each motor has to work to move its joint. If the tension sweep lists no clicks that means your hand is well tensioned.
+
+### Guided and simple tensioning
+
+- On v2.1 hands, guided tensioning alternates ratcheting the marked spools with moving each finger through its range. You can jump back to any finger, redo a joint, and see the current each motor holds.
+
+- v2.0 gets *Simple tensioning*: the motors hold while you ratchet.
+
+### Manual calibration
+
+- A new button in the *Calibrate* step: with torque off, lets you calibrate manually by holding each joint on its stops and records their positions.
+
+### v2.1.1 hands
+
+- Hardware versions now read v2.0.0, v2.1.0 and v2.1.1, and the version picker offers v2.1.1. A v2.1.1 hand uses its own joint ranges.
+
+## Bugfixes
+
+### The console no longer falls out of step with the touch sensors
+
+### The 3D view no longer spills out of its dashboard card
+
+### Forcing simple tensioning no longer reopens the last guided run
+
 ## UI 0.3.0 — 2026-10-21
 Core: 0.10.1
 

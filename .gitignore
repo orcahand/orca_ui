@@ -29,6 +29,25 @@ node_modules/
 # A machine-local orca_core path, from the orca-dev tool
 .orca-dev.json
 
+# The assembly guide's media lives in the public bucket (scripts/guide_media.py).
+# A local copy may sit here for publishing, and the build copies it into webui.
+/frontend/public/assembly/**/*.mp4
+/frontend/public/assembly/**/*.png
+/frontend/public/assembly/**/*.webp
+/frontend/public/assembly/**/*.jpg
+/frontend/public/assembly/**/*.jpeg
+/frontend/public/assembly/**/*.glb
+/frontend/public/assembly/**/*.stl
+/frontend/public/assembly/**/*.pdf
+/orca_ui/webui/assembly/**/*.mp4
+/orca_ui/webui/assembly/**/*.png
+/orca_ui/webui/assembly/**/*.webp
+/orca_ui/webui/assembly/**/*.jpg
+/orca_ui/webui/assembly/**/*.jpeg
+/orca_ui/webui/assembly/**/*.glb
+/orca_ui/webui/assembly/**/*.stl
+/orca_ui/webui/assembly/**/*.pdf
+
 # Personal Claude Code instructions, never committed
 CLAUDE.local.md
 

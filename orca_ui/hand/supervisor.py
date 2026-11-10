@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from orca_core import HandDetection
+from orca_core.constants import normalize_hardware_version
 from orca_core.hand_config import (
     OrcaHandConfig,
     OrcaHandTouchConfig,
@@ -167,6 +168,7 @@ class HandSupervisor(threading.Thread):
         # The connected hand's serial (or board id) from its last detection;
         # None in mock mode and for boards that report no identity.
         self._hand_id: str | None = None
+        self._identity = None  # the full OrcaBoardInfo behind _hand_id
         # The hardware version the board last reported; None with no board.
         self._board_hardware_version: int | None = None
         # What config.yaml pins (None = auto); a fresh load is still the pin.
@@ -178,6 +180,7 @@ class HandSupervisor(threading.Thread):
 
         self._lock = threading.Lock()
         self._session: Optional[HandSession] = None
+        self._ready_session: Optional[HandSession] = None  # its ready hook has run
         self._state = HandState.DISCONNECTED
         self._message = "starting"
         self._ports: dict = {}
@@ -211,12 +214,23 @@ class HandSupervisor(threading.Thread):
             return self._session
 
     @property
+    def session_ready(self) -> bool:
+        """True once the current session's ready hook (stream autostart and
+        the like) has finished; a session is published before that runs."""
+        with self._lock:
+            return self._session is not None and self._ready_session is self._session
+
+    @property
     def model_name(self) -> str:
         return model_name_of(self.config)
 
     @property
     def hand_id(self) -> str | None:
         return self._hand_id
+
+    @property
+    def identity(self):
+        return self._identity
 
     @property
     def board_hardware_version(self) -> int | None:
@@ -244,6 +258,7 @@ class HandSupervisor(threading.Thread):
     def _apply_hardware_version(self, board_version: int | None) -> bool:
         """Put in force the version config.yaml pins, else the board's.
         Returns True when that changed the config in force."""
+        board_version = normalize_hardware_version(board_version)
         self._board_hardware_version = board_version
         if self._settings.bare:
             return False
@@ -698,6 +713,7 @@ class HandSupervisor(threading.Thread):
         identity = getattr(detection, "identity", None)
         if identity is not None and identity.hand_id:
             self._hand_id = identity.hand_id
+            self._identity = identity
         if identity is not None and self._board_pinned:
             # Kept so a later probe can start from it once the pinned CDC is held.
             self._pinned_identity = identity
@@ -735,6 +751,7 @@ class HandSupervisor(threading.Thread):
                 session.hand.disable_torque()
             except Exception:
                 logger.exception("post-connect torque disable failed")
+        session.read_fingertip_identities()
 
         with self._lock:
             self._session = session
@@ -770,6 +787,8 @@ class HandSupervisor(threading.Thread):
         except Exception as e:
             logger.exception("session-ready hook failed")
             self._on_error(f"session init: {e}")
+        with self._lock:
+            self._ready_session = session
         return HEALTH_PERIOD_S
 
     def _board_motor_bus_unresolved(self, detection: HandDetection | None) -> bool:
@@ -967,6 +986,8 @@ class HandSupervisor(threading.Thread):
 
         logger.info("hand identifies as %s (was %s) — switching model",
                     detection.model_name, self.model_name)
+        # The pin belongs to the model's own config, not the one it replaces.
+        self._pinned_hardware_version = config.hardware_version
         self._install_config(config)
         return True
 

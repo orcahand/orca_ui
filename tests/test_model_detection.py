@@ -308,14 +308,14 @@ def test_the_board_version_flips_the_left_thumb_and_a_pin_wins(tmp_path):
     v20 = dict(sup.config.joint_inversion_dict)
 
     sup._apply_hardware_version(21)
-    assert sup.config.hardware_version == 21
+    assert sup.config.hardware_version == 210
     assert sup.config.joint_inversion_dict["thumb_mcp"] != v20["thumb_mcp"]
 
-    sup.set_hardware_version(2)
-    assert sup.config.hardware_version == 2
+    sup.set_hardware_version(200)
+    assert sup.config.hardware_version == 200
     assert sup.config.joint_inversion_dict == v20
     assert sup.status().hardware_version_pinned
 
     sup.set_hardware_version(None)
-    assert sup.config.hardware_version == 21
+    assert sup.config.hardware_version == 210
     assert "hardware_version: auto" in path.read_text()
