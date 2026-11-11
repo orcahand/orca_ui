@@ -1,4 +1,4 @@
-"""Review inline maintenance using a production build and mocked APIs/WebSockets.
+"""Review the maintenance window using a production build and mocked APIs/WebSockets.
 
 Serve a frontend production build, then run:
 uv run --no-project --with playwright python scripts/check_upkeep_guide.py --url http://127.0.0.1:5192
@@ -51,8 +51,8 @@ with sync_playwright() as p:
         return context, page, guide, mutations, errors
 
     context, page, guide, mutations, errors = setup()
-    expect(page.get_by_role('dialog')).to_have_count(0)
-    expect(page.get_by_role('button', name='Maintenance', exact=True)).to_have_attribute('aria-expanded', 'true')
+    expect(page.get_by_role('dialog', name='Maintenance', exact=True)).to_be_visible()
+    expect(page.get_by_role('dialog', name='Maintenance', exact=True).get_by_role('button', name='■ E-STOP')).to_be_visible()
     expect(guide.locator('.upkeep-intro')).to_have_text(INTRO)
     expect(guide.locator('.upkeep-grid')).to_have_count(0)
     expect(guide.get_by_role('navigation', name='Repair steps').get_by_role('button')).to_have_count(9)
@@ -97,8 +97,8 @@ with sync_playwright() as p:
     expect(slider).to_have_value('5')
     saved = json.loads(page.evaluate(f"localStorage.getItem('{KEY}')"))
     assert saved['current'] == 'open'
-    page.get_by_role('button', name='Maintenance', exact=True).click()
-    expect(guide).to_have_count(0)
+    guide.get_by_role('button', name='Close maintenance').click()
+    expect(page.get_by_role('dialog')).to_have_count(0)
     page.get_by_role('button', name='Maintenance', exact=True).click()
     expect(guide.locator('.upkeep-player-caption > span')).to_have_text('STEP 5 / 9')
     guide.get_by_role('button', name='Watch the repair', exact=True).click()
@@ -113,7 +113,7 @@ with sync_playwright() as p:
     expect(slider).to_have_value('9')
     guide.get_by_role('button', name='Replay', exact=True).click()
     expect(guide.locator('.upkeep-player-caption > span')).to_have_text('STEP 1 / 9')
-    # Existing assembly remains a modal; maintenance itself stays inline.
+    # The assembly guide opens on top of maintenance and closes back to it.
     reference = guide.get_by_role('button', name='Assembly guide: knots and routing →')
     reference.click()
     assembly = page.get_by_role('dialog', name='Assembly instructions', exact=True)
@@ -141,7 +141,7 @@ with sync_playwright() as p:
     assert all(path in ('/api/estop', '/api/assembly/progress') for _, path in mutations), mutations
     assert sum(path == '/api/estop' for _, path in mutations) == 1
     context.close()
-    print('PASS: inline maintenance, PDF, step selection, full playback/replay, labels only, assembly reference, mobile/dark layout, WebGL recovery, no hardware calls.', flush=True)
+    print('PASS: maintenance window, PDF, step selection, full playback/replay, labels only, assembly reference, mobile/dark layout, WebGL recovery, no hardware calls.', flush=True)
 
     for seed, fail_storage in [('{broken', False), (None, True)]:
         context, page, guide, mutations, errors = setup(seed, fail_storage)
