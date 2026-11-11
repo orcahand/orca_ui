@@ -72,6 +72,33 @@
 
 =========================================================================== -->
 
+## UI 0.5.0 — 2026-11-11
+Core: 0.13.0
+
+## Features
+
+### Maintenance guide overlay
+
+*Setup → Maintenance* now opens in a separate overlay, like the assembly guide. The close control and E-stop remain within reach, and you can open the assembly guide from the maintenance steps.
+
+### Base-only assembly setup
+
+The assembly guide now uses Base automatically, without a Base/Full selector. You can still choose the side and motor type. Saved Full or Touch choices display the Base guide for now; those choices are retained for when the other versions return.
+
+## Bugfixes
+
+### Assembly guide editing disabled
+
+Guide text and background colors can no longer be edited in the assembly manual. Previously saved text and color overrides no longer change what the guide displays.
+
+### Tendon animation and framing
+
+The maintenance animation has smoother slack transitions and finer tendon paths. The routing camera follows the replacement tendon more closely, the anchor view has less clutter, and the animation background now matches dark mode.
+
+### HIVE board naming
+
+The assembly instructions, board diagrams, parts lists and motor-chain display now call the board HIVE instead of OH.
+
 ## UI 0.4.0 — 2026-11-10
 Core: 0.13.0
 
