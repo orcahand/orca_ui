@@ -2,7 +2,7 @@
 
 ## Current state (UI 0.5.0, November 2026)
 
-- Builders get the Base guide and choose left or right, Dynamixel or Feetech.. The maintenance walkthrough covers
+- Builders get the Base guide and choose left or right, Dynamixel or Feetech. The maintenance walkthrough covers
   the index AP tendon on Base right Dynamixel.
 - All media loads through `media.ts` from the public bucket; see
   [Model distribution](#model-distribution) and
