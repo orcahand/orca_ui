@@ -121,11 +121,11 @@ export const TOUCH_STEPS: AssemblyStep[] = [
   ),
   step(
     'touch-board-link',
-    'Connect the Touch board to the OH board',
+    'Connect the Touch board to the HIVE board',
     [
-      'Keep board power off. Remove the rear hull cover if it is fitted and support the cover and OH board without pulling on the existing cables.',
-      'Connect the supplied four-wire board cable to the white four-pin socket on the Touch connector board and the four-pin connector-board socket on the OH board. Match the keyed housings shown below; do not force or offset a plug.',
-      'Guide the cable down from the carpals toward the OH board, clear of the wrist belt, tendons and motor spools. At the rear cover, use the upper-right cable exit alongside the motor lead, as shown when fitting the OH board. Leave slack for wrist movement and for lifting the rear cover.',
+      'Keep board power off. Remove the rear hull cover if it is fitted and support the cover and HIVE board without pulling on the existing cables.',
+      'Connect the supplied four-wire board cable to the white four-pin socket on the Touch connector board and the four-pin connector-board socket on the HIVE board. Match the keyed housings shown below; do not force or offset a plug.',
+      'Guide the cable down from the carpals toward the HIVE board, clear of the wrist belt, tendons and motor spools. At the rear cover, use the upper-right cable exit alongside the motor lead, as shown when fitting the HIVE board. Leave slack for wrist movement and for lifting the rear cover.',
       'Gently move the unpowered wrist through its free movement and lift the rear cover slightly. Check that neither connector is pulled, the cable cannot enter a moving part and the cover closes without pinching it.',
     ],
     'Both ends of the four-wire board cable are fully seated, with slack and clearance checked.',
@@ -202,7 +202,7 @@ export const TOUCH_KITS: Record<string, string[]> = {
   'touch-board-connect': ['5 routed sensor cables', 'Mounted Touch connector board'],
   'touch-board-link': [
     'Mounted Touch connector board',
-    'OH board in its rear cover',
+    'HIVE board in its rear cover',
     '1 four-wire connector-board cable',
   ],
   'touch-test': ['Completed Touch hand', '12 V supply', 'USB-C data cable', 'ORCA UI'],

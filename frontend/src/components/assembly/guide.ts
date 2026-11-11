@@ -586,7 +586,7 @@ add(
 )
 add(
   'Electronics',
-  'Identify the OH board connections',
+  'Identify the HIVE board connections',
   101,
   104,
   [
@@ -616,7 +616,7 @@ add(
   111,
   [
     'Base hands do not need this extra connector-board step.',
-    'For touch or joint-sensing hands, power through the OH board’s 4-wire cable, choose the correct hand side and follow the connection sequence below.',
+    'For touch or joint-sensing hands, power through the HIVE board’s 4-wire cable, choose the correct hand side and follow the connection sequence below.',
   ],
   'The applicable connector-board flashing is complete, or this is a base hand.',
 )
@@ -638,7 +638,7 @@ add(
   154,
   156,
   [
-    'Power through the OH board’s 4-wire cable and hold the Tag-Connect on the six pads for the entire flash.',
+    'Power through the HIVE board’s 4-wire cable and hold the Tag-Connect on the six pads for the entire flash.',
     'Use the firmware for your hand side: --r for right or --l for left, as shown below.',
     'Proceed only once the script reports that flashing completed and the target started.',
   ],
@@ -661,7 +661,7 @@ add(
   112,
   114,
   [
-    'Power the OH board with the 12 V supply and use the connector for your motor type.',
+    'Power the HIVE board with the 12 V supply and use the connector for your motor type.',
     'Run the command below for your selected motor type. Wait for “Scanning for motor …” before connecting the top-right palm-side motor.',
   ],
   'The configuration tool is scanning and the first connection is correct.',

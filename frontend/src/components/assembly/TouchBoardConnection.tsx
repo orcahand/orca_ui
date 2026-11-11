@@ -26,7 +26,7 @@ function BoardDiagram({
     { size, invalidate, camera } = useThree()
   const scene = useMemo(() => {
     const pieces = cadPieces(bundle, build),
-      oh = pieces.find((p) => p.part.label === 'OH control board')!,
+      oh = pieces.find((p) => p.part.label === 'HIVE control board')!,
       group = new THREE.Group()
     // Both connector faces use the verified right-hand board reference, independent of hand side.
     group.add(oh.object)
@@ -142,7 +142,7 @@ export function TouchBoardConnection() {
     <section
       className="assembly-board-link"
       data-contrast={false}
-      aria-label="Touch connector board to OH board cable"
+      aria-label="Touch connector board to HIVE board cable"
     >
       <div className="assembly-clip-tabs">
         <button aria-pressed={selected === -1} onClick={() => setSelected(-1)}>
@@ -152,7 +152,7 @@ export function TouchBoardConnection() {
           A · Touch socket
         </button>
         <button aria-pressed={selected === 1} onClick={() => setSelected(1)}>
-          B · OH socket
+          B · HIVE socket
         </button>
       </div>
       <div className="assembly-board-link-layout">
@@ -213,7 +213,7 @@ export function TouchBoardConnection() {
           <button aria-pressed={selected === 1} onClick={() => setSelected(1)}>
             <span>B</span>
             <div>
-              <strong>OH control board</strong>
+              <strong>HIVE control board</strong>
               <p>
                 <GuideText
                   variant

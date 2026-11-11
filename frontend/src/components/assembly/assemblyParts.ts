@@ -265,7 +265,7 @@ export function supplies(build: Build): Supply[] {
             quantity: '1',
             areas: ['Tower'] as Area[],
             kind: 'cable' as const,
-            note: 'From the OH board through the upper tower slot.',
+            note: 'From the HIVE board through the upper tower slot.',
           },
           {
             id: 'motor-links',
@@ -314,7 +314,7 @@ export function supplies(build: Build): Supply[] {
     },
     {
       id: 'board-cover',
-      label: 'OH board cable cover',
+      label: 'HIVE board cable cover',
       quantity: '1',
       areas: ['Tower'],
       kind: 'hardware',
@@ -347,7 +347,7 @@ export function supplies(build: Build): Supply[] {
       quantity: '1',
       areas: ['Tower'],
       kind: 'hardware',
-      note: 'Includes 1 screw for the OH board cable cover.',
+      note: 'Includes 1 screw for the HIVE board cable cover.',
       image: './assembly/parts/base-right-dynamixel/d1b7310480.png',
     },
     {
@@ -388,7 +388,7 @@ export function supplies(build: Build): Supply[] {
             quantity: '1',
             areas: ['Carpals', 'Tower'] as Area[],
             kind: 'cable' as const,
-            note: 'Connects the OH board and the selected version’s connector board.',
+            note: 'Connects the HIVE board and the selected version’s connector board.',
           },
           ...(build.version === 'touch'
             ? [
@@ -435,7 +435,7 @@ export function supplies(build: Build): Supply[] {
       quantity: '1',
       areas: ['Tower'],
       kind: 'equipment',
-      note: 'Power connection to the OH board.',
+      note: 'Power connection to the HIVE board.',
     },
     {
       id: 'power-cable',
@@ -443,7 +443,7 @@ export function supplies(build: Build): Supply[] {
       quantity: '1',
       areas: ['Tower'],
       kind: 'cable',
-      note: 'Power supply to OH board.',
+      note: 'Power supply to HIVE board.',
     },
     {
       id: 'usb',

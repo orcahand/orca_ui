@@ -84,7 +84,7 @@ const CHANGES: Record<string, Changes> = {
     structure:
       'For Touch, board identification moves ahead of palm closure so flashing can happen on the bench.',
     images:
-      'Adds the actual OH-board CAD identification render alongside the labeled connector diagram; the diagram retains the port labels.',
+      'Adds the actual HIVE-board CAD identification render alongside the labeled connector diagram; the diagram retains the port labels.',
   },
   p105: {
     structure:

@@ -58,7 +58,7 @@ export function BoardIdentification({ build }: { build: Build }) {
     dialog = useRef<HTMLDialogElement>(null)
   const port = PORTS.find((p) => p.id === selected)!
   const drawing = (
-    <svg viewBox="0 0 1152 864" role="img" aria-label={`OH board: ${port.name} highlighted`}>
+    <svg viewBox="0 0 1152 864" role="img" aria-label={`HIVE board: ${port.name} highlighted`}>
       <image
         href={mediaUrl('./assembly/details/oh-board-reference.jpeg')}
         width="864"
@@ -98,7 +98,7 @@ export function BoardIdentification({ build }: { build: Build }) {
   return (
     <section
       className="assembly-board-identification"
-      aria-label="Identify the OH board connections"
+      aria-label="Identify the HIVE board connections"
       data-contrast={false}
     >
       <div className="assembly-row">
@@ -107,7 +107,7 @@ export function BoardIdentification({ build }: { build: Build }) {
             <GuideText
               variant
               field="prose/BoardIdentification.tsx/a3bbf8574b"
-              text={'The OH control board'}
+              text={'The HIVE control board'}
               label="Section heading"
             />
           </h3>
@@ -154,7 +154,7 @@ export function BoardIdentification({ build }: { build: Build }) {
       <dialog
         ref={dialog}
         className="assembly-lightbox assembly-board-port-dialog"
-        aria-label="OH board connections"
+        aria-label="HIVE board connections"
         onCancel={(e) => e.stopPropagation()}
         onClick={(e) => {
           if (e.target === e.currentTarget) dialog.current?.close()
