@@ -320,7 +320,7 @@ export function createRepairScene(bundle: Bundle): UpkeepScene {
       lastStyle = style
       cords.forEach((cord, i) => {
         if (i !== 4)
-          (cord.mesh.material as THREE.MeshBasicMaterial).opacity = stage === 5 ? 0.18 : 1
+          (cord.mesh.material as THREE.MeshBasicMaterial).opacity = stage === 5 ? 0 : 1
       })
       for (const piece of pieces) {
         const label = piece.part.label,
@@ -346,7 +346,7 @@ export function createRepairScene(bundle: Bundle): UpkeepScene {
         const opacity = selected
           ? skin
             ? 0.18
-            : 1
+            : stage >= 4 && stage <= 7 ? 0.7 : 1
           : spool || indexMotor
             ? 1
             : piece === holder || piece === holderScrew
@@ -649,7 +649,7 @@ export function createRepairScene(bundle: Bundle): UpkeepScene {
       seat = anchorPoints.at(-1)!
     const anchorUp = vector(anchorRoutes['base-right'].up)
     const working = seat.clone().addScaledVector(anchorUp, 19)
-    const outside = anchorPoints[0].clone().add(new THREE.Vector3(-45, -20, 20))
+    const outside = anchorPoints[0].clone().add(new THREE.Vector3(-18, -8, 8))
     insertion.set(
       [
         ...looseSpan([outside.clone().add(new THREE.Vector3(-5, -5, 0)), outside], anchorPoints),
@@ -659,6 +659,8 @@ export function createRepairScene(bundle: Bundle): UpkeepScene {
       0,
       stage === 5 ? ease(range(p, 0.2, 0.36)) : 0,
     )
+    ;(insertion.mesh.material as THREE.MeshBasicMaterial).opacity =
+      stage === 5 ? 1 - ease(range(p, 0.94, 1)) : 0
     anchor.group.visible = stage > 5 || (stage === 5 && p > 0.85)
     const at = vector(anchorPose.position).applyMatrix4(matrices[0])
     anchor.group.position
@@ -707,7 +709,9 @@ export function createRepairScene(bundle: Bundle): UpkeepScene {
       direction.lerp(anchorDirection, ease(range(p, 0, 0.08)))
       up.lerp(vector(anchorRoutes['base-right'].across), ease(range(p, 0, 0.08))).normalize()
     } else if (stage === 6) {
-      lerpBox(apBox, routeBox, range(p, 0, 0.2))
+      const following = box(marker.position, new THREE.Vector3(110, 175, 110))
+      if (p < 0.2) lerpBox(apBox, following, range(p, 0, 0.2))
+      else lerpBox(following, routeBox, range(p, 0.8, 1))
       direction.copy(anchorDirection).lerp(front, ease(range(p, 0, 0.2)))
       up.copy(vector(anchorRoutes['base-right'].across))
         .lerp(new THREE.Vector3(0, 1, 0), ease(range(p, 0, 0.2)))

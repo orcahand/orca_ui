@@ -24,38 +24,13 @@ export function looseSpan(from: THREE.Vector3[], to: THREE.Vector3[], sag = 0) {
     .normalize()
   const incoming = (to[1] ?? a).clone().sub(b).normalize()
   const handle = Math.min(distance * 0.3, 12)
-  if (sag < 0.1)
-    return new THREE.CubicBezierCurve3(
-      a,
-      a.clone().addScaledVector(outgoing, handle),
-      b.clone().addScaledVector(incoming, -handle),
-      b,
-    ).getPoints(32)
-  const middle = a
-    .clone()
-    .lerp(b, 0.5)
-    .add(new THREE.Vector3(-sag * 0.35, -sag, sag * 0.25))
-  const tangent = b
-    .clone()
-    .sub(a)
-    .normalize()
-    .multiplyScalar(Math.max(distance * 0.15, sag * 0.35))
-  return [
-    ...new THREE.CubicBezierCurve3(
-      a,
-      a.clone().addScaledVector(outgoing, handle),
-      middle.clone().sub(tangent),
-      middle,
-    ).getPoints(24),
-    ...new THREE.CubicBezierCurve3(
-      middle,
-      middle.clone().add(tangent),
-      b.clone().addScaledVector(incoming, -handle),
-      b,
-    )
-      .getPoints(24)
-      .slice(1),
-  ]
+  const droop = new THREE.Vector3(-sag * 0.35, -sag, sag * 0.25)
+  return new THREE.CubicBezierCurve3(
+    a,
+    a.clone().addScaledVector(outgoing, handle).add(droop),
+    b.clone().addScaledVector(incoming, -handle).add(droop),
+    b,
+  ).getPoints(48)
 }
 export function hangingTail(channel: THREE.Vector3[], length: number) {
   const start = channel.at(-1)!,
@@ -70,7 +45,7 @@ export function hangingTail(channel: THREE.Vector3[], length: number) {
 }
 // Fixed-size buffers avoid allocating and uploading a new tube for every video frame.
 export function repairCord(color: string, radius = 0.32) {
-  const count = 220,
+  const count = 660,
     sides = 6,
     geometry = new THREE.BufferGeometry()
   const positions = new Float32Array((count + 1) * sides * 3),
@@ -86,7 +61,7 @@ export function repairCord(color: string, radius = 0.32) {
     new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage),
   )
   geometry.setIndex(indices)
-  const material = new THREE.MeshBasicMaterial({ color, transparent: true, depthTest: false })
+  const material = new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false })
   const mesh = new THREE.Mesh(geometry, material)
   mesh.frustumCulled = false
   mesh.renderOrder = 5

@@ -28,7 +28,12 @@ class GuideBoundary extends Component<
   }
 }
 
-function AssemblyPopup({ onClose }: { onClose: () => void }) {
+function GuidePopup({ onClose, maintenance, onOpenAssembly, assemblyOpen }: {
+  onClose: () => void
+  maintenance?: boolean
+  onOpenAssembly?: () => void
+  assemblyOpen?: boolean
+}) {
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const node = dialog.current!
@@ -49,7 +54,7 @@ function AssemblyPopup({ onClose }: { onClose: () => void }) {
     <dialog
       ref={dialog}
       className="assembly-dialog"
-      aria-label="Assembly instructions"
+      aria-label={maintenance ? 'Maintenance' : 'Assembly instructions'}
       onCancel={(e) => {
         if (e.target === e.currentTarget) {
           e.preventDefault()
@@ -62,14 +67,18 @@ function AssemblyPopup({ onClose }: { onClose: () => void }) {
           fallback={
             <div className="assembly-loading">
               <EStopButton />
-              <p>Opening your assembly guide…</p>
+              <p>{maintenance ? 'Opening maintenance…' : 'Opening your assembly guide…'}</p>
               <button className="btn" onClick={onClose}>
                 Close
               </button>
             </div>
           }
         >
-          <Guide onClose={onClose} safetyControl={<EStopButton />} />
+          {maintenance ? (
+            <UpkeepGuide onClose={onClose} onOpenAssembly={onOpenAssembly!} active={!assemblyOpen} safetyControl={<EStopButton />} />
+          ) : (
+            <Guide onClose={onClose} safetyControl={<EStopButton />} />
+          )}
         </Suspense>
       </GuideBoundary>
     </dialog>,
@@ -79,7 +88,6 @@ function AssemblyPopup({ onClose }: { onClose: () => void }) {
 export function AssemblyCard() {
   const [open, setOpen] = useState(false),
     [maintenance, setMaintenance] = useState(false)
-  const maintenanceButton = useRef<HTMLButtonElement>(null)
   return (
     <>
       <section className="assembly-launch">
@@ -100,29 +108,18 @@ export function AssemblyCard() {
           </button>
           <button
             type="button"
-            ref={maintenanceButton}
             className="btn btn-info"
-            aria-expanded={maintenance}
-            aria-controls="maintenance"
-            onClick={() => setMaintenance((value) => !value)}
+            aria-haspopup="dialog"
+            onClick={() => setMaintenance(true)}
           >
             Maintenance
           </button>
         </div>
       </section>
       {maintenance && (
-        <GuideBoundary
-          onClose={() => {
-            setMaintenance(false)
-            maintenanceButton.current?.focus()
-          }}
-        >
-          <Suspense fallback={<p role="status">Opening maintenance…</p>}>
-            <UpkeepGuide onOpenAssembly={() => setOpen(true)} active={!open} />
-          </Suspense>
-        </GuideBoundary>
+        <GuidePopup maintenance onClose={() => setMaintenance(false)} onOpenAssembly={() => setOpen(true)} assemblyOpen={open} />
       )}
-      {open && <AssemblyPopup onClose={() => setOpen(false)} />}
+      {open && <GuidePopup onClose={() => setOpen(false)} />}
     </>
   )
 }

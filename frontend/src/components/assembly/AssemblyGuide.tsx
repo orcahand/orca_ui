@@ -1,8 +1,7 @@
 import { MotorRenderReference } from './MotorRenderReference'
 import { AssemblyVisualSlot } from './AssemblyVisualSlot'
 import { FingerPreparation } from './FingerPreparation'
-import { GuideBackgroundEditor } from './GuideBackgroundEditor'
-import { GuideText, GuideEditingContext, useGuideEditing } from './GuideEditing'
+import { GuideText } from './GuideEditing'
 import { ViewToggle } from './AssemblyComparison'
 import { TouchBoardConnection } from './TouchBoardConnection'
 import { BoardIdentification } from './BoardIdentification'
@@ -98,9 +97,6 @@ export function AssemblyGuide({
 }) {
   const { progress, setProgress, ready, saveStatus } = useAssemblyProgress()
   const build = editionBuild(progress.build)
-  const editing = useGuideEditing(
-    [build.version, build.side, build.motor, build.audience].join('/'),
-  )
   const [query, setQuery] = useState('')
   const [navOpen, setNavOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -195,12 +191,7 @@ export function AssemblyGuide({
     })
   }
   const filtered = STEPS.filter((s) =>
-    `${editing.read(`${s.id}/title`, s.title)} ${s.section ?? ''} ${s.chapter} ${instructions(
-      s,
-      build,
-    )
-      .map((line, i) => editing.read(`${s.id}/instruction/${i}`, line))
-      .join(' ')} ${kit(s, build).join(' ')} ${stepTools(s).join(' ')}`
+    `${s.title} ${s.section ?? ''} ${s.chapter} ${instructions(s, build).join(' ')} ${kit(s, build).join(' ')} ${stepTools(s).join(' ')}`
       .toLowerCase()
       .includes(query.trim().toLowerCase()),
   )
@@ -222,7 +213,7 @@ export function AssemblyGuide({
       </div>
     )
   return (
-    <GuideEditingContext.Provider value={editing}>
+    <>
       <div className="assembly-app" data-version={build.version}>
         <header className="assembly-header">
           <div className="assembly-brand">
@@ -299,7 +290,7 @@ export function AssemblyGuide({
               steps={STEPS}
               current={step}
               done={progress.done}
-              title={(s) => editing.read(`${s.id}/title`, s.title)}
+              title={(s) => s.title}
               query={query}
               filtered={filtered}
               build={build}
@@ -372,7 +363,6 @@ export function AssemblyGuide({
             >
               {sidebarCollapsed ? '›' : '‹'}
             </button>
-            <GuideBackgroundEditor step={step.id} />
             <div className="assembly-breadcrumb">
               <span>
                 {step.id !== 'p1' && (
@@ -448,18 +438,20 @@ export function AssemblyGuide({
                     <option value="feetech">FeeTech</option>
                   </select>
                 </label>
-                <label>
-                  <span className="assembly-sr-only">Version</span>
-                  <select
-                    aria-label="Version"
-                    value={build.version}
-                    onChange={(e) => changeBuild({ version: e.target.value as Build['version'] })}
-                  >
-                    <option value="base">Base</option>
-                    {SHOW_TOUCH && <option value="touch">Touch</option>}
-                    <option value="full">Full</option>
-                  </select>
-                </label>
+                {SHOW_TOUCH && (
+                  <label>
+                    <span className="assembly-sr-only">Version</span>
+                    <select
+                      aria-label="Version"
+                      value={build.version}
+                      onChange={(e) => changeBuild({ version: e.target.value as Build['version'] })}
+                    >
+                      <option value="base">Base</option>
+                      <option value="touch">Touch</option>
+                      <option value="full">Full</option>
+                    </select>
+                  </label>
+                )}
                 {SHOW_INTERNAL_EDITION && (
                   <label>
                     <span className="assembly-sr-only">Guide edition</span>
@@ -992,7 +984,7 @@ export function AssemblyGuide({
           </main>
         </div>
       </div>
-    </GuideEditingContext.Provider>
+    </>
   )
 }
 

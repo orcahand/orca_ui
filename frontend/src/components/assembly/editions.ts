@@ -3,8 +3,7 @@
 // hidden choices, so a build restored with a flag on resumes where it was.
 import type { Build } from './buildContent'
 
-// The Touch version in the Version picker, with its sensor, skin and
-// connector-board chapters. Off: a saved Touch build is shown as Base.
+// The Version picker and Touch chapters. Off: all saved versions use Base.
 export const SHOW_TOUCH = false
 
 // The Internal/External edition picker and the flashing chapters (ORCA Console
@@ -14,7 +13,7 @@ export const SHOW_INTERNAL_EDITION = false
 export function editionBuild(build: Build): Build {
   return {
     ...build,
-    version: !SHOW_TOUCH && build.version === 'touch' ? 'base' : build.version,
+    version: SHOW_TOUCH ? build.version : 'base',
     audience: SHOW_INTERNAL_EDITION ? build.audience : 'external',
   }
 }
