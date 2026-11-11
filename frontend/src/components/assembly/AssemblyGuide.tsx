@@ -34,7 +34,7 @@ import { StepMedia } from './StepMedia'
 import { StepSupplies } from './StepSupplies'
 import { ThreadingAnimation } from './ThreadingAnimation'
 import { EMPTY_PROGRESS, changeBuildProgress, flashingMethod } from './progress'
-import { SHOW_INTERNAL_EDITION, SHOW_TOUCH, editionBuild } from './editions'
+import { SHOW_GUIDE_EDITOR, SHOW_INTERNAL_EDITION, SHOW_TOUCH_AND_FULL, editionBuild } from './editions'
 import { useAssemblyProgress } from './useAssemblyProgress'
 import {
   buildSteps,
@@ -98,9 +98,11 @@ export function AssemblyGuide({
 }) {
   const { progress, setProgress, ready, saveStatus } = useAssemblyProgress()
   const build = editionBuild(progress.build)
-  const editing = useGuideEditing(
+  const drafts = useGuideEditing(
     [build.version, build.side, build.motor, build.audience].join('/'),
   )
+  const editing = SHOW_GUIDE_EDITOR ? drafts : null
+  const read = (field: string, source: string) => editing?.read(field, source) ?? source
   const [query, setQuery] = useState('')
   const [navOpen, setNavOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -195,11 +197,8 @@ export function AssemblyGuide({
     })
   }
   const filtered = STEPS.filter((s) =>
-    `${editing.read(`${s.id}/title`, s.title)} ${s.section ?? ''} ${s.chapter} ${instructions(
-      s,
-      build,
-    )
-      .map((line, i) => editing.read(`${s.id}/instruction/${i}`, line))
+    `${read(`${s.id}/title`, s.title)} ${s.section ?? ''} ${s.chapter} ${instructions(s, build)
+      .map((line, i) => read(`${s.id}/instruction/${i}`, line))
       .join(' ')} ${kit(s, build).join(' ')} ${stepTools(s).join(' ')}`
       .toLowerCase()
       .includes(query.trim().toLowerCase()),
@@ -299,7 +298,7 @@ export function AssemblyGuide({
               steps={STEPS}
               current={step}
               done={progress.done}
-              title={(s) => editing.read(`${s.id}/title`, s.title)}
+              title={(s) => read(`${s.id}/title`, s.title)}
               query={query}
               filtered={filtered}
               build={build}
@@ -372,7 +371,7 @@ export function AssemblyGuide({
             >
               {sidebarCollapsed ? '›' : '‹'}
             </button>
-            <GuideBackgroundEditor step={step.id} />
+            {SHOW_GUIDE_EDITOR && <GuideBackgroundEditor step={step.id} />}
             <div className="assembly-breadcrumb">
               <span>
                 {step.id !== 'p1' && (
@@ -448,18 +447,20 @@ export function AssemblyGuide({
                     <option value="feetech">FeeTech</option>
                   </select>
                 </label>
-                <label>
-                  <span className="assembly-sr-only">Version</span>
-                  <select
-                    aria-label="Version"
-                    value={build.version}
-                    onChange={(e) => changeBuild({ version: e.target.value as Build['version'] })}
-                  >
-                    <option value="base">Base</option>
-                    {SHOW_TOUCH && <option value="touch">Touch</option>}
-                    <option value="full">Full</option>
-                  </select>
-                </label>
+                {SHOW_TOUCH_AND_FULL && (
+                  <label>
+                    <span className="assembly-sr-only">Version</span>
+                    <select
+                      aria-label="Version"
+                      value={build.version}
+                      onChange={(e) => changeBuild({ version: e.target.value as Build['version'] })}
+                    >
+                      <option value="base">Base</option>
+                      <option value="touch">Touch</option>
+                      <option value="full">Full</option>
+                    </select>
+                  </label>
+                )}
                 {SHOW_INTERNAL_EDITION && (
                   <label>
                     <span className="assembly-sr-only">Guide edition</span>

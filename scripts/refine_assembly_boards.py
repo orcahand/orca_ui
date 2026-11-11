@@ -45,8 +45,8 @@ def main():
             walk(child, location, path, board, color)
 
     walk(assembly)
-    assert meshes, 'No OH board in STEP'
-    part = next(p for p in inventory['parts'] if p['label'] == 'OH control board')
+    assert meshes, 'No HIVE board in STEP'
+    part = next(p for p in inventory['parts'] if p['label'] == 'HIVE control board')
     assert len(part['nodes']) == 1
     doc, binary = read_glb(folder/'assembly.glb')
     node = next(n for n in doc['nodes'] if n.get('name') == part['nodes'][0])

@@ -506,10 +506,10 @@ export function PartsExplorer({ build }: { build: Build }) {
       })),
   ]
   // The control board is required even when absent from an individual assembly export.
-  if (bundle && !bom.some((p) => p.label === 'OH control board'))
+  if (bundle && !bom.some((p) => p.label === 'HIVE control board'))
     rows.push({
       id: 'oh-board',
-      label: 'OH control board',
+      label: 'HIVE control board',
       quantity: '1',
       category: 'Drive & electronics',
       areas: 'Tower',
@@ -517,7 +517,7 @@ export function PartsExplorer({ build }: { build: Build }) {
       part: null,
       supply: {
         id: 'oh-board',
-        label: 'OH control board',
+        label: 'HIVE control board',
         quantity: '1',
         kind: 'hardware',
         areas: ['Tower'],

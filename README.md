@@ -71,7 +71,7 @@ A browser app window opens automatically and closes when you stop the program
 (Ctrl-C); pass `--no-browser` to open `http://localhost:5001` yourself.
 
 The backend probes for hardware continuously upon initialization: motor bus, tactile sensors, and
-joint encoders are discovered by USB id (plus the OH board's `ORCA_ID?`
+joint encoders are discovered by USB id (plus the HIVE board's `ORCA_ID?`
 handshake) and connected at the best achievable tier. Unplugging triggers
 reconnection; a reconnect/sensor rescan can be triggered manually from the ui
 

@@ -129,7 +129,7 @@ export function stepPartImages(text: string, build: Build, step: string): Image[
       if (/\bfans?\b/.test(t))
         addPart((label) => (/plate/.test(t) ? label === 'side plate' : label === 'cooling fan'))
       if (/\bbelt\b/.test(t)) addPart((label) => label.includes('gt2 belt'))
-      if (/oh (board|control board)/.test(t)) addPart((label) => label === 'oh control board')
+      if (/hive (board|control board)/.test(t)) addPart((label) => label === 'hive control board')
       if (/connector (board|pcbs?)/.test(t))
         addPart((label) =>
           /motor/.test(t) ? label === 'motor connector pcb' : label.includes('connector board'),

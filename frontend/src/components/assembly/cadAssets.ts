@@ -19,6 +19,8 @@ export function loadBundle(key: string) {
       }),
       new GLTFLoader().loadAsync(mediaUrl(`./assembly/parts/${key}/assembly.glb`)),
     ]).then(([inventory, gltf]) => {
+      for (const part of inventory.parts)
+        if (part.label === 'OH control board') part.label = 'HIVE control board'
       fitBeltBetweenSleeves(gltf.scene, inventory)
       return { inventory, scene: gltf.scene }
     })
@@ -31,7 +33,7 @@ export function finishMaterial(part: Part, build: Build, geometry?: THREE.Buffer
   const skin = part.category === 'Skins',
     metal = part.category === 'Standard components' || part.label === 'Metal spool holder',
     tendon = part.category === 'Tendons'
-  const boardColors = part.label === 'OH control board' && !!geometry?.getAttribute('color')
+  const boardColors = part.label === 'HIVE control board' && !!geometry?.getAttribute('color')
   return new THREE.MeshStandardMaterial({
     color: boardColors
       ? '#ffffff'
@@ -45,11 +47,9 @@ export function finishMaterial(part: Part, build: Build, geometry?: THREE.Buffer
           ? '#b5bcc3'
           : tendon
             ? '#f5f6f2'
-            : /OH control board/.test(part.label)
+            : /board|PCB/.test(part.label)
               ? '#171c1b'
-              : /board|PCB/.test(part.label)
-                ? '#171c1b'
-                : '#29333b',
+              : '#29333b',
     vertexColors: boardColors,
     roughness: skin ? 0.76 : metal ? 0.3 : 0.48,
     metalness: metal ? 0.55 : 0,

@@ -1,9 +1,8 @@
 # Assembly workspace
 
-## Current state (UI 0.4.0, November 2026)
+## Current state (UI 0.5.0, November 2026)
 
-- Builders choose Base or Full, left or right, Dynamixel or Feetech; the Touch
-  version and the internal edition are off in `editions.ts`. The maintenance walkthrough covers
+- Builders get the Base guide and choose left or right, Dynamixel or Feetech. The maintenance walkthrough covers
   the index AP tendon on Base right Dynamixel.
 - All media loads through `media.ts` from the public bucket; see
   [Model distribution](#model-distribution) and
@@ -14,10 +13,10 @@
 
 ## Maintenance
 
-Setup has a **Maintenance** button beside **Open assembly guide**. It expands an
-inline section; maintenance has no separate modal, window or launcher card. The
-assembly reference still opens the existing modal, pauses playback underneath,
-and restores focus when closed. The introductory paragraph gives the general
+Setup has a **Maintenance** button beside **Open assembly guide**. It opens a
+window like the assembly guide's, with E-STOP and Close. The assembly reference
+opens the assembly guide on top, pauses playback underneath, and closes back to
+maintenance. The introductory paragraph gives the general
 six/eight-end rule. A single animation teaches index AP replacement (Base right,
 Dynamixel); nine numbered chapter buttons replace the duplicate image grid.
 Selecting a chapter shows its representative pose. Play starts that chapter;
@@ -149,11 +148,11 @@ and populated PCBs as units. It removes coincident repeated motor subassemblies
 before counting fasteners and spools. Finer tessellation and exported vertex normals
 support the high-DPI viewer. Touch uses black structural parts and skins.
 
-`scripts/refine_assembly_boards.py` restores the OH board's individual component
+`scripts/refine_assembly_boards.py` restores the HIVE board's individual component
 colors from each current STEP while keeping its single inventory identity and
 assembly placement. The PCB is black; the modeled connectors retain their light
 plastic finish. `board-components.json` records the source hash and 26 component
-meshes. The supplied OH model omits the USB-C port, power switch/input and fan
+meshes. The supplied HIVE model omits the USB-C port, power switch/input and fan
 connectors, so it cannot replace the connector-identification and wiring photos.
 Those photos remain the connection reference. The rear-hull instructions specify
 the upper motor/connector-board exit and lower fan exit, viewed from inside the hull.
@@ -182,7 +181,7 @@ merges these into the existing hardware rows, and the Tower kit includes them;
 the model's node counts remain unchanged. Cable harnesses without specified individual lengths are explicitly
 listed as a matching set. The exports have asymmetric hardware/board content and
 are not independently verified procurement BOMs. Both updated Touch exports contain
-the OH board and separate front and rear hull covers. Optional arm mounting parts are marked.
+the HIVE board and separate front and rear hull covers. Optional arm mounting parts are marked.
 
 Regenerate models in a separate environment with CadQuery, trimesh, NumPy and Pillow:
 

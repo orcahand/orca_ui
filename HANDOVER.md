@@ -1,9 +1,9 @@
 # ORCA assembly guide — handover
 
-## Current state (UI 0.4.0, November 2026)
+## Current state (UI 0.5.0, November 2026)
 
-- The guide and the maintenance walkthrough ship in the console on `main`. Open **Setup → Open assembly guide**, or **Setup → Maintenance** for the index AP tendon replacement (Base right, Dynamixel).
-- Builders choose Base or Full, left or right, Dynamixel or Feetech. The Touch version and the internal edition are switched off in `frontend/src/components/assembly/editions.ts`.
+- The guide and the maintenance walkthrough ship in the console on `main`. Open **Setup → Open assembly guide**, or **Setup → Maintenance** for the index AP tendon replacement (Base right, Dynamixel); both open in their own window.
+- Builders get the Base guide and choose left or right, Dynamixel or Feetech. The Touch and Full builds, the internal edition and the guide editor (a dev tool for reviewing the guide's wording) are switched off in `frontend/src/components/assembly/editions.ts`.
 - Photos, videos, 3D models and PDFs live in the public bucket, listed in `storedMedia.json`; publishing and the rules for new files are in [DEVELOPMENT.md](DEVELOPMENT.md#assembly-guide-media). Nothing is unpacked from archives any more.
 - Browser checks: `scripts/check_upkeep_guide.py` for the maintenance walkthrough; see [the assembly README](frontend/src/components/assembly/README.md) for the guide's own.
 

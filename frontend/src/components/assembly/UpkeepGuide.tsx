@@ -52,9 +52,13 @@ function readStep() {
 }
 export function UpkeepGuide({
   onOpenAssembly,
+  onClose,
+  safetyControl,
   active = true,
 }: {
   onOpenAssembly: () => void
+  onClose: () => void
+  safetyControl: ReactNode
   active?: boolean
 }) {
   const [selected, setSelected] = useState(readStep)
@@ -71,6 +75,18 @@ export function UpkeepGuide({
   }, [selected])
   return (
     <section id="maintenance" className="assembly-app upkeep-app" aria-label="Maintenance">
+      <header className="assembly-header">
+        <div className="assembly-brand">
+          <i className="assembly-logo" role="img" aria-label="ORCA" />
+          <span>MAINTENANCE</span>
+        </div>
+        <div className="assembly-header-actions">
+          {safetyControl}
+          <button className="assembly-close" onClick={onClose} aria-label="Close maintenance">
+            Close ×
+          </button>
+        </div>
+      </header>
       <div className="upkeep-main">
         <div className="upkeep-section-heading">
           <span className="assembly-eyebrow">MAINTENANCE · BASE RIGHT · DYNAMIXEL</span>

@@ -1,11 +1,12 @@
 .assembly-app.upkeep-app {
   max-width: none;
-  margin: 0 0 24px;
-  border: 1px solid var(--panel-border-strong);
-  border-radius: 12px;
-  background: var(--panel);
+  margin: 0;
+  background: var(--bg);
 }
 .upkeep-main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: clamp(18px, 3vw, 40px);
 }
 .upkeep-main p {
@@ -45,6 +46,9 @@
   background: #f7f7f2;
   overflow: hidden;
   border-radius: 6px;
+}
+:root:not([data-theme='light']) .upkeep-stage {
+  background: #343b40;
 }
 .upkeep-stage canvas {
   display: block;

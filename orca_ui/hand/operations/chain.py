@@ -313,7 +313,7 @@ class ConfigureChainOperation(Operation):
             if not port:
                 raise RuntimeError(
                     "no motor bus port found — check the USB connection "
-                    "(the OH board must be powered and plugged in)")
+                    "(the HIVE board must be powered and plugged in)")
             motor_type = self.params["motor_type"]
             if motor_type is None:
                 ctx.set_phase("detecting",
