@@ -47,11 +47,9 @@ export function finishMaterial(part: Part, build: Build, geometry?: THREE.Buffer
           ? '#b5bcc3'
           : tendon
             ? '#f5f6f2'
-            : /HIVE control board/.test(part.label)
+            : /board|PCB/.test(part.label)
               ? '#171c1b'
-              : /board|PCB/.test(part.label)
-                ? '#171c1b'
-                : '#29333b',
+              : '#29333b',
     vertexColors: boardColors,
     roughness: skin ? 0.76 : metal ? 0.3 : 0.48,
     metalness: metal ? 0.55 : 0,

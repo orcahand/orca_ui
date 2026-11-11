@@ -1,6 +1,6 @@
 """Hardware presence probing — which ports exist, before anything connects.
 
-Wraps orca_core's detect_hand(): the OH board's identity reply names the
+Wraps orca_core's detect_hand(): the HIVE board's identity reply names the
 motor/sensing CDCs and the hand's side, a live encoder stream confirms joint
 encoders, and a sensor register reply (or a dedicated adapter) confirms
 tactile. Explicit port strings in the config pass through without opening
