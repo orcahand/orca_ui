@@ -247,7 +247,9 @@
 .assembly-dialog .assembly-sidebar { display:flex; flex-direction:column; min-height:0; overflow:hidden; }
 .assembly-navigation-layers { display:flex; flex-direction:column; flex:1; min-height:0; }
 .assembly-hand-navigation { flex:none; position:relative; z-index:2; background:var(--bg); margin:0 0 12px; }
-.assembly-contents-scroll { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; padding-right:5px; }
+/* Dialog only: on the web page the sidebar itself scrolls, and an inner pane
+   with overscroll-behavior:contain that never overflows swallows the wheel. */
+.assembly-dialog .assembly-contents-scroll { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; padding-right:5px; }
 .assembly-sidebar .assembly-save-status,.assembly-sidebar>.assembly-text-button,.assembly-sidebar>.assembly-reset { flex:none; }
 @media(max-width:900px) {
  .assembly-dialog .assembly-sidebar { display:none; }
