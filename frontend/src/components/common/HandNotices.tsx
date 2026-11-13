@@ -6,7 +6,8 @@ import { useState } from 'react'
 import { api } from '../../api/rest'
 import { useAppStore } from '../../state/appStore'
 import { useOperationActive } from '../../state/operationStore'
-import { calendarDate, handFailed, refreshHandInfo } from '../hand/handStore'
+import { handFailed, refreshHandInfo } from '../hand/handStore'
+import { shortDate } from '../setup/setupUtils'
 
 function BoardCalibrationNotice() {
   const newer = useAppStore((s) => s.handInfo?.hand?.board_calibration_newer ?? null)
@@ -21,8 +22,8 @@ function BoardCalibrationNotice() {
       .catch(handFailed(choice === 'use_board' ? "take the board's calibration" : "keep this computer's calibration"))
       .finally(() => setWorking(false))
   }
-  const board = calendarDate(newer.board.calibrated_at)
-  const computer = calendarDate(newer.computer.calibrated_at)
+  const board = shortDate(newer.board.calibrated_at)
+  const computer = shortDate(newer.computer.calibrated_at)
   return (
     <div className="hand-notice">
       <span>

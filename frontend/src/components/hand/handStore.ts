@@ -4,11 +4,6 @@ import { api, ApiError } from '../../api/rest'
 import type { HandStoreInfo } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
 
-export function calendarDate(iso: string | null | undefined): string {
-  if (!iso) return ''
-  return new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
 export function refreshHandInfo(): Promise<void> {
   return api
     .handInfo()

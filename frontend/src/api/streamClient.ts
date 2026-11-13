@@ -1,6 +1,7 @@
 // WebSocket lifecycle: auto-connect, backoff reconnect, message dispatch into
 // the stream store, per-topic rate meters (published to zustand at 1 Hz).
 
+import { refreshHandInfo } from '../components/hand/handStore'
 import { useAppStore } from '../state/appStore'
 import { useEventLogStore } from '../state/eventLogStore'
 import { useOperationStore } from '../state/operationStore'
@@ -115,14 +116,6 @@ function connect(): void {
   }
 
   ws.onerror = () => ws.close()
-}
-
-async function refreshHandInfo(): Promise<void> {
-  try {
-    useAppStore.getState().setHandInfo(await api.handInfo())
-  } catch {
-    /* backend not ready yet; the status stream will drive the UI */
-  }
 }
 
 async function resyncControlPlanes(): Promise<void> {

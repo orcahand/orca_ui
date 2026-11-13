@@ -6,6 +6,7 @@ import { api } from '../../api/rest'
 import type { TravelBaselines as Baselines } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
 import { useOperationStore } from '../../state/operationStore'
+import { refreshHandInfo } from '../hand/handStore'
 import { failToBanner } from './setupUtils'
 
 function when(iso: string): string {
@@ -21,7 +22,7 @@ export function useTravelBaselines() {
   const [state, setState] = useState<Baselines | null>(null)
   const refresh = useCallback(() => {
     api.baselines().then(setState).catch(failToBanner)
-    api.handInfo().then(useAppStore.getState().setHandInfo).catch(() => undefined)
+    void refreshHandInfo()
   }, [])
   const modelName = useAppStore((s) => s.handInfo?.model_name)
   // A finished calibration adds a snapshot: refetch when one ends.

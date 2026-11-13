@@ -7,7 +7,8 @@ import { useState } from 'react'
 import { api } from '../../api/rest'
 import type { HandStoreInfo } from '../../api/types'
 import { useOperationActive } from '../../state/operationStore'
-import { calendarDate, handFailed, refreshHandInfo } from './handStore'
+import { handFailed, refreshHandInfo } from './handStore'
+import { shortDate } from '../setup/setupUtils'
 
 function NicknameField({ hand }: { hand: HandStoreInfo }) {
   const [draft, setDraft] = useState<string | null>(null)
@@ -69,7 +70,7 @@ function RestorePrevious({ hand }: { hand: HandStoreInfo }) {
   if (asking) {
     return (
       <span className="hand-confirm">
-        put back the calibration{previousAt ? ` from ${calendarDate(previousAt)}` : ''}? The hand
+        put back the calibration{previousAt ? ` from ${shortDate(previousAt)}` : ''}? The hand
         reconnects.
         <button className="hand-link" disabled={working || busy} onClick={restore}>
           restore
@@ -105,7 +106,7 @@ export function HandDetails({ hand }: { hand: HandStoreInfo }) {
         <span className="hand-key">calibration</span>
         <span title={calibration.path ?? undefined}>
           {calibration.calibrated_at
-            ? `calibrated ${calendarDate(calibration.calibrated_at)}`
+            ? `calibrated ${shortDate(calibration.calibrated_at)}`
             : 'none on this computer yet'}
         </span>
         <RestorePrevious hand={hand} />
@@ -114,7 +115,7 @@ export function HandDetails({ hand }: { hand: HandStoreInfo }) {
         <span className="hand-key">joint ranges</span>
         <span>
           {ranges.source === 'measured'
-            ? `measured on this hand${ranges.measured_at ? ` (${calendarDate(ranges.measured_at)})` : ''}`
+            ? `measured on this hand${ranges.measured_at ? ` (${shortDate(ranges.measured_at)})` : ''}`
             : 'model defaults'}
         </span>
       </div>

@@ -7,7 +7,8 @@ export function failToBanner(error: unknown) {
   useAppStore.getState().setError(String((error as Error).message ?? error))
 }
 
-export function shortDate(iso: string): string {
+export function shortDate(iso: string | null | undefined): string {
+  if (!iso) return ''
   return new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short' })
 }
 
