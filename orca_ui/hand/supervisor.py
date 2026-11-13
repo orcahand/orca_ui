@@ -66,6 +66,9 @@ DETECT_BACKOFF_MAX_S = 10.0
 HEALTH_PERIOD_S = 2.0
 UPGRADE_PROBE_PERIOD_S = 10.0
 MOTOR_FAILURES_BEFORE_RECONNECT = 3
+IDENTITY_MISSES_BEFORE_CONNECTING = 3
+"""Consecutive missed identity replies from the same ports before connecting
+anyway: a board whose motor port never answers the probe still gets a hand."""
 
 UPGRADE_PROBE_ATTEMPTS = 2
 """Probes for declared hardware the connect ladder could not reach, after
@@ -165,6 +168,8 @@ class HandSupervisor(threading.Thread):
         # GIL only (str swap), like _model_pinned.
         self._board_pinned: str | None = settings.board or None
         self._pinned_identity = None
+        # (ports, count) of consecutive connects whose board identity reply was missed.
+        self._identity_misses: tuple = (None, 0)
         # The connected hand's serial (or board id) from its last connect;
         # None in mock mode, without a board, and for boards that report no identity.
         self._hand_id: str | None = None
@@ -667,6 +672,7 @@ class HandSupervisor(threading.Thread):
                         f"searching for board {pin}" if pin
                         else "searching for hardware")
         presence = None
+        identity_unknown = False
         if self._settings.bare:
             presence = self._bare_presence()
         elif not self._settings.mock:
@@ -709,15 +715,26 @@ class HandSupervisor(threading.Thread):
                     return delay
                 self._adopt_model(detection)
                 presence = presence_from_detection(self.config, detection)
-                if self._board_identity_missed(presence):
-                    self._set_state(
-                        HandState.DETECTING,
-                        "controller board found but its identity reply was "
-                        "missed — retrying")
-                    delay = self._backoff
-                    self._backoff = min(self._backoff * 1.5,
-                                        DETECT_BACKOFF_MAX_S)
-                    return delay
+                identity_unknown = self._board_identity_missed(presence)
+                if identity_unknown:
+                    ports = (presence.motor_port, tuple(sorted(oh_board_ports())))
+                    last_ports, misses = self._identity_misses
+                    misses = misses + 1 if last_ports == ports else 1
+                    if misses < IDENTITY_MISSES_BEFORE_CONNECTING:
+                        self._identity_misses = (ports, misses)
+                        self._set_state(
+                            HandState.DETECTING,
+                            "controller board found but its identity reply was "
+                            "missed — retrying")
+                        delay = self._backoff
+                        self._backoff = min(self._backoff * 1.5,
+                                            DETECT_BACKOFF_MAX_S)
+                        return delay
+                    logger.warning(
+                        "controller board on %s missed its identity reply %d "
+                        "times in a row — connecting with its identity unknown",
+                        presence.motor_port, misses)
+                self._identity_misses = (None, 0)
         detection = getattr(presence, "detection", None)
         identity = getattr(detection, "identity", None)
         # Every connect says which hand this is: a board without an identity, or
@@ -793,7 +810,10 @@ class HandSupervisor(threading.Thread):
         with self._lock:
             self._leaving_maintenance = False
         state = HandState.DEGRADED if session.caps.degraded else HandState.CONNECTED
-        self._set_state(state, f"[{session.tier}] {session.message}", session.ports)
+        message = f"[{session.tier}] {session.message}"
+        if identity_unknown:
+            message += " — board identity unknown"
+        self._set_state(state, message, session.ports)
 
         try:
             self._on_session_ready(session)

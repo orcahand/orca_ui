@@ -134,12 +134,15 @@ def test_a_hand_with_no_board_identity_is_not_judged_by_another_hands_slack_test
     board_hand = dataclasses.replace(
         PLAIN_LEFT, identity=OrcaBoardInfo(role="motor", side="left", serial="ser-0001"))
     plain_adapter = dataclasses.replace(PLAIN_LEFT, identity=None)
-    # The last case: the board's identity reply was missed and the fallback scan found
-    # its motor port. It must retry, not connect as a hand with no identity.
+    # The last cases: the board's identity reply was missed and the fallback scan found
+    # its motor port. It retries rather than connect as a hand with no identity, until
+    # the third miss in a row, when it connects with the identity unknown.
     for detected, port, hand_id, connected in ((board_hand, "/dev/motor", "ser-0001", 1),
                                                (plain_adapter, "/dev/usb-adapter", None, 2),
                                                (board_hand, "/dev/motor", "ser-0001", 3),
-                                               (plain_adapter, "/dev/motor", "ser-0001", 3)):
+                                               (plain_adapter, "/dev/motor", "ser-0001", 3),
+                                               (plain_adapter, "/dev/motor", "ser-0001", 3),
+                                               (plain_adapter, "/dev/motor", None, 4)):
         monkeypatch.setattr(supervisor_mod, "run_detection", lambda config, force=False: detected)
         monkeypatch.setattr(supervisor_mod, "presence_from_detection",
                             lambda config, detection, **k: SimpleNamespace(detection=detection, motor_port=port))
