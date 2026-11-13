@@ -100,6 +100,36 @@ def test_a_choice_belongs_to_the_hand_it_was_made_for(tmp_path):
     assert sup._settle_override_owner("ser-1")
 
 
+def test_a_choice_landing_mid_connect_is_never_published_stale(tmp_path, monkeypatch):
+    """A version picked while a connect is in flight must not leave the hand
+    running the old map under a header that shows the new one; the retry runs
+    it, and the synthetic mock calibration is taken on the new map."""
+    from orca_ui.hand import sessions
+
+    path = orca_core.write_standalone_config(str(tmp_path / "config.yaml"), LEFT)
+    sup = HandSupervisor(UiSettings(config_path=path, mock=True, open_browser=False))
+    read = sessions.HandSession.read_fingertip_identities
+    raced = []
+
+    def racing(session):
+        if not raced:
+            raced.append(True)
+            sup.set_hardware_version(HARDWARE_VERSION_V21)
+        return read(session)
+
+    monkeypatch.setattr(sessions.HandSession, "read_fingertip_identities", racing)
+    sup._try_connect()
+    assert sup.session is None
+    sup._try_connect()
+    hand = sup.session.hand
+    try:
+        assert hand.config.hardware_version == sup.config.hardware_version == HARDWARE_VERSION_V21
+        assert sup.config.joint_inversion_dict == hand.config.joint_inversion_dict
+        assert hand.is_calibrated()
+    finally:
+        sup.session.close()
+
+
 def test_auto_takes_the_board(tmp_path):
     sup, _ = _supervisor(tmp_path, LEFT)   # packaged: auto
     assert sup.config.hardware_version is None

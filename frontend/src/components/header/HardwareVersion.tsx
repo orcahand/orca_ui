@@ -40,6 +40,8 @@ export function HardwareVersionBadge() {
 
   const override = status.hardware_version_override ?? null
   const board = status.board_hardware_version ?? null
+  // With neither, a version in force is the one config.yaml pins.
+  const pinned = override == null && board == null ? (status.hardware_version ?? null) : null
   const choose = async (version: number | null) => {
     setSaving(true)
     await save(version)
@@ -67,7 +69,11 @@ export function HardwareVersionBadge() {
         aria-label="Hardware version"
       >
         <option value={BOARD}>
-          {board != null ? `hw ${formatHardwareVersion(board)} · board` : 'hw ? · no board'}
+          {board != null
+            ? `hw ${formatHardwareVersion(board)} · board`
+            : pinned != null
+              ? `hw ${formatHardwareVersion(pinned)} · from config`
+              : 'hw ? · no board'}
         </option>
         {VERSIONS.map((version) => (
           <option key={version} value={version} title={note(version)}>
@@ -99,7 +105,7 @@ export function HardwareVersionBadge() {
 }
 
 // Setup prompt for a hand nothing has told the console the version of: no
-// board to report it and none picked this session.
+// board to report it, none pinned in config.yaml and none picked this session.
 export function HardwareVersionPrompt() {
   const status = useAppStore((s) => s.status)
   const [saving, setSaving] = useState(false)
@@ -107,7 +113,8 @@ export function HardwareVersionPrompt() {
     !status ||
     status.bare ||
     status.hardware_version_override != null ||
-    status.board_hardware_version != null
+    status.board_hardware_version != null ||
+    status.hardware_version != null
   ) {
     return null
   }

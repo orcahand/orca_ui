@@ -42,7 +42,7 @@ from orca_core.hardware.sensing.serial_discovery import (
 )
 
 from orca_ui.hand.boards import detect_pinned_board
-from orca_ui.hand.hand_store import hardware_version_in_force
+from orca_ui.hand.hand_store import hardware_version_in_force, settled_config
 from orca_ui.hand.detection import (
     HardwarePresence,
     names_a_hand,
@@ -176,6 +176,9 @@ class HandSupervisor(threading.Thread):
         # when chosen with no hand connected (the next hand to connect takes it).
         self._version_override: int | None = None
         self._override_hand: str | None = None
+        # Bumped whenever the config in force or the version choice changes, so
+        # a connect that raced one is never published.
+        self._config_generation = 0
         # Set while maintenance hands the bus back and the session is being
         # rebuilt, so a front-end can say so instead of showing the hand as
         # lost.
@@ -254,9 +257,10 @@ class HandSupervisor(threading.Thread):
                 raise HandBusyError(
                     "an operation holds the hand — stop it before changing "
                     "the hardware version")
-        connected = self.session is not None
-        self._version_override = normalize_hardware_version(version)
-        self._override_hand = (self._hand_id or "") if connected and version is not None else None
+            self._version_override = normalize_hardware_version(version)
+            connected = self._session is not None
+            self._override_hand = (self._hand_id or "") if connected and version is not None else None
+            self._config_generation += 1
         logger.info("hardware version %s for this session",
                     "back to the board's" if version is None else f"set to {self._version_override}")
         if self._apply_hardware_version(self._board_hardware_version):
@@ -283,6 +287,13 @@ class HandSupervisor(threading.Thread):
         self._override_hand = None
         return True
 
+    def _version_in_force(self, board_version: int | None, config=None) -> tuple[int | None, object]:
+        """(the version in force, the model's config fresh from its file)."""
+        fresh = load_config((config or self.config).config_path)
+        return hardware_version_in_force(
+            override=self._version_override, board=board_version,
+            model=fresh.hardware_version), fresh
+
     def _apply_hardware_version(self, board_version: int | None) -> bool:
         """Put in force the session's choice, else the board's version, else
         the model's. Returns True when that changed the config in force."""
@@ -290,13 +301,21 @@ class HandSupervisor(threading.Thread):
         self._board_hardware_version = board_version
         if self._settings.bare:
             return False
-        fresh = load_config(self.config.config_path)
-        version = hardware_version_in_force(
-            override=self._version_override, board=board_version, model=fresh.hardware_version)
+        version, fresh = self._version_in_force(board_version)
         if version == self.config.hardware_version:
             return False
         self._install_config(self._in_hand_folder(fresh.with_hardware_version(version)))
         return True
+
+    def _forget_hand(self) -> None:
+        """No hand known: the config in force is the model's, filed under no folder."""
+        if self._settings.bare:
+            self._set_hand_folder("", "")
+            return
+        _version, fresh = self._version_in_force(self._board_hardware_version)
+        with self._lock:
+            self.config = replace(fresh.with_hardware_version(self.config.hardware_version),
+                                  hand_dir="", calibration_path="")
 
     def _in_hand_folder(self, config):
         """``config`` filed under the folder of the hand the config in force is filed under."""
@@ -750,15 +769,16 @@ class HandSupervisor(threading.Thread):
         hand_id = getattr(identity, "hand_id", None) or None
         if hand_id != self._hand_id:
             logger.info("hand identity %s -> %s", self._hand_id or "none", hand_id or "none")
-            # Another hand: the last one's folder is not this one's.
-            self._set_hand_folder("", "")
+            # Another hand: the last one's folder and measured ranges are not this one's.
+            self._forget_hand()
         self._hand_id = hand_id
         self._identity = identity if hand_id else None
         if identity is not None and self._board_pinned:
             # Kept so a later probe can start from it once the pinned CDC is held.
             self._pinned_identity = identity
         self._apply_hardware_version(getattr(identity, "hw_version", None))
-        config = self.config
+        with self._lock:
+            config, generation = self.config, self._config_generation
         try:
             session = connect_session(self._settings, config, presence=presence,
                                       hardware_version=self._version_override)
@@ -777,10 +797,7 @@ class HandSupervisor(threading.Thread):
             self._backoff = min(self._backoff * 1.5, DETECT_BACKOFF_MAX_S)
             return delay
 
-        if (self._released or self.config is not config
-                or self._board_pinned != pin):
-            # A disconnect, model change or board change landed while this
-            # connect was in flight: the session belongs to the old state.
+        if self._stale(generation, pin):
             self._close_stale_session(session)
             return 0.1
 
@@ -792,23 +809,33 @@ class HandSupervisor(threading.Thread):
             except Exception:
                 logger.exception("post-connect torque disable failed")
         session.read_fingertip_identities()
-        hand_dir = getattr(session.hand, "hand_dir", None)
-        if hand_dir:
-            self._set_hand_folder(hand_dir, session.hand.config.calibration_path)
         # orca_core's connect asks the board itself, so it has the identity
         # even when detection missed it.
         self._hand_id = getattr(session.hand, "board_hand_id", None) or self._hand_id
-        if (self._settle_override_owner(self._hand_id)
-                and self._apply_hardware_version(self._board_hardware_version)):
-            # Connected as the version chosen for the last hand: reconnect as this one's.
-            self._close_stale_session(session)
-            return 0.1
+        self._settle_override_owner(self._hand_id)
+        settled, agrees = self._settled_config(config, session)
+        if not agrees:
+            if self._apply_hardware_version(self._board_hardware_version):
+                # The hand settled on another version than the one now in force
+                # (a choice made for another hand was dropped): reconnect as this one.
+                self._close_stale_session(session)
+                return 0.1
+            logger.warning("the hand runs hardware version %s, not %s; running it as it is",
+                           session.hand.config.hardware_version, config.hardware_version)
 
         with self._lock:
-            self._session = session
-            self._torque_enabled = False
-            self._motor_failures = 0
-            self._tactile_health = (0, time.time())
+            # Re-checked under the lock: a model, version or board change that
+            # landed during the connect must not see this session published.
+            stale = self._stale_locked(generation, pin)
+            if not stale:
+                self.config = settled
+                self._session = session
+                self._torque_enabled = False
+                self._motor_failures = 0
+                self._tactile_health = (0, time.time())
+        if stale:
+            self._close_stale_session(session)
+            return 0.1
         self._backoff = DETECT_BACKOFF_START_S
         self._model_probes_left = (
             0 if self._model_pinned or self._model_is_maximal()
@@ -854,6 +881,34 @@ class HandSupervisor(threading.Thread):
             return True
         return (detection.motor_port is not None
                 and detection.motor_port not in set(oh_board_ports()))
+
+    def _stale_locked(self, generation: int, pin: str | None) -> bool:
+        """A disconnect, model, version or board change landed since a connect
+        began with ``generation`` and ``pin``: its session belongs to the old state."""
+        return (self._released or self._config_generation != generation
+                or self._board_pinned != pin)
+
+    def _stale(self, generation: int, pin: str | None) -> bool:
+        with self._lock:
+            return self._stale_locked(generation, pin)
+
+    def _settled_config(self, config, session: HandSession) -> tuple[object, bool]:
+        """(``config`` with what the connected hand settled at connect, whether
+        the hand runs the version now in force). Settled: its folder and, when
+        its motors connected, the board's version, the map and the ranges
+        measured on it."""
+        hand = session.hand
+        hand_dir = getattr(hand, "hand_dir", None)
+        if self._settings.bare or not session.caps.motors:
+            if not hand_dir:
+                return config, True
+            return replace(config, hand_dir=hand_dir,
+                           calibration_path=hand.config.calibration_path), True
+        board = normalize_hardware_version(getattr(hand, "board_hardware_version", None))
+        if board is not None:
+            self._board_hardware_version = board
+        version, _fresh = self._version_in_force(self._board_hardware_version, config)
+        return settled_config(config, hand.config), version == hand.config.hardware_version
 
     def _close_stale_session(self, session: HandSession) -> None:
         try:
@@ -1085,6 +1140,7 @@ class HandSupervisor(threading.Thread):
         """Put ``config`` in force and repoint everything keyed by the model."""
         with self._lock:
             self.config = config
+            self._config_generation += 1
             self._declared = declared_capabilities(
                 config, self._settings.engage_feedback,
                 motors_enabled=self._settings.motors_enabled)

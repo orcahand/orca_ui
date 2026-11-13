@@ -8,6 +8,7 @@ a change in core's API is a change here and nowhere else.
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Any, Callable
 
 from orca_core import hand_store as core_store
@@ -52,6 +53,22 @@ def hardware_version_in_force(*, override: int | None, board: int | None,
         if version is not None:
             return version
     return None
+
+
+# What a hand settles at connect: the version in force, the map and ranges it
+# selects (with the ranges measured on this hand), and the hand's folder.
+SETTLED_FIELDS = (
+    "hardware_version", "joint_to_motor_map", "joint_inversion_dict", "joint_roms_dict",
+    "measured_joint_roms_dict", "base_joint_to_motor_map", "base_joint_roms_dict",
+    "hand_dir", "calibration_path",
+)
+
+
+def settled_config(config, settled):
+    """``config`` with what a connected hand settled (``settled``, its config)."""
+    return dataclasses.replace(config, **{
+        name: getattr(settled, name) for name in SETTLED_FIELDS
+        if hasattr(config, name) and hasattr(settled, name)})
 
 
 def prepare_hand(hand, hardware_version: int | None) -> None:

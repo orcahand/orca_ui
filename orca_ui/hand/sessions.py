@@ -375,9 +375,10 @@ def _build_hand(settings: UiSettings, config, feedback: bool, tactile: bool):
         return OrcaHandJointFeedback(config=config)
     if not feedback and not tactile and isinstance(config, OrcaHandTouchConfig):
         return OrcaHand(config=config)
+    # The version is the hand's to settle at connect, from its own board: one
+    # handed in here would pass for the board's on a hand that has none.
     return load_hand(config_path=config.config_path,
-                     engage_feedback=feedback,
-                     detected_hardware_version=config.hardware_version)
+                     engage_feedback=feedback)
 
 
 def _connect_with_motors(settings, config, declared, presence: HardwarePresence,
