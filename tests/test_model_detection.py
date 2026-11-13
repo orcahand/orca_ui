@@ -279,7 +279,7 @@ def test_connect_derives_the_model_before_connecting(monkeypatch):
     monkeypatch.setattr(supervisor_mod, "run_detection",
                         lambda config, force=False: FULL_LEFT)
 
-    def fake_connect(settings, config, presence=None):
+    def fake_connect(settings, config, presence=None, **_):
         seen["model"] = supervisor_mod.model_name_of(config)
         seen["encoder_port"] = presence.sensing.encoder
         raise supervisor_mod.SessionConnectError("not today")

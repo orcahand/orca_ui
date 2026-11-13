@@ -346,9 +346,7 @@ class HandService:
         from orca_ui.hand.operations import hand_ops
 
         try:
-            return baselines.slack_estimate(
-                config, self.supervisor.hand_id, hand_ops.last_tension(config)
-            )
+            return baselines.slack_estimate(config, hand_ops.last_tension(config))
         except Exception:
             logger.exception("estimating slack from the calibration failed")
             return None
@@ -367,13 +365,13 @@ class HandService:
         from orca_ui.hand import slack_tests
 
         try:
-            found = slack_tests.summary(config, self.supervisor.hand_id)
+            found = slack_tests.summary(config)
         except Exception:
             logger.exception("reading slack tests failed")
             return None
         if found is None:
             return None
-        found["block"] = slack_tests.calibration_block(config, self.supervisor.hand_id)
+        found["block"] = slack_tests.calibration_block(config)
         return found
 
     def _tension_sweep(self, config) -> dict | None:
@@ -384,7 +382,7 @@ class HandService:
             from orca_ui.hand.operations.guided_tension import motor_family
 
             ref = sweeps.reference(config, motor_family(self))
-            mine = sweeps.for_hand(config, self.supervisor.hand_id)
+            mine = sweeps.recent(config)
         except Exception:
             logger.exception("reading tension sweeps failed")
             return None
@@ -683,7 +681,7 @@ class HandService:
         """The hand block of ``hand_info``, plus the notices it raises."""
         session = self.session
         hand = session.hand if session is not None and session.caps.motors else None
-        hand_id = hand_store.store_hand_id(self.supervisor.hand_id, self.supervisor.model_name)
+        hand_id = self.supervisor.store_id
         state = hand_store.details(hand, hand_id)
         newer = hand_store.board_calibration_newer(hand) if hand is not None else None
         if newer and self._board_choice_key(hand_id, newer) in self._kept_over_board:
@@ -720,7 +718,7 @@ class HandService:
             return {"written": None}
         newer = hand_store.board_calibration_newer(hand)
         if newer:
-            hand_id = hand_store.store_hand_id(self.supervisor.hand_id, self.supervisor.model_name)
+            hand_id = self.supervisor.store_id
             self._kept_over_board.add(self._board_choice_key(hand_id, newer))
         return {"written": None}
 

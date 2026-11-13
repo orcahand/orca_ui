@@ -1,9 +1,6 @@
 """Suite-wide fixtures."""
 
-import os
-
 import pytest
-from orca_core import hand_config
 
 from orca_ui.hand.operations import player
 
@@ -11,27 +8,12 @@ from orca_ui.hand.operations import player
 @pytest.fixture(autouse=True)
 def _orca_home_in_tmp(tmp_path_factory, monkeypatch):
     """No test reads or writes the real ~/.orca: the console's own state and
-    orca_core's hand store both live under ORCA_HOME."""
+    orca_core's hand store both live under ORCA_HOME. Mock hands get a folder
+    of their own per test (orca_core keeps one per process)."""
+    from orca_core import hand_store
+
     monkeypatch.setenv("ORCA_HOME", str(tmp_path_factory.mktemp("orca-home")))
-
-
-@pytest.fixture(autouse=True)
-def _no_sidecar_from_the_installed_package(monkeypatch):
-    """A packaged model carries no local_config.yaml during tests.
-
-    The console's picker writes a hand's pin beside the installed package's
-    config.yaml, so a bench pin would otherwise reach every test that loads a
-    packaged model. Sidecars beside copies in tmp_path still apply.
-    """
-    package_dir = os.path.dirname(os.path.abspath(hand_config.__file__))
-    read = hand_config.read_local_config
-
-    def read_outside_package(config_path):
-        if os.path.abspath(config_path).startswith(package_dir + os.sep):
-            return {}
-        return read(config_path)
-
-    monkeypatch.setattr(hand_config, "read_local_config", read_outside_package)
+    monkeypatch.setattr(hand_store, "_mock_root", tmp_path_factory.mktemp("mock-hands"))
 
 
 @pytest.fixture(autouse=True, scope="session")

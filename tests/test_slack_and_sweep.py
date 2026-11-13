@@ -223,7 +223,7 @@ def test_a_marked_reference_from_another_motor_family_is_not_used(monkeypatch):
     from orca_ui.hand import sweeps
 
     section = {"reference": "mine", "sweeps": {"mine": {"motor_type": "dynamixel", "results": []}}}
-    monkeypatch.setattr(sweeps, "read_section", lambda *a, **k: section)
+    monkeypatch.setattr(sweeps, "read_records", lambda *a, **k: section)
     monkeypatch.setattr(shipped, "sweep", lambda config, family: {"name": f"shipped-{family}"})
     assert sweeps.reference(None, "dynamixel")[0] == "mine"
     assert sweeps.reference(None, None)[0] == "mine"
@@ -259,6 +259,7 @@ def test_a_stop_inside_the_routine_ends_the_run_as_a_stop(monkeypatch, op_name, 
     monkeypatch.setattr(sweeps, "reference", lambda config, family: None)
     supervisor = SimpleNamespace(
         config=SimpleNamespace(max_current="default", motor_type="dynamixel"), hand_id=None,
+        hardware_version_override=None,
         enter_maintenance=lambda kind: SimpleNamespace(presence=None),
         exit_maintenance=lambda: released.append("lease"))
     service = SimpleNamespace(session=None, max_current=None, supervisor=supervisor)

@@ -259,6 +259,7 @@ class TensionSweepOperation(Operation):
             hand = hand_ops.build_maintenance_hand(
                 supervisor.config, ctx.stop_event,
                 motor_port=lease.presence.motor_port if lease.presence else None,
+                hardware_version=supervisor.hardware_version_override,
             )
             self._hand = hand
             family = hand_ops.hand_family(hand)

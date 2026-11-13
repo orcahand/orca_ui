@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 
 from orca_ui.api import schemas
 from orca_ui import changelog as changelog_doc
+from orca_ui.hand.hand_store import NoHandFolder
 from orca_ui.hand.service import HandService, ServiceError
 from orca_ui.hand.taxel_geometry import get_taxel_geometry
 
@@ -19,6 +20,8 @@ def build_router(service: HandService) -> APIRouter:
             return fn(*args, **kwargs)
         except ServiceError as e:
             raise HTTPException(status_code=e.status_code, detail=str(e))
+        except NoHandFolder as e:
+            raise HTTPException(status_code=409, detail=str(e))
 
     # ----- status / info -----------------------------------------------------
 
@@ -73,7 +76,7 @@ def build_router(service: HandService) -> APIRouter:
         from orca_ui.hand import sweeps
 
         try:
-            sweeps.set_reference(service.supervisor.config, body.name)
+            guard(sweeps.set_reference, service.supervisor.config, body.name)
         except KeyError as e:
             raise HTTPException(404, str(e))
         return {"reference": body.name}
@@ -96,7 +99,8 @@ def build_router(service: HandService) -> APIRouter:
         from orca_ui.hand import baselines
 
         try:
-            entry = baselines.promote(
+            entry = guard(
+                baselines.promote,
                 service.supervisor.config,
                 body.snapshot,
                 body.name,
@@ -114,7 +118,7 @@ def build_router(service: HandService) -> APIRouter:
         from orca_ui.hand import baselines
 
         try:
-            baselines.activate(service.supervisor.config, body.name)
+            guard(baselines.activate, service.supervisor.config, body.name)
         except KeyError as e:
             raise HTTPException(status_code=404, detail=str(e.args[0]))
         return {"active": body.name}

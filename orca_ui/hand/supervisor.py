@@ -24,7 +24,7 @@ import logging
 import os
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable, Optional
 
 from orca_core import HandDetection
@@ -264,7 +264,14 @@ class HandSupervisor(threading.Thread):
         self._publish()
 
     def _store_hand_id(self) -> str:
-        return store_hand_id(self._hand_id, self.model_name)
+        return store_hand_id(self._identity, self.model_name)
+
+    @property
+    def store_id(self) -> str:
+        """The id the hand's folder is named by: the connected hand's own, else
+        what orca_core would file the last-detected hand under."""
+        hand = getattr(self.session, "hand", None)
+        return getattr(hand, "hand_id", None) or self._store_hand_id()
 
     def _forget_override_of_another_hand(self) -> None:
         if self._version_override is not None and self._override_hand != self._store_hand_id():
@@ -285,8 +292,21 @@ class HandSupervisor(threading.Thread):
             override=self._version_override, board=board_version, model=fresh.hardware_version)
         if version == self.config.hardware_version:
             return False
-        self._install_config(fresh.with_hardware_version(version))
+        self._install_config(self._in_hand_folder(fresh.with_hardware_version(version)))
         return True
+
+    def _in_hand_folder(self, config):
+        """``config`` filed under the folder of the hand the config in force is filed under."""
+        return replace(config, hand_dir=self.config.hand_dir,
+                       calibration_path=self.config.calibration_path)
+
+    def _set_hand_folder(self, hand_dir: str, calibration_path: str) -> None:
+        """File the config in force under a hand's folder: setup records and the
+        fresh hands operations build go there. Empty strings: no hand known."""
+        with self._lock:
+            if (self.config.hand_dir, self.config.calibration_path) != (hand_dir, calibration_path):
+                self.config = replace(self.config, hand_dir=hand_dir,
+                                      calibration_path=calibration_path)
 
     def _probeable_devices(self, session) -> tuple[str, ...]:
         """Missing devices a probe could still find: the ones whose port was
@@ -727,6 +747,8 @@ class HandSupervisor(threading.Thread):
         hand_id = getattr(identity, "hand_id", None) or None
         if hand_id != self._hand_id:
             logger.info("hand identity %s -> %s", self._hand_id or "none", hand_id or "none")
+            # Another hand: the last one's folder is not this one's.
+            self._set_hand_folder("", "")
         self._hand_id = hand_id
         self._identity = identity if hand_id else None
         if identity is not None and self._board_pinned:
@@ -736,8 +758,8 @@ class HandSupervisor(threading.Thread):
         self._apply_hardware_version(getattr(identity, "hw_version", None))
         config = self.config
         try:
-            session = connect_session(self._settings, config,
-                                      presence=presence)
+            session = connect_session(self._settings, config, presence=presence,
+                                      hardware_version=self._version_override)
         except SessionConnectError as e:
             detail = "; ".join(e.attempts) if e.attempts else str(e)
             self._set_state(HandState.DETECTING,
@@ -768,6 +790,9 @@ class HandSupervisor(threading.Thread):
             except Exception:
                 logger.exception("post-connect torque disable failed")
         session.read_fingertip_identities()
+        hand_dir = getattr(session.hand, "hand_dir", None)
+        if hand_dir:
+            self._set_hand_folder(hand_dir, session.hand.config.calibration_path)
 
         with self._lock:
             self._session = session

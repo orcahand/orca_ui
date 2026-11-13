@@ -55,7 +55,7 @@ def validate_calibrate_params(service, params: dict) -> dict:
     if not params.get("ignore_slack_test"):
         from orca_ui.hand import slack_tests
 
-        block = slack_tests.calibration_block(config, service.supervisor.hand_id)
+        block = slack_tests.calibration_block(config)
         if block:
             raise ServiceError(block, status_code=409)
     return {
@@ -513,6 +513,7 @@ class CalibrateOperation(Operation):
                 supervisor.config,
                 ctx.stop_event,
                 motor_port=lease.presence.motor_port if lease.presence else None,
+                hardware_version=supervisor.hardware_version_override,
             )
             self._hand = hand
             apply_calibration_current(hand, ctx.service.max_current, ctx)

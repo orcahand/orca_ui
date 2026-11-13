@@ -8,6 +8,7 @@ choice is never written anywhere and never follows the console to another hand.
 import glob
 import os
 import shutil
+from types import SimpleNamespace
 
 import orca_core
 from orca_core.constants import HARDWARE_VERSION_V21
@@ -83,11 +84,11 @@ def test_a_session_choice_wins_over_the_board_and_writes_nothing(tmp_path):
 
 def test_another_hand_connecting_drops_the_choice(tmp_path):
     sup, _ = _supervisor(tmp_path, LEFT)
-    sup._hand_id = "ser-1"
+    sup._identity = SimpleNamespace(serial="ser-1", board_id=None)
     sup.set_hardware_version(HARDWARE_VERSION_V21)
     sup._forget_override_of_another_hand()       # the same hand reconnects
     assert sup.hardware_version_override == HARDWARE_VERSION_V21
-    sup._hand_id = "ser-2"
+    sup._identity = SimpleNamespace(serial="ser-2", board_id=None)
     sup._forget_override_of_another_hand()
     sup._apply_hardware_version(2)
     assert sup.hardware_version_override is None
