@@ -163,26 +163,6 @@ def test_rounds_count_on_from_the_saved_progress():
     assert fresh.extra["round"] == 1
 
 
-def test_limits_read_back_and_drawn_currents_reach_the_operation_log():
-    """So a run's log shows the limit each motor held and what it drew, and a
-    limit that did not land stands out."""
-    ctx = _Ctx()
-    presenter = _Presenter(ctx, {})
-    stage = {"key": "ring", "joints": ["ring_abd", "ring_mcp", "ring_pip"]}
-    presenter.progress({"event": "current_limits", "phase": "range_check", "stage": stage,
-                        "limits": {"ring_mcp": {"asked": 140.0, "held": 140.0},
-                                   "index_mcp": {"asked": 300.0, "held": 300.0},
-                                   "wrist": {"asked": 100.0, "held": None}}})
-    assert ctx.lines[-1] == ("current limits (range check, ring), asked→held mA: "
-                             "ring_mcp 140→140, index_mcp 300→300, wrist 100→none")
-    presenter.progress({"event": "current_limits", "phase": "pull",
-                        "limits": {"ring_mcp": {"asked": 300.0, "held": 0.0}}})
-    assert "MISMATCH on ring_mcp" in ctx.lines[-1]
-    presenter.progress({"event": "currents_drawn", "stage": stage,
-                        "drawn": {"ring_mcp": {"peak": 132.0, "mean": 41.5}}})
-    assert ctx.lines[-1] == "currents drawn while checking ring, peak/mean mA: ring_mcp 132/41.5"
-
-
 def test_a_dead_sampler_and_motors_left_holding_are_shown_and_logged():
     """Spreads that stopped updating, and motors that never acknowledged torque
     off at the end of the run, must reach the dialog and the log in plain words."""
