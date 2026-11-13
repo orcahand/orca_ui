@@ -7,12 +7,13 @@ choice is never written anywhere and never follows the console to another hand.
 
 import glob
 import os
-import shutil
 from types import SimpleNamespace
 
 import orca_core
+import yaml
 from orca_core.constants import HARDWARE_VERSION_V21
 
+from orca_ui.hand.models import model_data
 from orca_ui.hand.supervisor import HandSupervisor
 from orca_ui.settings import UiSettings
 
@@ -24,7 +25,7 @@ THUMB = {"thumb_mcp", "thumb_dip"}
 
 def _supervisor(tmp_path, packaged):
     path = tmp_path / "config.yaml"
-    shutil.copy(packaged, path)
+    path.write_text(yaml.safe_dump(model_data(packaged)))
     settings = UiSettings(config_path=str(path), mock=False, open_browser=False)
     return HandSupervisor(settings), str(path)
 
