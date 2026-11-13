@@ -67,9 +67,11 @@ def test_a_range_checked_joint_whose_motor_never_moved_still_gets_clicks():
 
     presenter.progress({"event": "step", "step": "pose", "round": 2, "stage": stage,
                         "stage_index": 0, "stage_count": 1})
-    presenter.progress({"event": "score", "round": 2, "passed": 0, "scored": 1, "fraction": 0.0,
-                        "motors": [{**row, "joint": "index_mcp"}]})
-    assert ctx.extra["motors"][0]["not_checked"] is True
+    # Saved progress keeps 0.0 for a joint that was never swept: still no score, so no clicks.
+    presenter.progress({"event": "score", "round": 2, "passed": 0, "scored": 2, "fraction": 0.0,
+                        "motors": [{**row, "joint": "index_mcp", "kept": 0.0},
+                                   {**row, "joint": "middle_mcp", "kept": 0.0}]})
+    assert all(m["not_checked"] and m["clicks_left"] is None for m in ctx.extra["motors"])
 
 
 def test_a_latched_motor_is_shown_until_its_reboot_clears_it(monkeypatch):

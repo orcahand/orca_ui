@@ -404,9 +404,10 @@ class _Presenter:
         """Add the ratchet clicks the joint's slack still needs: its slack in
         degrees, or the travel it is short of (expected × (1 − fraction)). A row whose
         stage had no range check this round, with no score kept from earlier, is not
-        checked and gets none."""
+        checked and gets none. A kept 0.0 is no score: saved progress may hold it for
+        a joint that was never swept."""
         unchecked = motor["joint"] not in self._checked and not motor.get("spread_deg")
-        if unchecked and motor.get("kept") is None and not motor.get("fault"):
+        if unchecked and not motor.get("kept") and not motor.get("fault"):
             return {**motor, "not_checked": True, "clicks_left": None}
         slack = motor.get("slack_deg")
         if slack is None and motor.get("fraction") is not None and motor.get("expected_deg"):
