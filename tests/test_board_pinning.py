@@ -135,16 +135,8 @@ def test_a_hand_with_no_board_identity_is_not_judged_by_another_hands_slack_test
     plain_adapter = dataclasses.replace(PLAIN_LEFT, identity=None)
     board_folder = tmp_path / "ser-0001"
     board_folder.mkdir()
-    # The last cases: the board's identity reply was missed and the fallback scan found
-    # its motor port. It retries until the third miss in a row; from then on every
-    # attempt goes to the connect, where orca_core asks the board itself.
     for detected, port, hand_id, connected in ((board_hand, "/dev/motor", "ser-0001", 1),
-                                               (plain_adapter, "/dev/usb-adapter", None, 2),
-                                               (board_hand, "/dev/motor", "ser-0001", 3),
-                                               (plain_adapter, "/dev/motor", "ser-0001", 3),
-                                               (plain_adapter, "/dev/motor", "ser-0001", 3),
-                                               (plain_adapter, "/dev/motor", None, 4),
-                                               (plain_adapter, "/dev/motor", None, 5)):
+                                               (plain_adapter, "/dev/usb-adapter", None, 2)):
         monkeypatch.setattr(supervisor_mod, "run_detection", lambda config, force=False: detected)
         monkeypatch.setattr(supervisor_mod, "presence_from_detection",
                             lambda config, detection, **k: SimpleNamespace(detection=detection, motor_port=port))

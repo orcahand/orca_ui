@@ -66,9 +66,6 @@ DETECT_BACKOFF_MAX_S = 10.0
 HEALTH_PERIOD_S = 2.0
 UPGRADE_PROBE_PERIOD_S = 10.0
 MOTOR_FAILURES_BEFORE_RECONNECT = 3
-IDENTITY_MISSES_BEFORE_CONNECTING = 3
-"""Consecutive missed identity replies from the same ports before connecting
-anyway; orca_core's connect then asks the board itself and refuses a silent one."""
 
 UPGRADE_PROBE_ATTEMPTS = 2
 """Probes for declared hardware the connect ladder could not reach, after
@@ -168,8 +165,6 @@ class HandSupervisor(threading.Thread):
         # GIL only (str swap), like _model_pinned.
         self._board_pinned: str | None = settings.board or None
         self._pinned_identity = None
-        # (ports, count) of consecutive connects whose board identity reply was missed.
-        self._identity_misses: tuple = (None, 0)
         # The connected hand's serial (or board id) from its last connect;
         # None in mock mode, without a board, and for boards that report no identity.
         self._hand_id: str | None = None
@@ -259,7 +254,7 @@ class HandSupervisor(threading.Thread):
                     "an operation holds the hand — stop it before changing "
                     "the hardware version")
         self._version_override = normalize_hardware_version(version)
-        self._override_hand = self._store_hand_id() if version is not None else None
+        self._override_hand = self.store_id if version is not None else None
         logger.info("hardware version %s for this session",
                     "back to the board's" if version is None else f"set to {self._version_override}")
         if self._apply_hardware_version(self._board_hardware_version):
@@ -278,12 +273,16 @@ class HandSupervisor(threading.Thread):
         hand = getattr(self.session, "hand", None)
         return getattr(hand, "hand_id", None) or self._store_hand_id()
 
-    def _forget_override_of_another_hand(self) -> None:
-        if self._version_override is not None and self._override_hand != self._store_hand_id():
-            logger.info("hardware version choice for %s dropped: %s connected",
-                        self._override_hand, self._store_hand_id())
-            self._version_override = None
-            self._override_hand = None
+    def _forget_override_of_another_hand(self, hand_id: str) -> bool:
+        """Drop a session's version choice made for another hand than
+        ``hand_id``; True when one was dropped."""
+        if self._version_override is None or self._override_hand == hand_id:
+            return False
+        logger.info("hardware version choice for %s dropped: %s connected",
+                    self._override_hand, hand_id)
+        self._version_override = None
+        self._override_hand = None
+        return True
 
     def _apply_hardware_version(self, board_version: int | None) -> bool:
         """Put in force the session's choice, else the board's version, else
@@ -703,7 +702,6 @@ class HandSupervisor(threading.Thread):
                         f"searching for board {pin}" if pin
                         else "searching for hardware")
         presence = None
-        identity_unknown = False
         if self._settings.bare:
             presence = self._bare_presence()
         elif not self._settings.mock:
@@ -746,28 +744,6 @@ class HandSupervisor(threading.Thread):
                     return delay
                 self._adopt_model(detection)
                 presence = presence_from_detection(self.config, detection)
-                identity_unknown = self._board_identity_missed(presence)
-                if identity_unknown:
-                    ports = (presence.motor_port, tuple(sorted(oh_board_ports())))
-                    last_ports, misses = self._identity_misses
-                    misses = misses + 1 if last_ports == ports else 1
-                    self._identity_misses = (ports, misses)
-                    if misses < IDENTITY_MISSES_BEFORE_CONNECTING:
-                        self._set_state(
-                            HandState.DETECTING,
-                            "controller board found but its identity reply was "
-                            "missed — retrying")
-                        delay = self._backoff
-                        self._backoff = min(self._backoff * 1.5,
-                                            DETECT_BACKOFF_MAX_S)
-                        return delay
-                    if misses == IDENTITY_MISSES_BEFORE_CONNECTING:
-                        logger.warning(
-                            "controller board on %s missed its identity reply %d "
-                            "times in a row — leaving it to the connect to ask again",
-                            presence.motor_port, misses)
-                else:
-                    self._identity_misses = (None, 0)
         detection = getattr(presence, "detection", None)
         identity = getattr(detection, "identity", None)
         # Every connect says which hand this is: a board without an identity, or
@@ -782,7 +758,6 @@ class HandSupervisor(threading.Thread):
         if identity is not None and self._board_pinned:
             # Kept so a later probe can start from it once the pinned CDC is held.
             self._pinned_identity = identity
-        self._forget_override_of_another_hand()
         self._apply_hardware_version(getattr(identity, "hw_version", None))
         config = self.config
         try:
@@ -821,12 +796,15 @@ class HandSupervisor(threading.Thread):
         hand_dir = getattr(session.hand, "hand_dir", None)
         if hand_dir:
             self._set_hand_folder(hand_dir, session.hand.config.calibration_path)
-        board_hand_id = getattr(session.hand, "board_hand_id", None)
-        if identity_unknown and board_hand_id:
-            # orca_core's connect got the identity detection missed.
-            logger.info("hand identity none -> %s (from the connect)", board_hand_id)
-            self._hand_id = board_hand_id
-            identity_unknown = False
+        # orca_core's connect asks the board itself, so it has the identity
+        # even when detection missed it.
+        self._hand_id = getattr(session.hand, "board_hand_id", None) or self._hand_id
+        connected_id = getattr(session.hand, "hand_id", None) or self._store_hand_id()
+        if (self._forget_override_of_another_hand(connected_id)
+                and self._apply_hardware_version(self._board_hardware_version)):
+            # Connected as the version chosen for the last hand: reconnect as this one's.
+            self._close_stale_session(session)
+            return 0.1
 
         with self._lock:
             self._session = session
@@ -856,8 +834,6 @@ class HandSupervisor(threading.Thread):
             self._leaving_maintenance = False
         state = HandState.DEGRADED if session.caps.degraded else HandState.CONNECTED
         message = f"[{session.tier}] {session.message}"
-        if identity_unknown:
-            message += " — board identity unknown"
         self._set_state(state, message, session.ports)
 
         try:
@@ -880,16 +856,6 @@ class HandSupervisor(threading.Thread):
             return True
         return (detection.motor_port is not None
                 and detection.motor_port not in set(oh_board_ports()))
-
-    def _board_identity_missed(self, presence) -> bool:
-        """True when the fallback scan found a controller board's motor port (so the
-        board answers its identity) but detection got none: connecting now would
-        file this hand's records under no identity. A port set in the config is left alone."""
-        motor_port = getattr(presence, "motor_port", None)
-        return (self._settings.motors_enabled and motor_port is not None
-                and getattr(self.config, "port", None) in ("auto", None)
-                and getattr(getattr(presence, "detection", None), "identity", None) is None
-                and motor_port in set(oh_board_ports()))
 
     def _close_stale_session(self, session: HandSession) -> None:
         try:

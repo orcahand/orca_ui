@@ -84,10 +84,10 @@ def test_another_hand_connecting_drops_the_choice(tmp_path):
     sup, _ = _supervisor(tmp_path, LEFT)
     sup._identity = SimpleNamespace(serial="ser-1", board_id=None)
     sup.set_hardware_version(HARDWARE_VERSION_V21)
-    sup._forget_override_of_another_hand()       # the same hand reconnects
+    sup._identity = None                          # detection missed the identity once
+    assert not sup._forget_override_of_another_hand("ser-1")   # the connect got it
     assert sup.hardware_version_override == HARDWARE_VERSION_V21
-    sup._identity = SimpleNamespace(serial="ser-2", board_id=None)
-    sup._forget_override_of_another_hand()
+    assert sup._forget_override_of_another_hand("ser-2")
     sup._apply_hardware_version(2)
     assert sup.hardware_version_override is None
     assert sup.config.hardware_version == 200
