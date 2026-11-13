@@ -869,9 +869,9 @@ def main(argv=None):
     args.out = args.out.resolve()
 
     log = print
-    from orca_ui.hand.models import model_data
+    from orca_core import load_config
 
-    core_cfg = model_data(str(args.core_config))
+    core_cfg = load_config(str(args.core_config))
     core_ids = list(core_cfg["joint_ids"])
     if sorted(core_ids) != sorted(CANONICAL_CHILD_LINK):
         raise SystemExit("orca_core joint_ids do not match the canonical ids "
