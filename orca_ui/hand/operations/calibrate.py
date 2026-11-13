@@ -319,7 +319,6 @@ def run_calibrate(
         "anchors_dead": [],
         "travel_logged": False,
         "aborted": False,
-        "written_to": None,
     }
 
     plan = manual_capture_plan(manual_capture_steps(hand.config, joints))
@@ -383,13 +382,9 @@ def run_calibrate(
         elif kind == "calibration_file":
             # Which file a run lands in decides what the hand loads next time;
             # orca_core says it at INFO, which the console does not show.
-            progress["written_to"] = event.get("path")
             ctx.log(f"calibration written to {event.get('path')}")
         elif kind == "calibration_done":
             ctx.log("calibration complete")
-            path = event.get("calibration_path")
-            if path and path != progress.get("written_to"):
-                ctx.log(f"calibration written to {path}")
             # What the numbers above mean, so the log reads on its own.
             ctx.log(
                 "ratio: motor radians per joint degree — the motor travel between the two "
