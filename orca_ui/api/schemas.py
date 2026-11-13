@@ -48,9 +48,10 @@ class NicknameRequest(BaseModel):
 
 
 class BoardCalibrationRequest(BaseModel):
-    """Answer to "the board's calibration is newer": take it, or keep this computer's."""
+    """Answer to "the board's calibration is newer": take it, keep this
+    computer's until the next connect, or until either calibration changes."""
 
-    use_board: bool
+    choice: Literal["use_board", "keep_session", "keep_until_change"]
 
 
 class TorqueRequest(BaseModel):

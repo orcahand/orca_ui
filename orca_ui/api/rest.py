@@ -202,7 +202,7 @@ def build_router(service: HandService) -> APIRouter:
 
     @router.post("/hand/calibration/board")
     def hand_board_calibration(body: schemas.BoardCalibrationRequest):
-        return guard(service.board_calibration_choice, body.use_board)
+        return guard(service.board_calibration_choice, body.choice)
 
     @router.post("/hand/legacy_files/dismiss")
     def hand_legacy_files_dismiss():

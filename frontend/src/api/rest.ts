@@ -113,8 +113,8 @@ export const api = {
   // Both reconnect the hand on the calibration they put in force.
   restorePreviousCalibration: () =>
     post<{ written: string }>('/api/hand/calibration/restore_previous'),
-  boardCalibration: (useBoard: boolean) =>
-    post<{ written: string | null }>('/api/hand/calibration/board', { use_board: useBoard }),
+  boardCalibration: (choice: 'use_board' | 'keep_session' | 'keep_until_change') =>
+    post<{ written: string | null }>('/api/hand/calibration/board', { choice }),
   dismissLegacyFiles: () => post<HandStoreInfo>('/api/hand/legacy_files/dismiss'),
   // Clears a latched hardware error. The motor's torque is restored if the hand has torque.
   rebootMotor: (id: number) =>

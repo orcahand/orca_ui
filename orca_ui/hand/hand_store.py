@@ -72,6 +72,11 @@ def board_calibration_newer(hand) -> dict | None:
     return None
 
 
+def keep_computer_calibration(hand) -> None:
+    """Stop offering the board's calibration until either side's changes."""
+    raise StoreUnavailable("this orca_core cannot remember a choice about the board's calibration")
+
+
 def adopt_board_calibration(hand) -> str:
     """Take the board's calibration as this computer's; returns the file written."""
     raise StoreUnavailable("this orca_core cannot read a board's calibration")

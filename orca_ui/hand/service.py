@@ -228,8 +228,9 @@ class HandService:
         # Old per-hand files a session reported when its hand folder was
         # created, kept until the operator dismisses the notice.
         self._legacy_files: list[str] = []
-        # Board calibrations the operator chose not to take, as (hand, board sequence).
-        self._kept_over_board: set[tuple[str, object]] = set()
+        # Board calibrations the operator chose not to take until the next
+        # connect, as (hand, board sequence, computer sequence).
+        self._kept_over_board: set[tuple] = set()
 
         self.supervisor = HandSupervisor(
             settings,
@@ -685,7 +686,7 @@ class HandService:
         hand_id = hand_store.store_hand_id(self.supervisor.hand_id, self.supervisor.model_name)
         state = hand_store.details(hand, hand_id)
         newer = hand_store.board_calibration_newer(hand) if hand is not None else None
-        if newer and (hand_id, newer["board"].get("sequence")) in self._kept_over_board:
+        if newer and self._board_choice_key(hand_id, newer) in self._kept_over_board:
             newer = None
         state["board_calibration_newer"] = newer
         state["legacy_files"] = list(self._legacy_files)
@@ -699,17 +700,28 @@ class HandService:
         return self._replace_calibration(
             "restore the previous calibration", hand_store.restore_previous_calibration)
 
-    def board_calibration_choice(self, use_board: bool) -> dict:
-        """``use it`` takes the board's newer calibration; ``keep`` hides the
-        banner for that board calibration until the console restarts."""
-        if use_board:
+    @staticmethod
+    def _board_choice_key(hand_id: str, newer: dict) -> tuple:
+        return (hand_id, newer["board"].get("sequence"), newer["computer"].get("sequence"))
+
+    def board_calibration_choice(self, choice: str) -> dict:
+        """Answer the "board's calibration is newer" banner.
+
+        ``use_board`` takes the board's calibration; ``keep_session`` hides the
+        banner until the next connect; ``keep_until_change`` has orca_core
+        remember the choice until either side's calibration changes.
+        """
+        if choice == "use_board":
             return self._replace_calibration(
                 "take the board's calibration", hand_store.adopt_board_calibration)
         hand = self._store_hand("keep this computer's calibration")
+        if choice == "keep_until_change":
+            self._store_call(hand_store.keep_computer_calibration, hand)
+            return {"written": None}
         newer = hand_store.board_calibration_newer(hand)
         if newer:
             hand_id = hand_store.store_hand_id(self.supervisor.hand_id, self.supervisor.model_name)
-            self._kept_over_board.add((hand_id, newer["board"].get("sequence")))
+            self._kept_over_board.add(self._board_choice_key(hand_id, newer))
         return {"written": None}
 
     def dismiss_legacy_notice(self) -> dict:
@@ -907,6 +919,7 @@ class HandService:
                     self._max_current = _current_or_none(hand_config.max_current)
             self._config_gains = config_gains
         self._publish_control_state()
+        self._kept_over_board.clear()  # the board banner asks again on every connect
         if session.caps.motors:
             found = hand_store.legacy_files(session.hand)
             if found:

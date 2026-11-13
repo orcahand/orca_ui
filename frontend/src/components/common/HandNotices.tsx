@@ -13,12 +13,12 @@ function BoardCalibrationNotice() {
   const busy = useOperationActive()
   const [working, setWorking] = useState(false)
   if (!newer) return null
-  const answer = (useBoard: boolean) => {
+  const answer = (choice: 'use_board' | 'keep_session' | 'keep_until_change') => {
     setWorking(true)
     api
-      .boardCalibration(useBoard)
+      .boardCalibration(choice)
       .then(() => refreshHandInfo())
-      .catch(handFailed(useBoard ? "take the board's calibration" : "keep this computer's calibration"))
+      .catch(handFailed(choice === 'use_board' ? "take the board's calibration" : "keep this computer's calibration"))
       .finally(() => setWorking(false))
   }
   const board = calendarDate(newer.board.calibrated_at)
@@ -33,12 +33,25 @@ function BoardCalibrationNotice() {
         className="btn btn-secondary btn-sm"
         disabled={working || busy}
         title={busy ? 'An operation is running — stop it first.' : 'The hand reconnects on it.'}
-        onClick={() => answer(true)}
+        onClick={() => answer('use_board')}
       >
         use it
       </button>
-      <button className="btn btn-secondary btn-sm" disabled={working} onClick={() => answer(false)}>
+      <button
+        className="btn btn-secondary btn-sm"
+        disabled={working}
+        title="Hidden until the hand next connects."
+        onClick={() => answer('keep_session')}
+      >
         keep this computer's
+      </button>
+      <button
+        className="hand-link"
+        disabled={working}
+        title="Asks again once the board's or this computer's calibration changes."
+        onClick={() => answer('keep_until_change')}
+      >
+        don't ask again until a calibration changes
       </button>
     </div>
   )
