@@ -247,44 +247,6 @@ def state(config) -> dict:
     }
 
 
-def slack_estimate(config, hand_key: str | None, last_tension: dict | None) -> dict | None:
-    """Per-joint slack from two sweeps of the same hand in the same state: the
-    motor-driven calibration reaches the hardstops plus the slack, the hand sweep
-    of the final tensioning round reaches them minus the slack. Half the
-    difference is the slack, half the sum the hand's own travel. Needs a full
-    calibration snapshot of ``hand_key`` taken after the tensioning completed."""
-    if not hand_key or not last_tension or not last_tension.get("spread_deg"):
-        return None
-    done_at = last_tension.get("completed_at") or ""
-    snapshots = [
-        (n, e)
-        for n, e in _load(config)["snapshots"].items()
-        if e.get("hand_key") == hand_key
-        and not e.get("partial")
-        and (e.get("recorded_at") or "") > done_at
-    ]
-    if not snapshots:
-        return None
-    name, entry = max(snapshots, key=lambda kv: kv[1].get("recorded_at", ""))
-    joints = {}
-    for joint, swept in last_tension["spread_deg"].items():
-        motor = (entry.get("travel") or {}).get(joint)
-        if swept is None or motor is None:
-            continue
-        joints[joint] = {
-            "sweep_deg": round(float(swept), 2),
-            "motor_deg": round(float(motor), 2),
-            "slack_deg": round((float(motor) - float(swept)) / 2, 2),
-            "travel_deg": round((float(motor) + float(swept)) / 2, 2),
-        }
-    return {
-        "snapshot": name,
-        "calibrated_at": entry.get("recorded_at"),
-        "tensioned_at": done_at,
-        "joints": joints,
-    }
-
-
 def _check_name(name: str) -> None:
     if not NAME_RE.match(name or ""):
         raise ValueError("baseline names are 1-40 characters: letters, digits, _ . -")

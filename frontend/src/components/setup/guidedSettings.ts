@@ -51,22 +51,6 @@ export function savePassFractions(passes: PassFractions): void {
   }
 }
 
-const inDegreeBounds = (v: unknown) =>
-  typeof v === 'number' && v >= PASS_BOUNDS_DEG[0] && v <= PASS_BOUNDS_DEG[1]
-
-export function loadPassSlack(): PassSlack {
-  try {
-    const stored = JSON.parse(localStorage.getItem(SLACK_KEY) ?? 'null')
-    if (stored && typeof stored === 'object') {
-      const valid = PASS_GROUPS.filter(({ key }) => inDegreeBounds(stored[key]))
-      return { ...DEFAULT_PASS_SLACK, ...Object.fromEntries(valid.map(({ key }) => [key, stored[key]])) }
-    }
-  } catch {
-    /* unreadable: fall back to the defaults */
-  }
-  return DEFAULT_PASS_SLACK
-}
-
 export function savePassSlack(passes: PassSlack): void {
   try {
     localStorage.setItem(SLACK_KEY, JSON.stringify(passes))

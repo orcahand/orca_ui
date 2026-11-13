@@ -334,18 +334,6 @@ class HandService:
             "joints": len(entry.get("travel") or {}),
         }
 
-    def _slack_estimate(self, config) -> dict | None:
-        from orca_ui.hand import baselines
-        from orca_ui.hand.operations import hand_ops
-
-        try:
-            return baselines.slack_estimate(
-                config, self.supervisor.hand_id, hand_ops.last_tension(config)
-            )
-        except Exception:
-            logger.exception("estimating slack from the calibration failed")
-            return None
-
     def _slack_current(self) -> dict | None:
         """The winding current and choices for the connected motor family."""
         from orca_ui.hand.operations.guided_tension import motor_family
@@ -485,11 +473,9 @@ class HandService:
             "guided_tension": hand_ops.guided_tension_supported(),
             "last_tension": hand_ops.last_tension(config),
             "tension_progress": self._tension_progress(config),
-            "tension_progress_slack": self._tension_progress(config, "slack"),
             "hand_id": self.supervisor.hand_id,
             "guided_tension_defaults": self._guided_tension_defaults(),
             "travel_baseline": self._travel_baseline(config),
-            "slack_estimate": self._slack_estimate(config),
             "slack_test": self._slack_test(config),
             "slack_current": self._slack_current(),
             "tension_sweep": self._tension_sweep(config),

@@ -269,12 +269,8 @@ export interface HandInfo {
   // False when the installed orca_core predates guided tensioning.
   guided_tension?: boolean
   last_tension?: LastTension | null
-  // Unfinished guided tensioning saved for this hand, per scoring: the best
-  // fraction per joint (fraction) and the last round's slack scores (slack).
+  // Unfinished guided tensioning saved for this hand: the best fraction per joint.
   tension_progress?: TensionProgress | null
-  tension_progress_slack?: TensionProgress | null
-  // Present once this hand was calibrated after its last completed tensioning.
-  slack_estimate?: SlackEstimate | null
   // Fingertip model per slot and slots holding another finger's model; absent
   // when the connector-board firmware doesn't report fingertip identities.
   fingertips?: FingertipIdentities
@@ -534,16 +530,6 @@ export interface LastTension {
   slack_deg?: Record<string, number | null>
   spread_deg?: Record<string, number>
   expected_deg?: Record<string, number | null>
-}
-
-// Slack per joint from two sweeps of the same hand in the same state: the
-// motor-driven calibration (hardstops plus slack) against the hand sweep of the
-// final tensioning round (hardstops minus slack).
-export interface SlackEstimate {
-  snapshot: string
-  calibrated_at: string
-  tensioned_at: string
-  joints: Record<string, { sweep_deg: number; motor_deg: number; slack_deg: number; travel_deg: number }>
 }
 
 export type TactileMode = 'resultant' | 'taxels' | 'combined'
