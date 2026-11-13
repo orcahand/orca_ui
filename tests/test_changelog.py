@@ -101,8 +101,9 @@ class TestTheDismissal:
 
     @pytest.fixture(autouse=True)
     def state_dir(self, tmp_path, monkeypatch):
-        directory = tmp_path / ".changelog"
+        directory = tmp_path / "ui" / "changelog"
         monkeypatch.setattr(changelog, "STATE_DIR", directory)
+        monkeypatch.setattr(changelog, "LEGACY_STATE_DIR", tmp_path / ".changelog")
         return directory
 
     def test_nothing_is_dismissed_before_anything_is_written(self, state_dir):
@@ -145,6 +146,15 @@ class TestTheDismissal:
         assert changelog.set_seen("0.3.0") is None
         assert changelog.seen_version() is None
 
+    def test_an_older_dismissal_is_read_until_the_new_folder_exists(self, state_dir, tmp_path):
+        legacy = tmp_path / ".changelog"
+        legacy.mkdir()
+        (legacy / "ui-0.3.0.seen").write_text("dismissed")
+        assert changelog.seen_version() == "0.3.0"
+        changelog.set_seen(None)
+        assert changelog.seen_version() is None
+        assert (legacy / "ui-0.3.0.seen").exists()
+
     def test_clearing_leaves_anything_that_is_not_a_file(self, state_dir):
         state_dir.mkdir(parents=True)
         (state_dir / "a-directory").mkdir()
@@ -164,7 +174,8 @@ class TestTheRoute:
 
     @pytest.fixture(autouse=True)
     def state_dir(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(changelog, "STATE_DIR", tmp_path / ".changelog")
+        monkeypatch.setattr(changelog, "STATE_DIR", tmp_path / "ui" / "changelog")
+        monkeypatch.setattr(changelog, "LEGACY_STATE_DIR", tmp_path / ".changelog")
 
     def test_ticking_and_unticking_round_trips_through_the_backend(self, client):
         assert client.get("/api/changelog").json()["dismissed"] is False
