@@ -68,7 +68,7 @@ UPGRADE_PROBE_PERIOD_S = 10.0
 MOTOR_FAILURES_BEFORE_RECONNECT = 3
 IDENTITY_MISSES_BEFORE_CONNECTING = 3
 """Consecutive missed identity replies from the same ports before connecting
-anyway: a board whose motor port never answers the probe still gets a hand."""
+anyway; orca_core's connect then asks the board itself and refuses a silent one."""
 
 UPGRADE_PROBE_ATTEMPTS = 2
 """Probes for declared hardware the connect ladder could not reach, after
@@ -751,8 +751,8 @@ class HandSupervisor(threading.Thread):
                     ports = (presence.motor_port, tuple(sorted(oh_board_ports())))
                     last_ports, misses = self._identity_misses
                     misses = misses + 1 if last_ports == ports else 1
+                    self._identity_misses = (ports, misses)
                     if misses < IDENTITY_MISSES_BEFORE_CONNECTING:
-                        self._identity_misses = (ports, misses)
                         self._set_state(
                             HandState.DETECTING,
                             "controller board found but its identity reply was "
@@ -761,11 +761,13 @@ class HandSupervisor(threading.Thread):
                         self._backoff = min(self._backoff * 1.5,
                                             DETECT_BACKOFF_MAX_S)
                         return delay
-                    logger.warning(
-                        "controller board on %s missed its identity reply %d "
-                        "times in a row — connecting with its identity unknown",
-                        presence.motor_port, misses)
-                self._identity_misses = (None, 0)
+                    if misses == IDENTITY_MISSES_BEFORE_CONNECTING:
+                        logger.warning(
+                            "controller board on %s missed its identity reply %d "
+                            "times in a row — leaving it to the connect to ask again",
+                            presence.motor_port, misses)
+                else:
+                    self._identity_misses = (None, 0)
         detection = getattr(presence, "detection", None)
         identity = getattr(detection, "identity", None)
         # Every connect says which hand this is: a board without an identity, or
@@ -819,6 +821,12 @@ class HandSupervisor(threading.Thread):
         hand_dir = getattr(session.hand, "hand_dir", None)
         if hand_dir:
             self._set_hand_folder(hand_dir, session.hand.config.calibration_path)
+        board_hand_id = getattr(session.hand, "board_hand_id", None)
+        if identity_unknown and board_hand_id:
+            # orca_core's connect got the identity detection missed.
+            logger.info("hand identity none -> %s (from the connect)", board_hand_id)
+            self._hand_id = board_hand_id
+            identity_unknown = False
 
         with self._lock:
             self._session = session
