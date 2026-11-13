@@ -38,7 +38,7 @@ export function useTravelBaselines() {
 // holds the stops by hand in one, the motors drive them in the other.
 export function CalibrationRecords() {
   const { state } = useTravelBaselines()
-  const joints = useAppStore((s) => s.handInfo?.joints ?? [])
+  const joints = useAppStore((s) => s.handInfo?.joints) ?? []
   const handId = useAppStore((s) => s.handInfo?.hand?.id ?? null)
   if (!state) return null
   const newest = (source: string) =>

@@ -59,7 +59,7 @@ function BoardCalibrationNotice() {
 }
 
 function LegacyFilesNotice() {
-  const files = useAppStore((s) => s.handInfo?.hand?.legacy_files ?? [])
+  const files = useAppStore((s) => s.handInfo?.hand?.legacy_files) ?? []
   const calibrated = useAppStore((s) => Boolean(s.handInfo?.hand?.calibration.calibrated_at))
   if (files.length === 0) return null
   const dismiss = () =>
