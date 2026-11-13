@@ -9,6 +9,13 @@ from orca_ui.hand.operations import player
 
 
 @pytest.fixture(autouse=True)
+def _orca_home_in_tmp(tmp_path_factory, monkeypatch):
+    """No test reads or writes the real ~/.orca: the console's own state and
+    orca_core's hand store both live under ORCA_HOME."""
+    monkeypatch.setenv("ORCA_HOME", str(tmp_path_factory.mktemp("orca-home")))
+
+
+@pytest.fixture(autouse=True)
 def _no_sidecar_from_the_installed_package(monkeypatch):
     """A packaged model carries no local_config.yaml during tests.
 

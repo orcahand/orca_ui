@@ -85,7 +85,7 @@ def parse_args(argv=None) -> argparse.Namespace:
                              "(motor-bus reads; default 1).")
     parser.add_argument("--library-dir", type=str, default=None,
                         help="Pose/trajectory library root "
-                             "(default ~/.orca_ui/library).")
+                             "(default ~/.orca/ui/library; $ORCA_HOME moves ~/.orca).")
     parser.add_argument("--teleop-dir", type=str, default=None,
                         help="Path to an orca_teleop checkout; the streamer "
                              "child is launched with `uv run --project <dir>` "
@@ -236,10 +236,12 @@ def main(argv=None) -> None:
     import uvicorn
     from orca_ui.console import install_stdout_dedupe
     from orca_ui.core_source import resolve as resolve_core_source
+    from orca_ui.home import prepare_ui_home, ui_home
     from orca_ui.server import create_app
 
     configure_logging()
     settings = build_settings(argv)
+    moved = prepare_ui_home(settings.library_dir)
 
     mode = "MOCK — no hardware" if settings.mock else "hardware"
     if settings.mock is False and not settings.motors_enabled:
@@ -254,6 +256,7 @@ def main(argv=None) -> None:
           f"  config    {settings.config_path}{provisional}\n"
           f"  mode      {mode}\n"
           f"  core      {core.summary()}\n"
+          f"  state     {ui_home()}{f'  ({moved})' if moved else ''}\n"
           f"{rule}\n")
 
     # orca_core prints hardware diagnostics; the connect ladder would repeat

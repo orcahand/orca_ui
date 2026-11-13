@@ -450,7 +450,7 @@ object already present in unpublished history.
 
 ## Persistence and compatibility
 
-`GET/PUT /api/assembly/progress` stores one build at `~/.orca_ui/assembly-progress-v2.json`, with validation and atomic replacement. Browser storage under `orca-ui.assembly.v2.1` provides fallback. Server persistence matters because the desktop shell can discard its browser profile.
+`GET/PUT /api/assembly/progress` stores one build at `~/.orca/ui/assembly-progress-v2.json`, with validation and atomic replacement. Browser storage under `orca-ui.assembly.v2.1` provides fallback. Server persistence matters because the desktop shell can discard its browser profile.
 
 Saved state includes the current step, build configuration, completed steps, checklists, tendon checks and selected views. Writes are serialized across modal mounts. Preserve stable step IDs and migrate incompatible state explicitly. Configuration changes invalidate relevant checks; do not allow completion for one configuration to imply verification of another.
 

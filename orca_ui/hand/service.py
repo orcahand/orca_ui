@@ -25,6 +25,7 @@ from pathlib import Path
 
 from orca_ui.core_source import resolve_cached as resolve_core_source
 from orca_ui.hand import zeroing
+from orca_ui.home import ui_home
 from orca_ui.hand.commands import CommandWorker
 from orca_ui.hand.presets import BUILTIN_POSES, BUILTIN_SEQUENCES
 from orca_ui.hand.faults import classify_hw_error
@@ -274,7 +275,7 @@ class HandService:
         self._library_root = (
             Path(settings.library_dir)
             if settings.library_dir
-            else Path.home() / ".orca_ui" / "library"
+            else ui_home() / "library"
         )
         self.library = Library(self._library_root, self.supervisor.model_name)
 
