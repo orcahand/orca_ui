@@ -391,7 +391,7 @@ class HandService:
             )
 
             return SimulatedGuidedTensionOperation.progress_for(scoring) or None
-        return hand_ops.tension_progress(config, self.supervisor.hand_id, scoring)
+        return hand_ops.tension_progress(config, scoring)
 
     def hand_info(self) -> dict:
         from orca_ui.hand.operations import hand_ops
@@ -476,7 +476,6 @@ class HandService:
             "guided_tension": hand_ops.guided_tension_supported(),
             "last_tension": hand_ops.last_tension(config),
             "tension_progress": self._tension_progress(config),
-            "hand_id": self.supervisor.hand_id,
             "hand": self._hand_store_state_or_none(),
             "guided_tension_defaults": self._guided_tension_defaults(),
             "travel_baseline": self._travel_baseline(config),

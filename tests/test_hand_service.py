@@ -592,3 +592,20 @@ def test_a_session_is_ready_only_once_its_ready_hook_has_finished():
     finally:
         release_hook.set()
         svc.stop()
+
+
+def test_unfinished_tension_progress_is_found_by_the_hand_folder(tmp_path):
+    """Progress is filed under the hand's folder, the id the connect settled:
+    a detection that missed the board's identity must not hide it."""
+    from types import SimpleNamespace
+
+    from orca_core.maintenance.setup_file import write_section
+
+    from orca_ui.hand.operations import hand_ops
+
+    folder = tmp_path / "hands" / "ser-0001"
+    folder.mkdir(parents=True)
+    config = SimpleNamespace(hand_dir=str(folder))
+    write_section(config, "tension_progress",
+                  {"hands": {"ser-0001": {"rounds": 2, "best": {"index_pip": 0.8}}}})
+    assert hand_ops.tension_progress(config)["best"] == {"index_pip": 0.8}

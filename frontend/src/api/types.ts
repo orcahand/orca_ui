@@ -277,8 +277,6 @@ export interface HandStoreInfo {
 export interface HandInfo {
   model_name: string
   side: 'left' | 'right'
-  // The connected hand's identity (board serial), null in mock mode or before it is read.
-  hand_id?: string | null
   hand?: HandStoreInfo
   // The model has a tactile skin (drawn black), connected or not.
   tactile_skin?: boolean
@@ -476,7 +474,6 @@ export interface SweepLevels {
 
 export interface SweepListing {
   recorded_at: string
-  hand_key?: string | null
   motor_type?: string | null
   note?: string | null
   joints: string[]
@@ -505,7 +502,6 @@ export interface TravelBaselineSummary {
 export interface TravelSnapshot {
   recorded_at: string
   source: 'manual' | 'auto' | 'import' | string
-  hand_key?: string | null
   note?: string | null
   // A run that did not calibrate every finger joint: the other values are older.
   partial?: boolean
@@ -517,7 +513,7 @@ export interface TravelSnapshot {
   limits?: Record<string, [number, number]>
 }
 
-export interface TravelBaseline extends Omit<TravelSnapshot, 'ratios' | 'limits' | 'hand_key'> {
+export interface TravelBaseline extends Omit<TravelSnapshot, 'ratios' | 'limits'> {
   from_snapshot: string | null
 }
 

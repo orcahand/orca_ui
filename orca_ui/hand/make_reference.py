@@ -1,16 +1,14 @@
 """Turn one well-tensioned hand's records into the shipped setup reference.
 
-Reads a hand's setup.yaml (or the separate files it replaced), takes its
-tension sweep, manual calibration travel (and optionally its automatic one
+Reads a hand's setup.yaml, takes its tension sweep, manual calibration travel (and optionally its automatic one
 and a slack test), prints them against the reference shipped now for that
 hand type, and with ``--write`` replaces that type's entry in
 setup_reference.yaml::
 
     uv run --with-editable ../orca_core python -m orca_ui.hand.make_reference \\
-        --dir PATH/TO/MODEL/FOLDER --hand 0123456789ABCDEF --write
+        --dir ~/.orca/hands/0123456789ABCDEF --write
 
-PATH/TO/MODEL/FOLDER is where the hand's setup.yaml sits (beside its
-calibration.yaml). Without ``--sweep`` / ``--travel`` it takes the hand's own
+The folder is the hand's own, where orca_core keeps its setup.yaml. Without ``--sweep`` / ``--travel`` it takes the hand's own
 sweep reference (else its newest sweep) and its active travel baseline (else
 its newest full manual calibration).
 """
@@ -24,10 +22,11 @@ from datetime import date
 from types import SimpleNamespace
 
 import yaml
+from orca_core.hand_store import read_hand
 from orca_core.maintenance.setup_file import read_section
 
 from orca_ui.hand import reference as shipped
-from orca_ui.hand.models import model_data
+from orca_ui.hand.models import available_models, model_data
 from orca_ui.hand.sweeps import curves, decompose
 
 # What the shipped entry calls its hand: a real serial or board id never ships.
@@ -73,23 +72,21 @@ _Dumper.add_representer(
 )
 
 
-def _newest(records: dict, hand: str, ok=lambda r: True) -> tuple[str, dict] | None:
-    mine = [(k, r) for k, r in records.items() if r.get("hand_key") == hand and ok(r)]
+def _newest(records: dict, ok=lambda r: True) -> tuple[str, dict] | None:
+    mine = [(k, r) for k, r in records.items() if ok(r)]
     return max(mine, key=lambda kv: kv[1].get("recorded_at", "")) if mine else None
 
 
-def _pick(
-    records: dict, name: str | None, hand: str, ok=lambda r: True
-) -> tuple[str, dict]:
+def _pick(records: dict, name: str | None, ok=lambda r: True) -> tuple[str, dict]:
     if name:
         if name not in records:
             sys.exit(
                 f"no record named {name!r}; there are: {', '.join(sorted(records)) or 'none'}"
             )
         return name, records[name]
-    found = _newest(records, hand, ok)
+    found = _newest(records, ok)
     if found is None:
-        sys.exit(f"no record for hand {hand!r}")
+        sys.exit("no matching record")
     return found
 
 
@@ -109,32 +106,32 @@ def _row(joint: str, new, old, unit: str) -> str:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--dir", required=True, help="the model folder with the hand's setup.yaml")
-    parser.add_argument("--hand", required=True, help="the hand's board id (hand_key in the records)")
+    parser.add_argument("--dir", required=True, help="the hand's folder, with its setup.yaml")
     parser.add_argument("--sweep", help="sweep name (default: the hand's reference, else its newest)")
     parser.add_argument("--travel", help="travel snapshot or baseline the range check expects "
                         "(default: active baseline, else newest full manual calibration)")
     parser.add_argument("--travel-auto", help="automatic calibration snapshot kept beside it for comparison")
     parser.add_argument("--slack", help="slack test key, or 'latest' (default: none)")
-    parser.add_argument("--kind", help="hand type the reference is for (default: from the model folder)")
+    parser.add_argument("--kind", help="hand type the reference is for (default: from the hand's model)")
     parser.add_argument("--note", default="", help="why this hand is the reference")
     parser.add_argument("--write", action="store_true", help="replace this hand type's reference")
     args = parser.parse_args(argv)
 
-    folder = os.path.abspath(args.dir)
+    folder = os.path.abspath(os.path.expanduser(args.dir))
+    hand = os.path.basename(folder)
+    model = read_hand(folder).get("model")
     config = SimpleNamespace(
-        calibration_path=os.path.join(folder, "calibration.yaml"),
-        config_path=os.path.join(folder, "config.yaml"),
+        hand_dir=folder,
+        config_path=next((m.config_path for m in available_models() if m.name == model), ""),
     )
     kind = args.kind or shipped.hand_kind(config)
-    sweep_data = read_section(config, "tension_sweeps", legacy="tension_sweeps.yaml") or {}
-    travel_data = read_section(config, "travel_baselines", legacy="travel_baselines.yaml") or {}
-    slack_data = read_section(config, "slack_tests", legacy="slack_tests.yaml") or {}
+    sweep_data = read_section(config, "tension_sweeps") or {}
+    travel_data = read_section(config, "travel_baselines") or {}
+    slack_data = read_section(config, "slack_tests") or {}
 
     sweeps = sweep_data.get("sweeps") or {}
     marked = sweep_data.get("reference")
-    sweep_name = args.sweep or (marked if (sweeps.get(marked) or {}).get("hand_key") == args.hand else None)
-    sweep_name, sweep = _pick(sweeps, sweep_name, args.hand)
+    sweep_name, sweep = _pick(sweeps, args.sweep or (marked if marked in sweeps else None))
     family = sweep.get("motor_type") or "dynamixel"
 
     snapshots = travel_data.get("snapshots") or {}
@@ -142,17 +139,17 @@ def main(argv: list[str] | None = None) -> None:
     active = travel_data.get("active")
     travel_name = args.travel or (active if active in (travel_data.get("baselines") or {}) else None)
     if travel_name:
-        travel_name, travel_entry = _pick(named, travel_name, args.hand)
+        travel_name, travel_entry = _pick(named, travel_name)
     else:
         travel_name, travel_entry = _pick(
-            snapshots, None, args.hand, ok=lambda r: not r.get("partial") and r.get("source") == "manual"
+            snapshots, None, ok=lambda r: not r.get("partial") and r.get("source") == "manual"
         )
-    auto = _pick(snapshots, args.travel_auto, args.hand) if args.travel_auto else None
+    auto = _pick(snapshots, args.travel_auto) if args.travel_auto else None
     slack_test = None
     if args.slack:
         # Only tests made with the joint held count; they carry max_free_deg.
         slack_key, slack_test = _pick(
-            slack_data.get("tests") or {}, None if args.slack == "latest" else args.slack, args.hand,
+            slack_data.get("tests") or {}, None if args.slack == "latest" else args.slack,
             ok=lambda r: "max_free_deg" in (r.get("settings") or {}),
         )
 
@@ -174,7 +171,7 @@ def main(argv: list[str] | None = None) -> None:
     if not old_travel and os.path.exists(config.config_path):
         old_travel = model_data(config.config_path).get("joint_motor_travel_v21") or {}
 
-    print(f"reference for {family}:{kind}, hand {args.hand}")
+    print(f"reference for {family}:{kind}, hand {hand}")
     print(f"sweep {sweep_name}: mean friction, mA, against {(old.get('sweep') or {}).get('name') or 'nothing'}")
     for j, c in new_curves.items():
         print(_row(j, _friction(c), _friction(old_curves[j]) if j in old_curves else None, ""))

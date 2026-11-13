@@ -15,7 +15,6 @@ Section layout::
       manual_2026-10-15T18-44-02:
         recorded_at: "2026-10-15T16:44:02+00:00"
         source: manual            # manual | auto | import
-        hand_key: ser-0001
         travel: {index_pip: 101.69, ...}     # motor degrees between hardstops
         ratios: {index_pip: 0.0145, ...}     # motor rad per joint degree
         limits: {index_pip: [-1.23, 0.54], ...}
@@ -85,7 +84,6 @@ def snapshot_calibration(
     calibration,
     *,
     source: str,
-    hand_key: str | None = None,
     note: str | None = None,
     recorded_at: str | None = None,
     joints: list[str] | None = None,
@@ -113,7 +111,6 @@ def snapshot_calibration(
     entry = {
         "recorded_at": recorded_at,
         "source": source,
-        "hand_key": hand_key,
         "partial": bool(partial),
         "joints": list(joints) if joints is not None else None,
         "travel": travel_from_calibration(config, calibration),

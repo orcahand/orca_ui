@@ -8,6 +8,7 @@ themselves must not import orca_core directly.
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 from typing import Callable
@@ -300,7 +301,6 @@ def guided_tension(
     scoring: str | None = None,
     pass_fraction=None,
     pass_slack_deg=None,
-    hand_key: str | None = None,
     resume: bool = True,
     any_hardware: bool = False,
     forget=None,
@@ -329,7 +329,7 @@ def guided_tension(
         prompt_callback=prompt_callback,
         progress_callback=progress_callback,
         should_stop=should_stop,
-        hand_key=hand_key,
+        hand_key=_progress_key(hand.config),
         resume=resume,
         any_hardware=any_hardware,
         **settings,
@@ -395,7 +395,13 @@ def set_joint_currents(hand, current_for_joint) -> None:
     )
 
 
-def tension_progress(config, hand_key: str | None, scoring: str = "fraction") -> dict | None:
+def _progress_key(config) -> str | None:
+    """orca_core's key for a hand's tension progress: its folder's name, the id
+    the connect filed it under, whatever detection made of the board."""
+    return os.path.basename(config.hand_dir) if getattr(config, "hand_dir", "") else None
+
+
+def tension_progress(config, scoring: str = "fraction") -> dict | None:
     """This hand's unfinished guided tensioning under ``scoring``: the best
     fraction per joint (fraction) or the last round's scores (slack)."""
     from orca_ui.hand.hand_store import has_folder
@@ -407,7 +413,7 @@ def tension_progress(config, hand_key: str | None, scoring: str = "fraction") ->
     if not has_folder(config):
         return None
     try:
-        return read_progress(config, hand_key, scoring)
+        return read_progress(config, _progress_key(config), scoring)
     except Exception:
         logger.exception("reading the tension progress failed")
         return None

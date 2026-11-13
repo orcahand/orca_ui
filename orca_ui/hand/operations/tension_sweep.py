@@ -222,7 +222,7 @@ def _save(ctx: OpContext, config, report: dict, params: dict, family: str | None
     from orca_ui.hand.operations.guided_tension import motor_family
 
     try:
-        name = sweeps.save(config, params.get("name"), report, hand_key=ctx.service.supervisor.hand_id,
+        name = sweeps.save(config, params.get("name"), report,
                            note=params.get("note"), motor_type=family or motor_family(ctx.service))
         ctx.log(f"saved as {name}")
         return name

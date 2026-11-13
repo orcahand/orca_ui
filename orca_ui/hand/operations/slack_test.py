@@ -245,8 +245,7 @@ def _save(ctx: OpContext, config, report: dict, family: str | None) -> str | Non
     from orca_ui.hand.operations.guided_tension import motor_family
 
     try:
-        key = slack_tests.save(config, report, hand_key=ctx.service.supervisor.hand_id,
-                               motor_type=family or motor_family(ctx.service))
+        key = slack_tests.save(config, report, motor_type=family or motor_family(ctx.service))
         ctx.log("slack test saved" + (" — calibration is blocked until a passing test" if report["blocked"] else ""))
         return key
     except Exception as e:

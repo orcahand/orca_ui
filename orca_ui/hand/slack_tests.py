@@ -30,7 +30,7 @@ def _load(config) -> dict:
     return _normalize(read_records(config, SECTION))
 
 
-def save(config, report: dict, *, hand_key: str | None = None, motor_type: str | None = None) -> str:
+def save(config, report: dict, *, motor_type: str | None = None) -> str:
     """Store one slack test keyed by its time; the one it replaces goes to the archive."""
     saved = []
 
@@ -41,7 +41,6 @@ def save(config, report: dict, *, hand_key: str | None = None, motor_type: str |
             key += "+"
         data["tests"][key] = {
             "recorded_at": key.rstrip("+"),
-            "hand_key": hand_key,
             "motor_type": motor_type,
             **report,
         }

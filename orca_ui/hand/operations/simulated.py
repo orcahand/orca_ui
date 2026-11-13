@@ -179,7 +179,6 @@ def _snapshot_mock(ctx: OpContext, config, manual: bool, partial: bool = False) 
             config,
             SimpleNamespace(motor_limits_dict=limits, joint_to_motor_ratios_dict=ratios),
             source="manual" if manual else "auto",
-            hand_key=ctx.service.supervisor.hand_id,
             partial=partial,
         )
         ctx.log(f"travel snapshot saved as {name}")

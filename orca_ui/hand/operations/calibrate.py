@@ -474,7 +474,6 @@ def _snapshot_run(ctx: OpContext, config, calibration, manual: bool,
             config,
             calibration,
             source="manual" if manual else "auto",
-            hand_key=ctx.service.supervisor.hand_id,
             joints=joints,
             partial=partial,
         )

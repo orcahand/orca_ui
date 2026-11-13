@@ -674,7 +674,6 @@ class GuidedTensionOperation(_LiveCurrents):
                     scoring=self.scoring,
                     pass_fraction=self.pass_fraction,
                     pass_slack_deg=self.pass_slack_deg,
-                    hand_key=supervisor.hand_id,
                     resume=self.params.get("resume", True),
                     any_hardware=self.params.get("any_hardware", False),
                     forget=self.drain_again,

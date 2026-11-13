@@ -100,7 +100,6 @@ def save(
     name: str | None,
     report: dict,
     *,
-    hand_key: str | None = None,
     note: str | None = None,
     motor_type: str | None = None,
 ) -> str:
@@ -115,7 +114,6 @@ def save(
             raise KeyError(f"sweep {name!r} already exists; sweep datasets are never overwritten")
         data["sweeps"][name] = {
             "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "hand_key": hand_key,
             "motor_type": motor_type,
             "note": note,
             **report,
