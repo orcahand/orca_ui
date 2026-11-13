@@ -40,11 +40,18 @@ def test_status_reports_full_mock_capabilities(client):
     caps = status["capabilities"]
     assert caps["motors"] and caps["tactile"] and caps["encoders"]
     assert status["torque_enabled"] is False
+    assert {"hardware_version", "hardware_version_override", "board_hardware_version"} <= set(status)
 
 
 def test_hand_info_and_geometry(client):
     info = client.get("/api/hand/info").json()
     assert len(info["joints"]) == 17
+    # The hand menu, Calibrate step and notices read these.
+    hand = info["hand"]
+    assert {"id", "nickname", "calibration", "joint_ranges",
+            "board_calibration_newer", "legacy_files"} <= set(hand)
+    assert {"calibrated_at", "path", "previous_available", "previous_at"} <= set(hand["calibration"])
+    assert hand["joint_ranges"]["source"] in ("model", "measured")
     geometry = client.get("/api/tactile/geometry").json()
     assert set(geometry) == {"thumb", "index", "middle", "ring", "pinky"}
     assert geometry["index"]["frame"] == "sensor"

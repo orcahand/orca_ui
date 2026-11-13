@@ -33,7 +33,6 @@ from orca_core.hand_config import (
     OrcaHandConfig,
     OrcaHandTouchConfig,
     _resolve_config_path,
-    write_hardware_version,
 )
 from orca_core.utils.utils import read_yaml
 
@@ -43,6 +42,7 @@ from orca_core.hardware.sensing.serial_discovery import (
 )
 
 from orca_ui.hand.boards import detect_pinned_board
+from orca_ui.hand.hand_store import hardware_version_in_force, store_hand_id
 from orca_ui.hand.detection import (
     HardwarePresence,
     names_a_hand,
@@ -171,12 +171,14 @@ class HandSupervisor(threading.Thread):
         self._identity = None  # the full OrcaBoardInfo behind _hand_id
         # The hardware version the board last reported; None with no board.
         self._board_hardware_version: int | None = None
-        # What config.yaml pins (None = auto); a fresh load is still the pin.
+        # A version chosen in the console for this session only, and the hand
+        # (store id) it was chosen for: another hand never inherits it.
+        self._version_override: int | None = None
+        self._override_hand: str | None = None
         # Set while maintenance hands the bus back and the session is being
         # rebuilt, so a front-end can say so instead of showing the hand as
         # lost.
         self._leaving_maintenance = False
-        self._pinned_hardware_version: int | None = self.config.hardware_version
 
         self._lock = threading.Lock()
         self._session: Optional[HandSession] = None
@@ -236,44 +238,53 @@ class HandSupervisor(threading.Thread):
     def board_hardware_version(self) -> int | None:
         return self._board_hardware_version
 
+    @property
+    def hardware_version_override(self) -> int | None:
+        return self._version_override
+
     def set_hardware_version(self, version: int | None) -> None:
-        """Pin the hand's hardware version in its config.yaml, or (``None``)
-        put it back on ``auto`` so the board decides. Reconnects when the
-        version in force changes: the joint↔motor map is installed by connect.
+        """Run the connected hand as ``version`` for this session, or
+        (``None``) go back to the board's. Nothing is written anywhere.
+        Reconnects when the version in force changes: the joint↔motor map is
+        installed by connect.
         """
         with self._lock:
             if self._maintenance_kind is not None or self._in_maintenance:
                 raise HandBusyError(
                     "an operation holds the hand — stop it before changing "
                     "the hardware version")
-        written = write_hardware_version(self.config.config_path, version)
-        logger.info("hardware version %s in %s",
-                    "set to auto" if version is None else f"pinned to {version}", written)
+        self._version_override = normalize_hardware_version(version)
+        self._override_hand = self._store_hand_id() if version is not None else None
+        logger.info("hardware version %s for this session",
+                    "back to the board's" if version is None else f"set to {self._version_override}")
         if self._apply_hardware_version(self._board_hardware_version):
             self._teardown_session("hardware version changed — reconnecting")
             self._backoff = DETECT_BACKOFF_START_S
             self._wake.set()
         self._publish()
 
+    def _store_hand_id(self) -> str:
+        return store_hand_id(self._hand_id, self.model_name)
+
+    def _forget_override_of_another_hand(self) -> None:
+        if self._version_override is not None and self._override_hand != self._store_hand_id():
+            logger.info("hardware version choice for %s dropped: %s connected",
+                        self._override_hand, self._store_hand_id())
+            self._version_override = None
+            self._override_hand = None
+
     def _apply_hardware_version(self, board_version: int | None) -> bool:
-        """Put in force the version config.yaml pins, else the board's.
-        Returns True when that changed the config in force."""
+        """Put in force the session's choice, else the board's version, else
+        the model's. Returns True when that changed the config in force."""
         board_version = normalize_hardware_version(board_version)
         self._board_hardware_version = board_version
         if self._settings.bare:
             return False
         fresh = load_config(self.config.config_path)
-        version = fresh.hardware_version if fresh.hardware_version is not None else board_version
-        if (fresh.hardware_version is not None and board_version is not None
-                and fresh.hardware_version != board_version
-                and fresh.hardware_version != self._pinned_hardware_version):
-            logger.warning(
-                "the config pins hardware_version=%r (config.yaml or local_config.yaml), "
-                "so the board's %r is not used. Lift the pin to take the board's value.",
-                fresh.hardware_version, board_version)
-        if version == self.config.hardware_version and fresh.hardware_version == self._pinned_hardware_version:
+        version = hardware_version_in_force(
+            override=self._version_override, board=board_version, model=fresh.hardware_version)
+        if version == self.config.hardware_version:
             return False
-        self._pinned_hardware_version = fresh.hardware_version
         self._install_config(fresh.with_hardware_version(version))
         return True
 
@@ -318,7 +329,7 @@ class HandSupervisor(threading.Thread):
                 released=self._released,
                 board_pinned=self._board_pinned,
                 hardware_version=config.hardware_version,
-                hardware_version_pinned=self._pinned_hardware_version is not None,
+                hardware_version_override=self._version_override,
                 board_hardware_version=self._board_hardware_version,
             )
 
@@ -721,6 +732,7 @@ class HandSupervisor(threading.Thread):
         if identity is not None and self._board_pinned:
             # Kept so a later probe can start from it once the pinned CDC is held.
             self._pinned_identity = identity
+        self._forget_override_of_another_hand()
         self._apply_hardware_version(getattr(identity, "hw_version", None))
         config = self.config
         try:
@@ -990,8 +1002,6 @@ class HandSupervisor(threading.Thread):
 
         logger.info("hand identifies as %s (was %s) — switching model",
                     detection.model_name, self.model_name)
-        # The pin belongs to the model's own config, not the one it replaces.
-        self._pinned_hardware_version = config.hardware_version
         self._install_config(config)
         return True
 

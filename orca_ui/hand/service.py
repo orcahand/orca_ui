@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 from pathlib import Path
 
 from orca_ui.core_source import resolve_cached as resolve_core_source
-from orca_ui.hand import zeroing
+from orca_ui.hand import hand_store, zeroing
 from orca_ui.home import ui_home
 from orca_ui.hand.commands import CommandWorker
 from orca_ui.hand.presets import BUILTIN_POSES, BUILTIN_SEQUENCES
@@ -225,6 +225,11 @@ class HandService:
         # Gains connect() installed from config.yaml — what "reset" restores.
         # Live gains are read back from the controller, never shadowed here.
         self._config_gains: dict[str, dict] = {}
+        # Old per-hand files a session reported when its hand folder was
+        # created, kept until the operator dismisses the notice.
+        self._legacy_files: list[str] = []
+        # Board calibrations the operator chose not to take, as (hand, board sequence).
+        self._kept_over_board: set[tuple[str, object]] = set()
 
         self.supervisor = HandSupervisor(
             settings,
@@ -488,6 +493,7 @@ class HandService:
             "tension_progress": self._tension_progress(config),
             "tension_progress_slack": self._tension_progress(config, "slack"),
             "hand_id": self.supervisor.hand_id,
+            "hand": self.hand_store_state(),
             "guided_tension_defaults": self._guided_tension_defaults(),
             "travel_baseline": self._travel_baseline(config),
             "slack_estimate": self._slack_estimate(config),
@@ -625,8 +631,8 @@ class HandService:
         return self.boards()
 
     def set_hardware_version(self, version: int | None) -> dict:
-        """Pin the hardware version in config.yaml (``None`` = auto) and
-        reconnect if that changes the version in force."""
+        """Run the connected hand as ``version`` for this session (``None`` =
+        the board's), reconnecting if that changes the version in force."""
         if self.settings.bare:
             raise ServiceError(
                 "bare motor mode has no hand to version", status_code=409
@@ -642,9 +648,73 @@ class HandService:
             self.supervisor.set_hardware_version(version)
         except HandBusyError as e:
             raise ServiceError(str(e), status_code=409)
-        except OSError as e:
-            raise ServiceError(f"could not write config.yaml: {e}", status_code=500)
         return self.supervisor.status().as_dict()
+
+    # ----- the hand's own files (orca_core's hand store) ---------------------
+
+    def _store_hand(self, action: str):
+        """The connected hand, for an action on its files."""
+        session = self.session
+        if session is None or not session.caps.motors:
+            raise ServiceError(f"no hand is connected to {action}", status_code=409)
+        return session.hand
+
+    def _store_call(self, fn, *args):
+        try:
+            return fn(*args)
+        except hand_store.StoreUnavailable as e:
+            raise ServiceError(str(e), status_code=501)
+        except (OSError, ValueError) as e:
+            raise ServiceError(str(e), status_code=500)
+
+    def _replace_calibration(self, action: str, fn) -> dict:
+        """Swap the calibration on file and reconnect so the hand runs on it."""
+        manager = self._operation_manager
+        if manager is not None and manager.active():
+            raise ServiceError(f"an operation is running — stop it before you {action}",
+                               status_code=409)
+        written = self._store_call(fn, self._store_hand(action))
+        logger.warning("%s: %s", action, written)
+        self.supervisor.request_reconnect()
+        return {"written": written}
+
+    def hand_store_state(self) -> dict:
+        """The hand block of ``hand_info``, plus the notices it raises."""
+        session = self.session
+        hand = session.hand if session is not None and session.caps.motors else None
+        hand_id = hand_store.store_hand_id(self.supervisor.hand_id, self.supervisor.model_name)
+        state = hand_store.details(hand, hand_id)
+        newer = hand_store.board_calibration_newer(hand) if hand is not None else None
+        if newer and (hand_id, newer["board"].get("sequence")) in self._kept_over_board:
+            newer = None
+        state["board_calibration_newer"] = newer
+        state["legacy_files"] = list(self._legacy_files)
+        return state
+
+    def set_nickname(self, nickname: str | None) -> dict:
+        self._store_call(hand_store.set_nickname, self._store_hand("name"), nickname or None)
+        return self.hand_store_state()
+
+    def restore_previous_calibration(self) -> dict:
+        return self._replace_calibration(
+            "restore the previous calibration", hand_store.restore_previous_calibration)
+
+    def board_calibration_choice(self, use_board: bool) -> dict:
+        """``use it`` takes the board's newer calibration; ``keep`` hides the
+        banner for that board calibration until the console restarts."""
+        if use_board:
+            return self._replace_calibration(
+                "take the board's calibration", hand_store.adopt_board_calibration)
+        hand = self._store_hand("keep this computer's calibration")
+        newer = hand_store.board_calibration_newer(hand)
+        if newer:
+            hand_id = hand_store.store_hand_id(self.supervisor.hand_id, self.supervisor.model_name)
+            self._kept_over_board.add((hand_id, newer["board"].get("sequence")))
+        return {"written": None}
+
+    def dismiss_legacy_notice(self) -> dict:
+        self._legacy_files = []
+        return self.hand_store_state()
 
     def disconnect(self) -> dict:
         """Close the session and hold the ports free until Reconnect."""
@@ -838,6 +908,11 @@ class HandService:
             self._config_gains = config_gains
         self._publish_control_state()
         if session.caps.motors:
+            found = hand_store.legacy_files(session.hand)
+            if found:
+                logger.warning("older per-hand files were found and are not used: %s",
+                               ", ".join(found))
+                self._legacy_files = found
             self._apply_default_profile(session)
         if session.caps.tactile:
             try:

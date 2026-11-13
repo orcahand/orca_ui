@@ -88,10 +88,11 @@ class StatusSnapshot:
     # UI and only the absent ones are worth probing for.
     refused: tuple[str, ...] = ()
     rescanning: bool = False
-    # Hardware version in force (2 = v2.0, 21 = v2.1; None = unknown), whether
-    # config.yaml pins it, and what the board reports (None with no board).
+    # Hardware version in force (200 = v2.0, 210 = v2.1; None = unknown), the
+    # one chosen in the console for this session (None = not chosen), and what
+    # the board reports (None with no board).
     hardware_version: int | None = None
-    hardware_version_pinned: bool = False
+    hardware_version_override: int | None = None
     board_hardware_version: int | None = None
     # Bare motor mode: the config was synthesised from a bus scan, so there is
     # no hand behind it. Views that pose a hand or map joints are meaningless
@@ -127,6 +128,6 @@ class StatusSnapshot:
             "rescanning": self.rescanning,
             "bare": self.bare,
             "hardware_version": self.hardware_version,
-            "hardware_version_pinned": self.hardware_version_pinned,
+            "hardware_version_override": self.hardware_version_override,
             "board_hardware_version": self.board_hardware_version,
         }

@@ -296,9 +296,9 @@ def test_connect_derives_the_model_before_connecting(monkeypatch):
 # ----- hardware version ------------------------------------------------------
 
 
-def test_the_board_version_flips_the_left_thumb_and_a_pin_wins(tmp_path):
+def test_the_board_version_flips_the_left_thumb_and_a_session_choice_wins(tmp_path):
     """v2.1 left hands turn the thumb MCP/DIP motors the other way: the board's
-    version must reach the config, and a version pinned from the UI beats it."""
+    version must reach the config, and a version chosen in the UI beats it."""
     import shutil
 
     path = tmp_path / "config.yaml"
@@ -314,8 +314,7 @@ def test_the_board_version_flips_the_left_thumb_and_a_pin_wins(tmp_path):
     sup.set_hardware_version(200)
     assert sup.config.hardware_version == 200
     assert sup.config.joint_inversion_dict == v20
-    assert sup.status().hardware_version_pinned
+    assert sup.status().hardware_version_override == 200
 
     sup.set_hardware_version(None)
     assert sup.config.hardware_version == 210
-    assert "hardware_version: auto" in path.read_text()

@@ -186,10 +186,27 @@ def build_router(service: HandService) -> APIRouter:
 
     @router.post("/hardware_version")
     def hardware_version(body: schemas.HardwareVersionRequest):
-        """Pin the hand's hardware version in its config.yaml, or (null) back
-        to what the board reports. A hand on a plain adapter has no board, so
-        this is how it becomes v2.1."""
+        """Run the connected hand as this hardware version for the session, or
+        (null) as the board reports. Nothing is saved; another hand clears it."""
         return guard(service.set_hardware_version, body.version)
+
+    # ----- the hand's own files ----------------------------------------------
+
+    @router.post("/hand/nickname")
+    def hand_nickname(body: schemas.NicknameRequest):
+        return guard(service.set_nickname, body.nickname)
+
+    @router.post("/hand/calibration/restore_previous")
+    def hand_restore_previous_calibration():
+        return guard(service.restore_previous_calibration)
+
+    @router.post("/hand/calibration/board")
+    def hand_board_calibration(body: schemas.BoardCalibrationRequest):
+        return guard(service.board_calibration_choice, body.use_board)
+
+    @router.post("/hand/legacy_files/dismiss")
+    def hand_legacy_files_dismiss():
+        return guard(service.dismiss_legacy_notice)
 
     @router.post("/rescan")
     def rescan():
