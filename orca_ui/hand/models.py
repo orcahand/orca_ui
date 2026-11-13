@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from orca_core import load_config
 from orca_core.utils.utils import (
     _get_models_dir,
     _version_sort_key,
@@ -27,11 +28,10 @@ from orca_core.utils.utils import (
 def model_data(config_path: str) -> dict:
     """A model's ``config.yaml`` as plain data, values its generation shares included.
 
-    The one place the console reads a model file raw: once packaged configs
-    keep only what differs between models, orca_core's loader merges in the
-    shared values and this reads through it.
+    The one place the console reads a whole model file: packaged configs keep
+    only what differs between models, and orca_core's loader merges in the rest.
     """
-    return read_yaml(config_path) or {}
+    return load_config(config_path)
 
 
 @dataclass(frozen=True)

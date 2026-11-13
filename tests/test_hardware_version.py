@@ -10,10 +10,8 @@ import os
 from types import SimpleNamespace
 
 import orca_core
-import yaml
 from orca_core.constants import HARDWARE_VERSION_V21
 
-from orca_ui.hand.models import model_data
 from orca_ui.hand.supervisor import HandSupervisor
 from orca_ui.settings import UiSettings
 
@@ -24,10 +22,9 @@ THUMB = {"thumb_mcp", "thumb_dip"}
 
 
 def _supervisor(tmp_path, packaged):
-    path = tmp_path / "config.yaml"
-    path.write_text(yaml.safe_dump(model_data(packaged)))
-    settings = UiSettings(config_path=str(path), mock=False, open_browser=False)
-    return HandSupervisor(settings), str(path)
+    path = orca_core.write_standalone_config(str(tmp_path / "config.yaml"), packaged)
+    settings = UiSettings(config_path=path, mock=False, open_browser=False)
+    return HandSupervisor(settings), path
 
 
 def test_a_v21_board_puts_the_v21_map_in_force_on_a_left_hand(tmp_path):

@@ -299,13 +299,10 @@ def test_connect_derives_the_model_before_connecting(monkeypatch):
 def test_the_board_version_flips_the_left_thumb_and_a_session_choice_wins(tmp_path):
     """v2.1 left hands turn the thumb MCP/DIP motors the other way: the board's
     version must reach the config, and a version chosen in the UI beats it."""
-    import yaml
+    from orca_core import write_standalone_config
 
-    from orca_ui.hand.models import model_data
-
-    path = tmp_path / "config.yaml"
-    path.write_text(yaml.safe_dump(model_data(_resolve_config_path(None, model_name="orcahand-left"))))
-    settings = UiSettings(config_path=str(path), mock=False, open_browser=False)
+    path = write_standalone_config(str(tmp_path / "config.yaml"), model_name="orcahand-left")
+    settings = UiSettings(config_path=path, mock=False, open_browser=False)
     sup = HandSupervisor(settings)
     v20 = dict(sup.config.joint_inversion_dict)
 
