@@ -25,11 +25,12 @@ export function useTravelBaselines() {
     void refreshHandInfo()
   }, [])
   const modelName = useAppStore((s) => s.handInfo?.model_name)
+  const handId = useAppStore((s) => s.handInfo?.hand?.id)
   // A finished calibration adds a snapshot: refetch when one ends.
   const finishedRun = useOperationStore((s) =>
     s.operation?.kind === 'calibrate' && s.operation.state === 'done' ? s.operation.run_id : null,
   )
-  useEffect(() => refresh(), [refresh, modelName, finishedRun])
+  useEffect(() => refresh(), [refresh, modelName, handId, finishedRun])
   return { state, refresh }
 }
 
