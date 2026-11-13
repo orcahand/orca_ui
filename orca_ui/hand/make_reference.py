@@ -24,7 +24,7 @@ from types import SimpleNamespace
 import yaml
 from orca_core import load_config
 from orca_core.hand_store import read_hand
-from orca_core.maintenance.setup_file import read_section
+from orca_core.maintenance.setup_file import read_archive, read_section
 
 from orca_ui.hand import reference as shipped
 from orca_ui.hand.models import available_models
@@ -91,6 +91,11 @@ def _pick(records: dict, name: str | None, ok=lambda r: True) -> tuple[str, dict
     return found
 
 
+def _with_archive(config, section: str, records: dict | None) -> dict:
+    """``records`` with the ones the hand's archive keeps for ``section`` (setup.yaml's win)."""
+    return {**(read_archive(config, section) or {}), **(records or {})}
+
+
 def _friction(curve: dict) -> float | None:
     values = [v for v in decompose(curve)[1] if v is not None]
     return sum(values) / len(values) if values else None
@@ -130,15 +135,16 @@ def main(argv: list[str] | None = None) -> None:
     travel_data = read_section(config, "travel_baselines") or {}
     slack_data = read_section(config, "slack_tests") or {}
 
-    sweeps = sweep_data.get("sweeps") or {}
+    sweeps = _with_archive(config, "tension_sweeps", sweep_data.get("sweeps"))
     marked = sweep_data.get("reference")
     sweep_name, sweep = _pick(sweeps, args.sweep or (marked if marked in sweeps else None))
     family = sweep.get("motor_type") or "dynamixel"
 
-    snapshots = travel_data.get("snapshots") or {}
-    named = {**snapshots, **(travel_data.get("baselines") or {})}
+    snapshots = _with_archive(config, "travel_baselines-snapshots", travel_data.get("snapshots"))
+    named_baselines = _with_archive(config, "travel_baselines-baselines", travel_data.get("baselines"))
+    named = {**snapshots, **named_baselines}
     active = travel_data.get("active")
-    travel_name = args.travel or (active if active in (travel_data.get("baselines") or {}) else None)
+    travel_name = args.travel or (active if active in named_baselines else None)
     if travel_name:
         travel_name, travel_entry = _pick(named, travel_name)
     else:
@@ -150,7 +156,8 @@ def main(argv: list[str] | None = None) -> None:
     if args.slack:
         # Only tests made with the joint held count; they carry max_free_deg.
         slack_key, slack_test = _pick(
-            slack_data.get("tests") or {}, None if args.slack == "latest" else args.slack,
+            _with_archive(config, "slack_tests", slack_data.get("tests")),
+            None if args.slack == "latest" else args.slack,
             ok=lambda r: "max_free_deg" in (r.get("settings") or {}),
         )
 

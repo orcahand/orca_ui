@@ -147,8 +147,11 @@ def import_travel(
 def promote(
     config, snapshot: str, name: str, note: str | None = None, activate_it: bool = True
 ) -> dict:
-    """Name a snapshot as a baseline (and make it the active one by default)."""
+    """Name a snapshot as a baseline (and make it the active one by default);
+    returns the baseline stored, which the archive may already hold."""
     _check_name(name)
+    archived = archived_records(config, f"{SECTION}-baselines")
+    stored = {}
 
     def change(data: dict) -> None:
         entry = data["snapshots"].get(snapshot)
@@ -157,29 +160,36 @@ def promote(
                            "only the newest calibrations can become a baseline")
         if entry.get("partial"):
             raise ValueError(f"{snapshot} is a partial run; a baseline needs a full calibration")
-        if name in data["baselines"]:
+        if name in data["baselines"] or name in archived:
             raise KeyError(
                 f"baseline {name!r} already exists; baselines are never overwritten"
             )
-        data["baselines"][name] = {
-            "from_snapshot": snapshot,
-            "recorded_at": entry["recorded_at"],
-            "source": entry["source"],
-            "note": note,
-            "travel": dict(entry["travel"]),
-        }
+        stored.update(
+            from_snapshot=snapshot,
+            recorded_at=entry["recorded_at"],
+            source=entry["source"],
+            note=note,
+            travel=dict(entry["travel"]),
+        )
+        data["baselines"][name] = dict(stored)
         if activate_it:
             data["active"] = name
 
-    return _update(config, change)["baselines"][name]
+    _update(config, change)
+    return stored
 
 
 def activate(config, name: str | None) -> None:
-    """Make ``name`` the baseline guided tensioning scores against; None falls
-    back to the shared v2.1 block."""
+    """Make ``name`` the baseline guided tensioning scores against, bringing it
+    back from the archive if it was moved there; None falls back to the shared
+    v2.1 block."""
+    archived = archived_records(config, f"{SECTION}-baselines") if name is not None else {}
+
     def change(data: dict) -> None:
         if name is not None and name not in data["baselines"]:
-            raise KeyError(f"no baseline named {name!r}")
+            if not isinstance(archived.get(name), dict):
+                raise KeyError(f"no baseline named {name!r}")
+            data["baselines"][name] = dict(archived[name])
         data["active"] = name
 
     _update(config, change)
