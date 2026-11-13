@@ -101,10 +101,8 @@ class TestTheDismissal:
 
     @pytest.fixture(autouse=True)
     def state_dir(self, tmp_path, monkeypatch):
-        directory = tmp_path / "ui" / "changelog"
-        monkeypatch.setattr(changelog, "STATE_DIR", directory)
-        monkeypatch.setattr(changelog, "LEGACY_STATE_DIR", tmp_path / ".changelog")
-        return directory
+        monkeypatch.setenv("ORCA_HOME", str(tmp_path))
+        return tmp_path / "ui" / "changelog"
 
     def test_nothing_is_dismissed_before_anything_is_written(self, state_dir):
         assert changelog.seen_version() is None
@@ -142,18 +140,9 @@ class TestTheDismissal:
     def test_an_unwritable_directory_is_not_an_error(self, tmp_path, monkeypatch):
         blocked = tmp_path / "a-file"
         blocked.write_text("not a directory")
-        monkeypatch.setattr(changelog, "STATE_DIR", blocked / ".changelog")
+        monkeypatch.setenv("ORCA_HOME", str(blocked))
         assert changelog.set_seen("0.3.0") is None
         assert changelog.seen_version() is None
-
-    def test_an_older_dismissal_is_read_until_the_new_folder_exists(self, state_dir, tmp_path):
-        legacy = tmp_path / ".changelog"
-        legacy.mkdir()
-        (legacy / "ui-0.3.0.seen").write_text("dismissed")
-        assert changelog.seen_version() == "0.3.0"
-        changelog.set_seen(None)
-        assert changelog.seen_version() is None
-        assert (legacy / "ui-0.3.0.seen").exists()
 
     def test_clearing_leaves_anything_that_is_not_a_file(self, state_dir):
         state_dir.mkdir(parents=True)
@@ -171,11 +160,6 @@ class TestTheRoute:
         )
         with TestClient(create_app(settings)) as test_client:
             yield test_client
-
-    @pytest.fixture(autouse=True)
-    def state_dir(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(changelog, "STATE_DIR", tmp_path / "ui" / "changelog")
-        monkeypatch.setattr(changelog, "LEGACY_STATE_DIR", tmp_path / ".changelog")
 
     def test_ticking_and_unticking_round_trips_through_the_backend(self, client):
         assert client.get("/api/changelog").json()["dismissed"] is False

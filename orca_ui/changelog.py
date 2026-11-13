@@ -21,12 +21,6 @@ from orca_ui.home import ui_home
 
 CHANGELOG_PATH = Path(__file__).with_name("changelog.md")
 
-# None: the console's state folder. Only ever holds one indicator file.
-STATE_DIR: Path | None = None
-# Where consoles up to 0.5 kept it, beside the package. Read while the new
-# folder does not exist yet; never written or deleted.
-LEGACY_STATE_DIR = Path(__file__).resolve().parent.parent / ".changelog"
-
 _INDICATOR = re.compile(r"^ui-(\d+(?:\.\d+)*)\.seen$")
 
 _ENTRY = re.compile(
@@ -80,16 +74,13 @@ def latest_version(markdown: str | None = None) -> str | None:
 
 
 def _state_dir() -> Path:
-    return STATE_DIR or ui_home() / "changelog"
+    return ui_home() / "changelog"
 
 
 def seen_version() -> str | None:
     """The release whose notes were ticked away, read off the indicator file."""
-    folder = _state_dir()
-    if not folder.exists():
-        folder = LEGACY_STATE_DIR
     try:
-        names = [entry.name for entry in folder.iterdir() if entry.is_file()]
+        names = [entry.name for entry in _state_dir().iterdir() if entry.is_file()]
     except OSError:
         return None
     found = [m.group(1) for m in map(_INDICATOR.match, names) if m]
@@ -113,15 +104,14 @@ def _clear_state_dir() -> None:
 def set_seen(version: str | None) -> str | None:
     """Mark ``version`` dismissed, or clear the dismissal when given None.
 
-    The directory is emptied either way, so exactly one indicator can exist,
-    and created either way, so an older dismissal is no longer read.
+    The directory is emptied either way, so exactly one indicator can exist.
     """
     _clear_state_dir()
+    if version is None:
+        return None
     folder = _state_dir()
     try:
         folder.mkdir(parents=True, exist_ok=True)
-        if version is None:
-            return None
         (folder / f"ui-{version}.seen").write_text(
             f"The console's {version} release notes have been dismissed.\n"
             "Delete this file to have them open again.\n",
