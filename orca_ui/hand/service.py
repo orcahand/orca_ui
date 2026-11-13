@@ -640,6 +640,8 @@ class HandService:
 
     def _store_hand(self, action: str):
         """The connected hand, for an action on its files."""
+        if self.settings.bare:
+            raise ServiceError(f"bare motor mode has no hand files to {action}", status_code=409)
         session = self.session
         if session is None or not session.caps.motors:
             raise ServiceError(f"no hand is connected to {action}", status_code=409)
@@ -648,7 +650,8 @@ class HandService:
     def _store_call(self, fn, *args):
         try:
             return fn(*args)
-        except hand_store.StoreRefused as e:
+        except RuntimeError as e:
+            # StoreRefused, and orca_core's refusals (a calibration a newer orca_core wrote).
             raise ServiceError(str(e), status_code=409)
         except (OSError, ValueError) as e:
             raise ServiceError(str(e), status_code=500)
@@ -665,9 +668,13 @@ class HandService:
                                status_code=409)
         if self.supervisor.status().torque_enabled:
             raise ServiceError(f"turn torque off before you {action}", status_code=409)
-        written = self._store_call(fn, self._store_hand(action))
+        hand = self._store_hand(action)
+        try:
+            written = self._store_call(fn, hand)
+        finally:
+            # Even a failed swap may have changed the hand's calibration in memory.
+            self.supervisor.request_reconnect()
         logger.warning("%s: %s", action, written)
-        self.supervisor.request_reconnect()
         return {"written": written}
 
     def hand_store_state(self) -> dict | None:
