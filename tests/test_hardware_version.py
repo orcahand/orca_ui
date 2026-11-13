@@ -1,17 +1,19 @@
 """The board's hardware revision picks which joint-to-motor map a session runs,
-and the supervisor is the one place it is resolved: config.yaml's pin when it
-has one, else what the board reported, installed before any hand is built and
-re-applied (with a reconnect) when the pin changes.
+and the supervisor is the one place it is resolved: the version chosen in the
+console for this session, else what the board reported, installed before any
+hand is built and re-applied (with a reconnect) when the choice changes. A
+choice is never written anywhere and never follows the console to another hand.
 """
 
 import glob
 import os
-import shutil
+from types import SimpleNamespace
 
 import orca_core
+import yaml
 from orca_core.constants import HARDWARE_VERSION_V21
-from orca_core.hand_config import OrcaHandConfig, _resolve_config_path, write_hardware_version
 
+from orca_ui.hand.models import model_data
 from orca_ui.hand.supervisor import HandSupervisor
 from orca_ui.settings import UiSettings
 
@@ -23,7 +25,7 @@ THUMB = {"thumb_mcp", "thumb_dip"}
 
 def _supervisor(tmp_path, packaged):
     path = tmp_path / "config.yaml"
-    shutil.copy(packaged, path)
+    path.write_text(yaml.safe_dump(model_data(packaged)))
     settings = UiSettings(config_path=str(path), mock=False, open_browser=False)
     return HandSupervisor(settings), str(path)
 
@@ -39,7 +41,7 @@ def test_a_v21_board_puts_the_v21_map_in_force_on_a_left_hand(tmp_path):
     assert differing == THUMB
     assert sup.status().hardware_version == HARDWARE_VERSION_V21
     assert sup.status().board_hardware_version == HARDWARE_VERSION_V21
-    assert not sup.status().hardware_version_pinned
+    assert sup.status().hardware_version_override is None
 
 
 def test_a_v20_board_leaves_the_base_map(tmp_path):
@@ -68,14 +70,30 @@ def test_no_board_means_no_version(tmp_path):
     assert sup.status().hardware_version is None
 
 
-def test_a_pinned_version_wins_over_the_board_and_says_so(tmp_path, caplog):
+def test_a_session_choice_wins_over_the_board_and_writes_nothing(tmp_path):
     sup, path = _supervisor(tmp_path, LEFT)
-    write_hardware_version(path, HARDWARE_VERSION_V21)
-    with caplog.at_level("WARNING"):
-        sup._apply_hardware_version(2)
+    before = sorted(p.name for p in tmp_path.iterdir()), open(path).read()
+    sup._apply_hardware_version(2)
+    sup.set_hardware_version(HARDWARE_VERSION_V21)
     assert sup.config.hardware_version == HARDWARE_VERSION_V21
-    assert sup.status().hardware_version_pinned
-    assert "pins hardware_version=210" in caplog.text
+    assert sup.status().hardware_version_override == HARDWARE_VERSION_V21
+    assert sup.status().board_hardware_version == 200
+    sup.set_hardware_version(None)
+    assert sup.config.hardware_version == 200
+    assert (sorted(p.name for p in tmp_path.iterdir()), open(path).read()) == before
+
+
+def test_another_hand_connecting_drops_the_choice(tmp_path):
+    sup, _ = _supervisor(tmp_path, LEFT)
+    sup._identity = SimpleNamespace(serial="ser-1", board_id=None)
+    sup.set_hardware_version(HARDWARE_VERSION_V21)
+    sup._forget_override_of_another_hand()       # the same hand reconnects
+    assert sup.hardware_version_override == HARDWARE_VERSION_V21
+    sup._identity = SimpleNamespace(serial="ser-2", board_id=None)
+    sup._forget_override_of_another_hand()
+    sup._apply_hardware_version(2)
+    assert sup.hardware_version_override is None
+    assert sup.config.hardware_version == 200
 
 
 def test_auto_takes_the_board(tmp_path):
@@ -83,12 +101,3 @@ def test_auto_takes_the_board(tmp_path):
     assert sup.config.hardware_version is None
     sup._apply_hardware_version(HARDWARE_VERSION_V21)
     assert sup.config.hardware_version == HARDWARE_VERSION_V21
-
-
-def test_the_pin_is_in_force_straight_from_the_file(tmp_path):
-    """A hand loaded by path, not through load_hand, still gets the pinned map."""
-    sup, path = _supervisor(tmp_path, LEFT)
-    write_hardware_version(path, HARDWARE_VERSION_V21)
-    pinned = OrcaHandConfig.from_config_path(config_path=path)
-    base = OrcaHandConfig.from_config_path(config_path=LEFT)
-    assert {j for j in base.joint_ids if pinned.joint_inversion_dict[j] != base.joint_inversion_dict[j]} == THUMB

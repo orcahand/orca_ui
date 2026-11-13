@@ -1,8 +1,7 @@
 """Tactile zero-offset capture, persistence, and restore.
 
-Per-taxel offsets live under ``sensor_offsets`` in the model's
-``calibration.yaml`` — same convention as the original UI, so existing files
-keep working. Resultant offsets are a *separate* baseline under
+Per-taxel offsets live under ``sensor_offsets`` in the hand's
+``calibration.yaml`` (in its own folder; orca_core keeps keys it does not own). Resultant offsets are a *separate* baseline under
 ``resultant_offsets``: the sensor reports the resultant on the same
 single-byte-per-axis scale as one taxel, not as the sum of its taxels, so it
 cannot be derived from ``sensor_offsets``. Per-taxel noise gates live under
@@ -21,13 +20,8 @@ logger = logging.getLogger(__name__)
 
 
 def _calibration_path(session) -> str | None:
-    path = getattr(session.hand.config, "calibration_path", None)
-    if path:
-        return path
-    config_path = getattr(session.hand.config, "config_path", None)
-    if config_path:
-        return os.path.join(os.path.dirname(config_path), "calibration.yaml")
-    return None
+    """The hand's calibration file; None before the hand knows its folder."""
+    return getattr(session.hand.config, "calibration_path", None) or None
 
 
 def apply_saved_offsets(session) -> None:

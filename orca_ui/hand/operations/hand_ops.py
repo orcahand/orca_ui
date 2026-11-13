@@ -44,12 +44,16 @@ def build_maintenance_hand(
     stop_event: threading.Event,
     retry_s: float = 2.0,
     motor_port: str | None = None,
+    hardware_version: int | None = None,
 ):
     """Fresh motor-only OrcaHand for a maintenance operation.
 
     Built from the supervisor's config, so the hardware version in force (and
-    the joint map and travel features it selects) carries over. Always the
-    plain class — never the feedback subclass, whose joint loop refuses to
+    the joint map and travel features it selects) carries over, and so does
+    the hand's folder: what the operation records is filed under the hand the
+    session was connected to. ``hardware_version`` is the session's choice,
+    which the hand would otherwise settle afresh at connect. Always the plain
+    class — never the feedback subclass, whose joint loop refuses to
     calibrate. Port-open is retried briefly to absorb the OS serial release
     latency after the supervisor closed the session.
     """
@@ -57,8 +61,11 @@ def build_maintenance_hand(
 
     from orca_core import OrcaHand
 
+    from orca_ui.hand.hand_store import prepare_hand
+
     # A copy, so the port pin below never reaches the supervisor's config.
     hand = OrcaHand(config=copy.copy(config))
+    prepare_hand(hand, hardware_version)
     if motor_port and getattr(hand.config, "port", None) == "auto":
         # The lease already resolved the motor port, scoped to the pinned
         # board when one is pinned; connect() must not look beyond it.
@@ -344,6 +351,11 @@ def record_hold_tension(config) -> None:
     """Mark the hand tensioned after a plain hold-and-ratchet."""
     from orca_core.maintenance.guided_tension import record_hold_tension as record
 
+    from orca_ui.hand.hand_store import has_folder
+
+    if not has_folder(config):
+        logger.warning("hold tension not recorded: no hand folder is known")
+        return
     try:
         record(config)
     except Exception:
@@ -386,9 +398,13 @@ def set_joint_currents(hand, current_for_joint) -> None:
 def tension_progress(config, hand_key: str | None, scoring: str = "fraction") -> dict | None:
     """This hand's unfinished guided tensioning under ``scoring``: the best
     fraction per joint (fraction) or the last round's scores (slack)."""
+    from orca_ui.hand.hand_store import has_folder
+
     try:
         from orca_core.maintenance.guided_tension import read_progress
     except ImportError:
+        return None
+    if not has_folder(config):
         return None
     try:
         return read_progress(config, hand_key, scoring)
@@ -399,9 +415,13 @@ def tension_progress(config, hand_key: str | None, scoring: str = "fraction") ->
 
 def last_tension(config) -> dict | None:
     """The last guided tension that reached 100 %, or None (or a core without it)."""
+    from orca_ui.hand.hand_store import has_folder
+
     try:
         from orca_core.maintenance.guided_tension import read_last_tension
     except ImportError:
+        return None
+    if not has_folder(config):
         return None
     try:
         return read_last_tension(config)

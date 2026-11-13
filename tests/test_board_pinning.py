@@ -113,11 +113,10 @@ def test_a_pinned_console_starts_on_the_pinned_boards_model_not_another_hands(mo
     assert path.endswith("orcahand-right/config.yaml") and not pinned
 
 
-def test_a_hand_with_no_board_identity_is_not_judged_by_another_hands_slack_test(monkeypatch):
+def test_a_hand_with_no_board_identity_is_not_judged_by_another_hands_slack_test(monkeypatch, tmp_path):
     """The identity follows every connect: a hand with no board (or one that
     reports no identity) plugged in after a board hand must not inherit that
-    board's records. Its slack-test gate then reads only tests saved without an
-    identity, so another hand's test neither blocks nor clears it."""
+    board's folder, so another hand's slack test neither blocks nor clears it."""
     import dataclasses
     from types import SimpleNamespace
 
@@ -134,6 +133,8 @@ def test_a_hand_with_no_board_identity_is_not_judged_by_another_hands_slack_test
     board_hand = dataclasses.replace(
         PLAIN_LEFT, identity=OrcaBoardInfo(role="motor", side="left", serial="ser-0001"))
     plain_adapter = dataclasses.replace(PLAIN_LEFT, identity=None)
+    board_folder = tmp_path / "ser-0001"
+    board_folder.mkdir()
     # The last cases: the board's identity reply was missed and the fallback scan found
     # its motor port. It retries rather than connect as a hand with no identity, until
     # the third miss in a row, when it connects with the identity unknown.
@@ -148,13 +149,13 @@ def test_a_hand_with_no_board_identity_is_not_judged_by_another_hands_slack_test
                             lambda config, detection, **k: SimpleNamespace(detection=detection, motor_port=port))
         sup._try_connect()
         assert (sup.hand_id, len(connects)) == (hand_id, connected)
+        if hand_id:
+            # What a connected session of the board hand files the config under.
+            sup._set_hand_folder(str(board_folder), str(board_folder / "calibration.yaml"))
+            slack_tests.save(sup.config, {"blocked": True, "results": [
+                {"joint": "index_mcp", "status": "fail"}]})
+            assert slack_tests.calibration_block(sup.config)
+        else:
+            assert not sup.config.hand_dir
+            assert slack_tests.calibration_block(sup.config) is None
 
-    failing = {"blocked": True, "results": [{"joint": "index_mcp", "status": "fail"}]}
-    tests = {"t1": {"recorded_at": "2026-11-01T10:00:00", "hand_key": "ser-0001", **failing}}
-    monkeypatch.setattr(slack_tests, "read_section", lambda *a, **k: {"tests": tests})
-    assert slack_tests.calibration_block(None, "ser-0001")
-    assert slack_tests.calibration_block(None, None) is None
-    tests["t2"] = {"recorded_at": "2026-11-02T10:00:00", "hand_key": None, **failing}
-    assert slack_tests.calibration_block(None, None)
-    tests["t3"] = {"recorded_at": "2026-11-03T10:00:00", "hand_key": "ser-0002", "blocked": False, "results": []}
-    assert slack_tests.calibration_block(None, None) and slack_tests.calibration_block(None, "ser-0001")

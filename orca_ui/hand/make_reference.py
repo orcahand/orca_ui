@@ -27,6 +27,7 @@ import yaml
 from orca_core.maintenance.setup_file import read_section
 
 from orca_ui.hand import reference as shipped
+from orca_ui.hand.models import model_data
 from orca_ui.hand.sweeps import curves, decompose
 
 # What the shipped entry calls its hand: a real serial or board id never ships.
@@ -171,7 +172,7 @@ def main(argv: list[str] | None = None) -> None:
     old_curves = (old.get("sweep") or {}).get("curves") or {}
     old_travel = old.get("travel") or {}
     if not old_travel and os.path.exists(config.config_path):
-        old_travel = (yaml.safe_load(open(config.config_path)) or {}).get("joint_motor_travel_v21") or {}
+        old_travel = model_data(config.config_path).get("joint_motor_travel_v21") or {}
 
     print(f"reference for {family}:{kind}, hand {args.hand}")
     print(f"sweep {sweep_name}: mean friction, mA, against {(old.get('sweep') or {}).get('name') or 'nothing'}")

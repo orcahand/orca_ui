@@ -1,9 +1,12 @@
 """Named motor-travel baselines (the ``travel_baselines`` section of setup.yaml).
 
-orca_core keeps a single ``calibration.yaml`` per hand, so each calibration
-overwrites the last. This module snapshots every run beside it and lets the
-operator promote one snapshot to a named ground truth (``GT_01`` ...) that
-guided tensioning scores against instead of the shared v2.1 baseline.
+orca_core keeps a single ``calibration.yaml`` per hand (and the one before
+it), so each calibration overwrites the last. This module snapshots every run
+in the hand's folder and lets the operator promote one snapshot to a named
+ground truth (``GT_01`` ...) that guided tensioning scores against instead of
+the shared v2.1 baseline. setup.yaml keeps the newest snapshot, the newest
+complete one, the newest baseline and the active one; the rest go to the
+hand's archive, where they can be read but no longer promoted.
 
 Section layout::
 
@@ -26,7 +29,7 @@ import math
 import re
 from datetime import datetime, timezone
 
-from orca_core.maintenance.setup_file import read_section, update_section
+from orca_ui.hand.hand_store import archived_records, read_records, update_records
 
 SECTION = "travel_baselines"
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$")
@@ -47,7 +50,7 @@ def _normalize(data) -> dict:
 
 
 def _load(config) -> dict:
-    return _normalize(read_section(config, SECTION, legacy="travel_baselines.yaml"))
+    return _normalize(read_records(config, SECTION))
 
 
 def _update(config, change) -> dict:
@@ -58,7 +61,7 @@ def _update(config, change) -> dict:
         change(data)
         return data
 
-    return update_section(config, SECTION, apply, legacy="travel_baselines.yaml")
+    return update_records(config, SECTION, apply)
 
 
 def travel_from_calibration(config, calibration) -> dict[str, float]:
@@ -123,33 +126,6 @@ def snapshot_calibration(
     return name
 
 
-def snapshot_from_file(
-    config,
-    calibration_path: str,
-    *,
-    source: str,
-    recorded_at: str | None = None,
-    hand_key: str | None = None,
-    note: str | None = None,
-    partial: bool = False,
-) -> str:
-    """Snapshot a saved calibration.yaml (e.g. one rescued before an overwrite)."""
-    from orca_core.calibration import CalibrationResult
-
-    calibration = CalibrationResult.from_calibration_path(
-        calibration_path, config.motor_ids
-    )
-    return snapshot_calibration(
-        config,
-        calibration,
-        source=source,
-        hand_key=hand_key,
-        note=note,
-        recorded_at=recorded_at,
-        partial=partial,
-    )
-
-
 def import_travel(
     config,
     name: str,
@@ -180,7 +156,8 @@ def promote(
     def change(data: dict) -> None:
         entry = data["snapshots"].get(snapshot)
         if entry is None:
-            raise KeyError(f"no snapshot named {snapshot!r}")
+            raise KeyError(f"no snapshot named {snapshot!r} is kept for promotion: "
+                           "only the newest calibrations can become a baseline")
         if entry.get("partial"):
             raise ValueError(f"{snapshot} is a partial run; a baseline needs a full calibration")
         if name in data["baselines"]:
@@ -225,8 +202,13 @@ def active_travel(config) -> dict[str, float] | None:
 
 
 def state(config) -> dict:
-    """What the console shows: the active name plus every baseline and snapshot."""
+    """What the console shows: the active name plus every baseline and snapshot,
+    archived ones marked ``archived`` (readable, not promotable)."""
     data = _load(config)
+    for kind in ("snapshots", "baselines"):
+        for name, entry in archived_records(config, f"{SECTION}-{kind}").items():
+            if name not in data[kind] and isinstance(entry, dict):
+                data[kind][name] = {**entry, "archived": True}
     shared = {
         j: config.expected_motor_travel_deg(j, any_hardware=True)
         for j in config.joint_ids

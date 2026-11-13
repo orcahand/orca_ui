@@ -27,6 +27,7 @@ from orca_core.hardware.sensing.types import LinkHealth
 from orca_core import JointFeedbackConnectError, OrcaHand, OrcaHandJointFeedback
 
 from orca_ui.hand.detection import HardwarePresence, probe_hardware
+from orca_ui.hand.hand_store import prepare_hand
 from orca_ui.hand.states import Capabilities
 from orca_ui.settings import UiSettings
 
@@ -263,18 +264,20 @@ class HandSession:
 
 
 def connect_session(settings: UiSettings, config,
-                    presence: HardwarePresence | None = None) -> HandSession:
+                    presence: HardwarePresence | None = None,
+                    hardware_version: int | None = None) -> HandSession:
     """Connect at the best achievable tier.
 
     ``presence`` may be supplied by a caller that has already probed (the
     supervisor does, because the same probe decides which model ``config``
-    is); left out, this probes for itself.
+    is); left out, this probes for itself. ``hardware_version`` is the
+    session's choice, carried into the hand before it connects.
     """
     declared = declared_capabilities(config, settings.engage_feedback,
                                      motors_enabled=settings.motors_enabled)
 
     if settings.mock:
-        return _connect_mock(settings, config, declared)
+        return _connect_mock(settings, config, declared, hardware_version)
 
     if presence is None:
         presence = probe_hardware(config)
@@ -282,7 +285,7 @@ def connect_session(settings: UiSettings, config,
 
     if settings.motors_enabled and presence.motor_port:
         try:
-            return _connect_with_motors(settings, config, declared, presence)
+            return _connect_with_motors(settings, config, declared, presence, hardware_version)
         except SessionConnectError as motor_error:
             # A motor port that answers but won't connect (unpowered motors,
             # broken motor stack) must not block sensor viewing.
@@ -335,13 +338,15 @@ def _caps_from_hand(hand, declared: dict) -> Capabilities:
     )
 
 
-def _connect_mock(settings: UiSettings, config, declared: dict) -> HandSession:
+def _connect_mock(settings: UiSettings, config, declared: dict,
+                  hardware_version: int | None = None) -> HandSession:
     from orca_ui.mock import build_mock_hand
 
     # The config in force, not settings.config_path: the model can be changed
     # from the browser, and the mock has to simulate the hand now selected.
     hand = build_mock_hand(config.config_path,
                            engage_feedback=settings.engage_feedback)
+    prepare_hand(hand, hardware_version)
     try:
         ok, msg = hand.connect(interactive=False)
     except (JointFeedbackConnectError, RuntimeError) as e:
@@ -375,7 +380,8 @@ def _build_hand(settings: UiSettings, config, feedback: bool, tactile: bool):
                      detected_hardware_version=config.hardware_version)
 
 
-def _connect_with_motors(settings, config, declared, presence: HardwarePresence):
+def _connect_with_motors(settings, config, declared, presence: HardwarePresence,
+                         hardware_version: int | None = None):
     want_feedback = declared["feedback_loop"] and bool(presence.sensing.encoder)
     want_tactile = declared["tactile"] and bool(presence.sensing.tactile)
 
@@ -418,6 +424,7 @@ def _connect_with_motors(settings, config, declared, presence: HardwarePresence)
             if hand.config is config:
                 hand.config = copy.copy(config)
             object.__setattr__(hand.config, "sensor_port", presence.sensing.tactile)
+        prepare_hand(hand, hardware_version)
         try:
             ok, msg = hand.connect(interactive=False)
         except (JointFeedbackConnectError, RuntimeError) as e:

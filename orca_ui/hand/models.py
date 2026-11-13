@@ -24,6 +24,16 @@ from orca_core.utils.utils import (
 )
 
 
+def model_data(config_path: str) -> dict:
+    """A model's ``config.yaml`` as plain data, values its generation shares included.
+
+    The one place the console reads a model file raw: once packaged configs
+    keep only what differs between models, orca_core's loader merges in the
+    shared values and this reads through it.
+    """
+    return read_yaml(config_path) or {}
+
+
 @dataclass(frozen=True)
 class ModelEntry:
     """One bundled model, as offered in the picker."""

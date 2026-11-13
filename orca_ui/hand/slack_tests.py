@@ -2,22 +2,21 @@
 calibration gate they drive.
 
 Each run of the slack test (how far each finger motor turns while the operator
-holds its joint) is kept beside the hand's calibration with the hand it was
-made on. The newest test on a hand decides whether it may be calibrated: a
-joint with more than half a turn of slack would unspool its tendon under the
-calibration drive, so the hand has to be tensioned and tested again first.
+holds its joint) is kept in the hand's own folder: setup.yaml holds the newest,
+the archive the older ones. The newest test decides whether the hand may be
+calibrated: a joint with more than half a turn of slack would unspool its
+tendon under the calibration drive, so the hand has to be tensioned and tested
+again first.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from orca_core.maintenance.setup_file import read_section, update_section
-
 from orca_ui.hand import reference
+from orca_ui.hand.hand_store import archived_records, read_records, update_records
 
 SECTION = "slack_tests"
-KEEP = 50
 
 
 def _normalize(data) -> dict:
@@ -28,11 +27,11 @@ def _normalize(data) -> dict:
 
 
 def _load(config) -> dict:
-    return _normalize(read_section(config, SECTION, legacy="slack_tests.yaml"))
+    return _normalize(read_records(config, SECTION))
 
 
 def save(config, report: dict, *, hand_key: str | None = None, motor_type: str | None = None) -> str:
-    """Store one slack test keyed by its time; the oldest are dropped past ``KEEP``."""
+    """Store one slack test keyed by its time; the one it replaces goes to the archive."""
     saved = []
 
     def add(data) -> dict:
@@ -46,30 +45,25 @@ def save(config, report: dict, *, hand_key: str | None = None, motor_type: str |
             "motor_type": motor_type,
             **report,
         }
-        for old in sorted(data["tests"])[:-KEEP]:
-            del data["tests"][old]
         saved.append(key)
         return data
 
-    update_section(config, SECTION, add, legacy="slack_tests.yaml")
+    update_records(config, SECTION, add)
     return saved[-1]
 
 
-def latest_for_hand(config, hand_key: str | None) -> tuple[str, dict] | None:
-    """(key, test) of the newest slack test on ``hand_key``. With no hand key
-    (mock, no board, or a board without an identity) only tests saved without
-    one count, so another hand's test never blocks or clears this one."""
+def latest(config) -> tuple[str, dict] | None:
+    """(key, test) of the newest slack test on the hand ``config`` is filed under."""
     tests = _load(config)["tests"]
-    mine = [(k, t) for k, t in tests.items() if t.get("hand_key") == hand_key]
-    if not mine:
+    if not tests:
         return None
     # Two tests within the same second differ only by the key's suffix.
-    return max(mine, key=lambda kv: (kv[1].get("recorded_at", ""), kv[0]))
+    return max(tests.items(), key=lambda kv: (kv[1].get("recorded_at", ""), kv[0]))
 
 
-def summary(config, hand_key: str | None) -> dict | None:
+def summary(config) -> dict | None:
     """What the Setup tab shows for the hand's newest slack test."""
-    found = latest_for_hand(config, hand_key)
+    found = latest(config)
     if found is None:
         return None
     key, test = found
@@ -95,10 +89,10 @@ def summary(config, hand_key: str | None) -> dict | None:
     }
 
 
-def calibration_block(config, hand_key: str | None) -> str | None:
+def calibration_block(config) -> str | None:
     """Why the hand may not be calibrated, or None: the newest slack test found
     joints with more than half a turn of slack."""
-    found = latest_for_hand(config, hand_key)
+    found = latest(config)
     if found is None or not found[1].get("blocked"):
         return None
     joints = [r["joint"] for r in found[1].get("results") or [] if r.get("status") == "fail"]
@@ -109,10 +103,11 @@ def calibration_block(config, hand_key: str | None) -> str | None:
 
 
 def state(config) -> dict:
-    data = _load(config)
+    """Every slack test on the hand, newest first, archived ones included."""
+    tests = {**archived_records(config, SECTION), **_load(config)["tests"]}
     return {
         "tests": {
             k: {**t, "results": t.get("results") or []}
-            for k, t in sorted(data["tests"].items(), key=lambda kv: kv[1].get("recorded_at", ""), reverse=True)
+            for k, t in sorted(tests.items(), key=lambda kv: kv[1].get("recorded_at", ""), reverse=True)
         }
     }

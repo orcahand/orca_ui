@@ -15,6 +15,8 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from orca_ui.home import ui_home
+
 ShortString = Annotated[str, Field(max_length=300)]
 
 
@@ -35,7 +37,7 @@ class AssemblyProgress(BaseModel):
 
 
 def build_router(path: Path | None = None) -> APIRouter:
-    path = path or Path.home() / ".orca_ui" / "assembly-progress-v2.json"
+    path = path or ui_home() / "assembly-progress-v2.json"
     router = APIRouter(prefix="/api/assembly", tags=["assembly"])
     lock = threading.Lock()
 

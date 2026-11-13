@@ -38,11 +38,11 @@ export function useTravelBaselines() {
 export function CalibrationRecords() {
   const { state } = useTravelBaselines()
   const joints = useAppStore((s) => s.handInfo?.joints ?? [])
-  const handId = useAppStore((s) => s.handInfo?.hand_id ?? null)
+  const handId = useAppStore((s) => s.handInfo?.hand?.id ?? null)
   if (!state) return null
   const newest = (source: string) =>
     Object.entries(state.snapshots).find(
-      ([, snap]) => snap.source === source && !snap.partial && (!handId || snap.hand_key === handId),
+      ([, snap]) => snap.source === source && !snap.partial,
     )
   const manual = newest('manual')
   const auto = newest('auto')
@@ -79,8 +79,7 @@ export function CalibrationRecords() {
         })}
       </div>
       <p className="setup-copy dim">
-        motor travel between the hard stops, from the newest complete run of each kind on this hand; both are also kept
-        as calibration_manual.yaml and calibration_auto.yaml beside calibration.yaml
+        motor travel between the hard stops, from the newest complete run of each kind on this hand
       </p>
     </div>
   )

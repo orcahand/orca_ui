@@ -41,7 +41,7 @@ def test_a_disconnect_during_a_connect_in_flight_wins(monkeypatch):
     sup, _ = build("orcahand-right")
     fake = _FakeSession()
 
-    def connect_and_release(settings, config, presence=None):
+    def connect_and_release(settings, config, presence=None, **_):
         sup.disconnect()
         return fake
 

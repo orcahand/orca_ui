@@ -40,11 +40,18 @@ def test_status_reports_full_mock_capabilities(client):
     caps = status["capabilities"]
     assert caps["motors"] and caps["tactile"] and caps["encoders"]
     assert status["torque_enabled"] is False
+    assert {"hardware_version", "hardware_version_override", "board_hardware_version"} <= set(status)
 
 
 def test_hand_info_and_geometry(client):
     info = client.get("/api/hand/info").json()
     assert len(info["joints"]) == 17
+    # The hand menu, Calibrate step and notices read these.
+    hand = info["hand"]
+    assert {"id", "nickname", "calibration", "joint_ranges",
+            "board_calibration_newer", "legacy_files"} <= set(hand)
+    assert {"calibrated_at", "path", "previous_available", "previous_at"} <= set(hand["calibration"])
+    assert hand["joint_ranges"]["source"] in ("model", "measured")
     geometry = client.get("/api/tactile/geometry").json()
     assert set(geometry) == {"thumb", "index", "middle", "ring", "pinky"}
     assert geometry["index"]["frame"] == "sensor"
@@ -253,3 +260,19 @@ def test_stats_expose_the_command_feed(client):
                        json={"angles": {"index_mcp": 12.0}}).status_code == 200
     assert _wait_for(
         lambda: client.get("/api/stats").json()["command"]["writes"] > 0)
+
+
+def test_a_calibration_is_never_swapped_under_a_driven_hand(client):
+    """Restoring or adopting a calibration remaps every joint to its motor: with
+    torque on, a held target would suddenly mean another position."""
+    hand = client.post("/api/hand/nickname", json={"nickname": "bench left"}).json()
+    assert hand["nickname"] == "bench left"
+    assert client.get("/api/hand/info").json()["hand"]["nickname"] == "bench left"
+
+    assert client.post("/api/torque/enable").status_code == 200
+    refused = client.post("/api/hand/calibration/restore_previous")
+    assert refused.status_code == 409 and "torque" in refused.json()["detail"]
+    assert client.post("/api/hand/calibration/board", json={"choice": "use_board"}).status_code == 409
+    assert client.post("/api/torque/disable").status_code == 200
+    # Torque off, but no previous calibration is kept for this hand.
+    assert client.post("/api/hand/calibration/restore_previous").status_code == 409
