@@ -58,6 +58,7 @@ def validate_sweep_params(service, params: dict) -> dict:
     from orca_ui.hand.operations.guided_tension import motor_family
 
     ceiling = current_ceiling(service, motor_family(service))
+    check_ceiling(ceiling)
     settings = {}
     for key, (low, high) in SETTING_BOUNDS.items():
         if params.get(key) is None:
@@ -90,8 +91,23 @@ def current_ceiling(service, family: str | None) -> float | None:
     return hand_ops.current_ceiling(service.supervisor.config, family, service.max_current)
 
 
+def check_ceiling(ceiling: float | None) -> None:
+    """Refuse a sweep when the console's current limit is below a current setting's minimum."""
+    from orca_ui.hand.service import ServiceError
+
+    if ceiling is None:
+        return
+    for key, (low, _high) in SETTING_BOUNDS.items():
+        if key.endswith("_ma") and key != "deadband_ma" and ceiling < low:
+            raise ServiceError(
+                f"the console's current limit ({ceiling:g} mA) is below the sweep's minimum {key} "
+                f"({low:g} mA) — raise the limit to run a sweep",
+                status_code=409,
+            )
+
+
 def sweep_defaults(service, family: str | None = None) -> dict:
-    """SweepSettings defaults for the motor family, within this console's limits."""
+    """SweepSettings defaults for the motor family, never above this console's limits."""
     from orca_ui.hand.operations.guided_tension import motor_family
 
     family = family or motor_family(service)
@@ -106,7 +122,7 @@ def sweep_defaults(service, family: str | None = None) -> dict:
         lo, hi = SETTING_BOUNDS.get(key, (0.0, value))
         if ceiling is not None:
             hi = min(hi, ceiling)
-        defaults[key] = float(max(lo, min(value, hi)))
+        defaults[key] = float(min(max(lo, value), hi))
     return defaults
 
 
@@ -264,6 +280,7 @@ class TensionSweepOperation(Operation):
             self._hand = hand
             family = hand_ops.hand_family(hand)
             ctx.log(f"motor family: {family or 'unknown'}")
+            check_ceiling(current_ceiling(ctx.service, family))
             presenter.set_reference(sweeps.reference(supervisor.config, family))
             try:
                 report = hand_ops.tension_sweep(

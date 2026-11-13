@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from orca_ui.hand.operations.slack_test import current_options, validate_slack_params
-from orca_ui.hand.operations.tension_sweep import _describe, sweep_defaults
+from orca_ui.hand.operations.tension_sweep import _describe, sweep_defaults, validate_sweep_params
 from orca_ui.hand.service import ServiceError
 from orca_ui.mock import materialize_mock_model
 from orca_ui.server import create_app
@@ -149,6 +149,7 @@ def test_feetech_slack_test_offers_and_accepts_its_own_currents():
     pytest.param("dynamixel", None, (200.0, 300.0, 300.0), id="dynamixel"),
     pytest.param("feetech", None, (400.0, 600.0, 600.0), id="feetech"),
     pytest.param("dynamixel", 250, (200.0, 250.0, 250.0), id="console-limit"),
+    pytest.param("dynamixel", 40, (40.0, 40.0, 40.0), id="limit-below-minimum"),
 ])
 def test_sweep_defaults_come_from_the_motor_family(family, live_ma, expected):
     """In maintenance there is no session: a config left on ``default`` still
@@ -157,6 +158,18 @@ def test_sweep_defaults_come_from_the_motor_family(family, live_ma, expected):
     service = SimpleNamespace(session=None, max_current=live_ma, supervisor=SimpleNamespace(config=config))
     defaults = sweep_defaults(service, family)
     assert (defaults["hold_current_ma"], defaults["pose_current_ma"], defaults["sweep_current_ma"]) == expected
+
+
+def test_a_sweep_is_refused_when_the_limit_is_below_its_minimum_current():
+    hand = SimpleNamespace(config=SimpleNamespace(motor_type="dynamixel"))
+    session = SimpleNamespace(caps=SimpleNamespace(motors=True), hand=hand)
+    config = SimpleNamespace(joint_ids=[], max_current="default")
+    service = SimpleNamespace(session=session, max_current=40, supervisor=SimpleNamespace(config=config))
+    with pytest.raises(ServiceError, match="below the sweep's minimum") as refused:
+        validate_sweep_params(service, {})
+    assert refused.value.status_code == 409
+    service.max_current = 50
+    assert validate_sweep_params(service, {})["settings"] == {}
 
 
 def test_a_sweep_is_saved_and_scored_against_the_reference(client):
