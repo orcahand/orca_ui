@@ -443,7 +443,10 @@ function StepContent({
     return (
       <div className="gt-pane">
         <h3 className="gt-heading">Stopped</h3>
-        <p className="setup-copy">{operation.error ?? 'the run ended with an error'} — torque is off.</p>
+        <p className="setup-copy">
+          {operation.error ?? 'the run ended with an error'} —{' '}
+          {extra?.torque_off_failed ? 'some motors may still hold (see above).' : 'torque is off.'}
+        </p>
       </div>
     )
   }

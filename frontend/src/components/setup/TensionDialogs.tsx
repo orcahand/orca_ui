@@ -4,7 +4,9 @@
 // exists, to explain the step before any current flows; a hold started from
 // the sweep dialog shows inside that dialog instead.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { GuidedTensionExtra } from '../../api/types'
+import { useAppStore } from '../../state/appStore'
 import { isOperationActive, useOperationStore } from '../../state/operationStore'
 import { useTensionFlow } from '../../state/tensionFlow'
 import { GuidedTensionDialog } from './GuidedTensionDialog'
@@ -42,6 +44,24 @@ export function TensionDialogs() {
   useEffect(() => {
     if (active) setWatched(tension.run_id)
   }, [active, tension?.run_id])
+
+  // Motors left holding are reported after a stop, often once the dialog is
+  // gone (Cancel, Hide): the banner carries it whether or not the dialog is open.
+  const torqueOffFailed =
+    operation?.kind === 'guided_tension'
+      ? (operation.extra as GuidedTensionExtra | null)?.torque_off_failed
+      : undefined
+  const reported = useRef<string | null>(null)
+  useEffect(() => {
+    if (!torqueOffFailed || !operation || reported.current === operation.run_id) return
+    reported.current = operation.run_id
+    const named = torqueOffFailed.motors
+      .map((m, i) => `M${m}${torqueOffFailed.joints[i] ? ` (${torqueOffFailed.joints[i]})` : ''}`)
+      .join(', ')
+    useAppStore
+      .getState()
+      .setError(`Torque off was not confirmed on ${named}: they may still be holding. Press E-STOP or power-cycle the hand.`)
+  }, [torqueOffFailed, operation])
 
   // A finished run stays readable until closed; asking for the hold dialog
   // again means a new run, so a finished one must not come back in its place.
