@@ -1,7 +1,8 @@
 """Tactile zero-offset capture, persistence, and restore.
 
 Per-taxel offsets live under ``sensor_offsets`` in the hand's
-``calibration.yaml`` (in its own folder; orca_core keeps keys it does not own). Resultant offsets are a *separate* baseline under
+``calibration.yaml``, in its own folder (orca_core keeps keys it does not
+own). Resultant offsets are a *separate* baseline under
 ``resultant_offsets``: the sensor reports the resultant on the same
 single-byte-per-axis scale as one taxel, not as the sum of its taxels, so it
 cannot be derived from ``sensor_offsets``. Per-taxel noise gates live under

@@ -167,7 +167,7 @@ def simulate_manual_calibration(
 
 def _snapshot_mock(ctx: OpContext, config, manual: bool, partial: bool = False) -> None:
     """The mock writes no calibration, so snapshot the limits the mock hand runs
-    on — the console exercises the same promote/activate path as on hardware."""
+    on: the Calibrate step then shows a run's travel as it does on hardware."""
     from types import SimpleNamespace
 
     from orca_ui.hand import baselines
