@@ -225,9 +225,8 @@ class HandService:
         # Gains connect() installed from config.yaml — what "reset" restores.
         # Live gains are read back from the controller, never shadowed here.
         self._config_gains: dict[str, dict] = {}
-        # Board calibrations the operator chose not to take until the next
-        # connect, as (hand, board sequence, computer sequence).
-        self._kept_over_board: set[tuple] = set()
+        # The operator chose not to take the board's calibration until the next connect.
+        self._kept_over_board = False
 
         self.supervisor = HandSupervisor(
             settings,
@@ -672,12 +671,9 @@ class HandService:
         """The hand block of ``hand_info``, plus the notices it raises."""
         session = self.session
         hand = session.hand if session is not None and session.caps.motors else None
-        hand_id = self.supervisor.store_id
-        state = hand_store.details(hand, hand_id)
+        state = hand_store.details(hand, self.supervisor.store_id)
         newer = hand_store.board_calibration_newer(hand) if hand is not None else None
-        if newer and self._board_choice_key(hand_id, newer) in self._kept_over_board:
-            newer = None
-        state["board_calibration_newer"] = newer
+        state["board_calibration_newer"] = None if self._kept_over_board else newer
         state["legacy_files"] = hand_store.legacy_files(hand)
         return state
 
@@ -696,10 +692,6 @@ class HandService:
         return self._replace_calibration(
             "restore the previous calibration", hand_store.restore_previous_calibration)
 
-    @staticmethod
-    def _board_choice_key(hand_id: str, newer: dict) -> tuple:
-        return (hand_id, newer["board"].get("sequence"), newer["computer"].get("sequence"))
-
     def board_calibration_choice(self, choice: str) -> dict:
         """Answer the "board's calibration is newer" banner.
 
@@ -714,10 +706,7 @@ class HandService:
         if choice == "keep_until_change":
             self._store_call(hand_store.keep_computer_calibration, hand)
             return {"written": None}
-        newer = hand_store.board_calibration_newer(hand)
-        if newer:
-            hand_id = self.supervisor.store_id
-            self._kept_over_board.add(self._board_choice_key(hand_id, newer))
+        self._kept_over_board = True
         return {"written": None}
 
     def dismiss_legacy_notice(self) -> dict:
@@ -915,7 +904,7 @@ class HandService:
                     self._max_current = _current_or_none(hand_config.max_current)
             self._config_gains = config_gains
         self._publish_control_state()
-        self._kept_over_board.clear()  # the board banner asks again on every connect
+        self._kept_over_board = False  # the board banner asks again on every connect
         if session.caps.motors:
             self._apply_default_profile(session)
         if session.caps.tactile:
