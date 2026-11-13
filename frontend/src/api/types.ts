@@ -1182,12 +1182,18 @@ export interface OperationMotorFault extends HwErrorInfo {
   relatched?: boolean
 }
 
+// Motors that did not acknowledge torque off when a routine let go: they may
+// still hold. Any operation's `extra` may carry it (OpContext.torque_off_failed).
+export interface TorqueOffFailed {
+  motors: number[]
+  joints: (string | null)[]
+}
+
 export interface GuidedTensionExtra {
   step: TensionStep
   // The live spread sampler died this round: the spreads shown stopped updating.
   sampler_failed?: { round: number; error: string | null }
-  // Motors that did not acknowledge torque off at the end of the run: they may still hold.
-  torque_off_failed?: { motors: number[]; joints: (string | null)[] }
+  torque_off_failed?: TorqueOffFailed
   round: number
   motors: MotorSpread[]
   passed?: number

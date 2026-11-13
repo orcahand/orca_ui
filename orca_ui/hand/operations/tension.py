@@ -71,6 +71,8 @@ def run_tension(hand, ctx: OpContext, move_motors: bool, offset_deg: float | Non
         elif kind == "pulled":
             ctx.set_extra({"pulled_deg": event["total_deg"]})
             ctx.log(f"finger motors turned {event['total_deg']:g}° counterclockwise")
+        elif kind == "torque_off_failed":
+            ctx.torque_off_failed(event)
         elif kind == "winding_progress":
             ctx.set_detail(
                 f"winding pass {event['stage']}/{event['stages']}")

@@ -297,6 +297,54 @@ def test_a_stop_inside_the_routine_ends_the_run_as_a_stop(monkeypatch, op_name, 
     assert released == ["hand", "lease"] * 2
 
 
+def test_motors_left_holding_after_a_sweep_reach_the_log_and_stay_on_the_snapshot(monkeypatch):
+    """orca_core reports motors it could not switch torque off on while letting go;
+    they must reach the log and stay on ``extra`` (the console's banner reads it)
+    through the run's last publish."""
+    import threading
+
+    from orca_ui.hand import sweeps
+    from orca_ui.hand.operations import hand_ops, tension_sweep
+    from orca_ui.hand.operations.base import OpContext
+
+    class _Manager:
+        def __init__(self):
+            self.extra = None
+            self.lines = []
+
+        def update_snapshot(self, extra=None, **kwargs):
+            if extra is not None:
+                self.extra = dict(extra)
+
+        def append_log(self, line):
+            self.lines.append(line)
+
+        def snapshot(self):
+            return {"extra": self.extra}
+
+    def routine(hand, *, progress_callback, **kwargs):
+        progress_callback({"event": "torque_off_failed", "motors": [7], "joints": ["index_pip"]})
+        return {"results": []}
+
+    monkeypatch.setattr(hand_ops, "build_maintenance_hand", lambda *a, **k: SimpleNamespace())
+    monkeypatch.setattr(hand_ops, "disconnect", lambda hand: None)
+    monkeypatch.setattr(hand_ops, "tension_sweep", routine)
+    monkeypatch.setattr(sweeps, "reference", lambda config, family: None)
+    monkeypatch.setattr(tension_sweep, "_save", lambda *a: "sweep.yaml")
+    supervisor = SimpleNamespace(
+        config=SimpleNamespace(max_current="default", motor_type="dynamixel"), hand_id=None,
+        hardware_version_override=None,
+        enter_maintenance=lambda kind: SimpleNamespace(presence=None), exit_maintenance=lambda: None)
+    service = SimpleNamespace(session=None, max_current=None, supervisor=supervisor)
+    manager = _Manager()
+    ctx = OpContext(manager, service, None, threading.Event(), None)
+
+    tension_sweep.TensionSweepOperation({}).run(ctx)
+    assert manager.extra["step"] == "done"
+    assert manager.extra["torque_off_failed"] == {"motors": [7], "joints": ["index_pip"]}
+    assert any("motor 7 (index_pip)" in line and "E-STOP" in line for line in manager.lines)
+
+
 def test_a_sweep_that_stalls_before_the_stop_still_gets_a_log_line():
     line = _describe({"joint": "thumb_dip", "sense": "flex", "run": 1, "mean_ma": 585.0, "end_ma": None,
                       "deadband_deg": 0.0, "short_deg": 95.6})

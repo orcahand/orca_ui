@@ -404,6 +404,8 @@ def run_calibrate(
         elif kind == "calibration_aborted":
             progress["aborted"] = True
             ctx.log("calibration aborted — completed steps are persisted")
+        elif kind == "torque_off_failed":
+            ctx.torque_off_failed(event)
         elif kind == "joints_skipped":
             ctx.log(f"skipping {', '.join(event['joints'])}: {event['reason']}")
         elif kind == "travel_checked":

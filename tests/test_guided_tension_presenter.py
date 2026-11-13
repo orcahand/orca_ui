@@ -168,14 +168,10 @@ def test_rounds_count_on_from_the_saved_progress():
     assert fresh.extra["round"] == 1
 
 
-def test_a_dead_sampler_and_motors_left_holding_are_shown_and_logged():
-    """Spreads that stopped updating, and motors that never acknowledged torque
-    off at the end of the run, must reach the dialog and the log in plain words."""
+def test_a_dead_sampler_is_shown_and_logged():
+    """Spreads that stopped updating must reach the dialog and the log in plain words."""
     ctx = _Ctx()
     presenter = _Presenter(ctx, {})
     presenter.progress({"event": "sampler_failed", "round": 2, "error": "bus timeout"})
-    presenter.progress({"event": "torque_off_failed", "motors": [7], "joints": ["index_pip"]})
     assert ctx.extra["sampler_failed"] == {"round": 2, "error": "bus timeout"}
-    assert ctx.extra["torque_off_failed"] == {"motors": [7], "joints": ["index_pip"]}
     assert "no longer update" in ctx.lines[0]
-    assert "motor 7 (index_pip)" in ctx.lines[1] and "E-STOP" in ctx.lines[1]

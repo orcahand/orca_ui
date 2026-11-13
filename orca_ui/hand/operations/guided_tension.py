@@ -384,14 +384,7 @@ class _Presenter:
                 )
                 self._publish()
             elif kind == "torque_off_failed":
-                motors = list(event.get("motors") or [])
-                joints = list(event.get("joints") or [])
-                self._extra["torque_off_failed"] = {"motors": motors, "joints": joints}
-                named = ", ".join(f"motor {m}" + (f" ({j})" if j else "") for m, j in zip(motors, joints))
-                self._ctx.log(
-                    f"torque off was not confirmed on {named}: they may still be holding. "
-                    "Press E-STOP or power-cycle the hand."
-                )
+                self._ctx.torque_off_failed(event)
                 self._publish()
             elif kind == "cleanup_failed":
                 self._ctx.log(f"cleanup failed: {event.get('error')}")
