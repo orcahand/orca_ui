@@ -90,3 +90,8 @@ def test_with_orca_home_set_the_old_folder_is_not_moved(folders, monkeypatch, ca
     assert home.ui_home() == target
     assert _data(source) == EXPECTED and not source.is_symlink()
     assert str(source) in caplog.text
+    # ORCA_HOME spelled out as the default still moves.
+    monkeypatch.setenv("ORCA_HOME", "~/.orca")
+    monkeypatch.setattr(home, "_in_use", None)
+    assert home.prepare_ui_home() is not None
+    assert _data(source.parent / ".orca" / "ui") == EXPECTED

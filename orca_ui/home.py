@@ -20,7 +20,12 @@ _in_use: Path | None = None
 
 def orca_home() -> Path:
     value = os.environ.get("ORCA_HOME")
-    return Path(value).expanduser() if value else Path.home() / ".orca"
+    return Path(value).expanduser().absolute() if value else Path.home() / ".orca"
+
+
+def _custom_orca_home() -> bool:
+    """ORCA_HOME is set to something other than the default ``~/.orca``."""
+    return orca_home() != Path.home() / ".orca"
 
 
 def legacy_ui_home() -> Path:
@@ -35,13 +40,13 @@ def ui_home() -> Path:
 def prepare_ui_home(library_dir: str | None = None) -> str | None:
     """Move ``~/.orca_ui`` into place if needed and fix :func:`ui_home` for this run.
 
-    With ``ORCA_HOME`` set nothing is moved: a scratch ORCA_HOME must not take
-    the operator's library with it. Returns a line for the startup banner when
-    a move happened.
+    With ``ORCA_HOME`` set elsewhere than ``~/.orca`` nothing is moved: a scratch
+    ORCA_HOME must not take the operator's library with it. Returns a line for
+    the startup banner when a move happened.
     """
     global _in_use
     source, target = legacy_ui_home(), orca_home() / "ui"
-    if os.environ.get("ORCA_HOME"):
+    if _custom_orca_home():
         if source.exists() and not _points_at(source, target):
             logger.warning("ORCA_HOME is set, so %s was not moved and is not read; "
                            "this console keeps its state in %s", source, target)
