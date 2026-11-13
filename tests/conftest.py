@@ -7,11 +7,13 @@ from orca_ui.hand.operations import player
 
 @pytest.fixture(autouse=True)
 def _orca_home_in_tmp(tmp_path_factory, monkeypatch):
-    """No test reads or writes the real ~/.orca: the console's own state and
-    orca_core's hand store both live under ORCA_HOME. Mock hands get a folder
-    of their own per test (orca_core keeps one per process)."""
+    """No test reads or writes the real home folder: HOME (~/.orca_ui) and
+    ORCA_HOME (the console's own state and orca_core's hand store) are
+    scratch folders. Mock hands get a folder of their own per test (orca_core
+    keeps one per process)."""
     from orca_core import hand_store
 
+    monkeypatch.setenv("HOME", str(tmp_path_factory.mktemp("home")))
     monkeypatch.setenv("ORCA_HOME", str(tmp_path_factory.mktemp("orca-home")))
     monkeypatch.setattr(hand_store, "_mock_root", tmp_path_factory.mktemp("mock-hands"))
 

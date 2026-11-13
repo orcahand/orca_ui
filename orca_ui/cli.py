@@ -83,7 +83,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--slow-hz", type=float, default=1.0,
                         help="Sampling rate for temps/currents/stats "
                              "(motor-bus reads; default 1).")
-    parser.add_argument("--library-dir", type=str, default=None,
+    parser.add_argument("--library-dir", type=os.path.expanduser, default=None,
                         help="Pose/trajectory library root "
                              "(default ~/.orca/ui/library; $ORCA_HOME moves ~/.orca).")
     parser.add_argument("--teleop-dir", type=str, default=None,
