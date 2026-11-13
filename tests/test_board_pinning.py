@@ -111,3 +111,41 @@ def test_a_pinned_console_starts_on_the_pinned_boards_model_not_another_hands(mo
     path, pinned = cli.resolve_config_path(args)
     assert asked == ["/dev/cu.usbmodemXXXX"]
     assert path.endswith("orcahand-right/config.yaml") and not pinned
+
+
+def test_a_hand_with_no_board_identity_is_not_judged_by_another_hands_slack_test(monkeypatch):
+    """The identity follows every connect: a hand with no board (or one that
+    reports no identity) plugged in after a board hand must not inherit that
+    board's records. Its slack-test gate then reads only tests saved without an
+    identity, so another hand's test neither blocks nor clears it."""
+    import dataclasses
+    from types import SimpleNamespace
+
+    from orca_core.hardware.sensing.serial_discovery import OrcaBoardInfo
+
+    from orca_ui.hand import slack_tests
+    from test_model_detection import PLAIN_LEFT
+
+    sup, _ = build("orcahand-left")
+    monkeypatch.setattr(supervisor_mod, "oh_board_ports", lambda: ["/dev/motor"])
+    monkeypatch.setattr(supervisor_mod, "presence_from_detection",
+                        lambda config, detection, **k: SimpleNamespace(detection=detection))
+    monkeypatch.setattr(supervisor_mod, "connect_session",
+                        lambda *a, **k: (_ for _ in ()).throw(supervisor_mod.SessionConnectError("stop here")))
+    board_hand = dataclasses.replace(
+        PLAIN_LEFT, identity=OrcaBoardInfo(role="motor", side="left", serial="ser-0001"))
+    plain_adapter = dataclasses.replace(PLAIN_LEFT, identity=None)
+    for detected, hand_id in ((board_hand, "ser-0001"), (plain_adapter, None), (board_hand, "ser-0001")):
+        monkeypatch.setattr(supervisor_mod, "run_detection", lambda config, force=False: detected)
+        sup._try_connect()
+        assert sup.hand_id == hand_id
+
+    failing = {"blocked": True, "results": [{"joint": "index_mcp", "status": "fail"}]}
+    tests = {"t1": {"recorded_at": "2026-11-01T10:00:00", "hand_key": "ser-0001", **failing}}
+    monkeypatch.setattr(slack_tests, "read_section", lambda *a, **k: {"tests": tests})
+    assert slack_tests.calibration_block(None, "ser-0001")
+    assert slack_tests.calibration_block(None, None) is None
+    tests["t2"] = {"recorded_at": "2026-11-02T10:00:00", "hand_key": None, **failing}
+    assert slack_tests.calibration_block(None, None)
+    tests["t3"] = {"recorded_at": "2026-11-03T10:00:00", "hand_key": "ser-0002", "blocked": False, "results": []}
+    assert slack_tests.calibration_block(None, None) and slack_tests.calibration_block(None, "ser-0001")

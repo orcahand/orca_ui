@@ -28,7 +28,6 @@ import type {
   TeleopSourcesInfo,
   TrajectoryData,
   TensionSweeps,
-  TravelBaseline,
   TravelBaselines,
   TrajectoryEntry,
   ServoGains,
@@ -159,15 +158,6 @@ export const api = {
   sweepReference: (name: string | null) =>
     post<{ reference: string | null }>('/api/sweeps/reference', { name }),
   baselines: () => request<TravelBaselines>('/api/baselines'),
-  baselinePromote: (snapshot: string, name: string, note?: string, activate = true) =>
-    post<TravelBaseline & { name: string }>('/api/baselines/promote', {
-      snapshot,
-      name,
-      note: note || null,
-      activate,
-    }),
-  baselineActivate: (name: string | null) =>
-    post<{ active: string | null }>('/api/baselines/activate', { name }),
   operation: () =>
     request<{ operation: OperationSnapshot | null }>('/api/operation'),
   operationLog: () => request<OperationLogPayload>('/api/operation/log'),

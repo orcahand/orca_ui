@@ -165,8 +165,8 @@ class HandSupervisor(threading.Thread):
         # GIL only (str swap), like _model_pinned.
         self._board_pinned: str | None = settings.board or None
         self._pinned_identity = None
-        # The connected hand's serial (or board id) from its last detection;
-        # None in mock mode and for boards that report no identity.
+        # The connected hand's serial (or board id) from its last connect;
+        # None in mock mode, without a board, and for boards that report no identity.
         self._hand_id: str | None = None
         self._identity = None  # the full OrcaBoardInfo behind _hand_id
         # The hardware version the board last reported; None with no board.
@@ -711,9 +711,13 @@ class HandSupervisor(threading.Thread):
                 presence = presence_from_detection(self.config, detection)
         detection = getattr(presence, "detection", None)
         identity = getattr(detection, "identity", None)
-        if identity is not None and identity.hand_id:
-            self._hand_id = identity.hand_id
-            self._identity = identity
+        # Every connect says which hand this is: a board without an identity, or
+        # no board, must not inherit the last board's records.
+        hand_id = getattr(identity, "hand_id", None) or None
+        if hand_id != self._hand_id:
+            logger.info("hand identity %s -> %s", self._hand_id or "none", hand_id or "none")
+        self._hand_id = hand_id
+        self._identity = identity if hand_id else None
         if identity is not None and self._board_pinned:
             # Kept so a later probe can start from it once the pinned CDC is held.
             self._pinned_identity = identity

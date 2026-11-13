@@ -350,9 +350,10 @@ class HandService:
         """The winding current and choices for the connected motor family."""
         from orca_ui.hand.operations.guided_tension import motor_family
         from orca_ui.hand.operations.slack_test import current_options
+        from orca_ui.hand.operations.tension_sweep import current_ceiling
 
         family = motor_family(self)
-        return current_options(family) if family else None
+        return current_options(family, current_ceiling(self, family)) if family else None
 
     def _slack_test(self, config) -> dict | None:
         """The hand's newest slack test, and whether it blocks calibration."""

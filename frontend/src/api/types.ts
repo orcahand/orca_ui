@@ -270,7 +270,7 @@ export interface HandInfo {
   guided_tension?: boolean
   last_tension?: LastTension | null
   // Unfinished guided tensioning saved for this hand, per scoring: the best
-  // fraction per joint (ccc page) and the last round's slack scores (kai page).
+  // fraction per joint (fraction) and the last round's slack scores (slack).
   tension_progress?: TensionProgress | null
   tension_progress_slack?: TensionProgress | null
   // Present once this hand was calibrated after its last completed tensioning.
@@ -1155,6 +1155,8 @@ export interface MotorSpread {
   // Ratchet clicks the joint's slack still needs (rounded down); null while
   // the degrees per click are unknown.
   clicks_left?: number | null
+  // Never swept and nothing kept from earlier: no slack measured, no clicks suggested.
+  not_checked?: boolean
   // Latched error bits while the motor is limp; null when it holds.
   fault?: string[] | null
 }
@@ -1170,6 +1172,10 @@ export interface OperationMotorFault extends HwErrorInfo {
 
 export interface GuidedTensionExtra {
   step: TensionStep
+  // The live spread sampler died this round: the spreads shown stopped updating.
+  sampler_failed?: { round: number; error: string | null }
+  // Motors that did not acknowledge torque off at the end of the run: they may still hold.
+  torque_off_failed?: { motors: number[]; joints: (string | null)[] }
   round: number
   motors: MotorSpread[]
   passed?: number

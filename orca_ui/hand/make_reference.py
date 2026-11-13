@@ -7,7 +7,7 @@ hand type, and with ``--write`` replaces that type's entry in
 setup_reference.yaml::
 
     uv run --with-editable ../orca_core python -m orca_ui.hand.make_reference \\
-        --dir PATH/TO/MODEL/FOLDER --hand 7CFBEC24BE210835 --write
+        --dir PATH/TO/MODEL/FOLDER --hand 0123456789ABCDEF --write
 
 PATH/TO/MODEL/FOLDER is where the hand's setup.yaml sits (beside its
 calibration.yaml). Without ``--sweep`` / ``--travel`` it takes the hand's own
@@ -29,6 +29,9 @@ from orca_core.maintenance.setup_file import read_section
 from orca_ui.hand import reference as shipped
 from orca_ui.hand.sweeps import curves, decompose
 
+# What the shipped entry calls its hand: a real serial or board id never ships.
+SHIPPED_HAND_KEY = "reference-hand"
+
 HEADER = """\
 # What every hand of a type is scored against until it has a reference of its
 # own, made from one well-tensioned hand of that type by
@@ -41,7 +44,7 @@ HEADER = """\
 #   into clicks.
 # ratchet.sweep_share_per_click: how much one click raises a joint's sweep
 #   friction, as a share of the reference (one click measured +40 to +120 %
-#   on 7CFBEC24BE210835, 2026-10-21).
+#   on one hand, 2026-10-21).
 # ratchet.click_scale: the share of the estimate recommended per joint,
 #   below 1 where the plain estimate over-tensioned.
 # hands.<motor family>:<hand type>; a type without its own uses another of
@@ -193,7 +196,7 @@ def main(argv: list[str] | None = None) -> None:
     hands = dict(data.get("hands") or {})
     kept_scale = (hands.get(f"{family}:{kind}") or {}).get("sweep_scale")
     hands[f"{family}:{kind}"] = {
-        "hand_key": args.hand,
+        "hand_key": SHIPPED_HAND_KEY,
         "made": date.today().isoformat(),
         "note": args.note,
         "travel_from": travel_name,

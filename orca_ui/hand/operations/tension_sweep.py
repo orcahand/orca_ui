@@ -55,7 +55,9 @@ def validate_sweep_params(service, params: dict) -> dict:
         if not isinstance(joints, list) or not joints or not set(joints) <= known:
             raise ServiceError("joints must be a non-empty list of this hand's finger joints", status_code=422)
         clean["joints"] = list(joints)
-    ceiling = hand_ops.current_ceiling(config, session)
+    from orca_ui.hand.operations.guided_tension import motor_family
+
+    ceiling = current_ceiling(service, motor_family(service))
     settings = {}
     for key, (low, high) in SETTING_BOUNDS.items():
         if params.get(key) is None:
@@ -83,12 +85,18 @@ def validate_sweep_params(service, params: dict) -> dict:
     return clean
 
 
+def current_ceiling(service, family: str | None) -> float | None:
+    """The console's current limit in mA for a hand of ``family`` (see hand_ops.current_ceiling)."""
+    return hand_ops.current_ceiling(service.supervisor.config, family, service.max_current)
+
+
 def sweep_defaults(service, family: str | None = None) -> dict:
     """SweepSettings defaults for the motor family, within this console's limits."""
     from orca_ui.hand.operations.guided_tension import motor_family
 
-    defaults = hand_ops.sweep_setting_defaults(family or motor_family(service))
-    ceiling = hand_ops.current_ceiling(service.supervisor.config, service.session)
+    family = family or motor_family(service)
+    defaults = hand_ops.sweep_setting_defaults(family)
+    ceiling = current_ceiling(service, family)
     for key, value in list(defaults.items()):
         if value is None:
             del defaults[key]
@@ -256,14 +264,19 @@ class TensionSweepOperation(Operation):
             family = hand_ops.hand_family(hand)
             ctx.log(f"motor family: {family or 'unknown'}")
             presenter.set_reference(sweeps.reference(supervisor.config, family))
-            report = hand_ops.tension_sweep(
-                hand,
-                joints=self.params.get("joints"),
-                settings={**sweep_defaults(ctx.service, family), **(self.params.get("settings") or {})},
-                repeats=self.params.get("repeats", DEFAULT_REPEATS),
-                progress_callback=presenter.progress,
-                should_stop=ctx.stop_event.is_set,
-            )
+            try:
+                report = hand_ops.tension_sweep(
+                    hand,
+                    joints=self.params.get("joints"),
+                    settings={**sweep_defaults(ctx.service, family), **(self.params.get("settings") or {})},
+                    repeats=self.params.get("repeats", DEFAULT_REPEATS),
+                    progress_callback=presenter.progress,
+                    should_stop=ctx.stop_event.is_set,
+                )
+            except InterruptedError:
+                # orca_core's answer to should_stop: a stop, not a failure.
+                ctx.check_stop()
+                raise
             ctx.check_stop()
             saved = _save(ctx, supervisor.config, report, self.params, family)
             presenter.finish(saved)

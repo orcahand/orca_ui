@@ -139,12 +139,13 @@ def _travel_line(event: dict, note: str) -> str:
 
 def manual_capture_steps(config, joints: list[str] | None) -> list[dict]:
     """The steps a manual run asks for, in order; one answer records a whole step.
-    The wrist is always included; absent motors are trimmed by ManualCapture."""
-    sequence = (
-        getattr(config, "manual_calibration_sequence", None)
-        or config.calibration_sequence
-    )
-    steps = [dict(step["joints"]) for step in sequence]
+    The wrist is always included; absent motors are trimmed by ManualCapture.
+    Without a manual sequence, orca_core asks for one joint per step of the calibration sequence."""
+    manual = getattr(config, "manual_calibration_sequence", None)
+    if manual:
+        steps = [dict(step["joints"]) for step in manual]
+    else:
+        steps = [{j: d} for step in config.calibration_sequence for j, d in step["joints"].items()]
     if not any("wrist" in step for step in steps) and "wrist" in config.joint_ids:
         steps += [{"wrist": "flex"}, {"wrist": "extend"}]
     wanted = set(joints) if joints is not None else None
@@ -390,9 +391,12 @@ def run_calibrate(
                 ctx.log("travel: motor-shaft travel between the hardstops in degrees, against the "
                         "hand's joint_motor_travel baseline; mA: the current the joint was driven "
                         "onto its hardstops with")
-            for line in _drive_current_lines(
-                    event.get("drive_current_ma") or {},
-                    event.get("drive_current_previous_ma") or {}):
+            measured = event.get("drive_current_ma") or {}
+            # Only the joints driven this run; the rest of drive_current_ma carries over from earlier runs.
+            if "drive_current_measured_joints" in event:
+                driven = set(event["drive_current_measured_joints"] or ())
+                measured = {j: v for j, v in measured.items() if j in driven}
+            for line in _drive_current_lines(measured, event.get("drive_current_previous_ma") or {}):
                 ctx.log(line)
         elif kind == "calibration_aborted":
             progress["aborted"] = True
@@ -467,7 +471,7 @@ def _snapshot_run(ctx: OpContext, config, calibration, manual: bool,
             partial=partial,
         )
         ctx.log(
-            f"travel snapshot saved as {name} — promote it to a baseline from the Setup tab"
+            f"travel snapshot saved as {name}"
         )
     except Exception as e:
         ctx.log(f"travel snapshot not saved: {e}")

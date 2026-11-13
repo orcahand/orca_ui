@@ -73,7 +73,7 @@ def build_maintenance_hand(
         if ok:
             return hand
         if stop_event.is_set():
-            raise RuntimeError("stopped while connecting")
+            raise OperationStopped()
         if time.monotonic() >= deadline:
             raise RuntimeError(f"maintenance connect failed: {last_message}")
         time.sleep(0.25)
@@ -185,14 +185,21 @@ def hand_family(hand) -> str | None:
     return family if isinstance(family, str) else None
 
 
-def current_ceiling(config, session) -> float | None:
-    """The hand's own current limit in mA, or None if nothing numeric is known."""
-    value = getattr(config, "max_current", None)
-    if isinstance(value, (int, float)) and value > 0:
-        return float(value)
-    client = getattr(getattr(session, "hand", None), "motor_client", None)
-    family_max = getattr(type(client), "max_current_ma", None) if client is not None else None
-    return float(family_max) if isinstance(family_max, (int, float)) and family_max > 0 else None
+def current_ceiling(config, family: str | None, live_ma: float | None = None) -> float | None:
+    """The hand's current limit in mA: the console's live ceiling, else config.yaml's,
+    else ``family``'s own default for a config left on ``default``; None if none is known."""
+    for value in (live_ma, getattr(config, "max_current", None)):
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0:
+            return float(value)
+    if not family:
+        return None
+    from orca_core.hardware.motor_factory import motor_client_class
+
+    try:
+        default_ma = getattr(motor_client_class(family), "default_max_current_ma", None)
+    except ValueError:
+        return None
+    return float(default_ma) if isinstance(default_ma, (int, float)) and default_ma > 0 else None
 
 
 def slack_test_supported() -> bool:

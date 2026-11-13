@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from orca_core.maintenance.setup_file import read_section, write_section
+from orca_core.maintenance.setup_file import read_section, update_section
 
 from orca_ui.hand import reference
 
@@ -20,37 +20,47 @@ SECTION = "slack_tests"
 KEEP = 50
 
 
-def _load(config) -> dict:
-    data = read_section(config, SECTION, legacy="slack_tests.yaml") or {}
+def _normalize(data) -> dict:
     if not isinstance(data, dict):
         data = {}
     data.setdefault("tests", {})
     return data
 
 
+def _load(config) -> dict:
+    return _normalize(read_section(config, SECTION, legacy="slack_tests.yaml"))
+
+
 def save(config, report: dict, *, hand_key: str | None = None, motor_type: str | None = None) -> str:
     """Store one slack test keyed by its time; the oldest are dropped past ``KEEP``."""
-    data = _load(config)
-    key = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    while key in data["tests"]:
-        key += "+"
-    data["tests"][key] = {
-        "recorded_at": key.rstrip("+"),
-        "hand_key": hand_key,
-        "motor_type": motor_type,
-        **report,
-    }
-    for old in sorted(data["tests"])[:-KEEP]:
-        del data["tests"][old]
-    write_section(config, SECTION, data)
-    return key
+    saved = []
+
+    def add(data) -> dict:
+        data = _normalize(data)
+        key = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        while key in data["tests"]:
+            key += "+"
+        data["tests"][key] = {
+            "recorded_at": key.rstrip("+"),
+            "hand_key": hand_key,
+            "motor_type": motor_type,
+            **report,
+        }
+        for old in sorted(data["tests"])[:-KEEP]:
+            del data["tests"][old]
+        saved.append(key)
+        return data
+
+    update_section(config, SECTION, add, legacy="slack_tests.yaml")
+    return saved[-1]
 
 
 def latest_for_hand(config, hand_key: str | None) -> tuple[str, dict] | None:
-    """(key, test) of the newest slack test on ``hand_key``; with no hand key,
-    the newest test in the file (mock, or a board without an identity)."""
+    """(key, test) of the newest slack test on ``hand_key``. With no hand key
+    (mock, no board, or a board without an identity) only tests saved without
+    one count, so another hand's test never blocks or clears this one."""
     tests = _load(config)["tests"]
-    mine = [(k, t) for k, t in tests.items() if hand_key is None or t.get("hand_key") == hand_key]
+    mine = [(k, t) for k, t in tests.items() if t.get("hand_key") == hand_key]
     if not mine:
         return None
     # Two tests within the same second differ only by the key's suffix.

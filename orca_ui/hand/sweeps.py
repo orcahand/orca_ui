@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 
-from orca_core.maintenance.setup_file import read_section, write_section
+from orca_core.maintenance.setup_file import read_section, update_section
 
 from orca_ui.hand import reference as shipped_reference
 
@@ -46,13 +46,27 @@ RANK = {"none": 0, "over": 1, "ok": 2, "under": 3, "slack": 4, "low": 5}
 SLACK_DEG = 8.0
 
 
-def _load(config) -> dict:
-    data = read_section(config, SECTION, legacy="tension_sweeps.yaml") or {}
+def _normalize(data) -> dict:
     if not isinstance(data, dict):
         data = {}
     data.setdefault("sweeps", {})
     data.setdefault("reference", None)
     return data
+
+
+def _load(config) -> dict:
+    return _normalize(read_section(config, SECTION, legacy="tension_sweeps.yaml"))
+
+
+def _update(config, change) -> None:
+    """Apply ``change`` to the section in place, re-read and stored under setup.yaml's lock."""
+
+    def apply(data):
+        data = _normalize(data)
+        change(data)
+        return data
+
+    update_section(config, SECTION, apply, legacy="tension_sweeps.yaml")
 
 
 def next_name(config, prefix: str = DEFAULT_PREFIX) -> str:
@@ -85,39 +99,44 @@ def save(
     note: str | None = None,
     motor_type: str | None = None,
 ) -> str:
-    data = _load(config)
     name = name or dataset_name(config)
     if not NAME_RE.match(name):
         raise ValueError("sweep names are 1-40 characters: letters, digits, _ . -")
-    if name in data["sweeps"]:
-        raise KeyError(f"sweep {name!r} already exists; sweep datasets are never overwritten")
-    data["sweeps"][name] = {
-        "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "hand_key": hand_key,
-        "motor_type": motor_type,
-        "note": note,
-        **report,
-    }
-    write_section(config, SECTION, data)
+
+    def add(data: dict) -> None:
+        if name in data["sweeps"]:
+            raise KeyError(f"sweep {name!r} already exists; sweep datasets are never overwritten")
+        data["sweeps"][name] = {
+            "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "hand_key": hand_key,
+            "motor_type": motor_type,
+            "note": note,
+            **report,
+        }
+
+    _update(config, add)
     return name
 
 
 def set_reference(config, name: str | None) -> None:
-    data = _load(config)
-    if name is not None and name not in data["sweeps"]:
-        raise KeyError(f"no sweep dataset named {name!r}")
-    data["reference"] = name
-    write_section(config, SECTION, data)
+    def mark(data: dict) -> None:
+        if name is not None and name not in data["sweeps"]:
+            raise KeyError(f"no sweep dataset named {name!r}")
+        data["reference"] = name
+
+    _update(config, mark)
 
 
 def reference(config, family: str | None) -> tuple[str, dict] | None:
     """(name, dataset) the hand's sweeps are scored against: the saved sweep
-    marked as reference, else the shipped one for the motor ``family`` (a
-    dataset that carries ``curves`` instead of ``results``)."""
+    marked as reference when its motor family matches ``family`` (or either is
+    unknown), else the shipped one for ``family`` (a dataset that carries
+    ``curves`` instead of ``results``)."""
     data = _load(config)
     name = data.get("reference")
-    if name and name in data["sweeps"]:
-        return name, data["sweeps"][name]
+    marked = data["sweeps"].get(name) if name else None
+    if marked is not None and (not family or not marked.get("motor_type") or marked["motor_type"] == family):
+        return name, marked
     shipped = shipped_reference.sweep(config, family)
     return (shipped["name"], shipped) if shipped else None
 
@@ -303,14 +322,15 @@ def _clicks(joint: str, status: str, share: float, deadband: dict, ref_deadband:
 
 def state(config, family: str | None) -> dict:
     data = _load(config)
+    ref = reference(config, family)
     # Curves are large; the listing carries the levels, the full dataset is read by name.
     return {
         "sweeps": {
             n: {k: v for k, v in s.items() if k != "results"} | {"levels": levels(s.get("results") or [])}
             for n, s in sorted(data["sweeps"].items(), key=lambda kv: kv[1].get("recorded_at", ""), reverse=True)
         },
-        "reference": (reference(config, family) or (None,))[0],
-        "reference_shipped": data["reference"] not in data["sweeps"],
+        "reference": ref[0] if ref else None,
+        "reference_shipped": ref is None or ref[0] not in data["sweeps"],
         "next_name": next_name(config),
     }
 

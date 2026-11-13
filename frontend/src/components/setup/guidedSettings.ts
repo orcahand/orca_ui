@@ -1,7 +1,6 @@
 // Per-viewer guided-tensioning thresholds, remembered so a fine-tuned set
-// carries over to the next run. Fraction scoring (the ccc page) keeps a pass
-// fraction per joint group; slack scoring (the kai page) a slack tolerance in
-// motor degrees. Groups and bounds mirror PASS_GROUPS / PASS_BOUNDS_* in
+// carries over to the next run. Fraction scoring keeps a pass fraction per
+// joint group; slack scoring a slack tolerance in motor degrees. Groups and bounds mirror PASS_GROUPS / PASS_BOUNDS_* in
 // orca_ui/hand/operations/guided_tension.py.
 
 export type PassGroup = 'ap' | 'mcp' | 'pip'

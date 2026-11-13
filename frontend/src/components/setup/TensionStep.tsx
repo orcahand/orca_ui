@@ -14,7 +14,6 @@ import {
   useOperationStore,
   useStartGate,
 } from '../../state/operationStore'
-import type { SetupVariant } from '../../state/setupVariant'
 import { formatHardwareVersion, isV21Family, useTensionFlow } from '../../state/tensionFlow'
 import { FlowRowTitle, FlowStep, type StepState } from './FlowStep'
 import { jointGroup, loadPassFractions } from './guidedSettings'
@@ -26,8 +25,7 @@ const GUIDED_INFO =
 const SIMPLE_INFO =
   'The v2.0 protocol: activate the current so the motors hold every tendon, then ratchet each top spool clockwise until it clicks, aiming a little loose. Nothing is scored.'
 
-export function TensionStep({ state, variant }: { state: StepState; variant: SetupVariant }) {
-  const kai = variant === 'kai'
+export function TensionStep({ state }: { state: StepState }) {
   const gate = useStartGate('motors')
   const handInfo = useAppStore((s) => s.handInfo)
   const version = useAppStore((s) => s.status?.hardware_version ?? null)
@@ -50,7 +48,10 @@ export function TensionStep({ state, variant }: { state: StepState; variant: Set
       : (slackCurrent?.default_ma ?? null)
   const slackTest = handInfo?.slack_test ?? null
   const slackBlock = slackTest?.block ?? null
-  const slackMax = slackTest ? Math.max(0, ...Object.values(slackTest.results).map((r) => r.total_deg ?? 0)) : 0
+  const slackRows = slackTest ? Object.values(slackTest.results) : []
+  const slackTested = slackRows.filter((r) => r.status !== 'skipped')
+  const slackSkipped = slackRows.length - slackTested.length
+  const slackMax = Math.max(0, ...slackTested.map((r) => r.total_deg ?? 0))
   const slackClicks = slackTest ? clicksText(slackTest.results) : ''
   const runningKind = operation && isOperationActive(operation) ? operation.kind : null
   const slackState = slackBlock ? 'warn' : slackTest ? 'done' : 'next'
@@ -64,7 +65,7 @@ export function TensionStep({ state, variant }: { state: StepState; variant: Set
   // Guided tensioning is scored against the v2.1 travel baseline: v2.1 hands only.
   const guided = isV21 && handInfo?.guided_tension !== false
   const progress = guided
-    ? ((kai ? handInfo?.tension_progress_slack : handInfo?.tension_progress) ?? null)
+    ? (handInfo?.tension_progress ?? null)
     : null
   const last = handInfo?.last_tension ?? null
   const blocked = gate.blocked
@@ -73,7 +74,7 @@ export function TensionStep({ state, variant }: { state: StepState; variant: Set
   const startGuided = (resume: boolean) => void startGuidedTension({ resume }).catch(failToBanner)
 
   const chip = progress ? (
-    <ProgressChip progress={progress} kai={kai} />
+    <ProgressChip progress={progress} />
   ) : last ? (
     <span
       title={`Last tensioned ${new Date(last.completed_at).toLocaleString()} (${
@@ -110,7 +111,7 @@ export function TensionStep({ state, variant }: { state: StepState; variant: Set
                 <div className="calib-step-note">
                   {slackBlock
                     ? `${slackBlock}${slackClicks ? ` · ${slackClicks}` : ''}`
-                    : `passed ${shortDate(slackTest.recorded_at)} · most slack ${slackMax.toFixed(0)}°${slackClicks ? ` · ${slackClicks}` : ''}`}
+                    : `${slackSkipped ? `${slackSkipped} skipped, the rest passed` : 'passed'} ${shortDate(slackTest.recorded_at)} · most slack ${slackMax.toFixed(0)}°${slackClicks ? ` · ${slackClicks}` : ''}`}
                 </div>
               )}
             </span>
@@ -201,16 +202,7 @@ function clicksText(results: Record<string, SlackJoint>): string {
     .join(', ')
 }
 
-function ProgressChip({ progress, kai }: { progress: TensionProgress; kai: boolean }) {
-  if (kai) {
-    const joints = Object.values(progress.scores ?? {})
-    const passed = joints.filter((s) => s.status === 'pass').length
-    return (
-      <span title={`last round: ${passed} of ${joints.length} joints within tolerance · ${progress.rounds} round${progress.rounds === 1 ? '' : 's'} so far`}>
-        {passed}/{joints.length}
-      </span>
-    )
-  }
+function ProgressChip({ progress }: { progress: TensionProgress }) {
   const passes = loadPassFractions()
   const joints = Object.entries(progress.best ?? {})
   const passed = joints.filter(([joint, f]) => f >= passes[jointGroup(joint)]).length

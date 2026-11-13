@@ -12,7 +12,7 @@ Section layout::
       manual_2026-10-15T18-44-02:
         recorded_at: "2026-10-15T16:44:02+00:00"
         source: manual            # manual | auto | import
-        hand_key: ser-9097
+        hand_key: ser-0001
         travel: {index_pip: 101.69, ...}     # motor degrees between hardstops
         ratios: {index_pip: 0.0145, ...}     # motor rad per joint degree
         limits: {index_pip: [-1.23, 0.54], ...}
@@ -26,7 +26,7 @@ import math
 import re
 from datetime import datetime, timezone
 
-from orca_core.maintenance.setup_file import read_section, write_section
+from orca_core.maintenance.setup_file import read_section, update_section
 
 SECTION = "travel_baselines"
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$")
@@ -37,8 +37,7 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def _load(config) -> dict:
-    data = read_section(config, SECTION, legacy="travel_baselines.yaml") or {}
+def _normalize(data) -> dict:
     if not isinstance(data, dict):
         data = {}
     data.setdefault("active", None)
@@ -47,8 +46,19 @@ def _load(config) -> dict:
     return data
 
 
-def _save(config, data: dict) -> None:
-    write_section(config, SECTION, data)
+def _load(config) -> dict:
+    return _normalize(read_section(config, SECTION, legacy="travel_baselines.yaml"))
+
+
+def _update(config, change) -> dict:
+    """Apply ``change`` to the section in place, re-read and stored under setup.yaml's lock."""
+
+    def apply(data):
+        data = _normalize(data)
+        change(data)
+        return data
+
+    return update_section(config, SECTION, apply, legacy="travel_baselines.yaml")
 
 
 def travel_from_calibration(config, calibration) -> dict[str, float]:
@@ -109,9 +119,7 @@ def snapshot_calibration(
     }
     if note:
         entry["note"] = note
-    data = _load(config)
-    data["snapshots"][name] = entry
-    _save(config, data)
+    _update(config, lambda data: data["snapshots"].__setitem__(name, entry))
     return name
 
 
@@ -153,15 +161,14 @@ def import_travel(
 ) -> None:
     """Add a baseline straight from a travel table (no snapshot behind it)."""
     _check_name(name)
-    data = _load(config)
-    data["baselines"][name] = {
+    baseline = {
         "from_snapshot": None,
         "recorded_at": recorded_at or _now(),
         "source": source,
         "note": note,
         "travel": {j: round(float(t), 2) for j, t in travel.items()},
     }
-    _save(config, data)
+    _update(config, lambda data: data["baselines"].__setitem__(name, baseline))
 
 
 def promote(
@@ -169,37 +176,39 @@ def promote(
 ) -> dict:
     """Name a snapshot as a baseline (and make it the active one by default)."""
     _check_name(name)
-    data = _load(config)
-    entry = data["snapshots"].get(snapshot)
-    if entry is None:
-        raise KeyError(f"no snapshot named {snapshot!r}")
-    if entry.get("partial"):
-        raise ValueError(f"{snapshot} is a partial run; a baseline needs a full calibration")
-    if name in data["baselines"]:
-        raise KeyError(
-            f"baseline {name!r} already exists; baselines are never overwritten"
-        )
-    data["baselines"][name] = {
-        "from_snapshot": snapshot,
-        "recorded_at": entry["recorded_at"],
-        "source": entry["source"],
-        "note": note,
-        "travel": dict(entry["travel"]),
-    }
-    if activate_it:
-        data["active"] = name
-    _save(config, data)
-    return data["baselines"][name]
+
+    def change(data: dict) -> None:
+        entry = data["snapshots"].get(snapshot)
+        if entry is None:
+            raise KeyError(f"no snapshot named {snapshot!r}")
+        if entry.get("partial"):
+            raise ValueError(f"{snapshot} is a partial run; a baseline needs a full calibration")
+        if name in data["baselines"]:
+            raise KeyError(
+                f"baseline {name!r} already exists; baselines are never overwritten"
+            )
+        data["baselines"][name] = {
+            "from_snapshot": snapshot,
+            "recorded_at": entry["recorded_at"],
+            "source": entry["source"],
+            "note": note,
+            "travel": dict(entry["travel"]),
+        }
+        if activate_it:
+            data["active"] = name
+
+    return _update(config, change)["baselines"][name]
 
 
 def activate(config, name: str | None) -> None:
     """Make ``name`` the baseline guided tensioning scores against; None falls
     back to the shared v2.1 block."""
-    data = _load(config)
-    if name is not None and name not in data["baselines"]:
-        raise KeyError(f"no baseline named {name!r}")
-    data["active"] = name
-    _save(config, data)
+    def change(data: dict) -> None:
+        if name is not None and name not in data["baselines"]:
+            raise KeyError(f"no baseline named {name!r}")
+        data["active"] = name
+
+    _update(config, change)
 
 
 def active_baseline(config) -> tuple[str, dict] | None:
