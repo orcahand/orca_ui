@@ -142,9 +142,10 @@ def reference(config, family: str | None) -> tuple[str, dict] | None:
 
 
 def for_hand(config, hand_key: str | None) -> list[tuple[str, dict]]:
-    """(name, dataset) of every sweep on ``hand_key``, newest first."""
+    """(name, dataset) of every sweep on ``hand_key``, newest first. With no hand
+    key only sweeps saved without one count, as for slack tests."""
     sweeps = _load(config)["sweeps"]
-    mine = [(n, s) for n, s in sweeps.items() if hand_key is None or s.get("hand_key") == hand_key]
+    mine = [(n, s) for n, s in sweeps.items() if s.get("hand_key") == hand_key]
     return sorted(mine, key=lambda kv: kv[1].get("recorded_at", ""), reverse=True)
 
 

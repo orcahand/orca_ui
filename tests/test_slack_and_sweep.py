@@ -218,16 +218,19 @@ def test_estop_mid_sweep_releases_the_lease(client):
 
 def test_a_marked_reference_from_another_motor_family_is_not_used(monkeypatch):
     """Clicks scored against another family's load curves would be wrong: such a
-    marked reference gives way to the shipped one for the hand's family."""
+    marked reference gives way to the shipped one for the hand's family. Nor is a
+    hand with no identity scored by another hand's newest sweep."""
     from orca_ui.hand import reference as shipped
     from orca_ui.hand import sweeps
 
-    section = {"reference": "mine", "sweeps": {"mine": {"motor_type": "dynamixel", "results": []}}}
+    mine = {"motor_type": "dynamixel", "hand_key": "ser-0001", "results": []}
+    section = {"reference": "mine", "sweeps": {"mine": mine}}
     monkeypatch.setattr(sweeps, "read_section", lambda *a, **k: section)
     monkeypatch.setattr(shipped, "sweep", lambda config, family: {"name": f"shipped-{family}"})
     assert sweeps.reference(None, "dynamixel")[0] == "mine"
     assert sweeps.reference(None, None)[0] == "mine"
     assert sweeps.reference(None, "feetech")[0] == "shipped-feetech"
+    assert sweeps.for_hand(None, "ser-0001") == [("mine", mine)] and sweeps.for_hand(None, None) == []
 
 
 @pytest.mark.parametrize("op_name, routine", [
