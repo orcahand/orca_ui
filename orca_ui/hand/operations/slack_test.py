@@ -204,6 +204,9 @@ class _Presenter:
                 self._publish()
             elif kind == "cleanup_failed":
                 self._ctx.log(f"cleanup failed: {event.get('error')}")
+            elif kind == "torque_off_failed":
+                self._ctx.torque_off_failed(event)
+                self._publish()
 
     def finish(self, report: dict, saved: str | None) -> None:
         skipped = [r["joint"] for r in report["results"] if r["status"] == "skipped"]
