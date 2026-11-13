@@ -414,6 +414,11 @@ class _Presenter:
             slack = motor["expected_deg"] * max(0.0, 1.0 - motor["fraction"])
         return {**motor, "clicks_left": reference.clicks_for_slack(slack, motor["joint"])}
 
+    def retested(self, joints: set[str]) -> None:
+        """Joints whose pass was dropped: unchecked until their stage's next range check."""
+        with self._lock:
+            self._checked -= joints
+
     def _set_fault(self, motor: int, joint, flags: list, relatched: bool = False) -> None:
         info = classify_hw_error(flags, motor=motor, joint=joint)
         faults = dict(self._extra.get("faults") or {})
@@ -583,6 +588,8 @@ class _LiveCurrents(Operation):
         """The joints asked to be tested again since the last call."""
         with self._again_lock:
             joints, self._again = self._again, set()
+        if joints and self._presenter is not None:
+            self._presenter.retested(joints)
         return joints
 
     def handle_input(self, value: str) -> bool:

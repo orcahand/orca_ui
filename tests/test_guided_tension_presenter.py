@@ -70,6 +70,14 @@ def test_the_score_sheet_carries_exclusions_and_suggests_no_clicks_for_unswept_j
                                    {**row, "joint": "middle_mcp", "kept": 0.0}]})
     assert all(m["not_checked"] and m["clicks_left"] is None for m in ctx.extra["motors"])
 
+    # A joint tested again is unchecked until it is measured again, not a whole travel short.
+    presenter.progress({"event": "step", "step": "range", "round": 2, "stage": stage,
+                        "stage_index": 0, "stage_count": 1})
+    presenter.retested({"index_mcp"})
+    presenter.progress({"event": "spread", "round": 2, "passed": 0, "scored": 1, "fraction": 0.0,
+                        "motors": [{**row, "joint": "index_mcp"}]})
+    assert ctx.extra["motors"][0]["not_checked"] is True
+
 
 def test_a_latched_motor_is_shown_until_its_reboot_clears_it(monkeypatch):
     """The routine names a latched motor; the dialog must show it with what to
