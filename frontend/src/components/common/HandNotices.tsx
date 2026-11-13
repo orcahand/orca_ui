@@ -41,7 +41,7 @@ function BoardCalibrationNotice() {
       <button
         className="btn btn-secondary btn-sm"
         disabled={working}
-        title="Hidden until the hand next connects."
+        title="Hidden until you disconnect or another hand connects."
         onClick={() => answer('keep_session')}
       >
         keep this computer's

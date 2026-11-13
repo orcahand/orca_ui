@@ -225,7 +225,8 @@ class HandService:
         # Gains connect() installed from config.yaml — what "reset" restores.
         # Live gains are read back from the controller, never shadowed here.
         self._config_gains: dict[str, dict] = {}
-        # The operator chose not to take the board's calibration until the next connect.
+        # The operator chose not to take the board's calibration until another
+        # hand connects or a Disconnect.
         self._kept_over_board = False
         # The hand the hand block describes: the connected one, else the last to
         # connect, until a Disconnect.
@@ -701,7 +702,7 @@ class HandService:
         """Answer the "board's calibration is newer" banner.
 
         ``use_board`` takes the board's calibration; ``keep_session`` hides the
-        banner until the next connect; ``keep_until_change`` has orca_core
+        banner until a Disconnect or another hand connects; ``keep_until_change`` has orca_core
         remember the choice until either side's calibration changes.
         """
         if choice == "use_board":
@@ -910,8 +911,11 @@ class HandService:
                     self._max_current = _current_or_none(hand_config.max_current)
             self._config_gains = config_gains
         self._publish_control_state()
-        self._last_hand_id = getattr(session.hand, "hand_id", None)
-        self._kept_over_board = False  # the board banner asks again on every connect
+        hand_id = getattr(session.hand, "hand_id", None)
+        if hand_id != self._last_hand_id:
+            # Another hand, or the first since a Disconnect: the board banner asks again.
+            self._kept_over_board = False
+        self._last_hand_id = hand_id
         if session.caps.motors:
             self._apply_default_profile(session)
         if session.caps.tactile:
