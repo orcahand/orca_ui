@@ -54,7 +54,9 @@ export function TensionStep({ state }: { state: StepState }) {
   const slackMax = Math.max(0, ...slackTested.map((r) => r.total_deg ?? 0))
   const slackClicks = slackTest ? clicksText(slackTest.results) : ''
   const runningKind = operation && isOperationActive(operation) ? operation.kind : null
-  const slackState = slackBlock ? 'warn' : slackTest ? 'done' : 'next'
+  // A test whose every joint was skipped measured nothing: it does not count as done.
+  const slackNone = !!slackTest && slackTested.length === 0
+  const slackState = slackBlock ? 'warn' : slackTest && !slackNone ? 'done' : 'next'
   const tensionState = slackBlock ? 'todo' : 'next'
   useEffect(() => {
     if (!confirmRestart) return
@@ -111,6 +113,8 @@ export function TensionStep({ state }: { state: StepState }) {
                 <div className="calib-step-note">
                   {slackBlock
                     ? `${slackBlock}${slackClicks ? ` · ${slackClicks}` : ''}`
+                    : slackNone
+                    ? `nothing tested ${shortDate(slackTest.recorded_at)} · all ${slackSkipped} joints skipped`
                     : `${slackSkipped ? `${slackSkipped} skipped, the rest passed` : 'passed'} ${shortDate(slackTest.recorded_at)} · most slack ${slackMax.toFixed(0)}°${slackClicks ? ` · ${slackClicks}` : ''}`}
                 </div>
               )}
