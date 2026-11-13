@@ -80,17 +80,24 @@ def test_a_session_choice_wins_over_the_board_and_writes_nothing(tmp_path):
     assert (sorted(p.name for p in tmp_path.iterdir()), open(path).read()) == before
 
 
-def test_another_hand_connecting_drops_the_choice(tmp_path):
+def test_a_choice_belongs_to_the_hand_it_was_made_for(tmp_path):
     sup, _ = _supervisor(tmp_path, LEFT)
-    sup._identity = SimpleNamespace(serial="ser-1", board_id=None)
-    sup.set_hardware_version(HARDWARE_VERSION_V21)
-    sup._identity = None                          # detection missed the identity once
-    assert not sup._forget_override_of_another_hand("ser-1")   # the connect got it
+    sup.set_hardware_version(HARDWARE_VERSION_V21)    # no hand connected: the next one takes it
+    assert not sup._settle_override_owner("ser-1")
+    assert not sup._settle_override_owner(None)       # noboard-/mock- hands never drop it
+    assert not sup._settle_override_owner("ser-1")
     assert sup.hardware_version_override == HARDWARE_VERSION_V21
-    assert sup._forget_override_of_another_hand("ser-2")
+    assert sup._settle_override_owner("ser-2")
     sup._apply_hardware_version(2)
     assert sup.hardware_version_override is None
     assert sup.config.hardware_version == 200
+
+    # Chosen for a hand with no board: a hand with a board drops it.
+    sup._session = SimpleNamespace(close=lambda: None, caps=None)
+    sup._hand_id = None
+    sup.set_hardware_version(HARDWARE_VERSION_V21)
+    assert not sup._settle_override_owner(None)
+    assert sup._settle_override_owner("ser-1")
 
 
 def test_auto_takes_the_board(tmp_path):

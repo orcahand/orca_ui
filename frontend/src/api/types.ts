@@ -277,7 +277,7 @@ export interface HandStoreInfo {
 export interface HandInfo {
   model_name: string
   side: 'left' | 'right'
-  hand?: HandStoreInfo
+  hand?: HandStoreInfo | null
   // The model has a tactile skin (drawn black), connected or not.
   tactile_skin?: boolean
   mock: boolean

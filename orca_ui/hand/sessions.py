@@ -345,8 +345,8 @@ def _connect_mock(settings: UiSettings, config, declared: dict,
     # The config in force, not settings.config_path: the model can be changed
     # from the browser, and the mock has to simulate the hand now selected.
     hand = build_mock_hand(config.config_path,
-                           engage_feedback=settings.engage_feedback)
-    prepare_hand(hand, hardware_version)
+                           engage_feedback=settings.engage_feedback,
+                           hardware_version=hardware_version)
     try:
         ok, msg = hand.connect(interactive=False)
     except (JointFeedbackConnectError, RuntimeError) as e:

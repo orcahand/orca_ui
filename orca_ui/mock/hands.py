@@ -19,6 +19,7 @@ from orca_core import (
 )
 from orca_core.utils.utils import read_yaml
 
+from orca_ui.hand.hand_store import prepare_hand
 from orca_ui.mock.pumps import EncoderPump, TactilePump
 from orca_ui.mock.tactile_responder import TactileMockState, install_tactile_mock
 
@@ -170,7 +171,8 @@ def _synthetic_calibration(hand) -> None:
     )
 
 
-def build_mock_hand(config_path: str, engage_feedback: bool = True):
+def build_mock_hand(config_path: str, engage_feedback: bool = True,
+                    hardware_version: int | None = None):
     """Construct the instrumented mock hand matching the config's capabilities.
 
     Two isolations from the real world, whatever the config says:
@@ -209,5 +211,7 @@ def build_mock_hand(config_path: str, engage_feedback: bool = True):
 
     feedback = engage_feedback and config.joint_feedback_enabled
     hand = _UI_MOCK_MATRIX[(bool(feedback), tactile)](config=config)
+    # The version picks the map the synthetic calibration is derived from.
+    prepare_hand(hand, hardware_version)
     _synthetic_calibration(hand)
     return hand

@@ -44,15 +44,6 @@ def archived_records(config, section: str) -> dict:
     return setup_file.read_archive(config, section) or {}
 
 
-def store_hand_id(identity, model_name: str) -> str:
-    """The id orca_core files a hand under, from what its board reported
-    (``identity``, None without a board). A connected hand says it itself as
-    ``hand.hand_id``; this answers before it connects."""
-    serial = getattr(identity, "serial", None)
-    board_id = getattr(identity, "board_id", None)
-    return core_store.resolve_hand_id(serial, board_id) or core_store.no_board_hand_id(model_name)
-
-
 def hardware_version_in_force(*, override: int | None, board: int | None,
                               model: int | None) -> int | None:
     """The session's choice, else the board's report, else a version

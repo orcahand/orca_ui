@@ -227,6 +227,9 @@ class HandService:
         self._config_gains: dict[str, dict] = {}
         # The operator chose not to take the board's calibration until the next connect.
         self._kept_over_board = False
+        # The hand the hand block describes: the connected one, else the last to
+        # connect, until a Disconnect.
+        self._last_hand_id: str | None = None
 
         self.supervisor = HandSupervisor(
             settings,
@@ -666,11 +669,14 @@ class HandService:
         self.supervisor.request_reconnect()
         return {"written": written}
 
-    def hand_store_state(self) -> dict:
-        """The hand block of ``hand_info``, plus the notices it raises."""
+    def hand_store_state(self) -> dict | None:
+        """The hand block of ``hand_info``, plus the notices it raises; None
+        when no hand has connected since the console started or the last Disconnect."""
+        if self._last_hand_id is None:
+            return None
         session = self.session
         hand = session.hand if session is not None and session.caps.motors else None
-        state = hand_store.details(hand, self.supervisor.store_id)
+        state = hand_store.details(hand, self._last_hand_id)
         newer = hand_store.board_calibration_newer(hand) if hand is not None else None
         state["board_calibration_newer"] = None if self._kept_over_board else newer
         state["legacy_files"] = hand_store.legacy_files(hand)
@@ -724,6 +730,7 @@ class HandService:
             self.supervisor.disconnect()
         except HandBusyError as e:
             raise ServiceError(str(e), status_code=409)
+        self._last_hand_id = None
         self.worker.reset()
         return self.status()
 
@@ -903,6 +910,7 @@ class HandService:
                     self._max_current = _current_or_none(hand_config.max_current)
             self._config_gains = config_gains
         self._publish_control_state()
+        self._last_hand_id = getattr(session.hand, "hand_id", None)
         self._kept_over_board = False  # the board banner asks again on every connect
         if session.caps.motors:
             self._apply_default_profile(session)

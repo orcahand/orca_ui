@@ -42,7 +42,7 @@ from orca_core.hardware.sensing.serial_discovery import (
 )
 
 from orca_ui.hand.boards import detect_pinned_board
-from orca_ui.hand.hand_store import hardware_version_in_force, store_hand_id
+from orca_ui.hand.hand_store import hardware_version_in_force
 from orca_ui.hand.detection import (
     HardwarePresence,
     names_a_hand,
@@ -171,8 +171,9 @@ class HandSupervisor(threading.Thread):
         self._identity = None  # the full OrcaBoardInfo behind _hand_id
         # The hardware version the board last reported; None with no board.
         self._board_hardware_version: int | None = None
-        # A version chosen in the console for this session only, and the hand
-        # (store id) it was chosen for: another hand never inherits it.
+        # A version chosen in the console for this session only, and the board
+        # id of the hand it was chosen for: "" for a hand with no board, None
+        # when chosen with no hand connected (the next hand to connect takes it).
         self._version_override: int | None = None
         self._override_hand: str | None = None
         # Set while maintenance hands the bus back and the session is being
@@ -253,8 +254,9 @@ class HandSupervisor(threading.Thread):
                 raise HandBusyError(
                     "an operation holds the hand — stop it before changing "
                     "the hardware version")
+        connected = self.session is not None
         self._version_override = normalize_hardware_version(version)
-        self._override_hand = self.store_id if version is not None else None
+        self._override_hand = (self._hand_id or "") if connected and version is not None else None
         logger.info("hardware version %s for this session",
                     "back to the board's" if version is None else f"set to {self._version_override}")
         if self._apply_hardware_version(self._board_hardware_version):
@@ -263,23 +265,20 @@ class HandSupervisor(threading.Thread):
             self._wake.set()
         self._publish()
 
-    def _store_hand_id(self) -> str:
-        return store_hand_id(self._identity, self.model_name)
-
-    @property
-    def store_id(self) -> str:
-        """The id the hand's folder is named by: the connected hand's own, else
-        what orca_core would file the last-detected hand under."""
-        hand = getattr(self.session, "hand", None)
-        return getattr(hand, "hand_id", None) or self._store_hand_id()
-
-    def _forget_override_of_another_hand(self, hand_id: str) -> bool:
-        """Drop a session's version choice made for another hand than
-        ``hand_id``; True when one was dropped."""
-        if self._version_override is None or self._override_hand == hand_id:
+    def _settle_override_owner(self, board_id: str | None) -> bool:
+        """The hand with board id ``board_id`` (None: no board) connected: a
+        version chosen with no hand connected becomes its; one chosen for a
+        hand with another board id is dropped. A hand with no board never
+        drops one. True when one was dropped."""
+        if self._version_override is None:
+            return False
+        if self._override_hand is None:
+            self._override_hand = board_id or ""
+            return False
+        if board_id is None or board_id == self._override_hand:
             return False
         logger.info("hardware version choice for %s dropped: %s connected",
-                    self._override_hand, hand_id)
+                    self._override_hand or "a hand with no board", board_id)
         self._version_override = None
         self._override_hand = None
         return True
@@ -799,8 +798,7 @@ class HandSupervisor(threading.Thread):
         # orca_core's connect asks the board itself, so it has the identity
         # even when detection missed it.
         self._hand_id = getattr(session.hand, "board_hand_id", None) or self._hand_id
-        connected_id = getattr(session.hand, "hand_id", None) or self._store_hand_id()
-        if (self._forget_override_of_another_hand(connected_id)
+        if (self._settle_override_owner(self._hand_id)
                 and self._apply_hardware_version(self._board_hardware_version)):
             # Connected as the version chosen for the last hand: reconnect as this one's.
             self._close_stale_session(session)
