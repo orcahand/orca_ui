@@ -10,7 +10,6 @@ tension + calibrate rounds under one lease.
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import math
 import threading
@@ -320,6 +319,7 @@ def run_calibrate(
         "anchors_dead": [],
         "travel_logged": False,
         "aborted": False,
+        "written_to": None,
     }
 
     plan = manual_capture_plan(manual_capture_steps(hand.config, joints))
@@ -380,8 +380,16 @@ def run_calibrate(
         elif kind == "joint_calibrated":
             progress["joints_calibrated"].append(event["joint"])
             ctx.log(f"joint calibrated: {event['joint']} (ratio {event['ratio']:.4f})")
+        elif kind == "calibration_file":
+            # Which file a run lands in decides what the hand loads next time;
+            # orca_core says it at INFO, which the console does not show.
+            progress["written_to"] = event.get("path")
+            ctx.log(f"calibration written to {event.get('path')}")
         elif kind == "calibration_done":
             ctx.log("calibration complete")
+            path = event.get("calibration_path")
+            if path and path != progress.get("written_to"):
+                ctx.log(f"calibration written to {path}")
             # What the numbers above mean, so the log reads on its own.
             ctx.log(
                 "ratio: motor radians per joint degree — the motor travel between the two "
@@ -456,9 +464,9 @@ def run_calibrate(
 
 def _snapshot_run(ctx: OpContext, config, calibration, manual: bool,
                   joints: list[str] | None = None, partial: bool = False) -> None:
-    """Keep this run's travel table: calibration.yaml alone is overwritten by the
-    next run. A partial run (subset, abort) is kept but marked: the other joints'
-    values are the previous run's."""
+    """Keep this run's travel table: calibration.yaml keeps only this run and the
+    one before. A partial run (subset, abort) is kept but marked: the other
+    joints' values are the previous run's."""
     from orca_ui.hand import baselines
 
     try:
@@ -475,17 +483,6 @@ def _snapshot_run(ctx: OpContext, config, calibration, manual: bool,
         )
     except Exception as e:
         ctx.log(f"travel snapshot not saved: {e}")
-    # calibration.yaml is overwritten by whichever run comes next; the last
-    # manual and the last automatic run are also kept each in its own file.
-    try:
-        import shutil
-
-        source = Path(config.calibration_path)
-        kept = source.with_name(f"calibration_{'manual' if manual else 'auto'}.yaml")
-        shutil.copyfile(source, kept)
-        ctx.log(f"calibration also kept as {kept.name}")
-    except Exception as e:
-        ctx.log(f"calibration copy not kept: {e}")
 
 
 class CalibrateOperation(Operation):

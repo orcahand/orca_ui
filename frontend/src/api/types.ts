@@ -513,6 +513,8 @@ export interface TravelSnapshot {
   note?: string | null
   // A run that did not calibrate every finger joint: the other values are older.
   partial?: boolean
+  // Kept in the hand's archive only: readable, no longer promotable.
+  archived?: boolean
   joints?: string[] | null
   travel: Record<string, number>
   ratios?: Record<string, number>
