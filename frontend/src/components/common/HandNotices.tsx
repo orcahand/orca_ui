@@ -60,6 +60,7 @@ function BoardCalibrationNotice() {
 
 function LegacyFilesNotice() {
   const files = useAppStore((s) => s.handInfo?.hand?.legacy_files ?? [])
+  const calibrated = useAppStore((s) => Boolean(s.handInfo?.hand?.calibration.calibrated_at))
   if (files.length === 0) return null
   const dismiss = () =>
     void api
@@ -69,8 +70,8 @@ function LegacyFilesNotice() {
   return (
     <div className="hand-notice">
       <span title={files.join('\n')}>
-        Older calibration and setup files from before this version were found and aren't used;
-        please calibrate.
+        Older calibration and setup files from before this version were found and aren't used
+        {calibrated ? '.' : '; please calibrate.'}
       </span>
       <button className="btn btn-secondary btn-sm" onClick={dismiss}>
         Dismiss
