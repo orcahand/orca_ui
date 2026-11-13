@@ -17,6 +17,8 @@ import os
 
 from orca_core.utils.utils import read_yaml, update_yaml
 
+from orca_ui.hand.hand_store import NoHandFolder
+
 logger = logging.getLogger(__name__)
 
 
@@ -62,15 +64,18 @@ def capture_and_persist(session, num_samples: int = 100) -> dict:
     client = session.tactile_client
     if client is None:
         raise RuntimeError("no tactile sensor connected")
-    offsets = client.capture_taxel_offsets(num_samples=num_samples)
     path = _calibration_path(session)
-    if path:
-        update_yaml(path, "sensor_offsets", offsets)
-        # Captured from the resultant stream alongside the taxels; ``None``
-        # when the stream is taxels-only, and then persisted as such so a
-        # reconnect doesn't restore a baseline from a different zeroing run.
-        update_yaml(path, "resultant_offsets", client.resultant_offsets)
-        update_yaml(path, "taxel_noise_gates", client.taxel_noise_gates)
+    if not path:
+        raise NoHandFolder(
+            "this hand's folder is not known yet, so a zero could not be kept: "
+            "connect it with its motors powered once, then zero again")
+    offsets = client.capture_taxel_offsets(num_samples=num_samples)
+    update_yaml(path, "sensor_offsets", offsets)
+    # Captured from the resultant stream alongside the taxels; ``None``
+    # when the stream is taxels-only, and then persisted as such so a
+    # reconnect doesn't restore a baseline from a different zeroing run.
+    update_yaml(path, "resultant_offsets", client.resultant_offsets)
+    update_yaml(path, "taxel_noise_gates", client.taxel_noise_gates)
     return offsets
 
 

@@ -24,7 +24,7 @@ from orca_core.hand_config import OrcaHandTouchConfig
 from orca_core.hardware.hand_serial_link import HandSerialLink
 from orca_core.hardware.joint_encoder_client import JointEncoderClient
 from orca_core.hardware.sensing.types import LinkHealth
-from orca_core import JointFeedbackConnectError, OrcaHand, OrcaHandJointFeedback
+from orca_core import JointFeedbackConnectError, OrcaHand, OrcaHandJointFeedback, OrcaHandTouch
 
 from orca_ui.hand.detection import HardwarePresence, probe_hardware
 from orca_ui.hand.hand_store import prepare_hand
@@ -494,9 +494,13 @@ def _tier_name(feedback: bool, tactile: bool) -> str:
 
 
 def _connect_sensors_only(settings, config, declared, presence: HardwarePresence):
-    """Motors unpowered: tactile viewing and/or encoder viewing only."""
-    hand = load_hand(config_path=config.config_path, engage_feedback=False,
-                     detected_hardware_version=config.hardware_version)
+    """Motors unpowered: tactile viewing and/or encoder viewing only.
+
+    Built on the config in force, so the hand keeps the folder (and the
+    calibration in it) its last motor connect settled: with no motor bus it
+    never asks its board which hand it is."""
+    hand_cls = OrcaHandTouch if isinstance(config, OrcaHandTouchConfig) else OrcaHand
+    hand = hand_cls(config=config)
     ports = {"motor": None, "tactile": None, "encoder": None}
     messages: list[str] = []
     owned_links: list[HandSerialLink] = []
