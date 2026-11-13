@@ -26,7 +26,7 @@ function NicknameField({ hand }: { hand: HandStoreInfo }) {
       <input
         className="hand-nickname-input"
         autoFocus
-        maxLength={40}
+        maxLength={64}
         value={draft}
         placeholder="nickname"
         onChange={(e) => setDraft(e.target.value)}

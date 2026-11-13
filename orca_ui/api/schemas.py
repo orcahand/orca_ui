@@ -44,7 +44,7 @@ class HardwareVersionRequest(BaseModel):
 class NicknameRequest(BaseModel):
     """A display name for the connected hand; null or empty removes it."""
 
-    nickname: Optional[str] = Field(default=None, max_length=40)
+    nickname: Optional[str] = Field(default=None, max_length=64)
 
 
 class BoardCalibrationRequest(BaseModel):

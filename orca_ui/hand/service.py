@@ -225,9 +225,6 @@ class HandService:
         # Gains connect() installed from config.yaml — what "reset" restores.
         # Live gains are read back from the controller, never shadowed here.
         self._config_gains: dict[str, dict] = {}
-        # Old per-hand files a session reported when its hand folder was
-        # created, kept until the operator dismisses the notice.
-        self._legacy_files: list[str] = []
         # Board calibrations the operator chose not to take until the next
         # connect, as (hand, board sequence, computer sequence).
         self._kept_over_board: set[tuple] = set()
@@ -492,7 +489,7 @@ class HandService:
             "tension_progress": self._tension_progress(config),
             "tension_progress_slack": self._tension_progress(config, "slack"),
             "hand_id": self.supervisor.hand_id,
-            "hand": self.hand_store_state(),
+            "hand": self._hand_store_state_or_none(),
             "guided_tension_defaults": self._guided_tension_defaults(),
             "travel_baseline": self._travel_baseline(config),
             "slack_estimate": self._slack_estimate(config),
@@ -661,17 +658,23 @@ class HandService:
     def _store_call(self, fn, *args):
         try:
             return fn(*args)
-        except hand_store.StoreUnavailable as e:
-            raise ServiceError(str(e), status_code=501)
+        except hand_store.StoreRefused as e:
+            raise ServiceError(str(e), status_code=409)
         except (OSError, ValueError) as e:
             raise ServiceError(str(e), status_code=500)
 
     def _replace_calibration(self, action: str, fn) -> dict:
-        """Swap the calibration on file and reconnect so the hand runs on it."""
+        """Swap the calibration on file and reconnect so the hand runs on it.
+
+        Refused while anything drives the hand: a new calibration remaps every
+        joint to its motor, and a held target would then mean another position.
+        """
         manager = self._operation_manager
         if manager is not None and manager.active():
             raise ServiceError(f"an operation is running — stop it before you {action}",
                                status_code=409)
+        if self.supervisor.status().torque_enabled:
+            raise ServiceError(f"turn torque off before you {action}", status_code=409)
         written = self._store_call(fn, self._store_hand(action))
         logger.warning("%s: %s", action, written)
         self.supervisor.request_reconnect()
@@ -687,8 +690,15 @@ class HandService:
         if newer and self._board_choice_key(hand_id, newer) in self._kept_over_board:
             newer = None
         state["board_calibration_newer"] = newer
-        state["legacy_files"] = list(self._legacy_files)
+        state["legacy_files"] = hand_store.legacy_files(hand)
         return state
+
+    def _hand_store_state_or_none(self) -> dict | None:
+        try:
+            return self.hand_store_state()
+        except Exception:
+            logger.exception("reading the hand's own files failed")
+            return None
 
     def set_nickname(self, nickname: str | None) -> dict:
         self._store_call(hand_store.set_nickname, self._store_hand("name"), nickname or None)
@@ -723,7 +733,7 @@ class HandService:
         return {"written": None}
 
     def dismiss_legacy_notice(self) -> dict:
-        self._legacy_files = []
+        self._store_call(hand_store.dismiss_legacy_files, self._store_hand("dismiss the notice"))
         return self.hand_store_state()
 
     def disconnect(self) -> dict:
@@ -919,11 +929,6 @@ class HandService:
         self._publish_control_state()
         self._kept_over_board.clear()  # the board banner asks again on every connect
         if session.caps.motors:
-            found = hand_store.legacy_files(session.hand)
-            if found:
-                logger.warning("older per-hand files were found and are not used: %s",
-                               ", ".join(found))
-                self._legacy_files = found
             self._apply_default_profile(session)
         if session.caps.tactile:
             try:

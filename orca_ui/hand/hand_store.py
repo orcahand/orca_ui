@@ -14,10 +14,6 @@ from orca_core import hand_store as core_store
 from orca_core.maintenance import setup_file
 
 
-class StoreUnavailable(RuntimeError):
-    """The installed orca_core cannot do this for the hand."""
-
-
 class NoHandFolder(RuntimeError):
     """No hand has connected yet, so there is no folder for its records."""
 
@@ -73,61 +69,84 @@ def prepare_hand(hand, hardware_version: int | None) -> None:
         hand.set_hardware_version(hardware_version)
 
 
+class StoreRefused(RuntimeError):
+    """orca_core refused the change for this hand (nothing to restore, a bad name)."""
+
+
 def details(hand, hand_id: str) -> dict:
-    """The hand block of ``/api/hand/info``: who the hand is and what is on file."""
+    """The hand block of ``/api/hand/info``: who the hand is and what is on file.
+    ``hand`` is the connected hand, or None."""
     return {
         "id": hand_id,
-        "nickname": nickname(hand),
+        "nickname": hand.nickname if hand is not None else None,
         "calibration": calibration_record(hand),
         "joint_ranges": joint_ranges(hand),
     }
 
 
-def nickname(hand) -> str | None:
-    return None
-
-
-def set_nickname(hand, value: str | None) -> None:
-    raise StoreUnavailable("this orca_core keeps no nickname for a hand")
+def set_nickname(hand, value: str | None) -> str | None:
+    """Name the hand for display (None clears it); returns the name stored."""
+    try:
+        return hand.set_nickname(value)
+    except (RuntimeError, core_store.HandStoreError) as e:
+        raise StoreRefused(str(e)) from e
 
 
 def calibration_record(hand) -> dict:
     """When the calibration in force was taken, which file holds it, and
     whether a previous one can be restored."""
-    path = getattr(getattr(hand, "config", None), "calibration_path", None) if hand else None
-    return {"calibrated_at": None, "sequence": None, "path": path,
-            "previous_at": None, "previous_available": False}
+    info = hand.calibration_info if hand is not None else {}
+    previous = info.get("previous") or None
+    return {
+        "calibrated_at": info.get("calibrated_at"),
+        "sequence": info.get("sequence"),
+        "path": info.get("path"),
+        "previous_available": previous is not None,
+        "previous_at": previous.get("calibrated_at") if previous else None,
+    }
 
 
 def joint_ranges(hand) -> dict:
     """``source`` is ``model`` (the model's defaults) or ``measured`` (on this
     hand, at ``measured_at``)."""
-    return {"source": "model", "measured_at": None}
+    info = hand.joint_ranges_info if hand is not None else {}
+    return {"source": info.get("source", "model"), "measured_at": info.get("measured_at")}
 
 
 def restore_previous_calibration(hand) -> str:
-    """Put the previous calibration back in force; returns the file written."""
-    raise StoreUnavailable("this orca_core keeps no previous calibration")
+    """Put the previous calibration back in force (again undoes it); returns the file."""
+    try:
+        return hand.restore_previous_calibration()["path"]
+    except FileNotFoundError as e:
+        raise StoreRefused(str(e)) from e
 
 
 def board_calibration_newer(hand) -> dict | None:
     """``{"board": {...}, "computer": {...}}`` (each ``sequence`` and
-    ``calibrated_at``) when the board holds a newer calibration than this
-    computer, else None."""
-    return None
+    ``calibrated_at``) when the board held a newer calibration than this
+    computer at connect, else None."""
+    return hand.board_calibration_newer()
 
 
 def keep_computer_calibration(hand) -> None:
     """Stop offering the board's calibration until either side's changes."""
-    raise StoreUnavailable("this orca_core cannot remember a choice about the board's calibration")
+    hand.keep_computer_calibration()
 
 
 def adopt_board_calibration(hand) -> str:
-    """Take the board's calibration as this computer's; returns the file written."""
-    raise StoreUnavailable("this orca_core cannot read a board's calibration")
+    """Take the board's calibration as this computer's (the replaced one becomes
+    the previous); returns the file written."""
+    try:
+        return hand.adopt_board_calibration()["path"]
+    except RuntimeError as e:
+        raise StoreRefused(str(e)) from e
 
 
 def legacy_files(hand) -> list[str]:
     """Per-hand files from before the hand store, found beside the model's
     config when this hand's folder was created; they are not used."""
-    return []
+    return list(hand.legacy_files) if hand is not None else []
+
+
+def dismiss_legacy_files(hand) -> None:
+    hand.dismiss_legacy_files()
