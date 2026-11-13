@@ -709,6 +709,15 @@ class HandSupervisor(threading.Thread):
                     return delay
                 self._adopt_model(detection)
                 presence = presence_from_detection(self.config, detection)
+                if self._board_identity_missed(presence):
+                    self._set_state(
+                        HandState.DETECTING,
+                        "controller board found but its identity reply was "
+                        "missed — retrying")
+                    delay = self._backoff
+                    self._backoff = min(self._backoff * 1.5,
+                                        DETECT_BACKOFF_MAX_S)
+                    return delay
         detection = getattr(presence, "detection", None)
         identity = getattr(detection, "identity", None)
         # Every connect says which hand this is: a board without an identity, or
@@ -806,6 +815,16 @@ class HandSupervisor(threading.Thread):
             return True
         return (detection.motor_port is not None
                 and detection.motor_port not in set(oh_board_ports()))
+
+    def _board_identity_missed(self, presence) -> bool:
+        """True when the fallback scan found a controller board's motor port (so the
+        board answers its identity) but detection got none: connecting now would
+        file this hand's records under no identity. A port set in the config is left alone."""
+        motor_port = getattr(presence, "motor_port", None)
+        return (self._settings.motors_enabled and motor_port is not None
+                and getattr(self.config, "port", None) in ("auto", None)
+                and getattr(getattr(presence, "detection", None), "identity", None) is None
+                and motor_port in set(oh_board_ports()))
 
     def _close_stale_session(self, session: HandSession) -> None:
         try:

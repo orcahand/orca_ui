@@ -127,18 +127,24 @@ def test_a_hand_with_no_board_identity_is_not_judged_by_another_hands_slack_test
     from test_model_detection import PLAIN_LEFT
 
     sup, _ = build("orcahand-left")
+    connects = []
     monkeypatch.setattr(supervisor_mod, "oh_board_ports", lambda: ["/dev/motor"])
-    monkeypatch.setattr(supervisor_mod, "presence_from_detection",
-                        lambda config, detection, **k: SimpleNamespace(detection=detection))
     monkeypatch.setattr(supervisor_mod, "connect_session",
-                        lambda *a, **k: (_ for _ in ()).throw(supervisor_mod.SessionConnectError("stop here")))
+                        lambda *a, **k: connects.append(1) or (_ for _ in ()).throw(supervisor_mod.SessionConnectError("stop here")))
     board_hand = dataclasses.replace(
         PLAIN_LEFT, identity=OrcaBoardInfo(role="motor", side="left", serial="ser-0001"))
     plain_adapter = dataclasses.replace(PLAIN_LEFT, identity=None)
-    for detected, hand_id in ((board_hand, "ser-0001"), (plain_adapter, None), (board_hand, "ser-0001")):
+    # The last case: the board's identity reply was missed and the fallback scan found
+    # its motor port. It must retry, not connect as a hand with no identity.
+    for detected, port, hand_id, connected in ((board_hand, "/dev/motor", "ser-0001", 1),
+                                               (plain_adapter, "/dev/usb-adapter", None, 2),
+                                               (board_hand, "/dev/motor", "ser-0001", 3),
+                                               (plain_adapter, "/dev/motor", "ser-0001", 3)):
         monkeypatch.setattr(supervisor_mod, "run_detection", lambda config, force=False: detected)
+        monkeypatch.setattr(supervisor_mod, "presence_from_detection",
+                            lambda config, detection, **k: SimpleNamespace(detection=detection, motor_port=port))
         sup._try_connect()
-        assert sup.hand_id == hand_id
+        assert (sup.hand_id, len(connects)) == (hand_id, connected)
 
     failing = {"blocked": True, "results": [{"joint": "index_mcp", "status": "fail"}]}
     tests = {"t1": {"recorded_at": "2026-11-01T10:00:00", "hand_key": "ser-0001", **failing}}
