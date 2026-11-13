@@ -20,6 +20,7 @@ import { failToBanner } from './setupUtils'
 import { CalibrationRecords } from './TravelBaselines'
 import { SWEEP_HINT, startTensionSweep } from './probeStart'
 import { useTensionFlow } from '../../state/tensionFlow'
+import { HandDetails } from '../hand/HandDetails'
 import { shortDate } from './setupUtils'
 
 const GROUP_ORDER = ['wrist', 'thumb', 'index', 'middle', 'ring', 'pinky']
@@ -226,6 +227,7 @@ export function CalibrateStep({ state }: { state: StepState }) {
           </div>
         </div>
       )}
+      {handInfo?.hand && <HandDetails hand={handInfo.hand} />}
       {joints.length > 0 && (
         <div className="flow-dots">
           {joints.map((joint) => (

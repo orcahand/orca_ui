@@ -7,6 +7,7 @@ import { ErrorBanner } from './components/common/ErrorBanner'
 import { ChangelogDialog } from './components/common/ChangelogDialog'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
 import { FaultPopup } from './components/common/FaultPopup'
+import { HandNotices } from './components/common/HandNotices'
 import { MaintenanceBanner } from './components/common/MaintenanceBanner'
 import { AppHeader } from './components/header/AppHeader'
 import { TensionDialogs } from './components/setup/TensionDialogs'
@@ -78,6 +79,7 @@ export default function App() {
       <AppHeader />
       <TransportBar />
       <ErrorBanner />
+      {!booting && <HandNotices />}
       {booting && view === 'setup' ? (
         <AssemblyCard />
       ) : booting ? (
