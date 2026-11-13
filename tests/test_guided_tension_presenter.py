@@ -34,7 +34,9 @@ def test_stages_with_no_present_joint_leave_the_sidebar():
 
 def test_the_score_sheet_carries_exclusions_and_suggests_no_clicks_for_unswept_joints():
     """A run that jumps to the ratchet mid-round leaves joints unswept: their
-    full "slack" is no measurement, so they must not be given clicks."""
+    full "slack" is no measurement, so they must not be given clicks. A fully
+    slack tendon leaves its motor still: zero spread from a range check is the
+    slackest result, not a joint nobody checked."""
     ctx = _Ctx()
     presenter = _Presenter(ctx, {})
     excluded = [{"joint": "ring_mcp", "motor": 4, "reason": "motor did not answer at connect"}]
@@ -48,11 +50,6 @@ def test_the_score_sheet_carries_exclusions_and_suggests_no_clicks_for_unswept_j
     assert swept["clicks_left"] == 2 and not swept.get("not_checked")
     assert unswept["not_checked"] is True and unswept["clicks_left"] is None
 
-
-def test_a_range_checked_joint_whose_motor_never_moved_still_gets_clicks():
-    """A fully slack tendon leaves its motor still: zero spread from a range
-    check is the slackest result, not a joint nobody checked."""
-    ctx = _Ctx()
     presenter = _Presenter(ctx, {})
     stage = {"key": "index", "joints": ["index_mcp"], "pose": "flat"}
     presenter.progress({"event": "step", "step": "range", "round": 1, "stage": stage,
