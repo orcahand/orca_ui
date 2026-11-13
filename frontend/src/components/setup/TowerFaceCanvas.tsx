@@ -28,7 +28,12 @@ const HAND_ABOVE_TOWER = 0.035
 
 const towers = new Map<string, Promise<THREE.Group>>()
 function loadTower(url: string): Promise<THREE.Group> {
-  if (!towers.has(url)) towers.set(url, new GLTFLoader().loadAsync(url).then((gltf) => gltf.scene))
+  if (!towers.has(url)) {
+    const loading = new GLTFLoader().loadAsync(url).then((gltf) => gltf.scene)
+    // A failed load is retried the next time the face is drawn.
+    loading.catch(() => towers.delete(url))
+    towers.set(url, loading)
+  }
   return towers.get(url)!
 }
 
@@ -90,7 +95,7 @@ function FaceRig({
       clone.userData.fit = tower.clone().expandByVector(new THREE.Vector3(0, 0, 0))
       clone.userData.fit.max.y = cut
       setRoot(clone)
-    })
+    }).catch((e) => console.warn('tower model failed to load', e))
     return () => {
       alive = false
     }
