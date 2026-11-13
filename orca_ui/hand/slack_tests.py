@@ -88,10 +88,24 @@ def summary(config) -> dict | None:
     }
 
 
-def calibration_block(config) -> str | None:
-    """Why the hand may not be calibrated, or None: the newest slack test found
-    joints with more than half a turn of slack."""
+def _tested_a_joint(test: dict) -> bool:
+    return any(r.get("status") != "skipped" for r in test.get("results") or [])
+
+
+def _deciding(config) -> tuple[str, dict] | None:
+    """The newest slack test that tested a joint: one that skipped every joint
+    leaves the gate as the test before it set it."""
     found = latest(config)
+    if found is None or _tested_a_joint(found[1]):
+        return found
+    tested = [kv for kv in archived_records(config, SECTION).items() if _tested_a_joint(kv[1])]
+    return max(tested, key=lambda kv: (kv[1].get("recorded_at", ""), kv[0]), default=None)
+
+
+def calibration_block(config) -> str | None:
+    """Why the hand may not be calibrated, or None: the newest slack test that
+    tested a joint found joints with more than half a turn of slack."""
+    found = _deciding(config)
     if found is None or not found[1].get("blocked"):
         return None
     joints = [r["joint"] for r in found[1].get("results") or [] if r.get("status") == "fail"]

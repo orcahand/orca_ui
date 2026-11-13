@@ -80,6 +80,13 @@ def test_too_much_slack_blocks_calibration_until_a_passing_test(client):
     assert client.post("/api/operation/calibrate/start",
                        json={"params": {**FAST, "manual": True}}).status_code == 409
 
+    # A test that skipped every joint tested nothing: the block stands.
+    assert client.post("/api/operation/slack_test/start",
+                       json={"params": {**FAST, "joints": ["ring_mcp"]}}).status_code == 200
+    _hold_each(client, ["Skip", "Finish"])
+    assert _done(client)["result"]["slack"] == {"ring_mcp": "skipped"}
+    assert "ring_mcp" in client.get("/api/hand/info").json()["slack_test"]["block"]
+
     assert client.post("/api/operation/slack_test/start",
                        json={"params": {**FAST, "joints": joints}}).status_code == 200
     _hold_each(client, ["Test", "Skip", "Finish"])
@@ -87,7 +94,7 @@ def test_too_much_slack_blocks_calibration_until_a_passing_test(client):
     assert snapshot["result"]["blocked"] is False
     assert snapshot["result"]["slack"] == {"index_pip": "pass", "ring_mcp": "skipped"}
     assert client.get("/api/hand/info").json()["slack_test"]["block"] is None
-    assert len(client.get("/api/slack_tests").json()["tests"]) == 2
+    assert len(client.get("/api/slack_tests").json()["tests"]) == 3
     assert client.post("/api/operation/calibrate/start",
                        json={"params": {**FAST, "joints": ["index_pip"]}}).status_code == 200
     _done(client)
