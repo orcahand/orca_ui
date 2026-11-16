@@ -123,7 +123,12 @@ def main_checkout(branch: Checkout, configured: Optional[str],
     elif environ.get(MAIN_ENV):
         candidate, origin = Path(environ[MAIN_ENV]), f"${MAIN_ENV}"
     elif branch.path is not None:
+        # The branch is a checkout with worktrees/ beside it, or itself one of those worktrees.
         candidate, origin = branch.path.parent / MAIN_WORKTREE, None
+        sibling = branch.path.parent / MAIN_WORKTREE.name
+        if not candidate.exists() and branch.path.parent.name == MAIN_WORKTREE.parent.name \
+                and sibling.exists():
+            candidate = sibling
     else:
         return Checkout(None, "main's checkout is found beside the branch's, and there is no branch "
                               "checkout; pass --main-core <path>")

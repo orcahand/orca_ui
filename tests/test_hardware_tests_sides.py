@@ -48,6 +48,12 @@ def test_checkouts_branch_is_the_console_core_and_main_follows_setting_env_then_
     assert "same checkout" in sides.main_checkout(branch, str(branch_path), {}).reason
     assert "not an orca_core checkout" in sides.main_checkout(branch, str(tmp_path), {}).reason
 
+    # A branch that is itself a worktree finds main among its sibling worktrees.
+    in_worktrees = _checkout(tmp_path / "code" / "worktrees" / "orca_core-0.14.0", "0.14.0")
+    worktree_branch = sides.branch_checkout(
+        SimpleNamespace(kind="local", location=str(in_worktrees), version="0.14.0"))
+    assert sides.main_checkout(worktree_branch, None, {}).path == default.resolve()
+
 
 def test_recorder_command_runs_in_the_checkouts_own_environment(tmp_path):
     cmd = sides.recorder_command("uv", tmp_path, "3.12", "neutral", tmp_path / "a.json",
