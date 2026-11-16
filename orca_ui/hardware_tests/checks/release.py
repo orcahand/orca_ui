@@ -593,15 +593,35 @@ def session_hardware_version(ctx: CheckContext) -> CheckResult:
 # ----- 5. the board's calibration --------------------------------------------------------
 
 
-def firmware_repo(ctx: CheckContext) -> Optional[Path]:
-    """The orca_firmware checkout calibrate.py needs to write the board."""
+FIRMWARE_TOOL = Path("tools") / "bench" / "cal_store.py"
+BOARD_WRITTEN = "Calibration also written to the hand's own board"
+BOARD_NOT_WRITTEN = re.compile(r"Calibration kept on this computer only: (.+)")
+
+
+def firmware_candidates(ctx: CheckContext) -> list[Path]:
+    """Where an orca_firmware checkout is looked for, in order."""
     configured = (ctx.step.params or {}).get("firmware_repo") or os.environ.get("ORCA_FIRMWARE_REPO")
     candidates = [Path(configured).expanduser()] if configured else []
     checkout = getattr(ctx.sides, "checkout", lambda side: None)("branch")
     if checkout is not None:
         candidates += [checkout.parent / "orca_firmware", checkout.parent.parent / "orca_firmware"]
     candidates.append(Path.home() / "code" / "orca_firmware")
-    return next((c.resolve() for c in candidates if (c / ".git").exists() or (c / "README.md").is_file()), None)
+    return candidates
+
+
+def firmware_repo(ctx: CheckContext) -> Optional[Path]:
+    """The orca_firmware checkout calibrate.py needs to write the board: one that has its store tool."""
+    return next((c.resolve() for c in firmware_candidates(ctx) if (c / FIRMWARE_TOOL).is_file()), None)
+
+
+def board_write_outcome(returncode: int, output: str) -> tuple[str, str]:
+    """What calibrate.py did with the board: ``wrote``, ``not_written`` (with its reason) or ``failed``."""
+    if returncode == 0 and BOARD_WRITTEN in output:
+        return "wrote", ""
+    kept = BOARD_NOT_WRITTEN.search(output)
+    if returncode == 0 and kept:
+        return "not_written", kept.group(1).strip().rstrip(".")
+    return "failed", f"exit {returncode}"
 
 
 def _sensor_offsets(path: Optional[Path]) -> Any:
@@ -627,8 +647,9 @@ def board_calibration_banner(ctx: CheckContext) -> CheckResult:
         return CheckResult(status="skipped", summary="this hand has no controller board")
     repo = firmware_repo(ctx)
     if repo is None:
-        return CheckResult(status="skipped", summary="no orca_firmware checkout found; set ORCA_FIRMWARE_REPO "
-                           "(or keep it beside orca_core) and run the step again")
+        tried = ", ".join(str(c).replace(str(Path.home()), "~", 1) for c in firmware_candidates(ctx))
+        return CheckResult(status="skipped", summary=f"no orca_firmware checkout with {FIRMWARE_TOOL} (tried {tried}); "
+                           "set ORCA_FIRMWARE_REPO to one that has it and run the step again")
     runner = ctx.sides
     if runner.available("branch") is not None or not hasattr(runner, "run_script"):
         return CheckResult(status="skipped", summary=f"the branch's orca_core cannot run scripts: {runner.available('branch')}")
@@ -642,8 +663,14 @@ def board_calibration_banner(ctx: CheckContext) -> CheckResult:
             ran = runner.run_script("branch", "calibrate.py", [], ctx.out_dir / "calibrate",
                                     timeout_s=1800.0, env={"ORCA_FIRMWARE_REPO": str(repo)})
         output = ran["stdout"] + ran["stderr"]
-        wrote = ran["returncode"] == 0 and re.search(r"board", output, re.IGNORECASE) is not None
-        metrics.append(Metric("calibrate.py wrote the board", "yes" if wrote else f"exit {ran['returncode']}", ok=wrote))
+        outcome, reason = board_write_outcome(ran["returncode"], output)
+        if outcome == "not_written":
+            # calibrate.py finished but left the board alone; the hand's files are put back on the way out.
+            return CheckResult(status="skipped", summary=f"calibrate.py ran but did not write the board: {reason}",
+                               metrics=[Metric("calibrate.py wrote the board", reason, ok=None)],
+                               details={"output": output[-3000:]})
+        wrote = outcome == "wrote"
+        metrics.append(Metric("calibrate.py wrote the board", "yes" if wrote else reason, ok=wrote))
         if not wrote:
             return CheckResult(status="fail", summary="calibrate.py did not finish writing the board.",
                                metrics=metrics, details={"output": output[-3000:]})
@@ -770,36 +797,83 @@ def holding_temperature(ctx: CheckContext) -> CheckResult:
     params = ctx.step.params or {}
     hold_s = float(params.get("hold_s", 180.0))
     max_rise = float(params.get("max_rise_c", 5.0))
+    abort_rise = float(params.get("abort_rise_c", 15.0))
+    abort_temp = float(params.get("abort_temp_c", 60.0))
     xs, peak = [], []
     start_temps: dict = {}
+    temps: dict = {}
+    currents: dict[int, list[float]] = {}
+    joints: dict = {}
+    targets = _mid_pose(ctx.service.session.hand.config)
+    errors: dict = {}
+    stopped = None
     try:
         ctx.service.enable_torque()
-        ctx.service.set_targets(_mid_pose(ctx.service.session.hand.config))
+        ctx.service.set_targets(targets)
         _wait(ctx, 2.0)
         t0 = time.monotonic()
         while True:
-            temps = {m["id"]: m.get("temp_c") for m in ctx.service.motor_snapshot()["motors"]}
-            temps = {k: float(v) for k, v in temps.items() if v is not None}
+            motors = ctx.service.motor_snapshot()["motors"]
+            temps = {m["id"]: float(m["temp_c"]) for m in motors if m.get("temp_c") is not None}
+            for m in motors:
+                joints[m["id"]] = m.get("joint")
+                if m.get("current_ma") is not None:
+                    currents.setdefault(m["id"], []).append(float(m["current_ma"]))
             if not start_temps:
                 start_temps = temps
             rise = max((temps[k] - start_temps.get(k, temps[k]) for k in temps), default=0.0)
             xs.append(round(time.monotonic() - t0, 1))
             peak.append(rise)
             ctx.progress(min(0.99, (time.monotonic() - t0) / hold_s), f"{rise:+.1f} °C")
-            if time.monotonic() - t0 >= hold_s:
+            stopped = holding_abort(start_temps, temps, abort_rise, abort_temp)
+            if stopped or time.monotonic() - t0 >= hold_s:
                 break
-            _wait(ctx, min(10.0, hold_s))
+            _wait(ctx, min(5.0, hold_s))
+        pose = ctx.service.current_pose()
+        errors = {j: float(pose[j]) - float(t) for j, t in targets.items() if j in pose}
     finally:
         _torque_off_quietly(ctx)
     if not start_temps:
         return CheckResult(status="skipped", summary="the motors report no temperature")
     worst = max(peak)
+    table = holding_table(start_temps, temps, currents, joints, errors)
+    hottest = "; ".join(f"M{r['motor']} {r['joint']} {r['rise_c']:+.0f} °C at {r['mean_ma']:.0f} mA, "
+                        f"{r['error_deg']:+.0f}° from target" if r["error_deg"] is not None else
+                        f"M{r['motor']} {r['joint']} {r['rise_c']:+.0f} °C at {r['mean_ma']:.0f} mA"
+                        for r in table[:3])
     metrics = [Metric("largest rise", round(worst, 1), unit="°C", ok=worst <= max_rise),
-               Metric("held for", round(xs[-1], 0), unit="s"), Metric("allowed rise", max_rise, unit="°C")]
+               Metric("held for", round(xs[-1], 0), unit="s"), Metric("allowed rise", max_rise, unit="°C"),
+               Metric("stopped early", stopped or "no", ok=None if not stopped else False),
+               Metric("hottest motors", hottest or "none", ok=None)]
     series = [Series(name="largest temperature rise", x=xs, y=peak, y_label="°C")]
-    return _fail_or_pass([f"a motor warmed by {worst:.1f} °C"] if worst > max_rise else [],
-                         f"holding for {xs[-1]:.0f} s warmed no motor by more than {worst:.1f} °C.", metrics,
-                         series=series)
+    problems = ([f"a motor warmed by {worst:.1f} °C ({hottest})"] if worst > max_rise else []) + \
+        ([f"stopped early: {stopped}"] if stopped else [])
+    return _fail_or_pass(problems, f"holding for {xs[-1]:.0f} s warmed no motor by more than {worst:.1f} °C.",
+                         metrics, series=series, details={"motors": table})
+
+
+def holding_abort(start: dict, temps: dict, max_rise: float, max_temp: float) -> Optional[str]:
+    """Why holding must stop now: a motor warmed by more than ``max_rise`` or reached ``max_temp``."""
+    for motor, temp in sorted(temps.items()):
+        if temp >= max_temp:
+            return f"motor {motor} reached {temp:.0f} °C"
+        if temp - start.get(motor, temp) > max_rise:
+            return f"motor {motor} warmed by {temp - start[motor]:.0f} °C"
+    return None
+
+
+def holding_table(start: dict, end: dict, currents: dict, joints: dict, errors: dict) -> list[dict]:
+    """Per motor, hottest first: its joint, start and end temperature, mean current and
+    how far the joint ended from its target (degrees, None when unknown)."""
+    rows = []
+    for motor, temp in end.items():
+        joint = joints.get(motor) or ""
+        drawn = currents.get(motor) or []
+        rows.append({"motor": motor, "joint": joint, "start_c": start.get(motor, temp), "end_c": temp,
+                     "rise_c": temp - start.get(motor, temp),
+                     "mean_ma": abs(sum(drawn) / len(drawn)) if drawn else 0.0,
+                     "error_deg": round(errors[joint], 1) if joint in errors else None})
+    return sorted(rows, key=lambda r: (-r["rise_c"], -r["mean_ma"]))
 
 
 @contextlib.contextmanager
@@ -839,20 +913,37 @@ def current_limit_respected(ctx: CheckContext) -> CheckResult:
             saved = (snapshot.get("result") or {}).get("saved")
             data = sweeps.dataset(ctx.service.supervisor.config, saved) if saved else None
     results = (data or {}).get("results") or []
-    peaks = [float(r.get("peak_ma") or 0) for r in results]
-    worst = max(peaks, default=None)
-    metrics = [Metric("limit set", limit, unit="mA"),
-               Metric("sweep's highest drive current", worst if not _mock(ctx) else "not swept (mock)", unit="mA",
-                      ok=None if _mock(ctx) else worst is not None and worst <= limit + tolerance),
-               Metric("slack test's highest offered current", max(offered, default=None), unit="mA",
-                      ok=not offered or max(offered) <= limit + 0.5),
-               Metric("slack test's default", default_ma, unit="mA",
-                      ok=default_ma is None or float(default_ma) <= limit + 0.5)]
+    metrics = [Metric("limit set", limit, unit="mA")]
+    if _mock(ctx):
+        metrics.append(Metric("sweep", "not swept (mock)"))
+    else:
+        metrics += sweep_current_metrics((data or {}).get("settings") or {}, results, limit, tolerance)
+    metrics += [Metric("slack test's highest offered current", max(offered, default=None), unit="mA",
+                       ok=not offered or max(offered) <= limit + 0.5),
+                Metric("slack test's default", default_ma, unit="mA",
+                       ok=default_ma is None or float(default_ma) <= limit + 0.5)]
     problems = [m.name for m in metrics if m.ok is False]
     if not results and not _mock(ctx):
         problems.append(f"the sweep saved no readings ({snapshot.get('error') or snapshot.get('detail')})")
-    return _fail_or_pass(problems, f"with max current at {limit} mA the sweep drew at most {worst} mA and the "
-                         "slack test offers nothing higher.", metrics)
+    return _fail_or_pass(problems, f"with max current at {limit} mA every current the sweep and the slack test "
+                         "command stays within it, and so does each joint's mean drive current.", metrics)
+
+
+def sweep_current_metrics(settings: dict, results: list, limit: float, tolerance: float) -> list[Metric]:
+    """The sweep's commanded currents and each joint's mean drive current against ``limit``;
+    the measured peaks are reported only, since present-current readings spike past the loop's cap."""
+    commanded = {k: float(v) for k, v in settings.items()
+                 if k.endswith("_current_ma") and isinstance(v, (int, float))}
+    means = [abs(float(r["mean_ma"])) for r in results if isinstance(r.get("mean_ma"), (int, float))]
+    peaks = [float(r["peak_ma"]) for r in results if isinstance(r.get("peak_ma"), (int, float))]
+    high = max(commanded.values(), default=None)
+    return [
+        Metric("sweep's highest commanded current", high, unit="mA",
+               ok=bool(commanded) and high <= limit + 0.5),
+        Metric("sweep's highest mean drive current", max(means, default=None), unit="mA",
+               ok=bool(means) and max(means) <= limit + tolerance),
+        Metric("sweep's highest peak (brief spikes, not judged)", max(peaks, default=None), unit="mA", ok=None),
+    ]
 
 
 @register("sweep_refused_below_minimum")
@@ -1002,6 +1093,11 @@ def mock_leaves_store(ctx: CheckContext) -> CheckResult:
 # ----- 13. click-through the console can answer ---------------------------------------------
 
 
+def has_feedback_loop(status: dict) -> bool:
+    """Whether the hand runs a joint-feedback loop (joint encoders): only then are there gains to read."""
+    return bool(((status or {}).get("capabilities") or {}).get("feedback_loop"))
+
+
 @register("console_regressions")
 def console_regressions(ctx: CheckContext) -> CheckResult:
     """What the console's pages read still answers: status, hand info, motors,
@@ -1033,7 +1129,10 @@ def console_regressions(ctx: CheckContext) -> CheckResult:
     probe("motor table", service.motor_snapshot, lambda s: len(s["motors"]) == count)
     probe("models", service.models)
     probe("boards", service.boards)
-    probe("gains", service.gains_state)
+    if has_feedback_loop(service.status()):
+        probe("gains", service.gains_state)
+    else:
+        metrics.append(Metric("gains", "not applicable: this hand has no joint-feedback loop", ok=None))
     name = "hwtest-pose"
     probe("pose saved", lambda: service.capture_pose(name))
     probe("pose listed", service.list_poses, lambda poses: any(p.get("name") == name for p in poses))
@@ -1197,6 +1296,19 @@ def damaged_calibration_set_aside(ctx: CheckContext) -> CheckResult:
 # ----- 18. your own config -----------------------------------------------------------------
 
 
+def edited_max_current(resolved, wanted=None) -> int:
+    """A max current for the edited copy that this hand's motor family accepts: above every
+    calibration current it resolves, and unlike the one in force, so the copy's value shows."""
+    floor = max(float(resolved.calibration_current), float(resolved.wrist_calibration_current),
+                float(resolved.calibration_max_current or 0))
+    current = int(resolved.max_current)
+    if wanted is not None and int(wanted) > floor and int(wanted) != current:
+        return int(wanted)
+    if current - 10 > floor:
+        return current - 10
+    return max(int(floor) + 10, current + 10)
+
+
 @register("standalone_config")
 def standalone_config(ctx: CheckContext) -> CheckResult:
     """A standalone copy loads as its model, runs this hand with its own calibration
@@ -1232,7 +1344,7 @@ def standalone_config(ctx: CheckContext) -> CheckResult:
     if not _mock(ctx) and ctx.sides.available("branch") is None:
         import yaml
 
-        limit = int((ctx.step.params or {}).get("max_current", 200))
+        limit = edited_max_current(ctx.service.session.hand.config, (ctx.step.params or {}).get("max_current"))
         changed = yaml.safe_load(copy.read_text())
         changed["max_current"] = limit
         edited = ctx.out_dir / "edited" / "config.yaml"
@@ -1256,6 +1368,35 @@ def standalone_config(ctx: CheckContext) -> CheckResult:
 
 # ----- 19. ORCA_HOME elsewhere ----------------------------------------------------------------
 
+# The console's own reconnect after a side run stamps these; they say nothing about the side run.
+_SEEN_KEYS = ("last_seen",)
+
+
+def store_snapshot(root: Path) -> dict:
+    """The hands folder's files, each as its size and mtime; ``hand.yaml`` as its content less
+    the last-seen stamp, and lock files only as present."""
+    import yaml
+
+    out = {}
+    for name, (size, mtime) in _tree(root).items():
+        path = root / name
+        if path.name == "hand.yaml":
+            try:
+                doc = yaml.safe_load(path.read_text()) or {}
+            except (OSError, yaml.YAMLError):
+                doc = {"unreadable": (size, mtime)}
+            out[name] = {k: v for k, v in doc.items() if k not in _SEEN_KEYS} if isinstance(doc, dict) else doc
+        elif path.suffix == ".lock":
+            out[name] = "present"
+        else:
+            out[name] = (size, mtime)
+    return out
+
+
+def snapshot_changes(before: dict, after: dict) -> list[str]:
+    """Files added, removed or changed between two :func:`store_snapshot` results."""
+    return sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k))
+
 
 @register("orca_home_elsewhere")
 def orca_home_elsewhere(ctx: CheckContext) -> CheckResult:
@@ -1275,14 +1416,15 @@ def orca_home_elsewhere(ctx: CheckContext) -> CheckResult:
                       ok=bool(lines) and lines[-1] == str(custom / "ui"))]
     if not _mock(ctx) and ctx.sides.available("branch") is None:
         root = hands_root()
-        before = _tree(root)
+        before = store_snapshot(root)
         result = _connect_only(ctx, "connect")
         data = result.get("data") or {}
         folder = str(data.get("hand_dir") or "")
+        changed = snapshot_changes(before, store_snapshot(root))
         metrics += [Metric("hand folder in the run's ORCA_HOME", folder,
                            ok=bool(result.get("ok")) and folder.startswith(str(ctx.out_dir))),
-                    Metric("real hands folder untouched", "yes" if _tree(root) == before else "changed",
-                           ok=_tree(root) == before)]
+                    Metric("real hands folder untouched", "yes" if not changed else "changed: " + ", ".join(changed[:5]),
+                           ok=not changed)]
     problems = [m.name for m in metrics if m.ok is False]
     return _fail_or_pass(problems, "with ORCA_HOME elsewhere nothing was moved, and the hand was filed there.", metrics)
 

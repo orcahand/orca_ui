@@ -9,9 +9,11 @@ steps:
   check: holding_temperature
   panels:
   - motor_temperatures
-  instructions: 'The check holds a mid-flexed pose with torque on for 3 minutes and reads the motor temperatures.
-    It moves the hand: keep it clear and on the bench.'
-  pass_rule: No motor warms by more than 5 °C.
+  instructions: 'The check holds a mid-flexed pose with torque on for 3 minutes and reads the motor temperatures,
+    stopping early (torque off) if a motor warms by 15 °C or reaches 60 °C. It moves the hand: keep it clear and on
+    the bench.'
+  pass_rule: No motor warms by more than 5 °C. The result names the hottest motors with their current and how far
+    each joint is from its target, so a joint pushing against something shows.
 - id: R7b
   title: 100 mA limit
   kind: auto
@@ -20,7 +22,9 @@ steps:
   - motor_currents
   instructions: 'The check sets max current to 100 mA, sweeps index_mcp once and reads the slack test''s offered
     currents, then puts max current back. It moves the hand: keep it clear and on the bench.'
-  pass_rule: The sweep draws at most the limit (plus a register step) and the slack test offers nothing above it.
+  pass_rule: Every current the sweep and the slack test command is at most the limit, and each joint's mean drive
+    current stays within it. Brief peaks above the limit are reported but allowed (present-current readings
+    spike, notably on Feetech).
 - id: R7c
   title: Below the sweep's minimum
   kind: auto

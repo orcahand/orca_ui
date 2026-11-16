@@ -8,7 +8,7 @@ steps:
   kind: auto
   check: standalone_config
   instructions: The check writes a standalone copy of this hand's model and a bare copy of its packaged config.yaml,
-    then (console let go of the hand) connects orca_core with the standalone copy, max current changed to 200 mA.
-    Nothing moves.
-  pass_rule: The copy loads as the model and connects with this hand's folder and calibration at 200 mA; the bare
+    then (console let go of the hand) connects orca_core with the standalone copy, its max current changed to a value the motor family
+    accepts (above every calibration current, unlike the one in force). Nothing moves.
+  pass_rule: The copy loads as the model and connects with this hand's folder and calibration at the changed max current; the bare
     copy is refused and points to write_standalone_config.

@@ -105,3 +105,73 @@ def test_torque_read_back_names_motors_still_on_or_silent():
     assert metrics[0].ok is False
     assert problems == ["torque still on for motor(s) 2", "no torque read-back from motor(s) 3"]
     assert release._torque_metrics({1: False, 2: False})[1] == []
+
+
+def test_gains_are_only_asked_of_a_hand_with_a_joint_feedback_loop():
+    assert release.has_feedback_loop({"capabilities": {"feedback_loop": True}})
+    assert not release.has_feedback_loop({"capabilities": {"feedback_loop": False}})
+    assert not release.has_feedback_loop({})
+
+
+def test_the_edited_max_current_is_valid_for_the_family_and_differs_from_the_one_in_force():
+    feetech = SimpleNamespace(calibration_current=500, wrist_calibration_current=500,
+                              calibration_max_current=None, max_current=1000)
+    assert release.edited_max_current(feetech) == 990
+    assert release.edited_max_current(feetech, wanted=200) == 990  # below the calibration current
+    tight = SimpleNamespace(calibration_current=500, wrist_calibration_current=500,
+                            calibration_max_current=None, max_current=505)
+    chosen = release.edited_max_current(tight)
+    assert chosen > 500 and chosen != 505
+
+
+def test_the_store_snapshot_ignores_the_consoles_own_reconnect_but_not_a_real_write(tmp_path):
+    hand = tmp_path / "ser-1"
+    hand.mkdir()
+    (hand / "hand.yaml").write_text("id: ser-1\nnickname: a\nlast_seen: '1'\n")
+    (hand / "setup.yaml.lock").write_text("")
+    before = release.store_snapshot(tmp_path)
+    (hand / "hand.yaml").write_text("id: ser-1\nnickname: a\nlast_seen: '2'\n")
+    (hand / "setup.yaml.lock").touch()
+    assert release.snapshot_changes(before, release.store_snapshot(tmp_path)) == []
+    (hand / "calibration.yaml").write_text("sequence: 1\n")
+    (hand / "hand.yaml").write_text("id: ser-1\nnickname: b\nlast_seen: '3'\n")
+    assert release.snapshot_changes(before, release.store_snapshot(tmp_path)) == \
+        ["ser-1/calibration.yaml", "ser-1/hand.yaml"]
+
+
+def test_the_sweep_is_judged_on_what_it_commands_and_its_mean_not_its_peaks():
+    capped = {"sweep_current_ma": 100.0, "hold_current_ma": 100.0, "pose_current_ma": 100.0, "speed_deg_s": 30}
+    readings = [{"mean_ma": 14.9, "peak_ma": 195.0}, {"mean_ma": -15.2, "peak_ma": 208.0}]
+    metrics = release.sweep_current_metrics(capped, readings, 100, 15.0)
+    assert [m.ok for m in metrics] == [True, True, None] and metrics[2].value == 208.0
+    over = release.sweep_current_metrics({**capped, "sweep_current_ma": 150.0}, readings, 100, 15.0)
+    assert over[0].ok is False
+    assert release.sweep_current_metrics(capped, [{"mean_ma": 140.0}], 100, 15.0)[1].ok is False
+
+
+def test_holding_stops_on_a_hot_motor_and_names_the_hottest_with_its_tracking_error():
+    start = {10: 32.0, 12: 32.0, 1: 29.0}
+    assert release.holding_abort(start, {10: 40.0, 12: 33.0, 1: 29.0}, 15.0, 60.0) is None
+    assert "warmed by 16" in release.holding_abort(start, {10: 48.0, 12: 33.0, 1: 29.0}, 15.0, 60.0)
+    assert "reached 60" in release.holding_abort({10: 50.0}, {10: 60.0}, 15.0, 60.0)
+    table = release.holding_table(start, {10: 54.0, 12: 56.0, 1: 29.0}, {10: [338.0, 368.0], 12: [455.0]},
+                                  {10: "middle_mcp", 12: "pinky_mcp", 1: "wrist"}, {"pinky_mcp": -49.7})
+    assert [r["motor"] for r in table] == [12, 10, 1]
+    assert table[0]["error_deg"] == -49.7 and table[1]["error_deg"] is None and table[1]["mean_ma"] == 353.0
+
+
+def test_the_board_step_needs_the_store_tool_and_reads_calibrates_own_verdict(tmp_path, monkeypatch):
+    plain, tooled = tmp_path / "plain", tmp_path / "tooled"
+    (plain / ".git").mkdir(parents=True)
+    (tooled / release.FIRMWARE_TOOL).parent.mkdir(parents=True)
+    (tooled / release.FIRMWARE_TOOL).write_text("")
+    ctx = SimpleNamespace(step=SimpleNamespace(params={"firmware_repo": str(plain)}), sides=SimpleNamespace())
+    monkeypatch.setattr(release.Path, "home", lambda: tmp_path / "nobody")
+    assert release.firmware_repo(ctx) is None
+    ctx.step.params["firmware_repo"] = str(tooled)
+    assert release.firmware_repo(ctx) == tooled.resolve()
+    kept = "WARNING board ...\nCalibration kept on this computer only: no orca_firmware checkout on this computer.\n"
+    assert release.board_write_outcome(0, kept) == ("not_written", "no orca_firmware checkout on this computer")
+    assert release.board_write_outcome(0, "Calibration also written to the hand's own board (seq 3).")[0] == "wrote"
+    assert release.board_write_outcome(0, "the board answered")[0] == "failed"
+    assert release.board_write_outcome(1, kept)[0] == "failed"
