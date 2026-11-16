@@ -561,7 +561,7 @@ function StepContent({
           {recheck.length > 0 && (
             <div className="flow-info warn">
               <div>
-                Nothing was checked this round: every joint passed in an earlier run. Check a
+                Nothing was checked this round; the scores shown are from earlier rounds. Check a
                 finger again, or Finish to keep those scores.
               </div>
               <div className="gt-actions" style={{ marginTop: 6 }}>
