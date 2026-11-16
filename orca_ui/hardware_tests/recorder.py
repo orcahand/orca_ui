@@ -266,8 +266,10 @@ def load(run: Run, *, engage_feedback: bool = True, engage_sensors: bool = True)
     kwargs = {
         "config_path": config_path,
         # The calibration copy beside the config: an orca_core with a hand store
-        # would otherwise use the hand's own folder.
-        "calibration_path": os.path.join(os.path.dirname(config_path), "calibration.yaml"),
+        # would otherwise use the hand's own folder (``use_hand_folder`` asks for that).
+        "calibration_path": (None if run.args.get("use_hand_folder")
+                             else os.path.join(os.path.dirname(config_path), "calibration.yaml")),
+        "motor_port": run.args.get("motor_port"),
         "mock": run.mock,
         "engage_feedback": engage_feedback,
         "engage_sensors": engage_sensors,
@@ -526,6 +528,25 @@ def load_configs(run: Run) -> dict:
                 entry[label] = {"ok": False, "error": f"{type(e).__name__}: {e}"}
         models[key] = entry
     return {"models": models}
+
+
+@scenario("connect_only")
+def connect_only(run: Run) -> dict:
+    """Connect without moving anything and report what the hand settled; torque stays off."""
+    hand = load(run, engage_feedback=False, engage_sensors=False)
+    try:
+        connect(run, hand, engage_feedback=False)
+        info = {}
+        with contextlib.suppress(Exception):
+            info = dict(hand.calibration_info)
+        config = hand.config
+        return {"connected": True, "hand_id": getattr(hand, "hand_id", None),
+                "hand_dir": getattr(hand, "hand_dir", None), "calibration": jsonable(info),
+                "max_current": jsonable(getattr(config, "max_current", None)),
+                "hardware_version": jsonable(getattr(config, "hardware_version", None)),
+                "port": getattr(config, "port", None)}
+    finally:
+        release(run, hand)
 
 
 @scenario("load_config")

@@ -548,6 +548,8 @@ def hardware_version_reported(ctx: CheckContext) -> CheckResult:
         Metric("pinned in config", "yes" if config_pins_version(ctx.service) else "no"),
     ]
     if version is None:
+        if ctx.service.settings.mock:
+            return CheckResult(status="skipped", summary="the mock hand has no board and no pin", metrics=metrics)
         return CheckResult(status="fail", summary="the console has no hardware version for this hand", metrics=metrics)
     if source is None:
         return CheckResult(status="fail", summary=f"version {version} is in force but neither the board "

@@ -1,0 +1,13 @@
+id: r14-damaged-file
+title: A damaged file
+group: new
+summary: An unreadable hand file is set aside instead of stopping the hand.
+steps:
+- id: R17a
+  title: Damaged calibration.yaml
+  kind: auto
+  check: damaged_calibration_set_aside
+  instructions: The check writes garbage into calibration.yaml, reconnects, then puts the real file back and removes
+    the set-aside copy. Nothing moves.
+  pass_rule: The hand connects, the damaged file is renamed calibration.yaml.corrupt-<time>, and the real calibration
+    is back afterwards.

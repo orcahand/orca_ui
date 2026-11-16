@@ -1,0 +1,11 @@
+id: r14-records
+title: Records per hand
+group: new
+summary: Setup records come from the connected hand's folder.
+steps:
+- id: R11a
+  title: Setup records in the hand's folder
+  kind: auto
+  check: records_in_hand_folder
+  instructions: The check reads where the console takes Setup records from. Nothing is changed.
+  pass_rule: setup.yaml is in the connected hand's folder.

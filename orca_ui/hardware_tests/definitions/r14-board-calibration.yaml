@@ -1,0 +1,18 @@
+id: r14-board-calibration
+title: The board's calibration
+group: new
+summary: A newer calibration on the board is offered with three answers.
+steps:
+- id: R5a
+  title: calibrate.py writes the board; the banner and its answers
+  kind: auto
+  check: board_calibration_banner
+  panels:
+  - operation_log
+  instructions: 'The check runs scripts/calibrate.py (with a scratch hand store, so only the board gets the new
+    calibration), then answers the banner: keep this computer''s, use it, restore previous, don''t ask again. Needs
+    an orca_firmware checkout (ORCA_FIRMWARE_REPO or beside orca_core). The computer''s files are put back; the
+    board keeps the new calibration. It moves the hand: keep it clear and on the bench. (a full calibration)'
+  pass_rule: The banner offers the board's; keep hides it until a Disconnect; use it puts the board's in force with
+    the computer's as previous and keeps the tactile zero; restore brings the banner back; don't ask again holds
+    over a reconnect.

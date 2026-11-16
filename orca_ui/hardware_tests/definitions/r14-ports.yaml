@@ -1,0 +1,12 @@
+id: r14-ports
+title: Ports and the board's side
+group: new
+summary: A named port is the only one tried; a board refuses a model of the other side.
+steps:
+- id: R15a
+  title: Unknown port and the other side's model
+  kind: auto
+  check: named_port_and_side_refused
+  instructions: With the console's hand let go, the check connects with orca_core on a port that does not exist,
+    then with the other side's model. Neither run moves the hand.
+  pass_rule: The unknown port fails without finding the hand elsewhere; the other side's model is refused.

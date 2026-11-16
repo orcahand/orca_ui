@@ -1,0 +1,136 @@
+id: r14-stops
+title: Stops and torque off
+group: new
+summary: Every routine lets go of the hand on Stop and E-STOP; the stop time is recorded for every hand, 17-motor
+  Dynamixel hands included.
+steps:
+- id: R6a
+  title: Stop during the guided tensioning
+  kind: auto
+  check: stop_releases_torque
+  params:
+    operation: guided_tension
+    how: stop
+  panels:
+  - motor_currents
+  - operation_log
+  applies_to:
+    hardware_versions:
+    - 210
+    - 211
+  instructions: 'The check starts the guided tensioning, lets it hold for a few seconds, presses Stop, then reads
+    torque enable back from every motor and times it. The hand''s records are put back. It moves the hand: keep
+    it clear and on the bench.'
+  pass_rule: It ends within 10 s, orca_core flags no motor as maybe holding, and every motor reads torque off.
+- id: R6b
+  title: E-STOP during the guided tensioning
+  kind: auto
+  check: stop_releases_torque
+  params:
+    operation: guided_tension
+    how: estop
+  panels:
+  - motor_currents
+  - operation_log
+  applies_to:
+    hardware_versions:
+    - 210
+    - 211
+  instructions: 'The check starts the guided tensioning, lets it hold for a few seconds, presses E-STOP, then reads
+    torque enable back from every motor and times it. The hand''s records are put back. It moves the hand: keep
+    it clear and on the bench.'
+  pass_rule: It ends within 10 s, orca_core flags no motor as maybe holding, and every motor reads torque off.
+- id: R6c
+  title: Stop during the tension sweep
+  kind: auto
+  check: stop_releases_torque
+  params:
+    operation: tension_sweep
+    how: stop
+  panels:
+  - motor_currents
+  - operation_log
+  instructions: 'The check starts the tension sweep, lets it hold for a few seconds, presses Stop, then reads torque
+    enable back from every motor and times it. The hand''s records are put back. It moves the hand: keep it clear
+    and on the bench.'
+  pass_rule: It ends within 10 s, orca_core flags no motor as maybe holding, and every motor reads torque off.
+- id: R6d
+  title: E-STOP during the tension sweep
+  kind: auto
+  check: stop_releases_torque
+  params:
+    operation: tension_sweep
+    how: estop
+  panels:
+  - motor_currents
+  - operation_log
+  instructions: 'The check starts the tension sweep, lets it hold for a few seconds, presses E-STOP, then reads
+    torque enable back from every motor and times it. The hand''s records are put back. It moves the hand: keep
+    it clear and on the bench.'
+  pass_rule: It ends within 10 s, orca_core flags no motor as maybe holding, and every motor reads torque off.
+- id: R6e
+  title: Stop during the slack test
+  kind: auto
+  check: stop_releases_torque
+  params:
+    operation: slack_test
+    how: stop
+  panels:
+  - motor_currents
+  - operation_log
+  instructions: 'The check starts the slack test, lets it hold for a few seconds, presses Stop, then reads torque
+    enable back from every motor and times it. The hand''s records are put back. It moves the hand: keep it clear
+    and on the bench.'
+  pass_rule: It ends within 10 s, orca_core flags no motor as maybe holding, and every motor reads torque off.
+- id: R6f
+  title: E-STOP during the slack test
+  kind: auto
+  check: stop_releases_torque
+  params:
+    operation: slack_test
+    how: estop
+  panels:
+  - motor_currents
+  - operation_log
+  instructions: 'The check starts the slack test, lets it hold for a few seconds, presses E-STOP, then reads torque
+    enable back from every motor and times it. The hand''s records are put back. It moves the hand: keep it clear
+    and on the bench.'
+  pass_rule: It ends within 10 s, orca_core flags no motor as maybe holding, and every motor reads torque off.
+- id: R6g
+  title: Stop during the calibration
+  kind: auto
+  check: stop_releases_torque
+  params:
+    operation: calibrate
+    how: stop
+    params:
+      joints:
+      - index_mcp
+      - middle_mcp
+  panels:
+  - motor_currents
+  - operation_log
+  instructions: 'The check starts the calibration, lets it hold for a few seconds, presses Stop, then reads torque
+    enable back from every motor and times it. The hand''s records are put back. It moves the hand: keep it clear
+    and on the bench.'
+  pass_rule: It ends within 10 s, orca_core flags no motor as maybe holding, and every motor reads torque off (a
+    stopped calibration keeps the calibration and its previous).
+- id: R6h
+  title: E-STOP during the calibration
+  kind: auto
+  check: stop_releases_torque
+  params:
+    operation: calibrate
+    how: estop
+    params:
+      joints:
+      - index_mcp
+      - middle_mcp
+  panels:
+  - motor_currents
+  - operation_log
+  instructions: 'The check starts the calibration, lets it hold for a few seconds, presses E-STOP, then reads torque
+    enable back from every motor and times it. The hand''s records are put back. It moves the hand: keep it clear
+    and on the bench.'
+  pass_rule: It ends within 10 s, orca_core flags no motor as maybe holding, and every motor reads torque off (a
+    stopped calibration keeps the calibration and its previous).

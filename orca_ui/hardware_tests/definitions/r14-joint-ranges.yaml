@@ -1,0 +1,21 @@
+id: r14-joint-ranges
+title: Joint ranges measured on this hand
+group: new
+summary: A joint_ranges.yaml in the hand's folder is in force and said so.
+steps:
+- id: R16a
+  title: Measured range in force, a bad value ignored
+  kind: auto
+  check: measured_joint_ranges
+  params:
+    joint: index_pip
+    range:
+    - 0
+    - 80
+  panels:
+  - motor_positions
+  instructions: 'The check writes a joint_ranges.yaml with index_pip at [0, 80], reconnects, drives index_pip to
+    both ends, then tries a bad value and no file. The hand''s own joint_ranges.yaml (if any) is put back. It moves
+    the hand: keep it clear and on the bench.'
+  pass_rule: The hand menu says measured; index_pip runs 0–80° and its ends land on the calibrated motor limits;
+    a bad value and no file fall back to the model's range.

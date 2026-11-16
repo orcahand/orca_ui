@@ -1,0 +1,23 @@
+id: r14-upgrade
+title: Upgrade to ~/.orca
+group: new
+summary: The console's state moved to <ORCA_HOME>/ui and the hand got a folder of its own.
+steps:
+- id: R1a
+  title: Console state moved
+  kind: auto
+  check: ui_home_moved
+  instructions: The check reads where the console keeps its state and what ~/.orca_ui is now. Nothing is changed.
+  pass_rule: The state folder is <ORCA_HOME>/ui; ~/.orca_ui is a link to it (or absent); the library is there.
+- id: R1b
+  title: The hand's folder
+  kind: auto
+  check: hand_folder_matches
+  instructions: The check compares the header's hand id with orca_core's and looks at the folder. Nothing is changed.
+  pass_rule: The folder is <ORCA_HOME>/hands/<id> with a hand.yaml, named like the header's id.
+- id: R1c
+  title: Files from before this version
+  kind: observe
+  check: legacy_notice_state
+  instructions: Records which old files the notice lists, if any.
+  pass_rule: Recorded only.

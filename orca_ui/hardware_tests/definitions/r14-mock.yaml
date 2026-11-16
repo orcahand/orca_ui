@@ -1,0 +1,12 @@
+id: r14-mock
+title: Mock hands
+group: new
+summary: A mock hand never writes the hands folder.
+steps:
+- id: R12a
+  title: A mock hand leaves ~/.orca alone
+  kind: auto
+  check: mock_leaves_store
+  instructions: The check connects a mock hand of this model in the console's process and calibrates one joint,
+    comparing the hands folder before and after. The real hand does not move.
+  pass_rule: Nothing under <ORCA_HOME>/hands changed; the mock hand used a folder elsewhere.

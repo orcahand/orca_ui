@@ -1,7 +1,9 @@
 """The registered checks: importing this package registers every check.
 
 ``console`` holds the checks that use the running console, ``evidence`` the
-ones that judge a hands-on step from what the session recorded, ``software``
+ones that judge a hands-on step from what the session recorded, ``release``
+the orca_core 0.14 / UI 0.6 plan's checks (hand folder, session versions,
+stops and torque off), ``software``
 the test-suite run, and ``compare`` the ones that run a scenario with main's
 and the branch's orca_core. A
 ``compare`` module that fails to import does not stop the console checks from
@@ -12,7 +14,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from orca_ui.hardware_tests.checks import console, evidence, software  # noqa: F401  (registers)
+from orca_ui.hardware_tests.checks import console, evidence, release, software  # noqa: F401  (registers)
 from orca_ui.hardware_tests.checks.base import CheckFn, get_check, registered_checks
 
 COMPARE_IMPORT_ERROR: Optional[BaseException] = None

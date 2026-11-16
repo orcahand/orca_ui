@@ -1,0 +1,16 @@
+id: r14-scripts
+title: orca_core's scripts on this hand
+group: new
+summary: The scripts use the hand's own folder.
+steps:
+- id: R20a
+  title: neutral, zero, guided_tension Ctrl-C, measure_travel
+  kind: auto
+  check: scripts_use_hand_folder
+  panels:
+  - operation_log
+  instructions: 'With the console let go of the hand, the check runs neutral.py and zero.py, starts guided_tension.py
+    and sends Ctrl-C after 20 s, and runs measure_travel.py --from-calibration --dry-run. It moves the hand: keep
+    it clear and on the bench.'
+  pass_rule: neutral and zero run without calibrating first; guided_tension ends on Ctrl-C with every motor reading
+    torque off; measure_travel prints the travel without moving.

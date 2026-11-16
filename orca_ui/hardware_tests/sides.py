@@ -43,14 +43,14 @@ MAIN_ENV = "ORCA_CORE_MAIN"
 MAIN_WORKTREE = Path("worktrees") / "orca_core-main"
 
 HAND_SCENARIOS = frozenset({"detect", "calibrate", "neutral", "tension_hold", "joint_loop",
-                            "tactile_health", "guided_tension_gate"})
+                            "tactile_health", "guided_tension_gate", "connect_only"})
 """Scenarios that open the hand's ports, so the console must let go of them first."""
 NO_CONFIG_SCENARIOS = frozenset({"detect", "load_configs"})
 
 SCENARIO_TIMEOUT_S = {
     "detect": 120.0, "load_configs": 180.0, "load_config": 60.0, "calibrate": 1200.0,
     "neutral": 300.0, "tension_hold": 300.0, "joint_loop": 300.0, "tactile_health": 120.0,
-    "guided_tension_gate": 120.0,
+    "guided_tension_gate": 120.0, "connect_only": 120.0,
 }
 DEFAULT_TIMEOUT_S = 600.0
 ENV_PREPARE_TIMEOUT_S = 900.0
@@ -413,8 +413,9 @@ class SideRunner:
         path = getattr(config, "config_path", None) or getattr(self.settings, "config_path", None)
         return Path(path) if path else None
 
-    def config_source(self, side: str) -> tuple[Path, str]:
-        """``(config.yaml to copy, where it came from)`` for the hand's model on ``side``.
+    def config_source(self, side: str, model_name: Optional[str] = None) -> tuple[Path, str]:
+        """``(config.yaml to copy, where it came from)`` for the hand's model on ``side``
+        (or ``model_name``'s).
 
         The side's packaged config for the console's model; a model no checkout
         packages (the console's own mock model) falls back to the console's config."""
@@ -422,6 +423,7 @@ class SideRunner:
         if console is None:
             raise RuntimeError("the console has no config for the hand")
         version, name = model_location(console)
+        name = model_name or name
         version = version or getattr(self.settings, "model_version", None)
         packaged = packaged_config(self._require(side), name, version)
         if packaged is not None:
@@ -467,11 +469,12 @@ class SideRunner:
             raise RuntimeError(f"{side}'s orca_core could not load {_display(source)}: "
                                + _tail(out_dir / "effective.stderr.log", 600).strip())
 
-    def prepare_config(self, side: str, out_dir: Path,
-                       overrides: Optional[Mapping] = None) -> Path:
-        """Write a complete copy of the side's config for the hand into ``out_dir/config``
-        with the hand's calibration beside it, apply ``overrides``, and return its path."""
-        source, origin = self.config_source(side)
+    def prepare_config(self, side: str, out_dir: Path, overrides: Optional[Mapping] = None,
+                       model_name: Optional[str] = None) -> Path:
+        """Write a complete copy of the side's config for the hand (or ``model_name``)
+        into ``out_dir/config`` with the hand's calibration beside it, apply
+        ``overrides``, and return its path."""
+        source, origin = self.config_source(side, model_name)
         calibration = self.hand_calibration()
         document = self.effective_config(side, source, out_dir)
         path = copy_config(source, out_dir / "config", calibration=calibration,
@@ -584,8 +587,9 @@ class SideRunner:
         args = dict(args)
         overrides = args.pop("config_overrides", None)
         env = self.run_env(out_dir, real_store=bool(args.pop("real_store", False)))
+        model_name = args.pop("model_name", None)
         if scenario not in NO_CONFIG_SCENARIOS and "config_path" not in args:
-            args["config_path"] = str(self.prepare_config(side, out_dir, overrides))
+            args["config_path"] = str(self.prepare_config(side, out_dir, overrides, model_name))
         stop_file = out_dir / "STOP"
         stop_file.unlink(missing_ok=True)
         (out_dir / "result.json").unlink(missing_ok=True)

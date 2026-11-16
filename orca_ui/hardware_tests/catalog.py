@@ -172,6 +172,7 @@ def load_plan(path: Path) -> Plan:
         title=str(raw["title"]),
         summary=str(raw["summary"]).strip(),
         features=_tuple(raw["features"], f"{path.name}.features"),
+        default=bool(raw.get("default", False)),
     )
 
 
@@ -200,6 +201,10 @@ def load_catalog(definitions_dir: Path = DEFINITIONS_DIR, plans_dir: Path = PLAN
         if len(set(plan.features)) != len(plan.features):
             raise CatalogError(f"plan {plan.id!r} lists a feature twice")
         plans[plan.id] = plan
+    if sum(p.default for p in plans.values()) > 1:
+        raise CatalogError("more than one plan is marked default")
+    # The default plan first: the tab offers the first plan it is given.
+    plans = dict(sorted(plans.items(), key=lambda kv: not kv[1].default))
     return Catalog(features=features, plans=plans)
 
 

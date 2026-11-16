@@ -1,0 +1,12 @@
+id: r14-slack
+title: Slack test
+group: new
+summary: A slack test that tests nothing changes nothing.
+steps:
+- id: R9a
+  title: Skip every joint
+  kind: auto
+  check: slack_skip_all
+  instructions: The check runs a slack test and answers Skip at every joint, then Finish. The hand's records are
+    put back. Nothing winds.
+  pass_rule: It reads as nothing tested, and a calibration block from an earlier test is unchanged.

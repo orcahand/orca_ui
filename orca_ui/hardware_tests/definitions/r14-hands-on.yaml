@@ -1,0 +1,112 @@
+id: r14-hands-on
+title: 'Hands-on: only what needs a person'
+group: new
+summary: 'The steps no check can do alone: unplugging, swapping hands and boards, power, and looking at the screen.
+  Everything else runs in the automatic checks.'
+steps:
+- id: H1
+  title: USB glitch while guided tensioning holds
+  kind: manual
+  action: operation:guided_tension
+  check: torque_off_now
+  panels:
+  - motor_currents
+  - operation_log
+  applies_to:
+    hardware_versions:
+    - 210
+    - 211
+  instructions: Start guided tensioning with the button and wait until a joint holds. Unplug the USB cable for about
+    1 s, plug it back in, then press Stop. Push each finger gently by hand. If a red banner says motors may still
+    be holding, press E-STOP and note it.
+  pass_rule: No hang, no crash; every finger moves freely. The check then reads torque off from every motor.
+- id: H2
+  title: USB glitch during a tension sweep
+  kind: manual
+  action: operation:tension_sweep
+  check: torque_off_now
+  panels:
+  - motor_currents
+  - operation_log
+  instructions: Start a tension sweep with the button. While it runs, unplug the USB cable for about 1 s, plug it
+    back in, then press Stop. Push each finger gently by hand; note any "may still be holding" banner.
+  pass_rule: No hang, no crash; every finger moves freely. The check then reads torque off from every motor.
+- id: H3
+  title: Another USB socket
+  kind: manual
+  check: hand_folder_matches
+  instructions: Quit the console, move the hand's USB cable to a different socket on the computer and start the
+    console again. Then, while it runs, move the cable once more and press Reconnect in the header.
+  pass_rule: Both times the hand is found and connects, with the same id in the header.
+- id: H4
+  title: 'Guided tensioning: unchecked joints and a retest'
+  kind: manual
+  action: operation:guided_tension
+  panels:
+  - operation_log
+  applies_to:
+    hardware_versions:
+    - 210
+    - 211
+  instructions: 'Start guided tensioning. 1. Range-check only the thumb, then jump straight to the ratchet: the
+    other fingers show "not checked" and get no click suggestions. 2. Stop, resume: still "not checked". 3. Finish
+    a round to the score screen and ask for a retest of one joint: only that joint moves, it shows "not checked"
+    while it waits, the other results stay; Finish updates the score. 4. Reopen guided tensioning: the retested
+    joint shows its new result.'
+  pass_rule: Every point holds as written. Posing the hand and turning the ratchets need a person, so this stays
+    hands-on.
+- id: H5
+  title: A second hand
+  kind: manual
+  instructions: With this hand connected, choose another hardware version in the header. Unplug it and plug in a
+    second hand (mark skipped if you have only one). Then plug the first hand back in.
+  pass_rule: The header shows the second hand's id and the version choice is gone; Setup's records, checkmarks and
+    the hand menu are the second hand's. With the first hand back, its nickname, calibration and records are back;
+    each hand has its own folder under ~/.orca/hands/.
+- id: H6
+  title: A hand without a board, and old board firmware
+  kind: manual
+  instructions: 'Only if you have them, otherwise mark skipped. 1. A hand on a plain USB adapter: start the console.
+    2. A board with firmware too old to report its identity: start the console.'
+  pass_rule: 1. The header reads "hw ? · no board", the folder is noboard-<model>, calibration works and a v2.1
+    choice switches the thumb steps. 2. It connects into a usb-<USB serial> folder and the log asks to update the
+    firmware.
+- id: H7
+  title: Sensors only (motor power off)
+  kind: manual
+  applies_to:
+    requires:
+    - tactile
+  panels:
+  - tactile
+  instructions: Switch the motor power off, start the console, zero the tactile sensors, reconnect.
+  pass_rule: The console runs sensors-only, the zero works and is kept after the reconnect.
+- id: H8
+  title: Look at the console
+  kind: manual
+  instructions: '1. Header: "hand <id> ▾" and the version select ("hw v… · board"). 2. Hand menu: id with nickname,
+    calibration date, joint ranges, restore previous; Escape closes it. 3. The old-files notice (if shown): hover
+    lists the files, Dismiss hides it. 4. Your light/dark theme is as before. 5. Dashboard: the 3D hand follows
+    the sliders; Setup → Tension: the tower preview loads. 6. Open the tension sweep dialog: E-STOP is visible.
+    7. Teleop tab opens.'
+  pass_rule: Everything shows as described; take a screenshot of anything that does not.
+- id: H9
+  title: Restart the console
+  kind: manual
+  instructions: Choose another hardware version in the header and dismiss "What's new". Quit the console and start
+    it again.
+  pass_rule: The version is back to the board's (a choice is never saved); "What's new" and a dismissed old-files
+    notice stay dismissed.
+- id: H10
+  title: Windows
+  kind: manual
+  instructions: Only on a Windows computer with a hand, otherwise mark skipped. Start the console the first time,
+    calibrate, rename the hand while it runs, restore the previous calibration.
+  pass_rule: '%USERPROFILE%\.orca_ui moved to %USERPROFILE%\.orca\ui (no link is left on Windows); no "file in use"
+    errors; a board that sends nothing counts as "no board".'
+- id: H11
+  title: Going back to the 0.5 console (optional)
+  kind: manual
+  instructions: Quit and start the old console (cd ~/code/orca_ui && uv run orca-ui).
+  pass_rule: Your library and recordings are there through the ~/.orca_ui link; it uses its old calibration beside
+    the config.

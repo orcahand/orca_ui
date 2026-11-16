@@ -1,0 +1,16 @@
+id: r14-touch
+title: 'Touch: the tactile zero'
+group: new
+summary: The zero lives in the hand's calibration and comes back on reconnect.
+steps:
+- id: R10a
+  title: Zero kept over a reconnect
+  kind: auto
+  check: tactile_zero_kept
+  applies_to:
+    requires:
+    - tactile
+  instructions: The check zeroes the sensors, reconnects, and compares. The calibration file is put back afterwards;
+    keep the fingertips untouched.
+  pass_rule: The sensors get the saved zero back after the reconnect. (The zero kept on taking the board's calibration
+    is checked in R5a.)

@@ -1,0 +1,29 @@
+id: release-0.14
+title: orca_core 0.14.0 + UI 0.6.0
+default: true
+summary: 'Hands-on first (only what needs a person), then one automatic run over everything else: the hand''s own
+  folder, session versions, the board''s calibration, stops and torque off, and what must not have broken.'
+features:
+- r14-hands-on
+- software
+- connect-detect
+- config-loading
+- current-defaults
+- r14-upgrade
+- r14-records
+- r14-console
+- r14-hand-menu
+- r14-session-version
+- r14-mock
+- r14-own-config
+- r14-orca-home
+- r14-ports
+- r14-damaged-file
+- r14-slack
+- r14-current
+- r14-calibration
+- r14-joint-ranges
+- r14-touch
+- r14-stops
+- r14-board-calibration
+- r14-scripts

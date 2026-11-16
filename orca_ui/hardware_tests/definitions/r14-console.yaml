@@ -1,0 +1,13 @@
+id: r14-console
+title: Nothing else broke
+group: new
+summary: What the console's pages read still answers.
+steps:
+- id: R13a
+  title: Pages, poses, Disconnect and Reconnect
+  kind: auto
+  check: console_regressions
+  instructions: The check reads status, hand info, the motor table, models, boards and gains, saves and deletes
+    a pose "hwtest-pose", then disconnects and reconnects. The hand does not move.
+  pass_rule: Every read answers, the pose is saved and gone again, Disconnect leaves torque off and "released",
+    Reconnect brings the hand back.

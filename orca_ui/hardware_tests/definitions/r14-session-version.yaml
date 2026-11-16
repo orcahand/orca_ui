@@ -1,0 +1,18 @@
+id: r14-session-version
+title: Hardware version for this session
+group: new
+summary: The board's version is used unless one is chosen for the session; a choice is never saved.
+steps:
+- id: R4a
+  title: Version and its source
+  kind: auto
+  check: hardware_version_reported
+  instructions: The check reads the version in force and where it came from.
+  pass_rule: A version is in force from the session choice, the board or a config pin.
+- id: R4b
+  title: Choose, reconnect, use board's
+  kind: auto
+  check: session_hardware_version
+  instructions: The check chooses another version, disconnects and reconnects, then takes the board's back. The
+    original choice is restored. The hand reconnects each time.
+  pass_rule: The choice is in force, survives Disconnect/Reconnect, and use board's returns to the board's version.

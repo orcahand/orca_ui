@@ -71,6 +71,8 @@ class Plan:
     title: str
     summary: str
     features: tuple[str, ...]
+    default: bool = False
+    """The plan the Tests tab offers first."""
 
 
 @dataclass(frozen=True)

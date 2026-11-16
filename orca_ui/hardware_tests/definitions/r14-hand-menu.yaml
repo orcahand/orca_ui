@@ -1,0 +1,12 @@
+id: r14-hand-menu
+title: Hand menu
+group: new
+summary: Nickname set, renamed and cleared through the console.
+steps:
+- id: R2a
+  title: Nickname
+  kind: auto
+  check: nickname_roundtrip
+  instructions: The check sets, renames and clears the nickname, reconnecting in between, and puts the original
+    back.
+  pass_rule: Each change shows, a name survives a reconnect, and the original nickname is back.

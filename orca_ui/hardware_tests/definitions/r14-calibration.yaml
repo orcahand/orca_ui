@@ -1,0 +1,27 @@
+id: r14-calibration
+title: Calibrate and restore previous
+group: new
+summary: Each calibration keeps the one before it; restore previous swaps them, never while anything drives the
+  hand.
+steps:
+- id: R3a
+  title: Two calibrations and restore previous
+  kind: auto
+  check: calibrate_and_restore
+  params:
+    joints:
+    - index_mcp
+  panels:
+  - operation_log
+  instructions: 'The check calibrates index_mcp twice, tries restore previous with torque on, then restores with
+    torque off. The hand''s calibration files are put back afterwards (a hand that had none keeps the new one).
+    It moves the hand: keep it clear and on the bench.'
+  pass_rule: The log names the file written; the sequence goes up by one; restore is refused with torque on and
+    puts the first run in force with the second as previous.
+- id: R3b
+  title: No changes while an operation runs
+  kind: auto
+  check: refused_while_operation_runs
+  instructions: The check starts a slack test and, while it waits at the first joint, tries restore previous, the
+    board's calibration and a version change; then stops the test. The hand's records are put back.
+  pass_rule: All three are refused naming the running operation; the test is still waiting.

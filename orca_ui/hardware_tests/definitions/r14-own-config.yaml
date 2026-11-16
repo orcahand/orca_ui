@@ -1,0 +1,14 @@
+id: r14-own-config
+title: Your own config file
+group: new
+summary: write_standalone_config makes a complete copy that runs the same hand.
+steps:
+- id: R18a
+  title: Standalone copy and a bare copy
+  kind: auto
+  check: standalone_config
+  instructions: The check writes a standalone copy of this hand's model and a bare copy of its packaged config.yaml,
+    then (console let go of the hand) connects orca_core with the standalone copy, max current changed to 200 mA.
+    Nothing moves.
+  pass_rule: The copy loads as the model and connects with this hand's folder and calibration at 200 mA; the bare
+    copy is refused and points to write_standalone_config.

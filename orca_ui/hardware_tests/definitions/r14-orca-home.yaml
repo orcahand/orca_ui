@@ -1,0 +1,12 @@
+id: r14-orca-home
+title: ORCA_HOME elsewhere
+group: new
+summary: A custom ORCA_HOME moves nothing and gets the hand's folder.
+steps:
+- id: R19a
+  title: Custom ORCA_HOME
+  kind: auto
+  check: orca_home_elsewhere
+  instructions: The check starts the console's home setup in a scratch HOME with ORCA_HOME elsewhere, and (console
+    let go of the hand) connects orca_core with its own ORCA_HOME. Nothing moves.
+  pass_rule: ~/.orca_ui is not moved; the hand gets a folder in that ORCA_HOME; the real hands folder is untouched.
