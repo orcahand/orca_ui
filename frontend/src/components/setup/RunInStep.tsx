@@ -23,7 +23,7 @@ export function RunInStep({
   calibrated: boolean
 }) {
   const gate = useStartGate('motors')
-  const model = useAppStore((s) => s.handInfo?.model_name)
+  const handId = useAppStore((s) => s.handInfo?.hand?.id ?? null)
   const torque = useAppStore((s) => s.status?.torque_enabled ?? false)
   const liveMaxCurrent = useAppStore((s) => s.control?.max_current ?? null)
   const operation = useOperationStore((s) => s.operation)
@@ -34,15 +34,15 @@ export function RunInStep({
   // Current cap for the run, in mA; empty = leave the hand's ceiling alone.
   const [capDraft, setCapDraft] = useState('')
   const [doneAt, setDoneAt] = useState<string | null>(null)
-  useEffect(() => setDoneAt(readRunInDone(model)), [model])
+  useEffect(() => setDoneAt(readRunInDone(handId)), [handId])
 
   const finishedId = runInCompleted(operation) ? operation!.run_id : null
   useEffect(() => {
-    if (!finishedId || !model) return
+    if (!finishedId || !handId) return
     const now = new Date().toISOString()
-    writeRunInDone(model, now)
+    writeRunInDone(handId, now)
     setDoneAt(now)
-  }, [finishedId, model])
+  }, [finishedId, handId])
 
   const cap = capDraft.trim() === '' ? null : parseInt(capDraft, 10)
   const capValid =
