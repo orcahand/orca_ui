@@ -704,8 +704,9 @@ class RunInOperation(Operation):
         speed = float(params.get("speed", RUN_IN_DEFAULT_SPEED))
         if speed not in RUN_IN_SPEEDS:
             raise ServiceError(f"speed must be one of {list(RUN_IN_SPEEDS)}")
-        clean = {"duration_s": duration_s, "speed": speed,
-                 "max_current_ma": None}
+        # The hand it runs on: the browser ticks the Run step for that hand only.
+        clean = {"duration_s": duration_s, "speed": speed, "max_current_ma": None,
+                 "hand_id": getattr(service.session.hand, "hand_id", None)}
         cap = params.get("max_current_ma")
         if cap is not None:
             try:

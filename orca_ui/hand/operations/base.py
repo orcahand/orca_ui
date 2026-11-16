@@ -37,6 +37,7 @@ class OpContext:
         self.settings = settings
         self.stop_event = stop_event
         self._input_queue = input_queue
+        self._torque_off_failed: dict | None = None
 
     # ----- snapshot updates ---------------------------------------------------
 
@@ -54,11 +55,30 @@ class OpContext:
     def set_extra(self, extra: dict) -> None:
         """Publish op-specific structured state (snapshot ``extra``) for rich
         frontends — e.g. the motor-chain panel's per-motor grid. Replaced
-        wholesale on every call."""
+        wholesale on every call, except that motors left holding stay on it."""
+        if self._torque_off_failed:
+            extra = {**extra, "torque_off_failed": self._torque_off_failed}
         self._manager.update_snapshot(extra=extra)
 
     def log(self, line: str) -> None:
         self._manager.append_log(line)
+
+    @property
+    def torque_off_report(self) -> dict | None:
+        """Motors this run could not confirm off (``motors``, ``joints``), or None."""
+        return self._torque_off_failed
+
+    def torque_off_failed(self, event: dict) -> None:
+        """orca_core's ``torque_off_failed``: motors that may still hold after a
+        routine let go. Logged, and kept on ``extra`` for the console's banner."""
+        motors = list(event.get("motors") or [])
+        joints = list(event.get("joints") or [])
+        joints += [None] * (len(motors) - len(joints))
+        self._torque_off_failed = {"motors": motors, "joints": joints}
+        named = ", ".join(f"motor {m}" + (f" ({j})" if j else "") for m, j in zip(motors, joints))
+        self.log(f"torque off was not confirmed on {named}: they may still be holding. "
+                 "Press E-STOP or power-cycle the hand.")
+        self.set_extra((self._manager.snapshot() or {}).get("extra") or {})
 
     # ----- stop / input ---------------------------------------------------------
 

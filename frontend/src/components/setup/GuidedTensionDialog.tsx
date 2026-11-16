@@ -78,10 +78,14 @@ function pct(fraction: number | null | undefined): string {
 const deg = (value: number | null | undefined, digits = 0) =>
   value == null ? '—' : `${value.toFixed(digits)}°`
 
+// A joint this round never swept: no slack to show and no clicks to suggest.
+const NOT_CHECKED = 'not checked'
+
 // Slack scoring: a latched motor shows what it is, not a number it cannot have
 // earned; the others show the slack still in their tendons, in motor degrees.
 function slackCell(motor: MotorSpread): string {
   if (motor.status === 'fault') return 'FAULT'
+  if (motor.not_checked) return NOT_CHECKED
   if (motor.slack_deg == null) return 'n/a'
   return deg(Math.max(0, motor.slack_deg))
 }
@@ -92,6 +96,7 @@ const clicksText = (clicks: number) => `~${clicks} click${clicks === 1 ? '' : 's
 // needs, or the travel itself while the degrees per click are unknown.
 function todoCell(motor: MotorSpread, slack: boolean): string {
   if (motor.status === 'fault') return 'FAULT'
+  if (motor.not_checked) return NOT_CHECKED
   if (motor.clicks_left != null) return motor.clicks_left > 0 ? clicksText(motor.clicks_left) : 'under 1 click'
   return slack ? `${deg(Math.max(0, motor.slack_deg ?? 0))} slack` : pct(motor.fraction)
 }
@@ -318,6 +323,22 @@ export function GuidedTensionDialog({
             </button>
           </div>
         )}
+        {extra?.torque_off_failed && (
+          <div className="gt-warning">
+            Torque off was not confirmed on{' '}
+            {extra.torque_off_failed.motors
+              .map((m, i) => `M${m}${extra.torque_off_failed!.joints[i] ? ` (${extra.torque_off_failed!.joints[i]})` : ''}`)
+              .join(', ')}
+            : they may still be holding. Press E-STOP or power-cycle the hand.
+          </div>
+        )}
+        {extra?.sampler_failed && active && (
+          <div className="gt-warning">
+            The live readings stopped in round {extra.sampler_failed.round}
+            {extra.sampler_failed.error ? ` (${extra.sampler_failed.error})` : ''}, so the spreads shown no longer
+            update. Stop the run and start guided tensioning again.
+          </div>
+        )}
         <div className="gt-body">
           <nav className="gt-steps">
             {steps.map((s, i) => {
@@ -422,7 +443,10 @@ function StepContent({
     return (
       <div className="gt-pane">
         <h3 className="gt-heading">Stopped</h3>
-        <p className="setup-copy">{operation.error ?? 'the run ended with an error'} — torque is off.</p>
+        <p className="setup-copy">
+          {operation.error ?? 'the run ended with an error'} —{' '}
+          {extra?.torque_off_failed ? 'some motors may still hold (see above).' : 'torque is off.'}
+        </p>
       </div>
     )
   }
@@ -537,7 +561,7 @@ function StepContent({
           {recheck.length > 0 && (
             <div className="flow-info warn">
               <div>
-                Nothing was checked this round: every joint passed in an earlier run. Check a
+                Nothing was checked this round; the scores shown are from earlier rounds. Check a
                 finger again, or Finish to keep those scores.
               </div>
               <div className="gt-actions" style={{ marginTop: 6 }}>
@@ -573,9 +597,11 @@ function StepContent({
         : motors.map((m) => ({
             joint: m.joint,
             motor: m.motor,
-            status: m.status,
+            status: m.not_checked ? ('unscored' as SpreadStatus) : m.status,
             fraction: m.fraction,
-            tag: ['pass', 'unconfirmed', 'unscored'].includes(m.status) ? undefined : todoCell(m, slack),
+            tag: m.not_checked
+              ? NOT_CHECKED
+              : ['pass', 'unconfirmed', 'unscored'].includes(m.status) ? undefined : todoCell(m, slack),
           }))
       return (
         <div className="gt-tension">
@@ -612,7 +638,10 @@ function StepContent({
         return (
           <div className="gt-pane">
             <h3 className="gt-heading">Cancelled</h3>
-            <p className="setup-copy">Torque is off. Nothing was recorded — calibrate before use.</p>
+            <p className="setup-copy">
+              {extra.torque_off_failed ? 'Some motors may still hold (see above).' : 'Torque is off.'} Nothing was
+              recorded — calibrate before use.
+            </p>
           </div>
         )
       }
@@ -769,8 +798,8 @@ function FractionRow({ motor, thresholds, dim = false, canRetest }: RowProps) {
         )}
       </span>
       <span className="gt-row-pct">
-        {motor.status === 'fault' ? 'FAULT' : motor.expected_deg == null ? 'n/a' : pct(motor.fraction)}
-        {motor.status !== 'fault' && <small>/{Math.round(passFraction * 100)}</small>}
+        {motor.status === 'fault' ? 'FAULT' : motor.not_checked ? NOT_CHECKED : motor.expected_deg == null ? 'n/a' : pct(motor.fraction)}
+        {motor.status !== 'fault' && !motor.not_checked && <small>/{Math.round(passFraction * 100)}</small>}
       </span>
       <RetestCell motor={motor} canRetest={canRetest} />
     </div>
@@ -807,7 +836,7 @@ function SlackRow({ motor, thresholds, dim = false, canRetest }: RowProps) {
       </span>
       <span className="gt-row-pct">
         {slackCell(motor)}
-        {motor.status !== 'fault' && motor.slack_deg != null && (
+        {motor.status !== 'fault' && !motor.not_checked && motor.slack_deg != null && (
           <small title="ends reached: + / −">/{tolerance}° · {ends}</small>
         )}
       </span>

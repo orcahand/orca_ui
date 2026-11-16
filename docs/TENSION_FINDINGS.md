@@ -8,7 +8,7 @@ backups under `~/Documents/Projects/orca/hand_data_backup/<serial>/<timestamp>/`
 (a detached loop copies both model folders there on every change; `backup.log`
 beside them lists each copy).
 
-## Reference hand: ser-9097 (orcahand-right, HW 210)
+## Reference hand: ser-0001 (orcahand-right, HW 210)
 
 | Artefact | Name | What it is |
 |---|---|---|
@@ -63,7 +63,7 @@ Per joint and direction, against the reference probe:
 - Degrees of motor free travel removed per ratchet click (click test, planned
   2026-10-16 on a fresh hand; script `scripts/click_test.py`, console stopped).
 - Noise band of the probe: needs a same-pose repeat on an unchanged hand
-  (GT_tension_04 after the GT_02 calibration on ser-9097).
+  (GT_tension_04 after the GT_02 calibration on ser-0001).
 - Does breakaway per joint transfer between hands of the same build, or does
   each hand need its own reference? First new hand answers this.
 
@@ -71,14 +71,14 @@ Per joint and direction, against the reference probe:
 - Baselines, probes and calibration live in the installed model folder
   (`orcahand-right/`, `orcahand-left/`). A left hand sees none of the right
   hand's data. GT_01 (travel) and GT_tension_03 (reference probe) were copied
-  into `orcahand-left/` and activated so new left hands score against ser-9097.
+  into `orcahand-left/` and activated so new left hands score against ser-0001.
   Entries carry `hand_key`, so hands stay distinguishable inside one folder.
 - Guided tensioning reads the active baseline when it starts; a run already in
   progress keeps its expected travel until resumed.
 
 ## Per-hand log
 (one entry per hand: serial, date, rounds, baselines/probes saved, verdict)
-- ser-9785 (orcahand-left, HW 210) — 2026-10-16 00:46: guided tensioning round 2,
+- ser-0002 (orcahand-left, HW 210) — 2026-10-16 00:46: guided tensioning round 2,
   scored against the shared v2.1 block (run started before GT_01 was imported).
   Best fractions so far: pinky_abd 0.25, ring_mcp 0.45, thumb_cmc 0.50,
   thumb_mcp 0.52, ring_abd 0.55, pinky_pip 0.60; rest 0.64–0.92. Saved
@@ -106,7 +106,7 @@ Per joint and direction, against the reference probe:
     pinky_abd 0.96, pinky_mcp 0.95, ring_pip 0.95, thumb_mcp 0.90, middle
     mcp/pip 0.89, pinky_pip 0.87, ring_mcp 0.81, thumb_cmc 0.80, thumb_dip
     0.80, thumb_abd 0.78, ring_abd 0.51. Index abd exceeding GT_01 by 10 %
-    means ser-9097's index abd travel (40.2° motor) is on the small side for
+    means ser-0001's index abd travel (40.2° motor) is on the small side for
     the baseline; revisit once a few hands are in.
   - 02:19 round 2: thumb_abd 0.78→0.90, ring_mcp 0.81→0.87, ring_pip 1.00,
     thumb_dip 0.82. ring_abd 0.51 unchanged.
@@ -116,7 +116,7 @@ Per joint and direction, against the reference probe:
     back was mechanical, not tension), ring_pip 1.04. Hand now ≥ 0.80
     everywhere; lowest: thumb_cmc 0.80, thumb_dip 0.82, pinky_pip 0.87.
   - 02:22 full manual calibration, snapshot manual_2026-10-16T00-22-47
-    (complete, wrist too). Motor travel vs GT_01 (ser-9097): within ±5 % on
+    (complete, wrist too). Motor travel vs GT_01 (ser-0001): within ±5 % on
     13 of 17 joints; index_abd 1.09, ring_abd 1.08, middle_abd 1.05 larger;
     thumb_dip 0.86 smaller (93.6° vs 109.3°). Cross-hand travel agrees to
     about 5 % except thumb_dip, so GT_01 is a usable baseline for the fleet;
@@ -136,14 +136,14 @@ Per joint and direction, against the reference probe:
 
 ### 2026-10-16 — a one-hand reference inherits that hand's flaws
 - GT_tension_03's pinky_abd (50 mA with a 12° dead zone) and pinky_mcp
-  (30/50 mA, free joint) were themselves not well tensioned, so ser-9785's
+  (30/50 mA, free joint) were themselves not well tensioned, so ser-0002's
   healthy pinky scores "over" against them. The reference for breakaway
   should be a per-joint band built from several well-tensioned hands (median
   ± noise), not one hand. Keep GT_tension_03 as the reference until a third
   hand is in, then replace the per-joint reference with fleet medians.
 - The take-up column is the trustworthy actionable signal: a stalled free
   travel of several degrees is slack on that tendon side, independent of any
-  reference. Index_pip extend 36° on ser-9785 is the clearest case so far.
+  reference. Index_pip extend 36° on ser-0002 is the clearest case so far.
 - Thumb cmc/abd extend probes get skipped from mid-range because the pose
   move never got there: GT_tension_04's centre for thumb_cmc sat 6° from the
   extend limit (should be ~30°). The move ran at the 200 mA hold current and
@@ -193,12 +193,12 @@ Per joint and direction, against the reference probe:
     new 20° flex dead zone, extend dead zone still 39°; index_mcp 140→110.
     Scores on those stayed flat (0.82 / 0.86). A tendon that loses 50 mA and
     gains 20° of slack in 15 minutes is slipping: check the index_pip and
-    thumb_dip spool ratchets / tendon knots on ser-9785.
+    thumb_dip spool ratchets / tendon knots on ser-0002.
     Unchanged free joints: ring_pip 30/30, pinky_pip 30/30 (both run to the
     cap at 60 mA, 0 dead zone) — these have no preload at all yet scored
     1.01 / 0.95 on travel: travel fraction alone cannot see missing preload.
 
-### 2026-10-16 — what the two signals mean, from ser-9785
+### 2026-10-16 — what the two signals mean, from ser-0002
 - Travel fraction (guided score) saturates near 1.0 before the tendon has
   any preload: ring_pip / pinky_pip score ≥ 0.95 while breaking away at
   30 mA and running free. Breakaway is the only signal that sees preload.
@@ -208,7 +208,7 @@ Per joint and direction, against the reference probe:
   fits every joint that was deliberately tensioned on both hands; thumb
   cmc/abd sit at 170–250 mA on both and may simply be stiffer joints.
 
-### 2026-10-16 — probe repeatability and post-tensioning relaxation (ser-9097)
+### 2026-10-16 — probe repeatability and post-tensioning relaxation (ser-0001)
 - GT_tension_03 vs 04 on the right hand, same settings and pose, one hour
   apart, nothing ratcheted in between: breakaway |diff| median 10 mA, 75th
   percentile 20 mA over 31 sides. Noise band for the verdict: ±20 mA, i.e.
@@ -217,7 +217,7 @@ Per joint and direction, against the reference probe:
 - The outliers are not noise, they are relaxation: thumb_cmc flex 180→140
   with a new 15.6° extend dead zone, thumb_dip 90/80→60/60 with a new 12.7°
   extend dead zone, middle_pip flex 70→20. The same joints relaxed on
-  ser-9785 between GT_tension_04 and 05 (thumb_dip 100→50 + 22° dead zone,
+  ser-0002 between GT_tension_04 and 05 (thumb_dip 100→50 + 22° dead zone,
   index_pip 80→40 + 20° dead zone). Freshly ratcheted tendons lose 30–50 mA
   and gain 10–20° of slack within an hour; thumb_dip does it on both hands.
   Either the tendon/knot settles after loading or those spools' ratchets
@@ -226,10 +226,10 @@ Per joint and direction, against the reference probe:
   done on the second probe. Worth checking the thumb_dip spool pawl on both.
   - 02:54–02:56 hold-and-ratchet tension (2 min hold) after the relaxation
     finding; no scores from this dialog. Next probe tells what it did.
-- 09784BB1BE210831 (orcahand-left; board reports its raw UID, no ser- label
+- FEDCBA9876543210 (orcahand-left; board reports its raw UID, no ser- label
   assigned) — 2026-10-16 02:58 guided round 1 vs GT_01: ring_abd 0.47,
   thumb_cmc 0.55, ring_pip 0.65, ring_mcp 0.66, pinky_pip 0.78, index_pip
-  0.80, thumb_dip 0.81; rest 0.85–0.99. Same pattern as ser-9785's start:
+  0.80, thumb_dip 0.81; rest 0.85–0.99. Same pattern as ser-0002's start:
   the ring finger and thumb_cmc arrive loosest.
   - 03:01 round 1 again (run restarted twice, three minutes after the 02:58
     round 1, nothing ratcheted that we know of): index_abd 0.94→0.74,
@@ -239,8 +239,8 @@ Per joint and direction, against the reference probe:
     repeatable round to round: slack tendons let the finger settle
     differently each time it is posed. Treat guided scores below ~0.8 as
     "loose", not as a number; the fraction only becomes meaningful once the
-    tendons are taut (ser-9785's clean rounds repeated within ~0.05).
-- ser-7339 (orcahand-right) — 2026-10-16 03:11 guided round 1 vs GT_01, a
+    tendons are taut (ser-0002's clean rounds repeated within ~0.05).
+- ser-0003 (orcahand-right) — 2026-10-16 03:11 guided round 1 vs GT_01, a
   fresh untensioned hand: thumb_cmc 0.08, thumb_abd 0.06, thumb_dip 0.03,
   middle_abd 0.03, ring_abd 0.04, index_pip 0.29, thumb_mcp 0.26, pinky_abd
   0.30, pinky_pip 0.32, index_abd 0.32, ring_mcp 0.36, pinky_mcp 0.48,
@@ -268,16 +268,16 @@ Per joint and direction, against the reference probe:
     calibration started straight after.
   - 03:28 full manual calibration manual_2026-10-16T01-28-37 (complete).
     Travel vs GT_01: 14 of 16 finger joints within ±5 %; index_abd 1.08,
-    middle_abd 1.06, ring_abd 1.05 larger again (same three as ser-9785, so
+    middle_abd 1.06, ring_abd 1.05 larger again (same three as ser-0002, so
     GT_01's abduction travels are ~6 % small for the fleet); thumb_dip 0.91
-    (GT_01's 109° is large; 9785 and 7339 have 95–99°). vs ser-9785: all
+    (GT_01's 109° is large; 9785 and 7339 have 95–99°). vs ser-0002: all
     finger joints within ±8 %. WRIST: 102.7° vs 147° on both other hands —
     one wrist end stop was not reached or was recorded early; redo the wrist
-    (Calibrate settings → redo wrist) before trusting wrist ROM on ser-7339.
+    (Calibrate settings → redo wrist) before trusting wrist ROM on ser-0003.
 
 ### 2026-10-16 — three hands calibrated: fleet travel table
-- Finger-joint motor travel agrees across ser-9097 (auto), ser-9785 and
-  ser-7339 (manual) to within ±8 % everywhere, ±5 % on most joints. A
+- Finger-joint motor travel agrees across ser-0001 (auto), ser-0002 and
+  ser-0003 (manual) to within ±8 % everywhere, ±5 % on most joints. A
   per-joint median of the three is a better baseline than any one hand:
   saved as FLEET_01 in both model folders (not activated; GT_01 stays the
   scoring baseline until the user switches). Wrist taken from GT_01.
@@ -292,11 +292,11 @@ Per joint and direction, against the reference probe:
       index_pip, middle_mcp, middle_pip, ring_mcp, ring_pip, pinky_pip, and
       thumb_mcp (40/50 with a 37° flex dead zone).
     So a hand that passes the guided travel check can still have every
-    finger MCP/PIP at zero preload. On ser-9785 the same joints went from
+    finger MCP/PIP at zero preload. On ser-0002 the same joints went from
     30 to 120–140 mA after one more round of clicks with almost no change in
     travel score. The guided pass criterion is necessary but not sufficient;
     the probe's breakaway is the second gate.
-    Reference caveat again: ser-9097's own ring_pip/pinky_pip/middle_mcp were
+    Reference caveat again: ser-0001's own ring_pip/pinky_pip/middle_mcp were
     at 30 mA too, so "ok 100 %" there means "as unpreloaded as the reference".
 
 ### 2026-10-16 — the gap in the pass criterion (three hands)
@@ -323,16 +323,16 @@ Per joint and direction, against the reference probe:
   that has not survived a run-in.
   - 03:42 round 2 after run-in: no joint improved on round 1 (best values
     unchanged), so this round's spreads were all at or below the previous.
-- ser-7577 (orcahand-left, FEETECH motors — user, 04:2x) — 2026-10-16 04:11 guided round 1 vs GT_01
+- ser-0004 (orcahand-left, FEETECH motors — user, 04:2x) — 2026-10-16 04:11 guided round 1 vs GT_01
   (fourth hand; possibly the board-UID hand from 02:58 after its serial was
   assigned, or a new one): thumb_cmc 0.41, ring_mcp 0.67, index_pip 0.78,
   thumb_dip 0.81, middle_abd 0.82; rest 0.86–1.00. Arrives much tighter than
-  ser-7339 did; thumb_cmc is again the loosest joint.
+  ser-0003 did; thumb_cmc is again the loosest joint.
   - 04:17 round 2: thumb_cmc 0.41→0.81, index_pip 0.78→0.96, thumb_abd 0.94,
     index_abd 1.05, ring_abd 1.01. Only ring_mcp 0.73 left under 0.81.
   - 04:19 guided tensioning COMPLETED after 2 rounds (~8 min); every joint
     ≥ 0.85, lowest middle_abd 0.88, ring_mcp 0.73→0.95. Fastest hand so far. Needs the run-in → re-tension check
-    before it counts as done (see ser-7339).
+    before it counts as done (see ser-0003).
   - 04:21 full manual calibration manual_2026-10-16T02-21-03 (complete,
     wrist 145° — good). vs FLEET_01: 15 of 17 within ±5 %; thumb_cmc 1.10
     (66° — largest of the four hands), middle_abd 0.92, pinky_mcp 0.92,
@@ -340,7 +340,7 @@ Per joint and direction, against the reference probe:
     joints ±5 %. Probe started right after.
 
 ### 2026-10-16 — Feetech hands are a separate population for currents
-- ser-7577 runs Feetech motors. Motor-degree travel is comparable (its
+- ser-0004 runs Feetech motors. Motor-degree travel is comparable (its
   calibration matched FLEET_01 within ±10 %), but every current is not:
   the config's guided-tension holds are ~1.9× Dynamixel (abd 380/200,
   mcp 320/140, pip 280/100, tension 800/400). Breakaway currents from a
@@ -348,7 +348,7 @@ Per joint and direction, against the reference probe:
   Probe datasets are now tagged with motor_type; the dialog only scores
   against a same-family reference; Feetech probe defaults are the Dynamixel
   ones ×2 (hold 400, take-up 120, ramp 40→600 by 20, pose 600 mA). The probe
-  run at 04:21 on ser-7577 used the Dynamixel defaults (old code) — treat
+  run at 04:21 on ser-0004 used the Dynamixel defaults (old code) — treat
   its currents as provisional. A Feetech reference probe is still needed.
   - 04:26 probe GT_tension_06 (left folder) on the Feetech hand with the
     Dynamixel settings (hold 200, ramp to 300 mA, take-up 60): unusable as
@@ -360,17 +360,17 @@ Per joint and direction, against the reference probe:
     the console restart and pick that run as the Feetech reference.
   - 04:27–04:31 run-in, then guided tensioning again: COMPLETED at 04:35
     after 2 rounds, every joint ≥ 0.85 (min thumb_cmc 0.88, several joints
-    ≥ 1.0). Unlike ser-7339 (Dynamixel, scores fell 0.1–0.6 after run-in),
+    ≥ 1.0). Unlike ser-0003 (Dynamixel, scores fell 0.1–0.6 after run-in),
     this Feetech hand held its tension through the run-in: the post-run-in
     spreads equal or exceed the pre-run-in pass. First hand to survive the
     run-in check. Candidate for the Feetech reference probe once re-probed
     with Feetech settings.
-- ser-1943 (orcahand-left, Dynamixel — user, 04:37) — 2026-10-16 04:41
+- ser-0005 (orcahand-left, Dynamixel — user, 04:37) — 2026-10-16 04:41
   guided round 2 vs GT_01 (round 1 was the all-zero start entry): thumb_cmc
   0.11, thumb_abd 0.20, pinky_abd 0.32, index_abd 0.36, ring_abd 0.52,
   middle_abd 0.54, thumb_mcp 0.63, middle_mcp 0.65, index_mcp 0.66, ring_mcp
   0.73; PIPs 0.82–0.89, thumb_dip 0.80. Fresh hand: abductions and thumb
-  loosest, same as ser-7339.
+  loosest, same as ser-0003.
   - 04:46 round 3: MCPs all ≥ 0.84 (thumb_mcp 0.63→0.86, index_mcp 0.90,
     ring_mcp 0.91), index_abd 0.36→0.74, pinky_abd 0.32→0.64. Still low:
     thumb_cmc 0.32, thumb_abd 0.34, ring_abd 0.52, middle_abd 0.66.
@@ -383,7 +383,7 @@ Per joint and direction, against the reference probe:
     under 0.85.
   - 04:53 round 7: middle_abd 0.72→0.88; every joint now ≥ 0.85 (min
     thumb_dip 0.85). Pass expected on the next check; ~16 min, 7 rounds —
-    same as ser-7339 (Dynamixel), vs 2 rounds for the Feetech ser-7577.
+    same as ser-0003 (Dynamixel), vs 2 rounds for the Feetech ser-0004.
   - 04:54 full manual calibration manual_2026-10-16T02-54-35 (complete,
     wrist 148.5°): EVERY joint within ±5 % of FLEET_01 — the closest match
     of the five hands. Fleet table holds. Probe started right after.
@@ -398,7 +398,7 @@ Per joint and direction, against the reference probe:
 
 ### 2026-10-16 — the same four joints read "free" on every Dynamixel hand
 - ring_pip, pinky_pip, pinky_mcp and middle_mcp break away at 20–60 mA and
-  run to the cap on ser-9097, ser-9785, ser-7339 and ser-1943 alike, right
+  run to the cap on ser-0001, ser-0002, ser-0003 and ser-0005 alike, right
   after each passed guided tensioning. Four of four. Either those joints are
   mechanically freer by design (short tendon path, low routing friction) or
   the ratchet geometry there cannot build preload. Either way the "well
@@ -409,17 +409,17 @@ Per joint and direction, against the reference probe:
   - 04:58–05:04 run-in, then guided round (Resume, so the best table hides
     drops; the run's own score says 15 of 16 joints passed on the first
     post-run-in range check). This Dynamixel hand held its tension through
-    the run-in, unlike ser-7339 (which fell to 8/16). So the post-run-in
-    loss is per hand, not per motor family; ser-7339's drop may have been a
+    the run-in, unlike ser-0003 (which fell to 8/16). So the post-run-in
+    loss is per hand, not per motor family; ser-0003's drop may have been a
     tendon/knot settling. Rule stands: pass must be confirmed after run-in.
   - 05:06 CORRECTION. The run was restarted (scores erased) and the clean
     round 1 after the run-in passed only 7 of 16: thumb_abd 0.88→0.68,
     ring_abd 0.98→0.64, middle_abd 0.88→0.69, index_abd 0.88→0.73, pinky_abd
-    0.89→0.77, thumb_mcp 0.86→0.82, index_mcp 0.90→0.81. So ser-1943 DID
-    relax after the run-in, abductions worst, exactly like ser-7339. The
+    0.89→0.77, thumb_mcp 0.86→0.82, index_mcp 0.90→0.81. So ser-0005 DID
+    relax after the run-in, abductions worst, exactly like ser-0003. The
     earlier "15 of 16 passed" came from a Resume: a resumed run counts a
     joint as passed on its stored best, not on the round it just measured.
-    The same applies to ser-7577's "survived the run-in" at 04:35 — its
+    The same applies to ser-0004's "survived the run-in" at 04:35 — its
     completion spreads equal its pre-run-in bests, so that was a Resume
     reporting history, not a fresh measurement. Withdraw both claims.
 
@@ -431,8 +431,8 @@ Per joint and direction, against the reference probe:
   round's spread (keep the best for history), and show both; make the
   post-run-in check a Restart by default. Until then: always Restart after
   a run-in.
-- With that, run-in relaxation is 3 for 3 (ser-7339, ser-7577 unknown but
-  unverified, ser-1943 confirmed): abductions lose 0.2–0.35, thumb and
+- With that, run-in relaxation is 3 for 3 (ser-0003, ser-0004 unknown but
+  unverified, ser-0005 confirmed): abductions lose 0.2–0.35, thumb and
   MCPs 0.05–0.1, PIPs ~0. The loop tension → run-in → Restart → tension is
   mandatory, not optional.
   - 05:09 round 2 after the restart (re-tensioning post run-in): 11 of 16
@@ -480,7 +480,7 @@ Built after the review (core `feature/improve-calibration`, console
   test passes (values trivial on the mock).
 Open: tolerance defaults are a first guess from yesterday's noise (taut hands
 repeat to ~0.05 of travel = 2–6°); tune after the first hands run with the
-new check. Hold-current drag on stiff joints (ser-7339 wrist 103° vs 147°) is
+new check. Hold-current drag on stiff joints (ser-0003 wrist 103° vs 147°) is
 still untested.
 
 ### 2026-10-16 — verification sweep of the rebuilt range check
@@ -499,7 +499,7 @@ still untested.
     GT_tension_03/04 that is exactly the four free joints (middle_mcp,
     ring_pip, pinky_mcp flex, plus thumb_cmc/pinky_abd where the cap is the
     limit margin). The probe gate and the click test now skip them; real slack
-    on ser-9097's GT_tension_04 is thumb_dip 12.7°, pinky_mcp extend 18.0°,
+    on ser-0001's GT_tension_04 is thumb_dip 12.7°, pinky_mcp extend 18.0°,
     middle_pip 3.7°, ring_mcp 3.4°. Yesterday's "stalled ≥ 3° = slack" rule
     needs this cap exclusion.
   - Core CLI `scripts/guided_tension.py` moved to `--pass-slack-deg`; mock
@@ -510,7 +510,7 @@ still untested.
   holds it at the global current (pre-existing).
 
 ### 2026-10-19 — the touch hand scored against the wrong table; tool split into two pages
-- ser-0191 (orcahand-touch-right) ran the rebuilt range check and read 10–56°
+- ser-0006 (orcahand-touch-right) ran the rebuilt range check and read 10–56°
   of slack on every joint. Two causes: the touch folder has no travel
   baselines file, so it fell back to the shared v2.1 table (MCPs/PIPs 10–30°
   above any measured hand), and even against FLEET_01 a hand sweep falls
@@ -541,7 +541,7 @@ still untested.
 
 ### 2026-10-20 — index ranges in Clemens's table overshoot every hand; "Measure slack" added to the ccc page
 
-Hand 7CFBEC24BE210835 (orcahand-right, 9 rounds, fraction scoring) was tensioned
+Hand 0123456789ABCDEF (orcahand-right, 9 rounds, fraction scoring) was tensioned
 well by feel, yet index_mcp stopped at 0.846 and index_pip at 0.714 of the
 `joint_motor_travel_v21` table. The table says index_mcp 139.39° and index_pip
 131.04° of motor travel (pass at 85 %: 118.5° and 111.4°). The motor-driven
@@ -549,8 +549,8 @@ calibration right after found 125.51° and 99.84°. Every calibration recorded s
 far (ten hands, both folders) puts index_mcp at 113.8–125.5° and index_pip at
 93.5–106.9°, so the table's index_pip is 24–37° above anything a hand reaches
 with the motors, and 85 % of it (111.4°) is above every calibration. The
-tensioning spreads above the calibration travel (ser-9097 index_mcp 135°,
-ser-9785 134.7°) are hands with slack: a hand push turns the motor past the
+tensioning spreads above the calibration travel (ser-0001 index_mcp 135°,
+ser-0002 134.7°) are hands with slack: a hand push turns the motor past the
 taut travel. Decision pending: adjust the index entries (and check the rest of
 the table against the calibration log) without touching the pass rule.
 
@@ -564,17 +564,17 @@ GT_tension_NN. What to do with the numbers is the next step.
 ### 2026-10-20 (afternoon) — travel table set to the fleet averages; take-up dropped, breakaway averaged over passes
 
 `joint_motor_travel_v21` in all eight v2 configs now holds the integer average
-calibration travel of the six Dynamixel hands (ser-9097, ser-9785, ser-7339,
-ser-1943, 09784BB1BE210831, 7CFBEC24BE210835; ser-7577 excluded). Saved
+calibration travel of the six Dynamixel hands (ser-0001, ser-0002, ser-0003,
+ser-0005, FEDCBA9876543210, 0123456789ABCDEF; ser-0004 excluded). Saved
 `best`/`last_tension` fractions were rescaled so their degrees are unchanged.
 Wrist left at 156.18 (not in the range check; readings bimodal).
 
-GT_tension_06 on 7CFBEC24BE210835 (well tensioned by feel) showed the take-up
+GT_tension_06 on 0123456789ABCDEF (well tensioned by feel) showed the take-up
 method cannot measure slack: at 60 mA the finger follows the motor on the long
 tendons (20–40° of travel, five sides to the cap) and the method reads that as
-slack or "free". The ser-9097 reference only looked clean because 60 mA did not
+slack or "free". The ser-0001 reference only looked clean because 60 mA did not
 move its fingers. Breakaway on this hand is 30–50 mA on the long tendons where
-ser-9097 needed 90–140 mA: it measures how hard the finger is to move.
+ser-0001 needed 90–140 mA: it measures how hard the finger is to move.
 
 Decision: breakaway is the measurement. Ramp now starts at 10 mA in 5 mA
 steps, "moved" is 1°, and the whole sequence runs `repeats` passes (default 5
@@ -593,7 +593,7 @@ unaffected (both run in motor degrees).
 
 ### 2026-10-20 (evening) — calibration in three parts: slack test, calibrate, measure tension
 
-GT_tension_07 (7CFBEC24BE210835, five breakaway passes, 160 results) is the
+GT_tension_07 (0123456789ABCDEF, five breakaway passes, 160 results) is the
 breakaway reference. The user judged the hand well tensioned apart from one
 slightly over-tensioned joint ("i-dip"; which joint that is remains to be
 named).
@@ -637,7 +637,7 @@ calibrate → measure tension. Datasets from a check carry `check: true`.
 
 ### 2026-10-21 — first full sweep read; the loop reworked around a faster check
 
-GT_sweep_00 (7CFBEC24BE210835, after the user's calibration, one pass, 32
+GT_sweep_00 (0123456789ABCDEF, after the user's calibration, one pass, 32
 sweeps, now the sweep reference) is readable on about half the joints and
 shows three things to fix, all fixed in the console today:
 
@@ -714,9 +714,9 @@ clicks", "after 1 click"), and every probe records the calibration limits in
 force. Files stay `tension_probes.yaml` / `tension_sweeps.yaml` in the model
 folder (per model, datasets keyed by hand). A labelled copy of the whole
 folder as calibrated today (auto + manual + checks) is in
-`hand_data_backup/7CFBEC24BE210835/2026-10-21_calibrated_auto+manual_before_clicks/`.
+`hand_data_backup/0123456789ABCDEF/2026-10-21_calibrated_auto+manual_before_clicks/`.
 
-Automatic vs manual calibration on 7CFBEC24BE210835 (motor degrees, span):
+Automatic vs manual calibration on 0123456789ABCDEF (motor degrees, span):
 within 2° on 10 of 17 joints; manual narrower on middle pip (−12.7), thumb
 dip (−9.2), ring pip (−7.7), wrist (−6.7), middle mcp (−6.2), index mcp
 (−3.0). The hand reaches less by hand than the motors push at the calibration

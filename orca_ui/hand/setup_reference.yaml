@@ -9,7 +9,7 @@
 #   into clicks.
 # ratchet.sweep_share_per_click: how much one click raises a joint's sweep
 #   friction, as a share of the reference (one click measured +40 to +120 %
-#   on 7CFBEC24BE210835, 2026-10-21).
+#   on one hand, 2026-10-21).
 # ratchet.click_scale: the share of the estimate recommended per joint,
 #   below 1 where the plain estimate over-tensioned.
 # hands.<motor family>:<hand type>; a type without its own uses another of
@@ -29,9 +29,9 @@ ratchet:
     thumb_dip: 0.6
 hands:
   dynamixel:touch:
-    hand_key: ser-9037
+    hand_key: reference-hand
     made: '2026-10-21'
-    note: 'reference hand ser-9037, 2026-10-21 evening: manual 21:29, automatic 21:24, sweep 21:26 (CEST)'
+    note: 'reference hand, 2026-10-21 evening: manual 21:29, automatic 21:24, sweep 21:26 (CEST)'
     travel_from: manual_2026-10-21T19-29-44
     travel:
       thumb_cmc: 50.62

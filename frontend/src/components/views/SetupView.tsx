@@ -8,7 +8,6 @@ import { useState } from 'react'
 import { AssemblyCard } from '../assembly/AssemblyCard'
 import { useAppStore } from '../../state/appStore'
 import { isOperationActive, useOperationStore } from '../../state/operationStore'
-import { useSetupVariant } from '../../state/setupVariant'
 import { HardwareVersionPrompt } from '../header/HardwareVersion'
 import { CalibrateStep } from '../setup/CalibrateStep'
 import { FingertipMismatches, FingertipNumbering } from '../setup/FingertipNumbering'
@@ -26,17 +25,16 @@ export function SetupView() {
   const handInfo = useAppStore((s) => s.handInfo)
   const caps = useAppStore((s) => s.status?.capabilities ?? null)
   const operation = useOperationStore((s) => s.operation)
-  const variant = useSetupVariant((s) => s.variant)
 
   const last = handInfo?.last_tension ?? null
-  const progress =
-    (variant === 'kai' ? handInfo?.tension_progress_slack : handInfo?.tension_progress) ?? null
+  const progress = handInfo?.tension_progress ?? null
   const tensioned =
     last !== null && (progress === null || progress.updated_at <= last.completed_at)
   const calibration = handInfo?.calibration
   const calibrated =
     calibration?.motors === true && calibration.missing_anchors.length === 0
-  const ranIn = readRunInDone(handInfo?.model_name) !== null || runInCompleted(operation)
+  const handId = handInfo?.hand?.id
+  const ranIn = readRunInDone(handId) !== null || runInCompleted(operation, handId)
 
   const tension: StepState = tensioned ? 'done' : 'next'
   const calibrate: StepState = calibrated ? 'done' : tensioned ? 'next' : 'todo'
@@ -73,9 +71,9 @@ export function SetupView() {
       <FingertipMismatches mismatches={handInfo?.fingertips?.mismatches} />
       <HardwareVersionPrompt />
       <div className="flow">
-        <TensionStep state={tension} variant={variant} />
+        <TensionStep state={tension} />
         <span className="flow-arrow" aria-hidden="true">›</span>
-        <CalibrateStep state={calibrate} variant={variant} />
+        <CalibrateStep state={calibrate} />
         <span className="flow-arrow" aria-hidden="true">›</span>
         <RunInStep state={runIn} calibrated={calibrated} />
       </div>

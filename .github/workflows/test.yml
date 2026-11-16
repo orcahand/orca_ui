@@ -98,10 +98,11 @@ jobs:
         run: uv sync --locked --group dev --python 3.10
 
       # The same layering ./dev does locally: orca_core from the checkout,
-      # everything else from the lock.
+      # everything else from the lock. `python -m pytest`, because the venv's
+      # pytest script runs the venv's python, which doesn't see the layer.
       - name: Run tests
         working-directory: orca_ui
-        run: uv run --no-sync --with-editable ../orca_core pytest --timeout=120
+        run: uv run --no-sync --with-editable ../orca_core python -m pytest --timeout=120
 
   # Read-only and needs no credentials: every file the guide's catalog names
   # must be in the public bucket, and no guide media may be committed. Without

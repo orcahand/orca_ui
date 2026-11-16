@@ -4,9 +4,8 @@
 import { api } from '../../api/rest'
 import { isOperationActive, useOperationStore } from '../../state/operationStore'
 import { estopsFired } from '../../state/estop'
-import { useSetupVariant } from '../../state/setupVariant'
 import { DEFAULT_OFFSET_DEG } from '../../state/tensionFlow'
-import { loadPassFractions, loadPassSlack } from './guidedSettings'
+import { loadPassFractions } from './guidedSettings'
 
 export const SLACK_HINT =
   'Slack test: you hold one joint at a time while its motor winds each way at low current. The free rotation is the slack; more than half a turn fails the joint and blocks calibration.'
@@ -33,10 +32,10 @@ export async function startHoldTension(): Promise<void> {
 // Guided tensioning (v2.1 hands) with the page's scoring; the currents come
 // from the hand's family defaults unless the Tension step passed its own.
 export async function startGuidedTension(params: Record<string, unknown> = {}): Promise<void> {
-  const kai = useSetupVariant.getState().variant === 'kai'
   return startWhenConnected('guided_tension', {
     tension_offset_deg: DEFAULT_OFFSET_DEG,
-    ...(kai ? { scoring: 'slack', pass_slack_deg: loadPassSlack() } : { scoring: 'fraction', pass_fractions: loadPassFractions() }),
+    scoring: 'fraction',
+    pass_fractions: loadPassFractions(),
     resume: true,
     ...params,
   })

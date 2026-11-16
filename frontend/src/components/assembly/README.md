@@ -293,7 +293,7 @@ cp -R /tmp/orca-assembly-build/. orca_ui/webui/
 
 ## Persistence
 
-`/api/assembly/progress` stores one build in `~/.orca_ui/assembly-progress-v2.json`,
+`/api/assembly/progress` stores one build in `~/.orca/ui/assembly-progress-v2.json`,
 using validation and atomic replacement. It never reads or writes hand config.
 The browser also keeps `orca-ui.assembly.v2.1` as a fallback. Server storage is
 necessary because the desktop launcher discards its browser profile on exit.

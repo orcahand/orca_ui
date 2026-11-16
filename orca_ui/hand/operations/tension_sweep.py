@@ -55,7 +55,10 @@ def validate_sweep_params(service, params: dict) -> dict:
         if not isinstance(joints, list) or not joints or not set(joints) <= known:
             raise ServiceError("joints must be a non-empty list of this hand's finger joints", status_code=422)
         clean["joints"] = list(joints)
-    ceiling = hand_ops.current_ceiling(config, session)
+    from orca_ui.hand.operations.guided_tension import motor_family
+
+    ceiling = current_ceiling(service, motor_family(service))
+    check_ceiling(ceiling)
     settings = {}
     for key, (low, high) in SETTING_BOUNDS.items():
         if params.get(key) is None:
@@ -83,12 +86,33 @@ def validate_sweep_params(service, params: dict) -> dict:
     return clean
 
 
+def current_ceiling(service, family: str | None) -> float | None:
+    """The console's current limit in mA for a hand of ``family`` (see hand_ops.current_ceiling)."""
+    return hand_ops.current_ceiling(service.supervisor.config, family, service.max_current)
+
+
+def check_ceiling(ceiling: float | None) -> None:
+    """Refuse a sweep when the console's current limit is below a current setting's minimum."""
+    from orca_ui.hand.service import ServiceError
+
+    if ceiling is None:
+        return
+    for key, (low, _high) in SETTING_BOUNDS.items():
+        if key.endswith("_ma") and key != "deadband_ma" and ceiling < low:
+            raise ServiceError(
+                f"the console's current limit ({ceiling:g} mA) is below the sweep's minimum {key} "
+                f"({low:g} mA) — raise the limit to run a sweep",
+                status_code=409,
+            )
+
+
 def sweep_defaults(service, family: str | None = None) -> dict:
-    """SweepSettings defaults for the motor family, within this console's limits."""
+    """SweepSettings defaults for the motor family, never above this console's limits."""
     from orca_ui.hand.operations.guided_tension import motor_family
 
-    defaults = hand_ops.sweep_setting_defaults(family or motor_family(service))
-    ceiling = hand_ops.current_ceiling(service.supervisor.config, service.session)
+    family = family or motor_family(service)
+    defaults = hand_ops.sweep_setting_defaults(family)
+    ceiling = current_ceiling(service, family)
     for key, value in list(defaults.items()):
         if value is None:
             del defaults[key]
@@ -98,7 +122,7 @@ def sweep_defaults(service, family: str | None = None) -> dict:
         lo, hi = SETTING_BOUNDS.get(key, (0.0, value))
         if ceiling is not None:
             hi = min(hi, ceiling)
-        defaults[key] = float(max(lo, min(value, hi)))
+        defaults[key] = float(min(max(lo, value), hi))
     return defaults
 
 
@@ -191,6 +215,9 @@ class _Presenter:
                 self._publish()
             elif kind == "cleanup_failed":
                 self._ctx.log(f"cleanup failed: {event.get('error')}")
+            elif kind == "torque_off_failed":
+                self._ctx.torque_off_failed(event)
+                self._publish()
 
     def finish(self, saved: str | None) -> None:
         with self._lock:
@@ -214,7 +241,7 @@ def _save(ctx: OpContext, config, report: dict, params: dict, family: str | None
     from orca_ui.hand.operations.guided_tension import motor_family
 
     try:
-        name = sweeps.save(config, params.get("name"), report, hand_key=ctx.service.supervisor.hand_id,
+        name = sweeps.save(config, params.get("name"), report,
                            note=params.get("note"), motor_type=family or motor_family(ctx.service))
         ctx.log(f"saved as {name}")
         return name
@@ -251,19 +278,26 @@ class TensionSweepOperation(Operation):
             hand = hand_ops.build_maintenance_hand(
                 supervisor.config, ctx.stop_event,
                 motor_port=lease.presence.motor_port if lease.presence else None,
+                hardware_version=supervisor.hardware_version_override,
             )
             self._hand = hand
             family = hand_ops.hand_family(hand)
             ctx.log(f"motor family: {family or 'unknown'}")
+            check_ceiling(current_ceiling(ctx.service, family))
             presenter.set_reference(sweeps.reference(supervisor.config, family))
-            report = hand_ops.tension_sweep(
-                hand,
-                joints=self.params.get("joints"),
-                settings={**sweep_defaults(ctx.service, family), **(self.params.get("settings") or {})},
-                repeats=self.params.get("repeats", DEFAULT_REPEATS),
-                progress_callback=presenter.progress,
-                should_stop=ctx.stop_event.is_set,
-            )
+            try:
+                report = hand_ops.tension_sweep(
+                    hand,
+                    joints=self.params.get("joints"),
+                    settings={**sweep_defaults(ctx.service, family), **(self.params.get("settings") or {})},
+                    repeats=self.params.get("repeats", DEFAULT_REPEATS),
+                    progress_callback=presenter.progress,
+                    should_stop=ctx.stop_event.is_set,
+                )
+            except InterruptedError:
+                # orca_core's answer to should_stop: a stop, not a failure.
+                ctx.check_stop()
+                raise
             ctx.check_stop()
             saved = _save(ctx, supervisor.config, report, self.params, family)
             presenter.finish(saved)

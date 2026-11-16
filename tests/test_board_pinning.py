@@ -111,3 +111,44 @@ def test_a_pinned_console_starts_on_the_pinned_boards_model_not_another_hands(mo
     path, pinned = cli.resolve_config_path(args)
     assert asked == ["/dev/cu.usbmodemXXXX"]
     assert path.endswith("orcahand-right/config.yaml") and not pinned
+
+
+def test_a_hand_with_no_board_identity_is_not_judged_by_another_hands_slack_test(monkeypatch, tmp_path):
+    """The identity follows every connect: a hand with no board (or one that
+    reports no identity) plugged in after a board hand must not inherit that
+    board's folder, so another hand's slack test neither blocks nor clears it."""
+    import dataclasses
+    from types import SimpleNamespace
+
+    from orca_core.hardware.sensing.serial_discovery import OrcaBoardInfo
+
+    from orca_ui.hand import slack_tests
+    from test_model_detection import PLAIN_LEFT
+
+    sup, _ = build("orcahand-left")
+    connects = []
+    monkeypatch.setattr(supervisor_mod, "oh_board_ports", lambda: ["/dev/motor"])
+    monkeypatch.setattr(supervisor_mod, "connect_session",
+                        lambda *a, **k: connects.append(1) or (_ for _ in ()).throw(supervisor_mod.SessionConnectError("stop here")))
+    board_hand = dataclasses.replace(
+        PLAIN_LEFT, identity=OrcaBoardInfo(role="motor", side="left", serial="ser-0001"))
+    plain_adapter = dataclasses.replace(PLAIN_LEFT, identity=None)
+    board_folder = tmp_path / "ser-0001"
+    board_folder.mkdir()
+    for detected, port, hand_id, connected in ((board_hand, "/dev/motor", "ser-0001", 1),
+                                               (plain_adapter, "/dev/usb-adapter", None, 2)):
+        monkeypatch.setattr(supervisor_mod, "run_detection", lambda config, force=False: detected)
+        monkeypatch.setattr(supervisor_mod, "presence_from_detection",
+                            lambda config, detection, **k: SimpleNamespace(detection=detection, motor_port=port))
+        sup._try_connect()
+        assert (sup.hand_id, len(connects)) == (hand_id, connected)
+        if hand_id:
+            # What a connected session of the board hand files the config under.
+            sup._set_hand_folder(str(board_folder), str(board_folder / "calibration.yaml"))
+            slack_tests.save(sup.config, {"blocked": True, "results": [
+                {"joint": "index_mcp", "status": "fail"}]})
+            assert slack_tests.calibration_block(sup.config)
+        else:
+            assert not sup.config.hand_dir
+            assert slack_tests.calibration_block(sup.config) is None
+

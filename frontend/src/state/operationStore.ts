@@ -3,6 +3,7 @@
 // fan-out) — both topics are event-driven and slow.
 
 import { create } from 'zustand'
+import { recordRunInFinish } from '../components/setup/setupUtils'
 import type {
   ControlSource,
   OperationLogLine,
@@ -49,6 +50,8 @@ export const useOperationStore = create<OperationStoreState>((set, get) => ({
 
   setOperation: (snapshot) => {
     const previous = get().operation
+    // Before the store updates, so the Run step reads the new date on its next render.
+    if (snapshot) recordRunInFinish(previous, snapshot, useAppStore.getState().handInfo?.hand?.id)
     set({ operation: snapshot })
     if (!snapshot) return
     const changed =

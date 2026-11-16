@@ -11,6 +11,7 @@ import type {
   DemoEntry,
   DirectMotorSnapshot,
   HandInfo,
+  HandStoreInfo,
   ModelMetadata,
   MotorModelInfo,
   ModelsInfo,
@@ -28,7 +29,6 @@ import type {
   TeleopSourcesInfo,
   TrajectoryData,
   TensionSweeps,
-  TravelBaseline,
   TravelBaselines,
   TrajectoryEntry,
   ServoGains,
@@ -105,9 +105,17 @@ export const api = {
   // device null hands the choice back to "first board to answer".
   selectBoard: (device: string | null) =>
     post<BoardsInfo>('/api/board/select', { device }),
-  // Pins hardware_version in the hand's config.yaml; null = take the board's.
+  // Runs the connected hand as this version for the session; null = the board's.
   setHardwareVersion: (version: number | null) =>
     post<StatusSnapshot>('/api/hardware_version', { version }),
+  setHandNickname: (nickname: string | null) =>
+    post<HandStoreInfo>('/api/hand/nickname', { nickname }),
+  // Both reconnect the hand on the calibration they put in force.
+  restorePreviousCalibration: () =>
+    post<{ written: string }>('/api/hand/calibration/restore_previous'),
+  boardCalibration: (choice: 'use_board' | 'keep_session' | 'keep_until_change') =>
+    post<{ written: string | null }>('/api/hand/calibration/board', { choice }),
+  dismissLegacyFiles: () => post<HandStoreInfo>('/api/hand/legacy_files/dismiss'),
   // Clears a latched hardware error. The motor's torque is restored if the hand has torque.
   rebootMotor: (id: number) =>
     post<{
@@ -159,15 +167,6 @@ export const api = {
   sweepReference: (name: string | null) =>
     post<{ reference: string | null }>('/api/sweeps/reference', { name }),
   baselines: () => request<TravelBaselines>('/api/baselines'),
-  baselinePromote: (snapshot: string, name: string, note?: string, activate = true) =>
-    post<TravelBaseline & { name: string }>('/api/baselines/promote', {
-      snapshot,
-      name,
-      note: note || null,
-      activate,
-    }),
-  baselineActivate: (name: string | null) =>
-    post<{ active: string | null }>('/api/baselines/activate', { name }),
   operation: () =>
     request<{ operation: OperationSnapshot | null }>('/api/operation'),
   operationLog: () => request<OperationLogPayload>('/api/operation/log'),
@@ -184,6 +183,8 @@ export const api = {
   // Never raises server-side; always 200 with a report of what was actioned.
   estop: () =>
     post<{ ok: boolean; report: Record<string, unknown> }>('/api/estop'),
+
+  motorsHoldingDismiss: () => post<{ ok: boolean }>('/api/motors-holding/dismiss'),
 
   torqueEnable: () =>
     post<{ seed: Record<string, number> }>('/api/torque/enable'),

@@ -7,7 +7,9 @@ import { ErrorBanner } from './components/common/ErrorBanner'
 import { ChangelogDialog } from './components/common/ChangelogDialog'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
 import { FaultPopup } from './components/common/FaultPopup'
+import { HandNotices } from './components/common/HandNotices'
 import { MaintenanceBanner } from './components/common/MaintenanceBanner'
+import { refreshHandInfo } from './components/hand/handStore'
 import { AppHeader } from './components/header/AppHeader'
 import { TensionDialogs } from './components/setup/TensionDialogs'
 import { TransportBar } from './components/transport/TransportBar'
@@ -57,7 +59,7 @@ export default function App() {
   useEffect(() => {
     startStreamClient()
     api.status().then(useAppStore.getState().setStatus).catch(() => undefined)
-    api.handInfo().then(useAppStore.getState().setHandInfo).catch(() => undefined)
+    void refreshHandInfo()
     void useChangelogStore.getState().load()
   }, [])
 
@@ -78,6 +80,7 @@ export default function App() {
       <AppHeader />
       <TransportBar />
       <ErrorBanner />
+      {!booting && <HandNotices />}
       {booting && view === 'setup' ? (
         <AssemblyCard />
       ) : booting ? (

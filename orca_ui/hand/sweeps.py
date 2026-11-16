@@ -1,8 +1,9 @@
 """Named tension sweeps (the ``tension_sweeps`` section of setup.yaml).
 
 Each run of the tension sweep (the current every motor draws walking its joint
-limit to limit and back) is saved under a name such as ``GT_sweep_00`` beside
-the hand's calibration. One saved sweep can be marked the reference: the load
+limit to limit and back) is saved under a name such as ``GT_sweep_00`` in the
+hand's own folder: setup.yaml keeps the newest and the reference, the archive
+every sweep. One saved sweep can be marked the reference: the load
 curve of a hand that is tensioned right. Later sweeps are compared against it
 joint for joint, and the comparison says which tendons are tighter or looser
 than the reference and where a dead band after the reversal shows slack.
@@ -13,9 +14,8 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 
-from orca_core.maintenance.setup_file import read_section, write_section
-
 from orca_ui.hand import reference as shipped_reference
+from orca_ui.hand.hand_store import archived_records, read_records, update_records
 
 SECTION = "tension_sweeps"
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$")
@@ -46,8 +46,7 @@ RANK = {"none": 0, "over": 1, "ok": 2, "under": 3, "slack": 4, "low": 5}
 SLACK_DEG = 8.0
 
 
-def _load(config) -> dict:
-    data = read_section(config, SECTION, legacy="tension_sweeps.yaml") or {}
+def _normalize(data) -> dict:
     if not isinstance(data, dict):
         data = {}
     data.setdefault("sweeps", {})
@@ -55,10 +54,30 @@ def _load(config) -> dict:
     return data
 
 
+def _load(config) -> dict:
+    return _normalize(read_records(config, SECTION))
+
+
+def _all(config) -> dict:
+    """Every sweep on the hand, archived ones included, by name."""
+    return {**archived_records(config, SECTION), **_load(config)["sweeps"]}
+
+
+def _update(config, change) -> None:
+    """Apply ``change`` to the section in place, re-read and stored under setup.yaml's lock."""
+
+    def apply(data):
+        data = _normalize(data)
+        change(data)
+        return data
+
+    update_records(config, SECTION, apply)
+
+
 def next_name(config, prefix: str = DEFAULT_PREFIX) -> str:
     taken = [
         int(m.group(1))
-        for n in _load(config)["sweeps"]
+        for n in _all(config)
         if (m := re.fullmatch(re.escape(prefix) + r"(\d+)", n))
     ]
     return f"{prefix}{(max(taken) + 1 if taken else 0):02d}"
@@ -67,7 +86,7 @@ def next_name(config, prefix: str = DEFAULT_PREFIX) -> str:
 def dataset_name(config) -> str:
     """``sweep_20261021_095301``, with a letter suffix on a same-second collision."""
     base = f"sweep_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    taken = _load(config)["sweeps"]
+    taken = _all(config)
     name = base
     for suffix in "bcdefgh":
         if name not in taken:
@@ -81,52 +100,62 @@ def save(
     name: str | None,
     report: dict,
     *,
-    hand_key: str | None = None,
     note: str | None = None,
     motor_type: str | None = None,
 ) -> str:
-    data = _load(config)
     name = name or dataset_name(config)
     if not NAME_RE.match(name):
         raise ValueError("sweep names are 1-40 characters: letters, digits, _ . -")
-    if name in data["sweeps"]:
-        raise KeyError(f"sweep {name!r} already exists; sweep datasets are never overwritten")
-    data["sweeps"][name] = {
-        "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "hand_key": hand_key,
-        "motor_type": motor_type,
-        "note": note,
-        **report,
-    }
-    write_section(config, SECTION, data)
+
+    archived = archived_records(config, SECTION)
+
+    def add(data: dict) -> None:
+        if name in data["sweeps"] or name in archived:
+            raise KeyError(f"sweep {name!r} already exists; sweep datasets are never overwritten")
+        data["sweeps"][name] = {
+            "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "motor_type": motor_type,
+            "note": note,
+            **report,
+        }
+
+    _update(config, add)
     return name
 
 
 def set_reference(config, name: str | None) -> None:
-    data = _load(config)
-    if name is not None and name not in data["sweeps"]:
-        raise KeyError(f"no sweep dataset named {name!r}")
-    data["reference"] = name
-    write_section(config, SECTION, data)
+    archived = archived_records(config, SECTION)
+
+    def mark(data: dict) -> None:
+        if name is not None and name not in data["sweeps"]:
+            if name not in archived:
+                raise KeyError(f"no sweep dataset named {name!r}")
+            # Back into setup.yaml, where the reference is always kept.
+            data["sweeps"][name] = archived[name]
+        data["reference"] = name
+
+    _update(config, mark)
 
 
 def reference(config, family: str | None) -> tuple[str, dict] | None:
     """(name, dataset) the hand's sweeps are scored against: the saved sweep
-    marked as reference, else the shipped one for the motor ``family`` (a
-    dataset that carries ``curves`` instead of ``results``)."""
+    marked as reference when its motor family matches ``family`` (or either is
+    unknown), else the shipped one for ``family`` (a dataset that carries
+    ``curves`` instead of ``results``)."""
     data = _load(config)
     name = data.get("reference")
-    if name and name in data["sweeps"]:
-        return name, data["sweeps"][name]
+    marked = data["sweeps"].get(name) if name else None
+    if marked is not None and (not family or not marked.get("motor_type") or marked["motor_type"] == family):
+        return name, marked
     shipped = shipped_reference.sweep(config, family)
     return (shipped["name"], shipped) if shipped else None
 
 
-def for_hand(config, hand_key: str | None) -> list[tuple[str, dict]]:
-    """(name, dataset) of every sweep on ``hand_key``, newest first."""
+def recent(config) -> list[tuple[str, dict]]:
+    """(name, dataset) of the sweeps setup.yaml keeps (the newest and the
+    reference), newest first."""
     sweeps = _load(config)["sweeps"]
-    mine = [(n, s) for n, s in sweeps.items() if hand_key is None or s.get("hand_key") == hand_key]
-    return sorted(mine, key=lambda kv: kv[1].get("recorded_at", ""), reverse=True)
+    return sorted(sweeps.items(), key=lambda kv: kv[1].get("recorded_at", ""), reverse=True)
 
 
 def levels(results: list[dict]) -> dict[str, dict[str, dict]]:
@@ -302,18 +331,19 @@ def _clicks(joint: str, status: str, share: float, deadband: dict, ref_deadband:
 
 
 def state(config, family: str | None) -> dict:
-    data = _load(config)
+    sweeps = _all(config)
+    ref = reference(config, family)
     # Curves are large; the listing carries the levels, the full dataset is read by name.
     return {
         "sweeps": {
             n: {k: v for k, v in s.items() if k != "results"} | {"levels": levels(s.get("results") or [])}
-            for n, s in sorted(data["sweeps"].items(), key=lambda kv: kv[1].get("recorded_at", ""), reverse=True)
+            for n, s in sorted(sweeps.items(), key=lambda kv: kv[1].get("recorded_at", ""), reverse=True)
         },
-        "reference": (reference(config, family) or (None,))[0],
-        "reference_shipped": data["reference"] not in data["sweeps"],
+        "reference": ref[0] if ref else None,
+        "reference_shipped": ref is None or ref[0] not in sweeps,
         "next_name": next_name(config),
     }
 
 
 def dataset(config, name: str) -> dict | None:
-    return _load(config)["sweeps"].get(name)
+    return _load(config)["sweeps"].get(name) or archived_records(config, SECTION).get(name)

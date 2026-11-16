@@ -1,6 +1,7 @@
 // WebSocket lifecycle: auto-connect, backoff reconnect, message dispatch into
 // the stream store, per-topic rate meters (published to zustand at 1 Hz).
 
+import { refreshHandInfo } from '../components/hand/handStore'
 import { useAppStore } from '../state/appStore'
 import { useEventLogStore } from '../state/eventLogStore'
 import { useOperationStore } from '../state/operationStore'
@@ -35,6 +36,8 @@ let socket: WebSocket | null = null
 let backoff = BACKOFF_START_MS
 let counters: Record<string, number> = {}
 let started = false
+// The banner text of the last error that ended a connection, cleared on reconnect.
+let connectionError: string | null = null
 const extraTopics = new Set<string>()
 
 export function startStreamClient(): void {
@@ -115,14 +118,6 @@ function connect(): void {
   }
 
   ws.onerror = () => ws.close()
-}
-
-async function refreshHandInfo(): Promise<void> {
-  try {
-    useAppStore.getState().setHandInfo(await api.handInfo())
-  } catch {
-    /* backend not ready yet; the status stream will drive the UI */
-  }
 }
 
 async function resyncControlPlanes(): Promise<void> {
@@ -282,6 +277,11 @@ function dispatch(message: ServerMessage): void {
           .pushEvent('status', `hand → ${status.model}`)
       }
       useAppStore.getState().setStatus(status)
+      // A connection-loss message is stale once a session is up again; any later error stays.
+      if (connectionError && (status.state === 'connected' || status.state === 'degraded')) {
+        if (useAppStore.getState().error === connectionError) useAppStore.getState().setError(null)
+        connectionError = null
+      }
       // A fresh session may change capabilities/joints.
       if (
         status.state === 'connected' ||
@@ -335,6 +335,7 @@ function dispatch(message: ServerMessage): void {
       break
     case TOPICS.error: {
       const message = (data.message as string) ?? 'unknown error'
+      connectionError = data.connection ? message : null
       useAppStore.getState().setError(message)
       useEventLogStore.getState().pushEvent('error', message)
       break

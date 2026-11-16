@@ -1,7 +1,6 @@
 // Per-viewer guided-tensioning thresholds, remembered so a fine-tuned set
-// carries over to the next run. Fraction scoring (the ccc page) keeps a pass
-// fraction per joint group; slack scoring (the kai page) a slack tolerance in
-// motor degrees. Groups and bounds mirror PASS_GROUPS / PASS_BOUNDS_* in
+// carries over to the next run. Fraction scoring keeps a pass fraction per
+// joint group; slack scoring a slack tolerance in motor degrees. Groups and bounds mirror PASS_GROUPS / PASS_BOUNDS_* in
 // orca_ui/hand/operations/guided_tension.py.
 
 export type PassGroup = 'ap' | 'mcp' | 'pip'
@@ -50,22 +49,6 @@ export function savePassFractions(passes: PassFractions): void {
   } catch {
     /* storage unavailable: the values last this run */
   }
-}
-
-const inDegreeBounds = (v: unknown) =>
-  typeof v === 'number' && v >= PASS_BOUNDS_DEG[0] && v <= PASS_BOUNDS_DEG[1]
-
-export function loadPassSlack(): PassSlack {
-  try {
-    const stored = JSON.parse(localStorage.getItem(SLACK_KEY) ?? 'null')
-    if (stored && typeof stored === 'object') {
-      const valid = PASS_GROUPS.filter(({ key }) => inDegreeBounds(stored[key]))
-      return { ...DEFAULT_PASS_SLACK, ...Object.fromEntries(valid.map(({ key }) => [key, stored[key]])) }
-    }
-  } catch {
-    /* unreadable: fall back to the defaults */
-  }
-  return DEFAULT_PASS_SLACK
 }
 
 export function savePassSlack(passes: PassSlack): void {

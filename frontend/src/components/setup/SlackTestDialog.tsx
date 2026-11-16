@@ -56,6 +56,8 @@ export function SlackTestDialog({ operation, onClose }: { operation: OperationSn
   const rows = Object.entries(results)
   const tested = rows.filter(([, r]) => r.status != null).length
   const failed = rows.filter(([, r]) => r.status === 'fail').map(([j]) => j)
+  const skipped = rows.filter(([, r]) => r.status === 'skipped').map(([j]) => j)
+  const skippedText = `${skipped.length} joint${skipped.length === 1 ? '' : 's'} skipped, not checked`
   const current = extra?.settings?.current_ma
   const perClick = extra?.deg_per_click ?? null
   const failedClicks = failed.map((j) => `${label(j)}${results[j].clicks ? ` ~${results[j].clicks} clicks` : ''}`)
@@ -146,7 +148,11 @@ export function SlackTestDialog({ operation, onClose }: { operation: OperationSn
                 <h3 className="gt-heading">
                   {failed.length
                     ? `Too much slack on ${failed.length} joint${failed.length === 1 ? '' : 's'} — calibration blocked`
-                    : 'Every joint is within half a turn'}
+                    : skipped.length === 0
+                      ? 'Every joint is within half a turn'
+                      : skipped.length === rows.length
+                        ? `No joint tested — ${skippedText}`
+                        : `Every tested joint is within half a turn — ${skippedText}`}
                 </h3>
                 {failed.length > 0 && (
                   <div className="gt-warning slack-advice">
@@ -158,7 +164,11 @@ export function SlackTestDialog({ operation, onClose }: { operation: OperationSn
                 <p className="setup-copy">
                   {failed.length
                     ? `${failedClicks.join(', ')}: the spool turned more than half a turn before the tendons went taut.`
-                    : 'Passed. The click counts are what the ratchet takes up of each joint’s slack, rounded down; go on to tensioning.'}{' '}
+                    : skipped.length === rows.length
+                      ? 'Nothing was measured.'
+                      : 'Passed. The click counts are what the ratchet takes up of each joint’s slack, rounded down; go on to tensioning.'}{' '}
+                  {skipped.length > 0 &&
+                    `Not checked: ${skipped.map(label).join(', ')} — run the slack test on ${skipped.length === 1 ? 'it' : 'them'} before trusting ${skipped.length === 1 ? 'its' : 'their'} slack. `}
                   {perClick == null && 'The degrees one click takes up are not set yet, so no click counts are shown. '}
                   {reviewing ? 'Back tests the last joint again. ' : ''}Torque is off.
                 </p>

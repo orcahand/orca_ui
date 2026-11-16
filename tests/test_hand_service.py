@@ -541,6 +541,43 @@ def test_a_touch_tier_with_no_answering_sensor_falls_to_the_next_tier(monkeypatc
     assert built[0].disconnected and session.hand is built[1]
 
 
+def test_a_sensors_only_hand_keeps_its_folder_and_a_zero_needs_one(monkeypatch, tmp_path):
+    """With no motor bus the hand never learns which hand it is: it takes the
+    folder the last motor connect settled, and with none a zero is refused
+    rather than reported kept."""
+    from dataclasses import replace
+    from types import SimpleNamespace
+
+    from orca_core import OrcaHandTouch
+    from orca_core.hand_config import _resolve_config_path
+    from orca_core.hardware.sensing.serial_discovery import SensingPorts
+
+    from orca_ui.hand import sessions, zeroing
+    from orca_ui.hand.detection import HardwarePresence
+    from orca_ui.hand.hand_store import NoHandFolder
+    from orca_ui.hand.supervisor import load_config
+
+    folder = tmp_path / "hands" / "ser-1"
+    folder.mkdir(parents=True)
+    config = replace(load_config(_resolve_config_path(None, model_name="orcahand-touch-right")),
+                     hand_dir=str(folder), calibration_path=str(folder / "calibration.yaml"))
+    monkeypatch.setattr(OrcaHandTouch, "connect_sensors_only", lambda self: (True, "ok"))
+    presence = HardwarePresence(motor_port=None, sensing=SensingPorts(tactile="/dev/oh", encoder=None))
+    declared = sessions.declared_capabilities(config, False, motors_enabled=True)
+    session = sessions._connect_sensors_only(
+        UiSettings(config_path=config.config_path, open_browser=False), config, declared, presence)
+    assert session.hand.config.hand_dir == str(folder)
+    assert session.hand.config.calibration_path == str(folder / "calibration.yaml")
+
+    captured = []
+    client = SimpleNamespace(capture_taxel_offsets=lambda num_samples: captured.append(num_samples))
+    nowhere = SimpleNamespace(tactile_client=client,
+                              hand=SimpleNamespace(config=SimpleNamespace(calibration_path="")))
+    with pytest.raises(NoHandFolder):
+        zeroing.capture_and_persist(nowhere, num_samples=5)
+    assert captured == []
+
+
 def test_fingertip_identities_are_read_once_and_never_from_a_request(monkeypatch):
     """A request handler reading the board would race the session's own
     register traffic, so hand info only serves what was read at connect."""
@@ -592,3 +629,20 @@ def test_a_session_is_ready_only_once_its_ready_hook_has_finished():
     finally:
         release_hook.set()
         svc.stop()
+
+
+def test_unfinished_tension_progress_is_found_by_the_hand_folder(tmp_path):
+    """Progress is filed under the hand's folder, the id the connect settled:
+    a detection that missed the board's identity must not hide it."""
+    from types import SimpleNamespace
+
+    from orca_core.maintenance.setup_file import write_section
+
+    from orca_ui.hand.operations import hand_ops
+
+    folder = tmp_path / "hands" / "ser-0001"
+    folder.mkdir(parents=True)
+    config = SimpleNamespace(hand_dir=str(folder))
+    write_section(config, "tension_progress",
+                  {"hands": {"ser-0001": {"rounds": 2, "best": {"index_pip": 0.8}}}})
+    assert hand_ops.tension_progress(config)["best"] == {"index_pip": 0.8}

@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from orca_ui.hand.operations.slack_test import current_options, validate_slack_params
-from orca_ui.hand.operations.tension_sweep import _describe, sweep_defaults
+from orca_ui.hand.operations.tension_sweep import _describe, sweep_defaults, validate_sweep_params
 from orca_ui.hand.service import ServiceError
 from orca_ui.mock import materialize_mock_model
 from orca_ui.server import create_app
@@ -80,6 +80,13 @@ def test_too_much_slack_blocks_calibration_until_a_passing_test(client):
     assert client.post("/api/operation/calibrate/start",
                        json={"params": {**FAST, "manual": True}}).status_code == 409
 
+    # A test that skipped every joint tested nothing: the block stands.
+    assert client.post("/api/operation/slack_test/start",
+                       json={"params": {**FAST, "joints": ["ring_mcp"]}}).status_code == 200
+    _hold_each(client, ["Skip", "Finish"])
+    assert _done(client)["result"]["slack"] == {"ring_mcp": "skipped"}
+    assert "ring_mcp" in client.get("/api/hand/info").json()["slack_test"]["block"]
+
     assert client.post("/api/operation/slack_test/start",
                        json={"params": {**FAST, "joints": joints}}).status_code == 200
     _hold_each(client, ["Test", "Skip", "Finish"])
@@ -87,7 +94,7 @@ def test_too_much_slack_blocks_calibration_until_a_passing_test(client):
     assert snapshot["result"]["blocked"] is False
     assert snapshot["result"]["slack"] == {"index_pip": "pass", "ring_mcp": "skipped"}
     assert client.get("/api/hand/info").json()["slack_test"]["block"] is None
-    assert len(client.get("/api/slack_tests").json()["tests"]) == 2
+    assert len(client.get("/api/slack_tests").json()["tests"]) == 3
     assert client.post("/api/operation/calibrate/start",
                        json={"params": {**FAST, "joints": ["index_pip"]}}).status_code == 200
     _done(client)
@@ -130,21 +137,46 @@ def test_feetech_slack_test_offers_and_accepts_its_own_currents():
     assert current_options("feetech") == {"default_ma": 120, "choices_ma": [80, 120, 160, 200]}
     motor_client = object.__new__(MockFeetechClient)
     session = SimpleNamespace(caps=SimpleNamespace(motors=True), hand=SimpleNamespace(motor_client=motor_client))
-    service = SimpleNamespace(session=session, supervisor=SimpleNamespace(config=SimpleNamespace(joint_ids=[])))
+    config = SimpleNamespace(joint_ids=[], max_current="default")
+    service = SimpleNamespace(session=session, max_current=None, supervisor=SimpleNamespace(config=config))
 
     assert validate_slack_params(service, {"current_ma": 300})["settings"]["current_ma"] == 300.0
     with pytest.raises(ServiceError, match="current_ma"):
         validate_slack_params(service, {"current_ma": 301})
 
+    # The console's current limit caps the winding current, chosen or not.
+    service.max_current = 100
+    assert current_options("feetech", 100) == {"default_ma": 100, "choices_ma": [80, 100]}
+    assert validate_slack_params(service, {})["settings"]["current_ma"] == 100
+    with pytest.raises(ServiceError, match="current_ma"):
+        validate_slack_params(service, {"current_ma": 101})
 
-@pytest.mark.parametrize("family, max_current, expected", [
-    pytest.param("dynamixel", 300, (200.0, 300.0, 300.0), id="dynamixel"),
-    pytest.param("feetech", 900, (400.0, 600.0, 600.0), id="feetech"),
+
+@pytest.mark.parametrize("family, live_ma, expected", [
+    pytest.param("dynamixel", None, (200.0, 300.0, 300.0), id="dynamixel"),
+    pytest.param("feetech", None, (400.0, 600.0, 600.0), id="feetech"),
+    pytest.param("dynamixel", 250, (200.0, 250.0, 250.0), id="console-limit"),
+    pytest.param("dynamixel", 40, (40.0, 40.0, 40.0), id="limit-below-minimum"),
 ])
-def test_sweep_defaults_come_from_the_motor_family(family, max_current, expected):
-    service = SimpleNamespace(session=None, supervisor=SimpleNamespace(config=SimpleNamespace(max_current=max_current)))
+def test_sweep_defaults_come_from_the_motor_family(family, live_ma, expected):
+    """In maintenance there is no session: a config left on ``default`` still
+    caps the sweep at the family's own limit, and the console's limit wins."""
+    config = SimpleNamespace(max_current="default")
+    service = SimpleNamespace(session=None, max_current=live_ma, supervisor=SimpleNamespace(config=config))
     defaults = sweep_defaults(service, family)
     assert (defaults["hold_current_ma"], defaults["pose_current_ma"], defaults["sweep_current_ma"]) == expected
+
+
+def test_a_sweep_is_refused_when_the_limit_is_below_its_minimum_current():
+    hand = SimpleNamespace(config=SimpleNamespace(motor_type="dynamixel"))
+    session = SimpleNamespace(caps=SimpleNamespace(motors=True), hand=hand)
+    config = SimpleNamespace(joint_ids=[], max_current="default")
+    service = SimpleNamespace(session=session, max_current=40, supervisor=SimpleNamespace(config=config))
+    with pytest.raises(ServiceError, match="below the sweep's minimum") as refused:
+        validate_sweep_params(service, {})
+    assert refused.value.status_code == 409
+    service.max_current = 50
+    assert validate_sweep_params(service, {})["settings"] == {}
 
 
 def test_a_sweep_is_saved_and_scored_against_the_reference(client):
@@ -202,6 +234,115 @@ def test_estop_mid_sweep_releases_the_lease(client):
     assert _wait_for(lambda: _operation(client).get("state") == "error")
     assert _wait_for(lambda: client.get("/api/status").json()["state"] == "connected")
     assert client.get("/api/sweeps").json()["sweeps"] == {}
+
+
+def test_a_marked_reference_from_another_motor_family_is_not_used(monkeypatch):
+    """Clicks scored against another family's load curves would be wrong: such a
+    marked reference gives way to the shipped one for the hand's family."""
+    from orca_ui.hand import reference as shipped
+    from orca_ui.hand import sweeps
+
+    section = {"reference": "mine", "sweeps": {"mine": {"motor_type": "dynamixel", "results": []}}}
+    monkeypatch.setattr(sweeps, "read_records", lambda *a, **k: section)
+    monkeypatch.setattr(shipped, "sweep", lambda config, family: {"name": f"shipped-{family}"})
+    assert sweeps.reference(None, "dynamixel")[0] == "mine"
+    assert sweeps.reference(None, None)[0] == "mine"
+    assert sweeps.reference(None, "feetech")[0] == "shipped-feetech"
+
+
+@pytest.mark.parametrize("op_name, routine", [
+    pytest.param("slack_test.SlackTestOperation", "slack_test", id="slack-test"),
+    pytest.param("tension_sweep.TensionSweepOperation", "tension_sweep", id="sweep"),
+])
+def test_a_stop_inside_the_routine_ends_the_run_as_a_stop(monkeypatch, op_name, routine):
+    """orca_core answers should_stop with InterruptedError: that is the operator's
+    stop, not a failure with a traceback; the hand is still let go and the lease returned."""
+    import importlib
+    import threading
+
+    from orca_ui.hand import sweeps
+    from orca_ui.hand.operations import hand_ops
+    from orca_ui.hand.operations.events import OperationStopped
+
+    released = []
+    stop = threading.Event()
+    press_stop = []
+
+    def interrupted(*args, **kwargs):
+        if press_stop:
+            stop.set()
+        raise InterruptedError("stopped")
+
+    monkeypatch.setattr(hand_ops, "build_maintenance_hand", lambda *a, **k: SimpleNamespace())
+    monkeypatch.setattr(hand_ops, "disconnect", lambda hand: released.append("hand"))
+    monkeypatch.setattr(hand_ops, routine, interrupted)
+    monkeypatch.setattr(sweeps, "reference", lambda config, family: None)
+    supervisor = SimpleNamespace(
+        config=SimpleNamespace(max_current="default", motor_type="dynamixel"), hand_id=None,
+        hardware_version_override=None,
+        enter_maintenance=lambda kind: SimpleNamespace(presence=None),
+        exit_maintenance=lambda: released.append("lease"))
+    service = SimpleNamespace(session=None, max_current=None, supervisor=supervisor)
+    module, cls = op_name.split(".")
+    op = getattr(importlib.import_module(f"orca_ui.hand.operations.{module}"), cls)({})
+    ctx = SimpleNamespace(service=service, stop_event=stop, set_phase=lambda *a, **k: None,
+                          log=lambda line: None, set_extra=lambda extra: None)
+    ctx.check_stop = lambda: (_ for _ in ()).throw(OperationStopped()) if ctx.stop_event.is_set() else None
+
+    with pytest.raises(InterruptedError):
+        op.run(ctx)
+    press_stop.append(True)
+    with pytest.raises(OperationStopped):
+        op.run(ctx)
+    assert released == ["hand", "lease"] * 2
+
+
+def test_motors_left_holding_after_a_sweep_reach_the_log_and_stay_on_the_snapshot(monkeypatch):
+    """orca_core reports motors it could not switch torque off on while letting go;
+    they must reach the log and stay on ``extra`` (the console's banner reads it)
+    through the run's last publish."""
+    import threading
+
+    from orca_ui.hand import sweeps
+    from orca_ui.hand.operations import hand_ops, tension_sweep
+    from orca_ui.hand.operations.base import OpContext
+
+    class _Manager:
+        def __init__(self):
+            self.extra = None
+            self.lines = []
+
+        def update_snapshot(self, extra=None, **kwargs):
+            if extra is not None:
+                self.extra = dict(extra)
+
+        def append_log(self, line):
+            self.lines.append(line)
+
+        def snapshot(self):
+            return {"extra": self.extra}
+
+    def routine(hand, *, progress_callback, **kwargs):
+        progress_callback({"event": "torque_off_failed", "motors": [7], "joints": ["index_pip"]})
+        return {"results": []}
+
+    monkeypatch.setattr(hand_ops, "build_maintenance_hand", lambda *a, **k: SimpleNamespace())
+    monkeypatch.setattr(hand_ops, "disconnect", lambda hand: None)
+    monkeypatch.setattr(hand_ops, "tension_sweep", routine)
+    monkeypatch.setattr(sweeps, "reference", lambda config, family: None)
+    monkeypatch.setattr(tension_sweep, "_save", lambda *a: "sweep.yaml")
+    supervisor = SimpleNamespace(
+        config=SimpleNamespace(max_current="default", motor_type="dynamixel"), hand_id=None,
+        hardware_version_override=None,
+        enter_maintenance=lambda kind: SimpleNamespace(presence=None), exit_maintenance=lambda: None)
+    service = SimpleNamespace(session=None, max_current=None, supervisor=supervisor)
+    manager = _Manager()
+    ctx = OpContext(manager, service, None, threading.Event(), None)
+
+    tension_sweep.TensionSweepOperation({}).run(ctx)
+    assert manager.extra["step"] == "done"
+    assert manager.extra["torque_off_failed"] == {"motors": [7], "joints": ["index_pip"]}
+    assert any("motor 7 (index_pip)" in line and "E-STOP" in line for line in manager.lines)
 
 
 def test_a_sweep_that_stalls_before_the_stop_still_gets_a_log_line():

@@ -264,6 +264,8 @@ class _Presenter:
         self._lock = threading.Lock()
         self._last_publish = 0.0
         self._rounds_before = 0
+        # Joints whose stage reached its range check this round.
+        self._checked: set[str] = set()
 
     @property
     def step(self) -> str:
@@ -292,6 +294,9 @@ class _Presenter:
                 round_no = self._round(event["round"])
                 if round_no != self._extra["round"]:
                     self._extra.update(motors=[], passed=0, scored=0, fraction=0.0)
+                    self._checked.clear()
+                if event["step"] == "range" and "stage" in event:
+                    self._checked.update(event["stage"].get("joints") or [])
                 # The slack test's clicks are for the first tension step only.
                 if self._extra["step"] == "tension" and event["step"] != "tension":
                     self._extra.pop("ratchet", None)
@@ -370,6 +375,17 @@ class _Presenter:
                         f"is checked again"
                     )
                 self._publish()
+            elif kind == "sampler_failed":
+                round_no = self._round(event.get("round", 1))
+                self._extra["sampler_failed"] = {"round": round_no, "error": event.get("error")}
+                self._ctx.log(
+                    f"round {round_no}: the live spread readings stopped ({event.get('error')}), so the "
+                    "spreads shown no longer update. Stop the run and start guided tensioning again."
+                )
+                self._publish()
+            elif kind == "torque_off_failed":
+                self._ctx.torque_off_failed(event)
+                self._publish()
             elif kind == "cleanup_failed":
                 self._ctx.log(f"cleanup failed: {event.get('error')}")
             elif kind == "current_limits":
@@ -379,11 +395,22 @@ class _Presenter:
 
     def _with_clicks(self, motor: dict) -> dict:
         """Add the ratchet clicks the joint's slack still needs: its slack in
-        degrees, or the travel it is short of (expected × (1 − fraction))."""
+        degrees, or the travel it is short of (expected × (1 − fraction)). A row whose
+        stage had no range check this round, with no score kept from earlier, is not
+        checked and gets none. A kept 0.0 is no score: saved progress may hold it for
+        a joint that was never swept."""
+        unchecked = motor["joint"] not in self._checked and not motor.get("spread_deg")
+        if unchecked and not motor.get("kept") and not motor.get("fault"):
+            return {**motor, "not_checked": True, "clicks_left": None}
         slack = motor.get("slack_deg")
         if slack is None and motor.get("fraction") is not None and motor.get("expected_deg"):
             slack = motor["expected_deg"] * max(0.0, 1.0 - motor["fraction"])
         return {**motor, "clicks_left": reference.clicks_for_slack(slack, motor["joint"])}
+
+    def retested(self, joints: set[str]) -> None:
+        """Joints whose pass was dropped: unchecked until their stage's next range check."""
+        with self._lock:
+            self._checked -= joints
 
     def _set_fault(self, motor: int, joint, flags: list, relatched: bool = False) -> None:
         info = classify_hw_error(flags, motor=motor, joint=joint)
@@ -554,6 +581,8 @@ class _LiveCurrents(Operation):
         """The joints asked to be tested again since the last call."""
         with self._again_lock:
             joints, self._again = self._again, set()
+        if joints and self._presenter is not None:
+            self._presenter.retested(joints)
         return joints
 
     def handle_input(self, value: str) -> bool:
@@ -626,6 +655,7 @@ class GuidedTensionOperation(_LiveCurrents):
                 supervisor.config,
                 ctx.stop_event,
                 motor_port=lease.presence.motor_port if lease.presence else None,
+                hardware_version=supervisor.hardware_version_override,
             )
             self._hand = hand
             baseline, travel = active_travel_baseline(supervisor.config, family)
@@ -633,21 +663,25 @@ class GuidedTensionOperation(_LiveCurrents):
                 hand_ops.override_travel(hand, travel)
             presenter.set_currents({"baseline": baseline})
             ctx.log(f"scoring against {baseline['label']}")
-            result = hand_ops.guided_tension(
-                hand,
-                prompt_callback=presenter.prompt,
-                progress_callback=presenter.progress,
-                should_stop=ctx.stop_event.is_set,
-                hold_current=self.hold_for,
-                tension_offset_deg=lambda: self.currents["tension_offset_deg"],
-                scoring=self.scoring,
-                pass_fraction=self.pass_fraction,
-                pass_slack_deg=self.pass_slack_deg,
-                hand_key=supervisor.hand_id,
-                resume=self.params.get("resume", True),
-                any_hardware=self.params.get("any_hardware", False),
-                forget=self.drain_again,
-            )
+            try:
+                result = hand_ops.guided_tension(
+                    hand,
+                    prompt_callback=presenter.prompt,
+                    progress_callback=presenter.progress,
+                    should_stop=ctx.stop_event.is_set,
+                    hold_current=self.hold_for,
+                    tension_offset_deg=lambda: self.currents["tension_offset_deg"],
+                    scoring=self.scoring,
+                    pass_fraction=self.pass_fraction,
+                    pass_slack_deg=self.pass_slack_deg,
+                    resume=self.params.get("resume", True),
+                    any_hardware=self.params.get("any_hardware", False),
+                    forget=self.drain_again,
+                )
+            except InterruptedError:
+                # orca_core's answer to should_stop: a stop, not a failure.
+                ctx.check_stop()
+                raise
             presenter.finish(result["completed"])
             ctx.set_phase("released", detail="torque off, control mode restored")
             return result
@@ -676,7 +710,7 @@ def active_travel_baseline(config, family: str | None) -> tuple[dict, dict[str, 
                 "name": ref.get("travel_from"),
                 "source": "reference",
                 "joints": len(shipped),
-                "label": f"the reference hand {ref.get('hand_key')} ({ref.get('travel_from')})",
+                "label": f"the reference hand ({ref.get('travel_from')})",
             }, shipped
         return {
             "name": None,
