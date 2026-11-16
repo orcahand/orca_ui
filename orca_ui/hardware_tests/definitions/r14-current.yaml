@@ -22,9 +22,9 @@ steps:
   - motor_currents
   instructions: 'The check sets max current to 100 mA, sweeps index_mcp once and reads the slack test''s offered
     currents, then puts max current back. It moves the hand: keep it clear and on the bench.'
-  pass_rule: Every current the sweep and the slack test command is at most the limit, and each joint's mean drive
-    current stays within it. Brief peaks above the limit are reported but allowed (present-current readings
-    spike, notably on Feetech).
+  pass_rule: Every current the sweep and the slack test command is at most the limit; the measured drive current
+    is never held above it (3 readings in a row, or more than 20% of a run, above the limit + 15%); the motors'
+    goal-current register reads at most the limit; and the swept joint moved. Readings above the limit are listed.
 - id: R7c
   title: Below the sweep's minimum
   kind: auto

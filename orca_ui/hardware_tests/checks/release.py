@@ -614,13 +614,26 @@ def firmware_repo(ctx: CheckContext) -> Optional[Path]:
     return next((c.resolve() for c in firmware_candidates(ctx) if (c / FIRMWARE_TOOL).is_file()), None)
 
 
+# orca_core's reasons for leaving the board alone that say nothing is wrong with the write itself
+# (orca_core/board_push.py); every other "kept on this computer only" reason is a failed write.
+BOARD_SKIP_REASONS = (
+    re.compile(r"^no orca_firmware checkout (at |on this computer$)"),
+    re.compile(r"^the orca_firmware checkout at .+ has no tools/bench/cal_store\.py$"),
+    re.compile(r"^this hand has no board to keep a calibration on$"),
+)
+
+
 def board_write_outcome(returncode: int, output: str) -> tuple[str, str]:
-    """What calibrate.py did with the board: ``wrote``, ``not_written`` (with its reason) or ``failed``."""
+    """What calibrate.py did with the board: ``wrote``, ``not_written`` (nothing to write
+    with or to, with its reason) or ``failed`` (with its reason)."""
     if returncode == 0 and BOARD_WRITTEN in output:
         return "wrote", ""
     kept = BOARD_NOT_WRITTEN.search(output)
     if returncode == 0 and kept:
-        return "not_written", kept.group(1).strip().rstrip(".")
+        reason = kept.group(1).strip().rstrip(".")
+        if any(p.search(reason) for p in BOARD_SKIP_REASONS):
+            return "not_written", reason
+        return "failed", reason
     return "failed", f"exit {returncode}"
 
 
@@ -672,7 +685,7 @@ def board_calibration_banner(ctx: CheckContext) -> CheckResult:
         wrote = outcome == "wrote"
         metrics.append(Metric("calibrate.py wrote the board", "yes" if wrote else reason, ok=wrote))
         if not wrote:
-            return CheckResult(status="fail", summary="calibrate.py did not finish writing the board.",
+            return CheckResult(status="fail", summary=f"calibrate.py did not write the board: {reason}",
                                metrics=metrics, details={"output": output[-3000:]})
         _wait_connected(ctx)
         offered = _state(ctx).get("board_calibration_newer")
@@ -898,9 +911,9 @@ def current_limit_respected(ctx: CheckContext) -> CheckResult:
     params = ctx.step.params or {}
     limit = int(params.get("limit_ma", 100))
     joint = str(params.get("joint", "index_mcp"))
-    tolerance = float(params.get("tolerance_ma", 15.0))
     from orca_ui.hand import sweeps
 
+    goal = None
     with hand_files_restored(ctx, ("setup.yaml",)), _max_current(ctx, limit):
         slack = (ctx.service.hand_info().get("slack_current") or {})
         offered = [float(v) for v in (slack.get("choices_ma") or []) if isinstance(v, (int, float))]
@@ -912,12 +925,15 @@ def current_limit_respected(ctx: CheckContext) -> CheckResult:
             _wait_connected(ctx)
             saved = (snapshot.get("result") or {}).get("saved")
             data = sweeps.dataset(ctx.service.supervisor.config, saved) if saved else None
+            # Read before the limit is put back: what the motors hold on the console's connection.
+            goal = goal_current_metric(ctx.service, limit)
     results = (data or {}).get("results") or []
     metrics = [Metric("limit set", limit, unit="mA")]
     if _mock(ctx):
         metrics.append(Metric("sweep", "not swept (mock)"))
     else:
-        metrics += sweep_current_metrics((data or {}).get("settings") or {}, results, limit, tolerance)
+        metrics += sweep_current_metrics((data or {}).get("settings") or {}, results, limit)
+        metrics.append(goal)
     metrics += [Metric("slack test's highest offered current", max(offered, default=None), unit="mA",
                        ok=not offered or max(offered) <= limit + 0.5),
                 Metric("slack test's default", default_ma, unit="mA",
@@ -926,24 +942,79 @@ def current_limit_respected(ctx: CheckContext) -> CheckResult:
     if not results and not _mock(ctx):
         problems.append(f"the sweep saved no readings ({snapshot.get('error') or snapshot.get('detail')})")
     return _fail_or_pass(problems, f"with max current at {limit} mA every current the sweep and the slack test "
-                         "command stays within it, and so does each joint's mean drive current.", metrics)
+                         "command stays within it, the measured drive current stays within it, and the joint moved.",
+                         metrics)
 
 
-def sweep_current_metrics(settings: dict, results: list, limit: float, tolerance: float) -> list[Metric]:
-    """The sweep's commanded currents and each joint's mean drive current against ``limit``;
-    the measured peaks are reported only, since present-current readings spike past the loop's cap."""
+OVER_LIMIT_FACTOR = 1.15     # a reading above limit × this counts as over the limit
+OVER_LIMIT_RUN = 3           # this many such readings in a row is current held above the limit
+OVER_LIMIT_SHARE = 0.20      # as is more than this share of a run's readings
+MOVED_DEG = 0.5              # a run whose joint moved less than this measured nothing
+
+
+def _run_label(r: dict) -> str:
+    return f"{r.get('joint')} {r.get('sense') or r.get('direction')}"
+
+
+def _over_limit(currents: list[float], limit: float) -> tuple[int, int]:
+    """(longest run of readings over the limit, how many are over it)."""
+    longest = streak = over = 0
+    for ma in currents:
+        if abs(ma) > limit * OVER_LIMIT_FACTOR:
+            over += 1
+            streak += 1
+            longest = max(longest, streak)
+        else:
+            streak = 0
+    return longest, over
+
+
+def sweep_current_metrics(settings: dict, results: list, limit: float) -> list[Metric]:
+    """The sweep's commanded currents and its measured drive current against ``limit``:
+    a run fails when its measured current stays above the limit, or when its joint never
+    moved, since it then measured nothing."""
     commanded = {k: float(v) for k, v in settings.items()
                  if k.endswith("_current_ma") and isinstance(v, (int, float))}
-    means = [abs(float(r["mean_ma"])) for r in results if isinstance(r.get("mean_ma"), (int, float))]
-    peaks = [float(r["peak_ma"]) for r in results if isinstance(r.get("peak_ma"), (int, float))]
     high = max(commanded.values(), default=None)
+    held_over, still, highest = [], [], None
+    for r in results:
+        samples = [s for s in (r.get("samples") or []) if isinstance(s, (list, tuple)) and len(s) >= 2]
+        currents = [float(s[1]) for s in samples if isinstance(s[1], (int, float))]
+        if currents:
+            highest = max(highest or 0.0, max(abs(c) for c in currents))
+            longest, over = _over_limit(currents, limit)
+            if longest >= OVER_LIMIT_RUN or over > OVER_LIMIT_SHARE * len(currents):
+                held_over.append(f"{_run_label(r)}: {over}/{len(currents)} readings over "
+                                 f"{limit * OVER_LIMIT_FACTOR:.0f} mA, mean {abs(float(r.get('mean_ma') or 0)):.0f} mA")
+        angles = [float(s[0]) for s in samples if isinstance(s[0], (int, float))]
+        span = (max(angles) - min(angles)) if angles else abs(float(r.get("end_deg") or 0) - float(r.get("start_deg") or 0))
+        if span < MOVED_DEG:
+            still.append(_run_label(r))
     return [
-        Metric("sweep's highest commanded current", high, unit="mA",
-               ok=bool(commanded) and high <= limit + 0.5),
-        Metric("sweep's highest mean drive current", max(means, default=None), unit="mA",
-               ok=bool(means) and max(means) <= limit + tolerance),
-        Metric("sweep's highest peak (brief spikes, not judged)", max(peaks, default=None), unit="mA", ok=None),
+        Metric("sweep's highest commanded current", high, unit="mA", ok=bool(commanded) and high <= limit + 0.5),
+        Metric("drive current held above the limit", "; ".join(held_over) or "no",
+               ok=bool(results) and not held_over),
+        Metric("sweep's highest drive current reading", highest, unit="mA", ok=None),
+        Metric("did not move at this current", ", ".join(still) or "none", ok=bool(results) and not still),
     ]
+
+
+def goal_current_metric(service, limit: float) -> Metric:
+    """The goal-current limit the motors hold on the console's connection, against ``limit``."""
+    session = service.session
+    client = getattr(getattr(session, "hand", None), "motor_client", None)
+    if client is None or not hasattr(client, "read_goal_currents"):
+        return Metric("goal current read back from the motors", "no way to read it", ok=None)
+    try:
+        read = client.read_goal_currents()
+    except Exception as e:
+        return Metric("goal current read back from the motors", f"{type(e).__name__}: {e}", ok=None)
+    values = [abs(float(v)) for v in read.values() if isinstance(v, (int, float))]
+    above = sorted(m for m, v in read.items() if isinstance(v, (int, float)) and abs(float(v)) > limit + 0.5)
+    shown = f"highest {max(values):.1f} mA" if values else "no answer"
+    return Metric("goal current read back from the motors",
+                  shown + (f"; above the limit on motor(s) {above}" if above else ""),
+                  unit="", ok=(not above) if values else None)
 
 
 @register("sweep_refused_below_minimum")
@@ -1368,29 +1439,9 @@ def standalone_config(ctx: CheckContext) -> CheckResult:
 
 # ----- 19. ORCA_HOME elsewhere ----------------------------------------------------------------
 
-# The console's own reconnect after a side run stamps these; they say nothing about the side run.
-_SEEN_KEYS = ("last_seen",)
-
-
 def store_snapshot(root: Path) -> dict:
-    """The hands folder's files, each as its size and mtime; ``hand.yaml`` as its content less
-    the last-seen stamp, and lock files only as present."""
-    import yaml
-
-    out = {}
-    for name, (size, mtime) in _tree(root).items():
-        path = root / name
-        if path.name == "hand.yaml":
-            try:
-                doc = yaml.safe_load(path.read_text()) or {}
-            except (OSError, yaml.YAMLError):
-                doc = {"unreadable": (size, mtime)}
-            out[name] = {k: v for k, v in doc.items() if k not in _SEEN_KEYS} if isinstance(doc, dict) else doc
-        elif path.suffix == ".lock":
-            out[name] = "present"
-        else:
-            out[name] = (size, mtime)
-    return out
+    """Every file in the hands folder as its size and mtime: any write shows."""
+    return _tree(root)
 
 
 def snapshot_changes(before: dict, after: dict) -> list[str]:
@@ -1411,22 +1462,27 @@ def orca_home_elsewhere(ctx: CheckContext) -> CheckResult:
     ran = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=60)
     lines = ran.stdout.strip().splitlines()
     unmoved = legacy.is_dir() and not legacy.is_symlink()
+    details: dict = {}
     metrics = [Metric("~/.orca_ui left where it was", "yes" if unmoved else "moved", ok=unmoved),
                Metric("console state folder", lines[-1] if lines else ran.stderr[-200:],
                       ok=bool(lines) and lines[-1] == str(custom / "ui"))]
     if not _mock(ctx) and ctx.sides.available("branch") is None:
         root = hands_root()
-        before = store_snapshot(root)
-        result = _connect_only(ctx, "connect")
+        # Both snapshots inside the release: the console's own disconnect and reconnect stay outside.
+        with ctx.sides.hand_released():
+            before = store_snapshot(root)
+            result = _connect_only(ctx, "connect")
+            changed = snapshot_changes(before, store_snapshot(root))
         data = result.get("data") or {}
         folder = str(data.get("hand_dir") or "")
-        changed = snapshot_changes(before, store_snapshot(root))
         metrics += [Metric("hand folder in the run's ORCA_HOME", folder,
                            ok=bool(result.get("ok")) and folder.startswith(str(ctx.out_dir))),
                     Metric("real hands folder untouched", "yes" if not changed else "changed: " + ", ".join(changed[:5]),
                            ok=not changed)]
+        details["changed_in_real_store"] = changed
     problems = [m.name for m in metrics if m.ok is False]
-    return _fail_or_pass(problems, "with ORCA_HOME elsewhere nothing was moved, and the hand was filed there.", metrics)
+    return _fail_or_pass(problems, "with ORCA_HOME elsewhere nothing was moved, and the hand was filed there.", metrics,
+                         details=details)
 
 
 # ----- 20. orca_core's scripts on this hand ------------------------------------------------

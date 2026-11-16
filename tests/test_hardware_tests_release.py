@@ -124,29 +124,96 @@ def test_the_edited_max_current_is_valid_for_the_family_and_differs_from_the_one
     assert chosen > 500 and chosen != 505
 
 
-def test_the_store_snapshot_ignores_the_consoles_own_reconnect_but_not_a_real_write(tmp_path):
+def test_the_store_snapshot_sees_any_write_even_a_last_seen_stamp_or_a_lock(tmp_path):
     hand = tmp_path / "ser-1"
     hand.mkdir()
-    (hand / "hand.yaml").write_text("id: ser-1\nnickname: a\nlast_seen: '1'\n")
+    (hand / "hand.yaml").write_text("id: ser-1\nlast_seen: '1'\n")
     (hand / "setup.yaml.lock").write_text("")
     before = release.store_snapshot(tmp_path)
-    (hand / "hand.yaml").write_text("id: ser-1\nnickname: a\nlast_seen: '2'\n")
-    (hand / "setup.yaml.lock").touch()
     assert release.snapshot_changes(before, release.store_snapshot(tmp_path)) == []
-    (hand / "calibration.yaml").write_text("sequence: 1\n")
-    (hand / "hand.yaml").write_text("id: ser-1\nnickname: b\nlast_seen: '3'\n")
+    (hand / "hand.yaml").write_text("id: ser-1\nlast_seen: '22'\n")
+    (hand / "setup.yaml.lock").write_text("x")
     assert release.snapshot_changes(before, release.store_snapshot(tmp_path)) == \
-        ["ser-1/calibration.yaml", "ser-1/hand.yaml"]
+        ["ser-1/hand.yaml", "ser-1/setup.yaml.lock"]
 
 
-def test_the_sweep_is_judged_on_what_it_commands_and_its_mean_not_its_peaks():
-    capped = {"sweep_current_ma": 100.0, "hold_current_ma": 100.0, "pose_current_ma": 100.0, "speed_deg_s": 30}
-    readings = [{"mean_ma": 14.9, "peak_ma": 195.0}, {"mean_ma": -15.2, "peak_ma": 208.0}]
-    metrics = release.sweep_current_metrics(capped, readings, 100, 15.0)
-    assert [m.ok for m in metrics] == [True, True, None] and metrics[2].value == 208.0
-    over = release.sweep_current_metrics({**capped, "sweep_current_ma": 150.0}, readings, 100, 15.0)
-    assert over[0].ok is False
-    assert release.sweep_current_metrics(capped, [{"mean_ma": 140.0}], 100, 15.0)[1].ok is False
+def test_the_custom_home_run_is_compared_only_while_the_console_has_let_go(tmp_path, monkeypatch):
+    real = tmp_path / "real-hands"
+    (real / "ser-1").mkdir(parents=True)
+    (real / "ser-1" / "hand.yaml").write_text("id: ser-1\n")
+    released = []
+
+    class Sides:
+        @staticmethod
+        def available(side):
+            return None
+
+        @staticmethod
+        @release.contextlib.contextmanager
+        def hand_released():
+            released.append("in")
+            yield
+            # The console takes the hand back and stamps its folder: outside the comparison.
+            (real / "ser-1" / "hand.yaml").write_text("id: ser-1\nlast_seen: now\n")
+
+    def connect(ctx, folder, **args):
+        assert released == ["in"]
+        return {"ok": True, "data": {"hand_dir": str(ctx.out_dir / "connect" / "orca_home" / "hands" / "ser-1")}}
+
+    monkeypatch.setattr(release, "hands_root", lambda: real)
+    monkeypatch.setattr(release, "_mock", lambda ctx: False)
+    monkeypatch.setattr(release, "_connect_only", connect)
+    ctx = SimpleNamespace(out_dir=tmp_path / "out", sides=Sides(), step=SimpleNamespace(params={}))
+    result = release.orca_home_elsewhere(ctx)
+    assert result.status == "pass", result.summary
+
+    def leaky(ctx, folder, **args):
+        (real / "ser-1" / "hand.yaml").write_text("id: ser-1\nlast_seen: leaked by the side run\n")
+        return connect(ctx, folder)
+
+    released.clear()
+    monkeypatch.setattr(release, "_connect_only", leaky)
+    result = release.orca_home_elsewhere(ctx)
+    assert result.status == "fail" and result.details["changed_in_real_store"] == ["ser-1/hand.yaml"]
+
+
+# The 100 mA run on the Feetech bench hand (2026-11-16): flex barely drew, extend held about twice the limit,
+# and index_mcp stayed at 11.95 deg throughout.
+_STUCK = 11.95
+_FLEX = {"joint": "index_mcp", "sense": "flex", "mean_ma": 14.92, "start_deg": _STUCK, "end_deg": _STUCK,
+         "samples": [[_STUCK, -195.0], [_STUCK, -195.0]] + [[_STUCK, -6.5]] * 42}
+_EXTEND = {"joint": "index_mcp", "sense": "extend", "mean_ma": 158.44, "start_deg": _STUCK, "end_deg": _STUCK,
+           "samples": [[_STUCK, -6.5], [_STUCK, -6.5], [_STUCK, 0.0], [_STUCK, 97.5]]
+           + [[_STUCK, ma] for ma in (-201.5, -208.0, -208.0, -201.5, -201.5, -201.5,
+                                      -195.0, -208.0, -208.0, -201.5, -195.0, -195.0)]}
+_CAPPED = {"sweep_current_ma": 100.0, "hold_current_ma": 100.0, "pose_current_ma": 100.0, "speed_deg_s": 30}
+
+
+def test_the_real_100_ma_run_fails_on_held_current_and_on_a_joint_that_never_moved():
+    by = {m.name: m for m in release.sweep_current_metrics(_CAPPED, [_FLEX, _EXTEND], 100)}
+    assert by["sweep's highest commanded current"].ok is True
+    held = by["drive current held above the limit"]
+    assert held.ok is False and "extend: 12/16" in held.value and "flex" not in held.value
+    assert by["sweep's highest drive current reading"].value == 208.0
+    assert by["did not move at this current"].ok is False
+
+
+def test_a_sweep_within_its_limit_that_moved_passes_and_a_commanded_overshoot_fails():
+    moving = {"joint": "index_mcp", "sense": "flex", "mean_ma": 60.0,
+              "samples": [[float(a), 60.0] for a in range(0, 90, 5)] + [[90.0, 160.0]]}
+    metrics = release.sweep_current_metrics(_CAPPED, [moving], 100)
+    assert [m.ok for m in metrics] == [True, True, None, True]
+    assert release.sweep_current_metrics({**_CAPPED, "sweep_current_ma": 150.0}, [moving], 100)[0].ok is False
+
+
+def test_the_goal_current_read_back_flags_a_motor_above_the_limit():
+    def service(read):
+        client = SimpleNamespace(read_goal_currents=read)
+        return SimpleNamespace(session=SimpleNamespace(hand=SimpleNamespace(motor_client=client)))
+    assert release.goal_current_metric(service(lambda: {1: 97.5, 2: 97.5}), 100).ok is True
+    above = release.goal_current_metric(service(lambda: {1: 97.5, 2: 899.6}), 100)
+    assert above.ok is False and "[2]" in above.value
+    assert release.goal_current_metric(SimpleNamespace(session=None), 100).ok is None
 
 
 def test_holding_stops_on_a_hot_motor_and_names_the_hottest_with_its_tracking_error():
@@ -175,3 +242,17 @@ def test_the_board_step_needs_the_store_tool_and_reads_calibrates_own_verdict(tm
     assert release.board_write_outcome(0, "Calibration also written to the hand's own board (seq 3).")[0] == "wrote"
     assert release.board_write_outcome(0, "the board answered")[0] == "failed"
     assert release.board_write_outcome(1, kept)[0] == "failed"
+
+
+@pytest.mark.parametrize("reason, outcome", [
+    ("no orca_firmware checkout at /x/orca_firmware", "not_written"),
+    ("the orca_firmware checkout at /x/orca_firmware has no tools/bench/cal_store.py", "not_written"),
+    ("this hand has no board to keep a calibration on", "not_written"),
+    ("the board on /dev/cu.usbmodem101 did not answer (timeout)", "failed"),
+    ("the firmware tool would not run (exit 2)", "failed"),
+    ("the board does not serve the calibration just written", "failed"),
+    ("the board was not written (OSError: boom)", "failed"),
+])
+def test_only_nothing_to_write_with_or_to_is_a_skip_and_every_failed_write_fails(reason, outcome):
+    got = release.board_write_outcome(0, f"Calibration kept on this computer only: {reason}.\n")
+    assert got == (outcome, reason)
