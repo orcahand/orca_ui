@@ -57,6 +57,9 @@ def test_plain_calibration_limits_must_lie_within_mains_spread():
     assert metrics[2].value == 117.0 and metrics[2].main == 117.0
     off = _calibration({"3": [-1.05, 1.50]}, {"index_mcp": 147.0})
     assert compare.judge_calibration(main, off)[1] == ["index_mcp (motor 3) upper limit"]
+    for lost in ({}, {"3": [-1.05, float("nan")]}):
+        metrics, outside = compare.judge_calibration(main, _calibration(lost, {}))
+        assert outside == ["index_mcp (motor 3) not calibrated on the branch"] and metrics[0].ok is False
 
 
 def test_plain_pass_never_swaps_a_v21_hands_joint_map(tmp_path):

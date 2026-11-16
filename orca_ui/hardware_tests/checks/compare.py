@@ -341,13 +341,24 @@ def _total_current_series(ctx: CheckContext, result: dict, side: str, name: str)
 def judge_calibration(main_runs: list[dict], branch: dict, joints: Optional[list] = None,
                       floor_deg: float = LIMIT_FLOOR_DEG) -> tuple[list[Metric], list[str]]:
     """Per calibrated motor: the branch's lower and upper limit inside main's band.
-    Returns the metrics and the labels of the limits outside it."""
+    Returns the metrics and the labels of the limits outside it (or missing on the branch)."""
     branch_limits = _limits(branch)
     main_limits = [_limits(r) for r in main_runs]
-    joint_by_motor = (branch.get("data") or {}).get("joint_by_motor") or {}
+    joint_by_motor = {}
+    for run in [*main_runs, branch]:
+        joint_by_motor.update((run.get("data") or {}).get("joint_by_motor") or {})
     floor = math.radians(floor_deg)
     metrics, outside = [], []
-    for motor in sorted(branch_limits, key=lambda m: int(m) if m.isdigit() else m):
+    order = lambda m: (0, int(m), "") if m.isdigit() else (1, 0, m)  # noqa: E731
+    # A motor main calibrated that the branch left out (or wrote as NaN) is a failure, not a skip.
+    for motor in sorted({m for limits in main_limits for m in limits} - set(branch_limits), key=order):
+        joint = joint_by_motor.get(motor)
+        if joints and joint not in joints:
+            continue
+        label = _joint_label(joint_by_motor, motor)
+        outside.append(f"{label} not calibrated on the branch")
+        metrics.append(Metric(f"{label} limits", "missing or not a number", "deg", main="calibrated", ok=False))
+    for motor in sorted(branch_limits, key=order):
         joint = joint_by_motor.get(motor)
         if joints and joint not in joints:
             continue
