@@ -256,3 +256,109 @@ def test_the_board_step_needs_the_store_tool_and_reads_calibrates_own_verdict(tm
 def test_only_nothing_to_write_with_or_to_is_a_skip_and_every_failed_write_fails(reason, outcome):
     got = release.board_write_outcome(0, f"Calibration kept on this computer only: {reason}.\n")
     assert got == (outcome, reason)
+
+
+class _Clock:
+    def __init__(self):
+        self.t = 0.0
+
+    def monotonic(self):
+        return self.t
+
+    def sleep(self, s):
+        self.t += s
+
+
+class _Probe:
+    """A Feetech motor whose present current is ``draw(direction, limit)``; ``read_back``
+    is what its goal-current register returns after a write."""
+
+    def __init__(self, hand, motor, draw=lambda d, limit: 0.6 * limit, read_back=None):
+        self.draw, self.read_back, self.limit, self.target, self.start = draw, read_back, None, 0.0, 0.0
+        self.torque_on, self.events = False, []
+
+    def registers(self):
+        return {"protection_current_28": 138, "goal_current_44": 15, "torque_limit_48": 1000}
+
+    def others_off(self):
+        self.events.append("others off")
+
+    def torque(self, on):
+        self.torque_on = on
+
+    def set_limit(self, ma):
+        self.limit = release.register_ma(ma)
+        return self.read_back(ma) if self.read_back else self.limit
+
+    def goal_current(self):
+        return self.limit
+
+    def position(self):
+        return self.start
+
+    def goal(self, position):
+        self.target = position
+
+    def current(self):
+        direction = 0 if self.target == self.start else (1 if self.target > self.start else -1)
+        ma = self.draw(direction, self.limit) if direction else 0.0
+        return ma, int(abs(ma) / 6.5)
+
+    def temperature(self):
+        return 30.0
+
+
+def _probe_ctx(monkeypatch, **probe_args):
+    import contextlib as cl
+
+    probes = []
+
+    class Client:
+        pass
+
+    Client.__module__ = "orca_core.hardware.feetech_client"
+    hand = SimpleNamespace(motor_client=Client(), config=SimpleNamespace(joint_to_motor_map={"index_mcp": 3}),
+                           calibration=SimpleNamespace(_motor_ready=lambda m: True))
+    monkeypatch.setattr(release, "_ready", lambda ctx: None)
+    monkeypatch.setattr(release, "_mock", lambda ctx: False)
+    monkeypatch.setattr(release, "_hand", lambda ctx: hand)
+    monkeypatch.setattr(release, "_max_current", lambda ctx, ma: cl.nullcontext())
+    monkeypatch.setattr(release, "flex_sign", lambda hand, joint: 1.0)
+    monkeypatch.setattr(release, "PROBE_CLOCK", _Clock())
+    monkeypatch.setattr(release, "FeetechMotorProbe",
+                        lambda hand, motor: probes.append(_Probe(hand, motor, **probe_args)) or probes[-1])
+    ctx = SimpleNamespace(step=SimpleNamespace(params={}), service=SimpleNamespace(session=None),
+                          progress=lambda *a: None, check_stop=lambda: None, log=lambda *a: None)
+    return ctx, probes
+
+
+def test_one_motor_within_its_limit_both_ways_passes_and_ends_with_torque_off(monkeypatch):
+    ctx, probes = _probe_ctx(monkeypatch)
+    result = release.current_limit_one_motor(ctx)
+    assert result.status == "pass", result.summary
+    assert probes[0].torque_on is False and probes[0].events == ["others off"]
+    assert set(result.details["runs"]) == {"flex@100", "extend@100", "flex@50", "extend@50"}
+
+
+def test_a_motor_that_caps_one_way_only_fails_naming_that_direction(monkeypatch):
+    # As on the Feetech bench hand: within the limit flexing, about twice it extending.
+    ctx, probes = _probe_ctx(monkeypatch, draw=lambda d, limit: 0.6 * limit if d > 0 else -2.0 * limit)
+    result = release.current_limit_one_motor(ctx)
+    assert result.status == "fail"
+    assert "extend at 100 mA drew" in result.summary and "flex at 100 mA" not in result.summary
+    assert probes[0].torque_on is False
+
+
+def test_a_goal_current_that_reads_back_wrong_blames_the_write_path(monkeypatch):
+    ctx, probes = _probe_ctx(monkeypatch, read_back=lambda ma: 899.5)
+    result = release.current_limit_one_motor(ctx)
+    assert result.status == "fail" and "the write path is at fault" in result.summary
+    assert result.details["runs"] == {}  # nothing is driven against a limit that isn't set
+
+
+def test_the_probe_stops_on_a_current_held_far_too_high():
+    probe = _Probe(None, 3, draw=lambda d, limit: 400.0)
+    probe.limit = 97.5
+    run = release.probe_direction(probe, 0.0, 0.17, clock=_Clock())
+    assert run["abort"] and "300 mA" in run["abort"] and probe.target == 0.0
+    assert release.signed_current_raw(0x8000 | 31) == -31 and release.signed_current_raw(15) == 15

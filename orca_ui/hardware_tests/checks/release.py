@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import math
 import os
 import re
 import shutil
@@ -1032,6 +1033,213 @@ def sweep_refused_below_minimum(ctx: CheckContext) -> CheckResult:
     return _fail_or_pass([] if ok else [f"the sweep did not refuse at {limit} mA ({refused})"],
                          f"at {limit} mA the sweep refuses: {refused}",
                          [Metric("refusal", refused or "none", ok=ok)])
+
+
+PROBE_JOINT = "index_mcp"
+PROBE_DEG = 10.0             # how far past where it stands the motor is asked to go
+PROBE_S = 2.0                # how long each direction is held
+PROBE_HZ = 20.0
+PROBE_SETTLE_S = 0.2         # readings before this are the motor starting, not holding
+PROBE_ABORT_MA = 300.0       # current above this for longer than PROBE_ABORT_S stops the probe
+PROBE_ABORT_S = 1.0
+PROBE_ABORT_WARM_C = 5.0
+PROBE_LIMITS_MA = (100, 50)
+FEETECH_PROTECTION_CURRENT, FEETECH_GOAL_CURRENT, FEETECH_TORQUE_LIMIT = 28, 44, 48
+FEETECH_PRESENT_CURRENT = 69
+FEETECH_MA_PER_UNIT = 6.5
+
+
+def signed_current_raw(raw: int) -> int:
+    """Feetech's present current: magnitude in bits 0-14, sign in bit 15."""
+    return -(raw & 0x7FFF) if raw & 0x8000 else raw
+
+
+class FeetechMotorProbe:
+    """One Feetech motor driven and read directly on the console's connection."""
+
+    def __init__(self, hand, motor: int):
+        import numpy as np
+
+        self._np = np
+        self.hand, self.client, self.motor = hand, hand.motor_client, int(motor)
+        self.index = list(hand.config.motor_ids).index(self.motor)
+
+    def _word(self, address: int) -> Optional[int]:
+        with self.client._bus_lock:
+            raw, result, error = self.client.packet_handler.read2ByteTxRx(self.motor, address)
+        return int(raw) if result == 0 else None
+
+    def registers(self) -> dict:
+        return {"protection_current_28": self._word(FEETECH_PROTECTION_CURRENT),
+                "goal_current_44": self._word(FEETECH_GOAL_CURRENT),
+                "torque_limit_48": self._word(FEETECH_TORQUE_LIMIT)}
+
+    def others_off(self) -> None:
+        others = [int(m) for m in self.hand.config.motor_ids if int(m) != self.motor]
+        self.client.set_torque_enabled(others, False)
+
+    def torque(self, on: bool) -> None:
+        self.client.set_torque_enabled([self.motor], on)
+
+    def set_limit(self, ma: float) -> Optional[float]:
+        self.client.write_desired_current([self.motor], self._np.array([float(ma)]))
+        return self.goal_current()
+
+    def goal_current(self) -> Optional[float]:
+        return self.client.read_goal_currents([self.motor]).get(self.motor)
+
+    def position(self) -> float:
+        return float(self.client.read_position_velocity_current()[0][self.index])
+
+    def goal(self, position_rad: float) -> None:
+        self.client.write_desired_pos([self.motor], self._np.array([float(position_rad)]))
+
+    def current(self) -> tuple[Optional[float], Optional[int]]:
+        raw = self._word(FEETECH_PRESENT_CURRENT)
+        return (None, None) if raw is None else (signed_current_raw(raw) * FEETECH_MA_PER_UNIT, raw)
+
+    def temperature(self) -> Optional[float]:
+        values = self.client.read_temperature()
+        return float(values[self.index]) if values is not None else None
+
+
+def flex_sign(hand, joint: str) -> float:
+    """+1 when flexing ``joint`` turns its motor towards higher angles, else -1."""
+    motor = hand.config.joint_to_motor_map[joint]
+    ratio = float(hand.calibration.joint_to_motor_ratios_dict.get(motor) or 1.0)
+    inverted = bool(hand.config.joint_inversion_dict.get(joint, False))
+    return (1.0 if ratio >= 0 else -1.0) * (-1.0 if inverted else 1.0)
+
+
+PROBE_CLOCK = time
+
+
+def probe_direction(probe, start: float, delta_rad: float, *, clock=None, check_stop=lambda: None) -> dict:
+    """Ask the motor ``delta_rad`` past ``start`` for PROBE_S, reading it at PROBE_HZ; the
+    goal goes back to ``start`` on the way out. ``abort`` says why it stopped early."""
+    clock = clock or PROBE_CLOCK
+    t0 = clock.monotonic()
+    warm0 = probe.temperature()
+    samples: list[dict] = []
+    over_since, abort, next_temp = None, None, 0.5
+    probe.goal(start + delta_rad)
+    try:
+        while True:
+            now = clock.monotonic() - t0
+            if now >= PROBE_S:
+                break
+            ma, raw = probe.current()
+            samples.append({"t": round(now, 3), "ma": ma, "raw": raw, "goal_ma": probe.goal_current(),
+                            "pos_deg": round(math.degrees(probe.position() - start), 2)})
+            if ma is not None and abs(ma) > PROBE_ABORT_MA:
+                over_since = now if over_since is None else over_since
+                if now - over_since > PROBE_ABORT_S:
+                    abort = f"current above {PROBE_ABORT_MA:.0f} mA for over {PROBE_ABORT_S:.0f} s"
+                    break
+            else:
+                over_since = None
+            if now >= next_temp:
+                next_temp = now + 0.5
+                warm = probe.temperature()
+                if warm0 is not None and warm is not None and warm - warm0 > PROBE_ABORT_WARM_C:
+                    abort = f"motor warmed by {warm - warm0:.0f} °C"
+                    break
+            check_stop()
+            clock.sleep(1.0 / PROBE_HZ)
+    finally:
+        probe.goal(start)
+    return {"samples": samples, "abort": abort}
+
+
+def limit_hold_verdict(samples: list[dict], limit: float) -> dict:
+    """Whether the present current stayed within ``limit`` + 15% once the motor had started."""
+    held = [abs(s["ma"]) for s in samples if s.get("ma") is not None and s["t"] >= PROBE_SETTLE_S]
+    peak = max(held, default=None)
+    mean = sum(held) / len(held) if held else None
+    return {"ok": bool(held) and peak <= limit * OVER_LIMIT_FACTOR, "peak_ma": peak, "mean_ma": mean,
+            "readings": len(held)}
+
+
+@register("current_limit_one_motor")
+def current_limit_one_motor(ctx: CheckContext) -> CheckResult:
+    """On one Feetech finger motor, with every other motor off: write a goal-current limit,
+    read it back, and drive 10° each way against the hand at 100 mA and 50 mA, reading the
+    present current. Moves one finger. Torque off and max current put back on every exit."""
+    blocked = _ready(ctx)
+    if blocked:
+        return blocked
+    if _mock(ctx):
+        return CheckResult(status="skipped", summary="a mock motor has no current to measure")
+    hand = _hand(ctx)
+    if not type(hand.motor_client).__module__.endswith("feetech_client"):
+        return CheckResult(status="skipped", summary="only Feetech motors are probed here")
+    params = ctx.step.params or {}
+    joint = str(params.get("joint", PROBE_JOINT))
+    motor = abs(int(hand.config.joint_to_motor_map[joint]))
+    if not hand.calibration._motor_ready(motor):
+        return CheckResult(status="skipped", summary=f"{joint} is not calibrated; calibrate the hand first")
+    from orca_ui.hand.service import _bus_fence
+
+    probe = FeetechMotorProbe(hand, motor)
+    sign = flex_sign(hand, joint)
+    metrics: list[Metric] = []
+    problems: list[str] = []
+    details: dict = {"joint": joint, "motor": motor, "runs": {}}
+    with _max_current(ctx, max(PROBE_LIMITS_MA)):
+        try:
+            with _bus_fence(hand):
+                probe.others_off()
+                details["registers_before"] = probe.registers()
+                start = probe.position()
+                probe.goal(start)
+                for limit in PROBE_LIMITS_MA:
+                    read_back = probe.set_limit(limit)
+                    written = register_ma(limit)
+                    matches = read_back is not None and abs(read_back - written) < 0.5
+                    metrics.append(Metric(f"goal current read back at {limit} mA", read_back, unit="mA",
+                                          ok=matches))
+                    if not matches:
+                        problems.append(f"the goal-current register reads {read_back} mA after writing "
+                                        f"{written} mA: the write path is at fault")
+                        continue
+                    probe.torque(True)
+                    for sense, direction in (("flex", sign), ("extend", -sign)):
+                        ctx.progress(0.1, f"{joint} {sense} at {limit} mA")
+                        run = probe_direction(probe, start, direction * math.radians(PROBE_DEG),
+                                              check_stop=ctx.check_stop)
+                        verdict = limit_hold_verdict(run["samples"], limit)
+                        details["runs"][f"{sense}@{limit}"] = {**run, **verdict}
+                        metrics.append(Metric(f"{sense} at {limit} mA: peak / mean present current",
+                                              _peak_mean(verdict), unit="mA",
+                                              ok=verdict["ok"] and not run["abort"]))
+                        if run["abort"]:
+                            problems.append(f"{sense} at {limit} mA stopped: {run['abort']}")
+                            break
+                        if not verdict["ok"]:
+                            problems.append(f"{sense} at {limit} mA drew {_peak_mean(verdict)} mA "
+                                            f"(limit {limit} mA)")
+                    probe.torque(False)
+                    if any(r.get("abort") for r in details["runs"].values()):
+                        break
+                details["registers_after"] = probe.registers()
+        finally:
+            with contextlib.suppress(Exception):
+                probe.torque(False)
+            _torque_off_quietly(ctx)
+    return _fail_or_pass(problems, f"on {joint} (motor {motor}) the goal current read back as written and the "
+                         f"present current stayed within {PROBE_LIMITS_MA} mA (+15%) both ways.", metrics,
+                         details=details)
+
+
+def register_ma(ma: float) -> float:
+    """``ma`` as the goal-current register holds it: whole 6.5 mA units, rounded down."""
+    return int(float(ma) // FEETECH_MA_PER_UNIT) * FEETECH_MA_PER_UNIT
+
+
+def _peak_mean(verdict: dict) -> str:
+    if verdict["peak_ma"] is None:
+        return "no readings"
+    return f"{verdict['peak_ma']:.0f} / {verdict['mean_ma']:.0f}"
 
 
 # ----- 9. slack test ---------------------------------------------------------------------

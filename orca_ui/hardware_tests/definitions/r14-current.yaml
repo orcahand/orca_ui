@@ -32,3 +32,20 @@ steps:
   instructions: The check sets max current to 40 mA, asks the sweep to start, and puts max current back. Nothing
     moves.
   pass_rule: The sweep refuses with a message about the minimum.
+- id: R7d
+  title: The current limit holds on one motor
+  kind: auto
+  check: current_limit_one_motor
+  applies_to:
+    motor_families:
+    - feetech
+  panels:
+  - motor_currents
+  instructions: 'The check switches every motor off except index_mcp''s, writes a 100 mA current limit and reads it
+    back, then asks that motor 10° past where it stands, first flexing and then extending, for 2 s each, reading
+    its current 20 times a second; then again at 50 mA. It moves one finger by 10°: hold the index finger gently so
+    it presses against your hand. It stops early (torque off) if the current stays above 300 mA for over 1 s or
+    the motor warms by 5 °C, and puts max current back.'
+  pass_rule: The goal-current register reads back what was written, and after the first 0.2 s the present current
+    stays within the limit + 15% in both directions at both limits. A read-back that differs points at the write
+    path; current above the limit with the right read-back means the motor does not cap it.
