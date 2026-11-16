@@ -100,11 +100,52 @@ def test_files_are_put_back_even_when_the_check_fails(tmp_path, monkeypatch):
     assert calls == ["reconnect"]
 
 
-def test_torque_read_back_names_motors_still_on_or_silent():
-    metrics, problems = release._torque_metrics({1: False, 2: True, 3: None})
-    assert metrics[0].ok is False
-    assert problems == ["torque still on for motor(s) 2", "no torque read-back from motor(s) 3"]
-    assert release._torque_metrics({1: False, 2: False})[1] == []
+def test_the_consoles_torque_read_after_its_reconnect_is_only_recorded_unless_a_motor_reads_on():
+    metric, problems = release.reconnect_torque({1: False, 2: False})
+    assert metric.ok is None and problems == [] and "reconnect switches torque off itself" in metric.name
+    metric, problems = release.reconnect_torque({1: False, 2: True, 3: None})
+    assert metric.ok is False and problems == ["motor(s) 2 read torque on even after the reconnect"]
+
+
+def _stopped_ctx(monkeypatch, snapshot, states, connected=True):
+    def wait_connected(ctx):
+        if not connected:
+            raise TimeoutError("the hand did not reconnect within 60 s")
+
+    monkeypatch.setattr(release, "_no_hand", lambda ctx: None)
+    monkeypatch.setattr(release, "_wait_connected", wait_connected)
+    monkeypatch.setattr(release, "torque_states", lambda service: states)
+    manager = SimpleNamespace(snapshot=lambda: snapshot)
+    return SimpleNamespace(service=SimpleNamespace(operation_manager=manager),
+                           step=SimpleNamespace(action="operation:tension_sweep", params={}))
+
+
+def test_a_hands_on_stop_rests_on_orca_cores_torque_report_not_the_consoles_read(monkeypatch):
+    stopped = {"kind": "tension_sweep", "state": "done", "detail": "stopped", "extra": {}}
+    off = {1: False, 2: False}
+    assert release.torque_off_now(_stopped_ctx(monkeypatch, stopped, off)).status == "pass"
+    flagged = {**stopped, "extra": {"torque_off_failed": {"motors": [2], "joints": ["index_mcp"]}}}
+    result = release.torque_off_now(_stopped_ctx(monkeypatch, flagged, off))
+    assert result.status == "fail" and "motor(s) 2" in result.summary
+    # Never a pass on nothing read, a reconnect that timed out, or a routine still running.
+    assert release.torque_off_now(_stopped_ctx(monkeypatch, stopped, {})).status == "error"
+    assert release.torque_off_now(_stopped_ctx(monkeypatch, stopped, {1: None})).status == "error"
+    assert release.torque_off_now(_stopped_ctx(monkeypatch, stopped, off, connected=False)).status == "error"
+    running = {**stopped, "state": "running"}
+    assert release.torque_off_now(_stopped_ctx(monkeypatch, running, off)).status == "error"
+
+
+def test_guided_tension_must_be_interrupted_while_it_holds_never_exit_on_its_own():
+    early = {"returncode": 1, "timed_out": False, "interrupted_s": None, "duration_s": 2.0}
+    metrics, cannot = release.guided_ctrl_c_metrics(early, "EOFError: EOF when reading a line\n")
+    assert metrics[0].ok is False and "exited before the Ctrl-C" in metrics[0].value and cannot is None
+    metrics, cannot = release.guided_ctrl_c_metrics(early, "Guided tensioning cannot run: needs v2.1 hardware\n")
+    assert metrics[0].ok is None and cannot == "needs v2.1 hardware"
+    out = "The index motors hold this pose at 60 mA; ...\nGuided tensioning interrupted.\n"
+    interrupted = {"returncode": 1, "timed_out": False, "interrupted_s": 8.0, "duration_s": 9.5}
+    assert [m.ok for m in release.guided_ctrl_c_metrics(interrupted, out)[0]] == [True, True]
+    held = out + "Torque could not be switched off on index_mcp (motors [3]); power the hand off.\n"
+    assert [m.ok for m in release.guided_ctrl_c_metrics(interrupted, held)[0]] == [True, False]
 
 
 def test_gains_are_only_asked_of_a_hand_with_a_joint_feedback_loop():

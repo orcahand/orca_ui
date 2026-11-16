@@ -19,7 +19,9 @@ steps:
   instructions: Start guided tensioning with the button and wait until a joint holds. Unplug the USB cable for about
     1 s, plug it back in, then press Stop. Push each finger gently by hand. If a red banner says motors may still
     be holding, press E-STOP and note it.
-  pass_rule: No hang, no crash; every finger moves freely. The check then reads torque off from every motor.
+  pass_rule: No hang, no crash; every finger moves freely. The check then confirms the routine ended and orca_core
+    flagged no motor as maybe holding; the console's own torque read comes after its reconnect, which switches
+    torque off itself, so it is only recorded.
 - id: H2
   title: USB glitch during a tension sweep
   kind: manual
@@ -30,7 +32,9 @@ steps:
   - operation_log
   instructions: Start a tension sweep with the button. While it runs, unplug the USB cable for about 1 s, plug it
     back in, then press Stop. Push each finger gently by hand; note any "may still be holding" banner.
-  pass_rule: No hang, no crash; every finger moves freely. The check then reads torque off from every motor.
+  pass_rule: No hang, no crash; every finger moves freely. The check then confirms the routine ended and orca_core
+    flagged no motor as maybe holding; the console's own torque read comes after its reconnect, which switches
+    torque off itself, so it is only recorded.
 - id: H3
   title: Another USB socket
   kind: manual

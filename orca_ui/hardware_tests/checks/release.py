@@ -234,17 +234,28 @@ def torque_states(service) -> dict[int, Optional[bool]]:
     return out
 
 
-def _torque_metrics(states: dict) -> tuple[list[Metric], list[str]]:
+RECONNECT_READ = "torque read after the console reconnected (the reconnect switches torque off itself)"
+
+
+def reconnect_torque(states: dict) -> tuple[Metric, list[str]]:
+    """The console's torque read, taken after it reconnected: its connect switches torque off
+    (supervisor.py), so an all-off read proves nothing and is only recorded. A motor that
+    still reads on fails all the same."""
     on = sorted(m for m, v in states.items() if v)
-    silent = sorted(m for m, v in states.items() if v is None)
-    metrics = [Metric("motors read torque off", sum(1 for v in states.values() if v is False),
-                      unit=f"of {len(states)}", ok=not on and not silent)]
-    problems = []
-    if on:
-        problems.append(f"torque still on for motor(s) {', '.join(map(str, on))}")
-    if silent:
-        problems.append(f"no torque read-back from motor(s) {', '.join(map(str, silent))}")
-    return metrics, problems
+    off = sum(1 for v in states.values() if v is False)
+    silent = sum(1 for v in states.values() if v is None)
+    value = (f"{off} of {len(states)} off" + (f", {silent} silent" if silent else "")
+             + (f", on: {', '.join(map(str, on))}" if on else "")) if states else "no motors read"
+    problems = [f"motor(s) {', '.join(map(str, on))} read torque on even after the reconnect"] if on else []
+    return Metric(RECONNECT_READ, value, ok=False if on else None), problems
+
+
+def _flagged(failed: Optional[dict]) -> tuple[Metric, list[str]]:
+    """orca_core's own read-back on a routine's way out: ``torque_off_failed`` names motors
+    it could not confirm off."""
+    motors = ", ".join(map(str, (failed or {}).get("motors") or []))
+    metric = Metric("motors orca_core flagged as maybe holding", motors or "none", ok=not failed)
+    return metric, ([f"orca_core could not confirm torque off on motor(s) {motors or '?'}"] if failed else [])
 
 
 def _manager(ctx: CheckContext):
@@ -341,16 +352,38 @@ def _fail_or_pass(problems: list[str], ok: str, metrics: list[Metric], **extra) 
 
 @register("torque_off_now")
 def torque_off_now(ctx: CheckContext) -> CheckResult:
-    """After a hands-on stop: every motor reads torque off right now."""
+    """After a hands-on stop: the routine ended and orca_core confirmed torque off on its
+    way out. The console's own read comes after its reconnect, so it is only recorded."""
     blocked = _no_hand(ctx)
     if blocked:
         return blocked
-    with contextlib.suppress(Exception):
+    manager = ctx.service.operation_manager
+    snapshot = (manager.snapshot() if manager is not None else None) or {}
+    wanted = str(getattr(ctx.step, "action", None) or "").partition("operation:")[2] or None
+    kind, state = snapshot.get("kind"), snapshot.get("state")
+    if not snapshot:
+        return CheckResult(status="error", summary="no routine ran in this console session: start it with "
+                           "the button, then Stop")
+    if wanted and kind != wanted:
+        return CheckResult(status="error", summary=f"the last routine was {kind}, not {wanted}: start "
+                           f"{wanted} with the button, then Stop")
+    if state not in ("done", "error"):
+        return CheckResult(status="error", summary=f"the {kind} is still {state}: press Stop first")
+    try:
         _wait_connected(ctx)
+    except TimeoutError as e:
+        return CheckResult(status="error", summary=f"{e}; nothing was read")
     states = torque_states(ctx.service)
-    metrics, problems = _torque_metrics(states)
-    return _fail_or_pass(problems, f"all {len(states)} motors read torque off.", metrics,
-                         details={"torque": {str(k): v for k, v in states.items()}})
+    read, problems = reconnect_torque(states)
+    if not any(v is not None for v in states.values()):
+        return CheckResult(status="error", summary="no motors read: the console got no torque read-back",
+                           metrics=[read])
+    flagged, flag_problems = _flagged((snapshot.get("extra") or {}).get("torque_off_failed"))
+    metrics = [Metric("ended as", f"{state} ({snapshot.get('detail') or snapshot.get('error') or ''})"),
+               flagged, read]
+    return _fail_or_pass(flag_problems + problems, f"the {kind.replace('_', ' ')} ended and orca_core confirmed "
+                         "torque off on every motor on its way out.", metrics,
+                         details={"torque": {str(k): v for k, v in states.items()}, "snapshot": snapshot})
 
 
 # ----- 1. the upgrade --------------------------------------------------------------------
@@ -771,8 +804,9 @@ def _slack_answer(snapshot: dict) -> Optional[str]:
 
 @register("stop_releases_torque")
 def stop_releases_torque(ctx: CheckContext) -> CheckResult:
-    """Start the step's routine, let it hold, Stop or E-STOP it, and read torque back
-    from every motor. Moves the hand. The hand's records are put back."""
+    """Start the step's routine, let it hold, Stop or E-STOP it: judged on how fast it
+    ended and on orca_core's own torque read-back on the way out. Moves the hand. The
+    hand's records are put back."""
     blocked = _ready(ctx)
     if blocked:
         return blocked
@@ -800,25 +834,27 @@ def stop_releases_torque(ctx: CheckContext) -> CheckResult:
         states = torque_states(ctx.service)
         after = _calibration(ctx)
         after_in_progress = _in_progress(after.get("path"))
-    metrics = [Metric("stopped within", round(seconds, 2), unit="s", ok=seconds <= STOP_DEADLINE_S),
-               Metric("ended as", f"{ended.get('state')} ({ended.get('detail') or ended.get('error') or ''})"),
-               Metric("motors flagged as maybe holding", ", ".join(map(str, (failed or {}).get("motors") or [])) or "none",
-                      ok=not failed)]
-    torque, problems = _torque_metrics(states)
-    metrics += torque
+    ended_ok = ended.get("run_id") != run_id or ended.get("state") in ("done", "error")
+    flagged, problems = _flagged(failed)
+    read, read_problems = reconnect_torque(states)
+    metrics = [Metric("stopped within", round(seconds, 2), unit="s", ok=ended_ok and seconds <= STOP_DEADLINE_S),
+               Metric("ended as", f"{ended.get('state')} ({ended.get('detail') or ended.get('error') or ''})",
+                      ok=ended_ok),
+               flagged, read]
+    problems += read_problems
     if kind == "calibrate":
         outcome, kept = stopped_calibration_outcome(before, after, after_in_progress)
         metrics.append(Metric("calibration after the stop", outcome, ok=kept))
         if not kept:
             problems.append(f"a stopped calibration left the files wrong: {outcome}")
-    if seconds > STOP_DEADLINE_S:
+    if not ended_ok:
+        problems.append(f"the routine had not ended {seconds:.1f} s after the {'E-STOP' if estop else 'Stop'}")
+    elif seconds > STOP_DEADLINE_S:
         problems.append(f"the routine took {seconds:.1f} s to end")
-    if failed:
-        problems.append(f"orca_core could not confirm torque off on motors {failed.get('motors')}")
     how = "E-STOP" if estop else "Stop"
-    return _fail_or_pass(problems, f"{how} ended the {kind.replace('_', ' ')} in {seconds:.1f} s and every motor "
-                         "reads torque off.", metrics, details={"torque": {str(k): v for k, v in states.items()},
-                                                                "snapshot": ended})
+    return _fail_or_pass(problems, f"{how} ended the {kind.replace('_', ' ')} in {seconds:.1f} s and orca_core "
+                         "confirmed torque off on every motor on its way out.", metrics,
+                         details={"torque": {str(k): v for k, v in states.items()}, "snapshot": ended})
 
 
 # ----- 7. holding and the current limit --------------------------------------------------
@@ -1732,8 +1768,9 @@ def orca_home_elsewhere(ctx: CheckContext) -> CheckResult:
 @register("scripts_use_hand_folder")
 def scripts_use_hand_folder(ctx: CheckContext) -> CheckResult:
     """neutral.py and zero.py run on the hand's stored calibration without
-    calibrating; guided_tension.py interrupted leaves torque off; measure_travel
-    reads the stored calibration without moving. Moves the hand."""
+    calibrating; guided_tension.py interrupted while it holds ends with orca_core
+    confirming torque off; measure_travel reads the stored calibration without
+    moving. Moves the hand."""
     blocked = _ready(ctx)
     if blocked:
         return blocked
@@ -1758,19 +1795,54 @@ def scripts_use_hand_folder(ctx: CheckContext) -> CheckResult:
             calibrated_first = re.search(r"calibrating|starting calibration", out, re.IGNORECASE) is not None
             metrics.append(Metric(script, "ran" if ran["returncode"] == 0 else f"exit {ran['returncode']}",
                                   ok=ran["returncode"] == 0 and not calibrated_first))
-        ctx.progress(0.6, "guided_tension.py, then Ctrl-C")
-        ran = runner.run_script("branch", "guided_tension.py", [], ctx.out_dir / "guided_tension", timeout_s=120.0,
-                                real_store=True, interrupt_after_s=float((ctx.step.params or {}).get("interrupt_after_s", 20.0)))
-        outputs["guided_tension.py"] = (ran["stdout"] + ran["stderr"])[-2000:]
+        ctx.progress(0.6, "guided_tension.py, then Ctrl-C while it holds")
+        # Enter past the first pose, then Ctrl-C while the range check holds (torque on). Slack
+        # scoring never skips a stage, so even a fully tensioned hand reaches that hold.
+        ran = runner.run_script("branch", "guided_tension.py", ["--scoring", "slack"], ctx.out_dir / "guided_tension",
+                                timeout_s=120.0, real_store=True, stdin_text="1\n", interrupt_on=GUIDED_HOLDING,
+                                interrupt_after_s=float((ctx.step.params or {}).get("interrupt_after_s", 3.0)))
+        tension_out = ran["stdout"] + ran["stderr"]
+        outputs["guided_tension.py"] = tension_out[-2000:]
     _wait_connected(ctx)
-    torque, problems = _torque_metrics(torque_states(ctx.service))
-    metrics += [Metric("guided_tension.py ended", "yes" if not ran["timed_out"] else "timed out", ok=not ran["timed_out"])]
-    metrics += torque
+    tension, cannot_run = guided_ctrl_c_metrics(ran, tension_out)
+    read, problems = reconnect_torque(torque_states(ctx.service))
+    metrics += tension + [read]
     ran = runner.run_script("branch", "measure_travel.py", ["--from-calibration", "--dry-run", "--model-name", model],
                             ctx.out_dir / "measure_travel", timeout_s=120.0, real_store=True)
     outputs["measure_travel.py"] = (ran["stdout"] + ran["stderr"])[-2000:]
     metrics.append(Metric("measure_travel.py --from-calibration", "ran" if ran["returncode"] == 0 else
                           f"exit {ran['returncode']}", ok=ran["returncode"] == 0))
     problems += [m.name for m in metrics if m.ok is False and m.name not in problems]
-    return _fail_or_pass(problems, "the scripts ran on the hand's stored calibration, and Ctrl-C left torque off.",
+    if cannot_run and not problems:
+        return CheckResult(status="skipped", summary=f"neutral, zero and measure_travel ran on the stored "
+                           f"calibration, but guided_tension.py cannot run on this hand ({cannot_run}), so "
+                           "its Ctrl-C was not tried.", metrics=metrics, details={"outputs": outputs})
+    return _fail_or_pass(problems, "the scripts ran on the hand's stored calibration, and Ctrl-C while guided "
+                         "tensioning held ended it with orca_core confirming torque off.",
                          metrics, details={"outputs": outputs})
+
+
+GUIDED_HOLDING = "motors hold this pose at"
+"""What guided_tension.py prints once its range check holds the pose (torque on)."""
+GUIDED_CANNOT_RUN = re.compile(r"Guided tensioning cannot run: (.+)")
+
+
+def guided_ctrl_c_metrics(ran: dict, output: str) -> tuple[list[Metric], Optional[str]]:
+    """Whether guided_tension.py was interrupted while holding and ended on it with torque
+    confirmed off; and why it could not run at all on this hand (None when it could)."""
+    refused = GUIDED_CANNOT_RUN.search(output)
+    if refused and ran.get("interrupted_s") is None:
+        return [Metric("guided_tension.py Ctrl-C while holding", f"not tried: {refused.group(1).strip()}",
+                       ok=None)], refused.group(1).strip()
+    if ran.get("interrupted_s") is None:
+        why = "timed out before its range check held" if ran.get("timed_out") else \
+            f"exited before the Ctrl-C (exit {ran.get('returncode')})"
+        return [Metric("guided_tension.py Ctrl-C while holding", why, ok=False)], None
+    after = max(0.0, float(ran.get("duration_s") or 0.0) - float(ran["interrupted_s"]))
+    ended = "Guided tensioning interrupted" in output and not ran.get("timed_out")
+    held = "Torque could not be switched off" in output
+    return [Metric("guided_tension.py ended on the Ctrl-C", f"in {after:.1f} s" if ended else
+                   ("timed out" if ran.get("timed_out") else f"exit {ran.get('returncode')} without saying so"),
+                   ok=ended and after <= STOP_DEADLINE_S),
+            Metric("orca_core confirmed torque off on its way out", "no: it says torque could not be switched off"
+                   if held else "yes", ok=not held)], None

@@ -18,10 +18,12 @@ steps:
     hardware_versions:
     - 210
     - 211
-  instructions: 'The check starts the guided tensioning, lets it hold for a few seconds, presses Stop, then reads
-    torque enable back from every motor and times it. The hand''s records are put back. It moves the hand: keep
+  instructions: 'The check starts the guided tensioning, lets it hold for a few seconds, presses Stop, then times how long it takes to
+    end and reads orca_core''s own torque report. The hand''s records are put back. It moves the hand: keep
     it clear and on the bench.'
-  pass_rule: It ends within 10 s, orca_core flags no motor as maybe holding, and every motor reads torque off.
+  pass_rule: It ends within 10 s and orca_core flags no motor as maybe holding (its own torque read-back on
+    the way out). The console's torque read comes after its reconnect, which switches torque off itself, so it
+    is only recorded.
 - id: R6b
   title: E-STOP during the guided tensioning
   kind: auto
@@ -36,10 +38,12 @@ steps:
     hardware_versions:
     - 210
     - 211
-  instructions: 'The check starts the guided tensioning, lets it hold for a few seconds, presses E-STOP, then reads
-    torque enable back from every motor and times it. The hand''s records are put back. It moves the hand: keep
+  instructions: 'The check starts the guided tensioning, lets it hold for a few seconds, presses E-STOP, then times how long it takes to
+    end and reads orca_core''s own torque report. The hand''s records are put back. It moves the hand: keep
     it clear and on the bench.'
-  pass_rule: It ends within 10 s, orca_core flags no motor as maybe holding, and every motor reads torque off.
+  pass_rule: It ends within 10 s and orca_core flags no motor as maybe holding (its own torque read-back on
+    the way out). The console's torque read comes after its reconnect, which switches torque off itself, so it
+    is only recorded.
 - id: R6c
   title: Stop during the tension sweep
   kind: auto
@@ -50,10 +54,12 @@ steps:
   panels:
   - motor_currents
   - operation_log
-  instructions: 'The check starts the tension sweep, lets it hold for a few seconds, presses Stop, then reads torque
-    enable back from every motor and times it. The hand''s records are put back. It moves the hand: keep it clear
+  instructions: 'The check starts the tension sweep, lets it hold for a few seconds, presses Stop, then times how long it takes to
+    end and reads orca_core''s own torque report. The hand''s records are put back. It moves the hand: keep it clear
     and on the bench.'
-  pass_rule: It ends within 10 s, orca_core flags no motor as maybe holding, and every motor reads torque off.
+  pass_rule: It ends within 10 s and orca_core flags no motor as maybe holding (its own torque read-back on
+    the way out). The console's torque read comes after its reconnect, which switches torque off itself, so it
+    is only recorded.
 - id: R6d
   title: E-STOP during the tension sweep
   kind: auto
@@ -64,10 +70,12 @@ steps:
   panels:
   - motor_currents
   - operation_log
-  instructions: 'The check starts the tension sweep, lets it hold for a few seconds, presses E-STOP, then reads
-    torque enable back from every motor and times it. The hand''s records are put back. It moves the hand: keep
+  instructions: 'The check starts the tension sweep, lets it hold for a few seconds, presses E-STOP, then times how long it takes to
+    end and reads orca_core''s own torque report. The hand''s records are put back. It moves the hand: keep
     it clear and on the bench.'
-  pass_rule: It ends within 10 s, orca_core flags no motor as maybe holding, and every motor reads torque off.
+  pass_rule: It ends within 10 s and orca_core flags no motor as maybe holding (its own torque read-back on
+    the way out). The console's torque read comes after its reconnect, which switches torque off itself, so it
+    is only recorded.
 - id: R6e
   title: Stop during the slack test
   kind: auto
@@ -78,10 +86,12 @@ steps:
   panels:
   - motor_currents
   - operation_log
-  instructions: 'The check starts the slack test, lets it hold for a few seconds, presses Stop, then reads torque
-    enable back from every motor and times it. The hand''s records are put back. It moves the hand: keep it clear
+  instructions: 'The check starts the slack test, lets it hold for a few seconds, presses Stop, then times how long it takes to
+    end and reads orca_core''s own torque report. The hand''s records are put back. It moves the hand: keep it clear
     and on the bench.'
-  pass_rule: It ends within 10 s, orca_core flags no motor as maybe holding, and every motor reads torque off.
+  pass_rule: It ends within 10 s and orca_core flags no motor as maybe holding (its own torque read-back on
+    the way out). The console's torque read comes after its reconnect, which switches torque off itself, so it
+    is only recorded.
 - id: R6f
   title: E-STOP during the slack test
   kind: auto
@@ -92,10 +102,12 @@ steps:
   panels:
   - motor_currents
   - operation_log
-  instructions: 'The check starts the slack test, lets it hold for a few seconds, presses E-STOP, then reads torque
-    enable back from every motor and times it. The hand''s records are put back. It moves the hand: keep it clear
+  instructions: 'The check starts the slack test, lets it hold for a few seconds, presses E-STOP, then times how long it takes to
+    end and reads orca_core''s own torque report. The hand''s records are put back. It moves the hand: keep it clear
     and on the bench.'
-  pass_rule: It ends within 10 s, orca_core flags no motor as maybe holding, and every motor reads torque off.
+  pass_rule: It ends within 10 s and orca_core flags no motor as maybe holding (its own torque read-back on
+    the way out). The console's torque read comes after its reconnect, which switches torque off itself, so it
+    is only recorded.
 - id: R6g
   title: Stop during the calibration
   kind: auto
@@ -110,12 +122,13 @@ steps:
   panels:
   - motor_currents
   - operation_log
-  instructions: 'The check starts the calibration, lets it hold for a few seconds, presses Stop, then reads torque
-    enable back from every motor and times it. The hand''s records are put back. It moves the hand: keep it clear
+  instructions: 'The check starts the calibration, lets it hold for a few seconds, presses Stop, then times how long it takes to
+    end and reads orca_core''s own torque report. The hand''s records are put back. It moves the hand: keep it clear
     and on the bench.'
-  pass_rule: It ends within 10 s, orca_core flags no motor as maybe holding, and every motor reads torque off (a
-    stopped calibration either changed nothing, or left its partial run marked unfinished with the last complete
-    calibration as the previous).
+  pass_rule: It ends within 10 s and orca_core flags no motor as maybe holding (its own torque read-back on
+    the way out; the console's read after its reconnect is only recorded), and a stopped calibration either
+    changed nothing, or left its partial run marked unfinished with the last complete calibration as the
+    previous.
 - id: R6h
   title: E-STOP during the calibration
   kind: auto
@@ -130,9 +143,10 @@ steps:
   panels:
   - motor_currents
   - operation_log
-  instructions: 'The check starts the calibration, lets it hold for a few seconds, presses E-STOP, then reads torque
-    enable back from every motor and times it. The hand''s records are put back. It moves the hand: keep it clear
+  instructions: 'The check starts the calibration, lets it hold for a few seconds, presses E-STOP, then times how long it takes to
+    end and reads orca_core''s own torque report. The hand''s records are put back. It moves the hand: keep it clear
     and on the bench.'
-  pass_rule: It ends within 10 s, orca_core flags no motor as maybe holding, and every motor reads torque off (a
-    stopped calibration either changed nothing, or left its partial run marked unfinished with the last complete
-    calibration as the previous).
+  pass_rule: It ends within 10 s and orca_core flags no motor as maybe holding (its own torque read-back on
+    the way out; the console's read after its reconnect is only recorded), and a stopped calibration either
+    changed nothing, or left its partial run marked unfinished with the last complete calibration as the
+    previous.
