@@ -126,6 +126,22 @@ def test_a_failed_verification_overrides_a_pass(tmp_path, monkeypatch):
     assert result.check["status"] == "fail"
 
 
+def test_an_events_file_that_cannot_be_written_does_not_hang_an_open_step(tmp_path, monkeypatch):
+    session = _tests(tmp_path).start(PLAN, "ser-0000")
+    session.open("A1")  # its warning capture feeds log records back into event()
+
+    def broken(path, record):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(store, "append_jsonl", broken)
+    worker = threading.Thread(target=session.event, args=("log",), daemon=True)
+    worker.start()
+    worker.join(timeout=5.0)
+    monkeypatch.undo()
+    assert not worker.is_alive()
+    session.close("A1")
+
+
 def test_the_automatic_run_waits_for_hands_on_steps_reports_errors_and_stops(tmp_path, monkeypatch):
     blocking = threading.Event()
 

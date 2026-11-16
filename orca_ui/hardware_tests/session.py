@@ -341,6 +341,7 @@ class TestSession:
         self._side_runner_factory = side_runner_factory
         self._lock = threading.RLock()
         self._events_lock = threading.Lock()
+        self._in_event = threading.local()
         self._check_lock = threading.Lock()
         self.features: list[FeatureDefinition] = catalog.plan_features(plan.id)
         self.feature_of: dict[str, FeatureDefinition] = {s.id: f for f in self.features for s in f.steps}
@@ -461,11 +462,21 @@ class TestSession:
         if step is not None:
             record["step"] = step
         record.update(fields)
+        if getattr(self._in_event, "active", False):
+            return  # a warning event() logs about itself must not come back into it
+        failed: Optional[OSError] = None
         with self._events_lock:
             try:
                 store.append_jsonl(self.paths.events, record)
-            except OSError:
-                logger.exception("could not append to %s", self.paths.events)
+            except OSError as e:
+                failed = e
+        if failed is not None:
+            # Logged outside the lock: a step's warning capture feeds log records back into event().
+            self._in_event.active = True
+            try:
+                logger.error("could not append to %s", self.paths.events, exc_info=failed)
+            finally:
+                self._in_event.active = False
 
     def log(self, line: str, step: Optional[str] = None) -> None:
         stamp = datetime.now().strftime("%H:%M:%S")
