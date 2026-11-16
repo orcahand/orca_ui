@@ -114,7 +114,8 @@ steps:
     enable back from every motor and times it. The hand''s records are put back. It moves the hand: keep it clear
     and on the bench.'
   pass_rule: It ends within 10 s, orca_core flags no motor as maybe holding, and every motor reads torque off (a
-    stopped calibration keeps the calibration and its previous).
+    stopped calibration either changed nothing, or left its partial run marked unfinished with the last complete
+    calibration as the previous).
 - id: R6h
   title: E-STOP during the calibration
   kind: auto
@@ -133,4 +134,5 @@ steps:
     enable back from every motor and times it. The hand''s records are put back. It moves the hand: keep it clear
     and on the bench.'
   pass_rule: It ends within 10 s, orca_core flags no motor as maybe holding, and every motor reads torque off (a
-    stopped calibration keeps the calibration and its previous).
+    stopped calibration either changed nothing, or left its partial run marked unfinished with the last complete
+    calibration as the previous).

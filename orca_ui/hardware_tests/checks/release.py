@@ -78,6 +78,35 @@ def _calibration(ctx: CheckContext) -> dict:
         return {}
 
 
+def _in_progress(path: Optional[str]) -> bool:
+    """Whether the calibration file carries orca_core's mark of a run that never finished."""
+    from orca_core.calibration_store import IN_PROGRESS, read_document
+
+    try:
+        return bool(path) and bool(read_document(path).get(IN_PROGRESS))
+    except Exception:
+        return False
+
+
+def stopped_calibration_outcome(before: dict, after: dict, in_progress: bool) -> tuple[str, bool]:
+    """orca_core saves after every step: a stopped run either wrote nothing, or left its
+    partial file marked in progress with the last complete calibration as the previous."""
+    stamp = lambda info: (info or {}).get("calibrated_at")  # noqa: E731
+    if stamp(after) == stamp(before) and stamp(after.get("previous")) == stamp(before.get("previous")):
+        return "unchanged (stopped before its first save)", True
+    if not in_progress:
+        return "replaced, but not marked as an unfinished run", False
+    kept = stamp(before.get("previous")) if _was_unfinished(before) else stamp(before)
+    if stamp(after.get("previous")) != kept:
+        return (f"partial run in force, but the previous is {stamp(after.get('previous'))}, "
+                f"not the last complete calibration ({kept})"), False
+    return "partial run in force, marked unfinished; the last complete calibration is the previous", True
+
+
+def _was_unfinished(info: dict) -> bool:
+    return bool((info or {}).get("in_progress"))
+
+
 def _state(ctx: CheckContext) -> dict:
     return ctx.service.hand_store_state() or {}
 
@@ -757,6 +786,7 @@ def stop_releases_torque(ctx: CheckContext) -> CheckResult:
         started_params["step_duration_s"] = 1.0
         wait_s = 0.5
     before = _calibration(ctx)
+    before["in_progress"] = _in_progress(before.get("path"))
     with hand_files_restored(ctx, ("setup.yaml", "calibration.yaml", "calibration.previous.yaml")):
         run_id = start_operation(ctx, kind, started_params)
         answer = _slack_answer if kind == "slack_test" else (lambda s: None)
@@ -769,6 +799,7 @@ def stop_releases_torque(ctx: CheckContext) -> CheckResult:
         _wait_connected(ctx)
         states = torque_states(ctx.service)
         after = _calibration(ctx)
+        after_in_progress = _in_progress(after.get("path"))
     metrics = [Metric("stopped within", round(seconds, 2), unit="s", ok=seconds <= STOP_DEADLINE_S),
                Metric("ended as", f"{ended.get('state')} ({ended.get('detail') or ended.get('error') or ''})"),
                Metric("motors flagged as maybe holding", ", ".join(map(str, (failed or {}).get("motors") or [])) or "none",
@@ -776,11 +807,10 @@ def stop_releases_torque(ctx: CheckContext) -> CheckResult:
     torque, problems = _torque_metrics(states)
     metrics += torque
     if kind == "calibrate":
-        kept = after.get("calibrated_at") == before.get("calibrated_at") and \
-            (after.get("previous") or {}).get("calibrated_at") == (before.get("previous") or {}).get("calibrated_at")
-        metrics.append(Metric("stopped run kept the calibration and its previous", "yes" if kept else "no", ok=kept))
+        outcome, kept = stopped_calibration_outcome(before, after, after_in_progress)
+        metrics.append(Metric("calibration after the stop", outcome, ok=kept))
         if not kept:
-            problems.append("a stopped calibration changed the calibration in force or its previous")
+            problems.append(f"a stopped calibration left the files wrong: {outcome}")
     if seconds > STOP_DEADLINE_S:
         problems.append(f"the routine took {seconds:.1f} s to end")
     if failed:
@@ -1000,22 +1030,25 @@ def sweep_current_metrics(settings: dict, results: list, limit: float) -> list[M
     ]
 
 
+GOAL_AFTER_SWEEP = "goal current the motors hold after the sweep (torque off)"
+
+
 def goal_current_metric(service, limit: float) -> Metric:
-    """The goal-current limit the motors hold on the console's connection, against ``limit``."""
+    """What the motors hold once the sweep has ended, recorded only: the sweep puts back the
+    hand file's limit, and the console writes its own again before it next enables torque."""
     session = service.session
     client = getattr(getattr(session, "hand", None), "motor_client", None)
     if client is None or not hasattr(client, "read_goal_currents"):
-        return Metric("goal current read back from the motors", "no way to read it", ok=None)
+        return Metric(GOAL_AFTER_SWEEP, "no way to read it", ok=None)
     try:
         read = client.read_goal_currents()
     except Exception as e:
-        return Metric("goal current read back from the motors", f"{type(e).__name__}: {e}", ok=None)
+        return Metric(GOAL_AFTER_SWEEP, f"{type(e).__name__}: {e}", ok=None)
     values = [abs(float(v)) for v in read.values() if isinstance(v, (int, float))]
     above = sorted(m for m, v in read.items() if isinstance(v, (int, float)) and abs(float(v)) > limit + 0.5)
     shown = f"highest {max(values):.1f} mA" if values else "no answer"
-    return Metric("goal current read back from the motors",
-                  shown + (f"; above the limit on motor(s) {above}" if above else ""),
-                  unit="", ok=(not above) if values else None)
+    return Metric(GOAL_AFTER_SWEEP, shown + (f"; above the console's {limit:g} mA on motor(s) {above}" if above else ""),
+                  unit="", ok=None)
 
 
 @register("sweep_refused_below_minimum")

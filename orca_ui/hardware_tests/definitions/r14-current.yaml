@@ -23,8 +23,9 @@ steps:
   instructions: 'The check sets max current to 100 mA, sweeps index_mcp once and reads the slack test''s offered
     currents, then puts max current back. It moves the hand: keep it clear and on the bench.'
   pass_rule: Every current the sweep and the slack test command is at most the limit; the measured drive current
-    is never held above it (3 readings in a row, or more than 20% of a run, above the limit + 15%); the motors'
-    goal-current register reads at most the limit; and the swept joint moved. Readings above the limit are listed.
+    is never held above it (3 readings in a row, or more than 20% of a run, above the limit + 15%); and the swept
+    joint moved. Readings above the limit are listed. The goal current the motors hold after the sweep is recorded
+    only, since the console writes its limit again before it next enables torque.
 - id: R7c
   title: Below the sweep's minimum
   kind: auto

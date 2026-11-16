@@ -206,14 +206,26 @@ def test_a_sweep_within_its_limit_that_moved_passes_and_a_commanded_overshoot_fa
     assert release.sweep_current_metrics({**_CAPPED, "sweep_current_ma": 150.0}, [moving], 100)[0].ok is False
 
 
-def test_the_goal_current_read_back_flags_a_motor_above_the_limit():
+def test_the_goal_current_after_the_sweep_is_recorded_and_never_decides():
     def service(read):
         client = SimpleNamespace(read_goal_currents=read)
         return SimpleNamespace(session=SimpleNamespace(hand=SimpleNamespace(motor_client=client)))
-    assert release.goal_current_metric(service(lambda: {1: 97.5, 2: 97.5}), 100).ok is True
-    above = release.goal_current_metric(service(lambda: {1: 97.5, 2: 899.6}), 100)
-    assert above.ok is False and "[2]" in above.value
+    above = release.goal_current_metric(service(lambda: {1: 97.5, 2: 300.0}), 100)
+    assert above.ok is None and "[2]" in above.value
     assert release.goal_current_metric(SimpleNamespace(session=None), 100).ok is None
+
+
+def test_a_stopped_calibration_may_leave_its_partial_run_marked_with_the_last_complete_as_previous():
+    done = {"calibrated_at": "A", "previous": {"calibrated_at": "P"}}
+    assert release.stopped_calibration_outcome(done, done, False)[1] is True
+    partial = {"calibrated_at": "B", "previous": {"calibrated_at": "A"}}
+    assert release.stopped_calibration_outcome(done, partial, True)[1] is True
+    assert release.stopped_calibration_outcome(done, partial, False)[1] is False
+    assert release.stopped_calibration_outcome(done, {"calibrated_at": "B", "previous": {"calibrated_at": "P"}},
+                                               True)[1] is False
+    unfinished = {**partial, "in_progress": True}
+    assert release.stopped_calibration_outcome(unfinished, {"calibrated_at": "C", "previous": {"calibrated_at": "A"}},
+                                               True)[1] is True
 
 
 def test_holding_stops_on_a_hot_motor_and_names_the_hottest_with_its_tracking_error():
