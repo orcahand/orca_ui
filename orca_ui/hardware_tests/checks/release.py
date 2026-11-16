@@ -569,16 +569,20 @@ def refused_while_operation_runs(ctx: CheckContext) -> CheckResult:
         return blocked
     with hand_files_restored(ctx, ("setup.yaml",)):
         run_id = start_operation(ctx, "slack_test")
-        follow_operation(ctx, run_id, until=lambda s, t: s.get("state") == "awaiting_input", timeout_s=120.0)
-        status = ctx.service.status()
-        other = next(v for v in VERSIONS if v != status.get("hardware_version"))
-        refusals = {
-            "restore previous": _refusal(ctx.service.restore_previous_calibration),
-            "take the board's calibration": _refusal(lambda: ctx.service.board_calibration_choice("use_board")),
-            "hardware version change": _refusal(lambda: ctx.service.set_hardware_version(other)),
-        }
-        still = (_manager(ctx).snapshot() or {}).get("state")
-        stop_operation(ctx, run_id)
+        try:
+            follow_operation(ctx, run_id, until=lambda s, t: s.get("state") == "awaiting_input", timeout_s=120.0)
+            status = ctx.service.status()
+            other = next(v for v in VERSIONS if v != status.get("hardware_version"))
+            refusals = {
+                "restore previous": _refusal(ctx.service.restore_previous_calibration),
+                "take the board's calibration": _refusal(lambda: ctx.service.board_calibration_choice("use_board")),
+                "hardware version change": _refusal(lambda: ctx.service.set_hardware_version(other)),
+            }
+            still = (_manager(ctx).snapshot() or {}).get("state")
+        finally:
+            # On every way out, also a failure or Stop half way: the slack test holds motors.
+            if (_manager(ctx).snapshot() or {}).get("run_id") == run_id:
+                stop_operation(ctx, run_id)
         _wait_connected(ctx)
     metrics = [Metric(name, why or "went through", ok=bool(why) and "running" in why) for name, why in refusals.items()]
     metrics.append(Metric("slack test still waiting", still, ok=still == "awaiting_input"))
