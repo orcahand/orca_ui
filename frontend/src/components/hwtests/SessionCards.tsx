@@ -17,7 +17,7 @@ function fallbackLabel(serial: string | null | undefined, side: string | null | 
 }
 
 export function StartCard({ plans }: { plans: HwPlanSummary[] }) {
-  const serial = useAppStore((s) => s.handInfo?.hand_id ?? null)
+  const serial = useAppStore((s) => s.handInfo?.hand?.id ?? null)
   const side = useAppStore((s) => s.status?.side || s.handInfo?.side || null)
   const model = useAppStore((s) => s.status?.model || s.handInfo?.model_name || null)
   const backendLabel = useHardwareTestsStore((s) => s.defaultLabel)
