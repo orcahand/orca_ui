@@ -15,7 +15,7 @@ from typing import Callable, TYPE_CHECKING
 
 import numpy as np
 
-from orca_core import JointGains, OrcaHandTouchConfig
+from orca_core import JointGains, OrcaHandTouchConfig, calibration_store
 from orca_core.hardware.motor_client import MotionTimeoutError
 
 if TYPE_CHECKING:
@@ -2825,8 +2825,14 @@ class HandService:
 
     def zero_tactile(self, num_samples: int = 100) -> None:
         session = self._require_tactile()
-        zeroing.capture_and_persist(session, num_samples=num_samples)
+        try:
+            zeroing.capture_and_persist(session, num_samples=num_samples)
+        except calibration_store.NewerCalibrationError as e:
+            raise ServiceError(str(e), status_code=409) from e
 
     def clear_tactile_zero(self) -> None:
         session = self._require_tactile()
-        zeroing.clear_offsets(session)
+        try:
+            zeroing.clear_offsets(session)
+        except calibration_store.NewerCalibrationError as e:
+            raise ServiceError(str(e), status_code=409) from e

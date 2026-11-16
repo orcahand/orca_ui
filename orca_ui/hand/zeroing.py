@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import os
 
+from orca_core import calibration_store
 from orca_core import hand_store as core_store
 from orca_core.utils.utils import read_yaml
 
@@ -82,6 +83,8 @@ def capture_and_persist(session, num_samples: int = 100) -> dict:
         raise NoHandFolder(
             "this hand's folder is not known yet, so a zero could not be kept: "
             "connect it with its motors powered once, then zero again")
+    # A file a newer orca_core wrote is left as it is (raises NewerCalibrationError).
+    calibration_store.check_writable(path)
     offsets = client.capture_taxel_offsets(num_samples=num_samples)
     # The resultant is ``None`` on a taxels-only stream, kept as such so a
     # reconnect doesn't restore a baseline from a different zeroing run.
@@ -97,7 +100,9 @@ def clear_offsets(session) -> None:
     client = session.tactile_client
     if client is None:
         raise RuntimeError("no tactile sensor connected")
-    client.clear_taxel_offsets()
     path = _calibration_path(session)
+    if path:
+        calibration_store.check_writable(path)
+    client.clear_taxel_offsets()
     if path and os.path.isfile(path):
         _keep_zero(path, None)

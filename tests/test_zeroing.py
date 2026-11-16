@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
+from orca_core import calibration_store
 from orca_core import hand_store as core_store
 from orca_ui.hand import zeroing
 
@@ -71,3 +72,16 @@ def test_reset_removes_the_zero_from_the_file_and_keeps_the_calibration(tmp_path
     assert session.tactile_client.cleared
     assert not set(zeroing.ZERO_KEYS) & set(doc)
     assert {k: doc[k] for k in CALIBRATION} == CALIBRATION
+
+
+def test_a_file_from_a_newer_orca_core_is_left_as_it_is(tmp_path):
+    path = tmp_path / "calibration.yaml"
+    path.write_text(yaml.safe_dump({**CALIBRATION, "schema": core_store.SCHEMA + 1}), encoding="utf-8")
+    before = path.read_text(encoding="utf-8")
+    session = _session(path)
+    with pytest.raises(calibration_store.NewerCalibrationError):
+        zeroing.capture_and_persist(session, num_samples=5)
+    with pytest.raises(calibration_store.NewerCalibrationError):
+        zeroing.clear_offsets(session)
+    assert path.read_text(encoding="utf-8") == before
+    assert not session.tactile_client.cleared
