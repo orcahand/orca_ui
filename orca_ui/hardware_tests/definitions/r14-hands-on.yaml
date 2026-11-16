@@ -9,6 +9,8 @@ steps:
   kind: manual
   action: operation:guided_tension
   check: torque_off_now
+  params:
+    usb_glitch: true
   panels:
   - motor_currents
   - operation_log
@@ -19,22 +21,24 @@ steps:
   instructions: Start guided tensioning with the button and wait until a joint holds. Unplug the USB cable for about
     1 s, plug it back in, then press Stop. Push each finger gently by hand. If a red banner says motors may still
     be holding, press E-STOP and note it.
-  pass_rule: No hang, no crash; every finger moves freely. The check then confirms the routine ended and orca_core
-    flagged no motor as maybe holding; the console's own torque read comes after its reconnect, which switches
-    torque off itself, so it is only recorded.
+  pass_rule: No hang, no crash; every finger moves freely. The check confirms the routine ended. Pulling the
+    cable makes orca_core flag the motors as maybe holding, so the check then wants the console's red warning to
+    have turned green (torque off confirmed on all motors after the reconnect); a warning still red fails.
 - id: H2
   title: USB glitch during a tension sweep
   kind: manual
   action: operation:tension_sweep
   check: torque_off_now
+  params:
+    usb_glitch: true
   panels:
   - motor_currents
   - operation_log
   instructions: Start a tension sweep with the button. While it runs, unplug the USB cable for about 1 s, plug it
     back in, then press Stop. Push each finger gently by hand; note any "may still be holding" banner.
-  pass_rule: No hang, no crash; every finger moves freely. The check then confirms the routine ended and orca_core
-    flagged no motor as maybe holding; the console's own torque read comes after its reconnect, which switches
-    torque off itself, so it is only recorded.
+  pass_rule: No hang, no crash; every finger moves freely. The check confirms the routine ended. Pulling the
+    cable makes orca_core flag the motors as maybe holding, so the check then wants the console's red warning to
+    have turned green (torque off confirmed on all motors after the reconnect); a warning still red fails.
 - id: H3
   title: Another USB socket
   kind: manual

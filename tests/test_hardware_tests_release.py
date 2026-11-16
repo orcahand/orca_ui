@@ -145,6 +145,21 @@ def test_a_hands_on_stop_rests_on_orca_cores_torque_report_not_the_consoles_read
     assert release.torque_off_now(_stopped_ctx(monkeypatch, running, off)).status == "error"
 
 
+def test_after_a_cable_pull_the_consoles_warning_must_turn_into_a_confirmation(monkeypatch):
+    flagged = {"kind": "tension_sweep", "state": "error", "detail": "", "extra": {
+        "torque_off_failed": {"motors": [1, 2], "joints": ["wrist", "index_pip"]}}}
+
+    def run(held):
+        ctx = _stopped_ctx(monkeypatch, flagged, {1: False, 2: False})
+        ctx.step.params = {"usb_glitch": True}
+        ctx.service.control_state = lambda: {"motors_holding": held}
+        return release.torque_off_now(ctx)
+    assert run({"motors": [], "confirmed": True}).status == "pass"
+    still = run({"motors": [2], "confirmed": False})
+    assert still.status == "fail" and "motor(s) 2" in still.summary
+    assert run(None).status == "pass"
+
+
 def test_guided_tension_must_be_interrupted_while_it_holds_never_exit_on_its_own():
     early = {"returncode": 1, "timed_out": False, "interrupted_s": None, "duration_s": 2.0}
     metrics, cannot = release.guided_ctrl_c_metrics(early, "EOFError: EOF when reading a line\n")

@@ -258,6 +258,18 @@ def _flagged(failed: Optional[dict]) -> tuple[Metric, list[str]]:
     return metric, ([f"orca_core could not confirm torque off on motor(s) {motors or '?'}"] if failed else [])
 
 
+def usb_glitch_outcome(held: Optional[dict]) -> tuple[Metric, list[str]]:
+    """After a cable pull: the console's holding warning must have turned into a confirmation."""
+    name = "console warning after the reconnect"
+    if not held:
+        return Metric(name, "not on screen any more (dismissed): the person's decision stands", ok=None), []
+    if held.get("confirmed"):
+        return Metric(name, "warned, then torque off confirmed on all motors", ok=True), []
+    motors = ", ".join(map(str, held.get("motors") or []))
+    return Metric(name, f"still warning on motor(s) {motors}", ok=False), \
+        [f"the console could not confirm torque off on motor(s) {motors} after the reconnect"]
+
+
 def _manager(ctx: CheckContext):
     manager = ctx.service.operation_manager
     if manager is None:
@@ -378,11 +390,19 @@ def torque_off_now(ctx: CheckContext) -> CheckResult:
     if not any(v is not None for v in states.values()):
         return CheckResult(status="error", summary="no motors read: the console got no torque read-back",
                            metrics=[read])
-    flagged, flag_problems = _flagged((snapshot.get("extra") or {}).get("torque_off_failed"))
+    failed = (snapshot.get("extra") or {}).get("torque_off_failed")
+    flagged, flag_problems = _flagged(failed)
     metrics = [Metric("ended as", f"{state} ({snapshot.get('detail') or snapshot.get('error') or ''})"),
                flagged, read]
-    return _fail_or_pass(flag_problems + problems, f"the {kind.replace('_', ' ')} ended and orca_core confirmed "
-                         "torque off on every motor on its way out.", metrics,
+    passed = (f"the {kind.replace('_', ' ')} ended and orca_core confirmed torque off on every motor on its way "
+              "out.")
+    if failed and (getattr(ctx.step, "params", None) or {}).get("usb_glitch"):
+        # A pulled cable makes orca_core's flag certain: what counts is that the console warned, then confirmed.
+        metric, flag_problems = usb_glitch_outcome((ctx.service.control_state() or {}).get("motors_holding"))
+        metrics.append(metric)
+        passed = (f"the {kind.replace('_', ' ')} ended; the cable pull left motors unconfirmed and the console "
+                  "confirmed torque off after the reconnect.")
+    return _fail_or_pass(flag_problems + problems, passed, metrics,
                          details={"torque": {str(k): v for k, v in states.items()}, "snapshot": snapshot})
 
 
