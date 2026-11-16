@@ -903,6 +903,10 @@ def holding_temperature(ctx: CheckContext) -> CheckResult:
                 joints[m["id"]] = m.get("joint")
                 if m.get("current_ma") is not None:
                     currents.setdefault(m["id"], []).append(float(m["current_ma"]))
+            if not temps:
+                # Never hold unwatched: with no temperature to watch, torque goes off now.
+                stopped = "the motors stopped reporting a temperature" if start_temps else None
+                break
             if not start_temps:
                 start_temps = temps
             rise = max((temps[k] - start_temps.get(k, temps[k]) for k in temps), default=0.0)

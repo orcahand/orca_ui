@@ -289,6 +289,22 @@ def test_holding_stops_on_a_hot_motor_and_names_the_hottest_with_its_tracking_er
     assert table[0]["error_deg"] == -49.7 and table[1]["error_deg"] is None and table[1]["mean_ma"] == 353.0
 
 
+def test_holding_without_a_temperature_to_watch_switches_torque_off_at_once(monkeypatch):
+    calls = []
+    config = SimpleNamespace(joint_roms_dict={"index_mcp": [0, 90]}, joint_to_motor_map={"index_mcp": 3})
+    service = SimpleNamespace(
+        session=SimpleNamespace(hand=SimpleNamespace(config=config), caps=SimpleNamespace(motors=True)),
+        enable_torque=lambda: calls.append("on"), disable_torque=lambda: calls.append("off"),
+        set_targets=lambda targets: None, current_pose=lambda: {"index_mcp": 45.0},
+        motor_snapshot=lambda: calls.append("poll") or {"motors": [{"id": 3, "joint": "index_mcp", "temp_c": None}]})
+    monkeypatch.setattr(release, "_ready", lambda ctx: None)
+    monkeypatch.setattr(release, "_mock", lambda ctx: False)
+    ctx = SimpleNamespace(service=service, step=SimpleNamespace(params={"hold_s": 180}),
+                          wait=lambda s: calls.append(f"wait {s:g}"), progress=lambda *a: None)
+    result = release.holding_temperature(ctx)
+    assert result.status == "skipped" and calls == ["on", "wait 2", "poll", "off"]
+
+
 def test_the_board_step_needs_the_store_tool_and_reads_calibrates_own_verdict(tmp_path, monkeypatch):
     plain, tooled = tmp_path / "plain", tmp_path / "tooled"
     (plain / ".git").mkdir(parents=True)
