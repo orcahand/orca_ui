@@ -1714,12 +1714,26 @@ def standalone_config(ctx: CheckContext) -> CheckResult:
         limit = edited_max_current(ctx.service.session.hand.config, (ctx.step.params or {}).get("max_current"))
         changed = yaml.safe_load(copy.read_text())
         changed["max_current"] = limit
-        edited = ctx.out_dir / "edited" / "config.yaml"
+        # orca_core names the model after the config's folder: keep the hand's model name, so the run
+        # records no other model in hand.yaml and a board-less hand keeps its noboard-<model> folder.
+        edited = ctx.out_dir / "edited" / name / "config.yaml"
         edited.parent.mkdir(parents=True, exist_ok=True)
         edited.write_text(yaml.safe_dump(changed, sort_keys=False))
-        result = ctx.sides.run("branch", "connect_only",
-                               {"config_path": str(edited), "use_hand_folder": True, "real_store": True},
-                               ctx.out_dir / "connect")
+        root = hands_root()
+        folders = {p.name for p in root.iterdir() if p.is_dir()} if root.is_dir() else set()
+        with hand_files_restored(ctx, ("hand.yaml",)):
+            try:
+                result = ctx.sides.run("branch", "connect_only",
+                                       {"config_path": str(edited), "use_hand_folder": True, "real_store": True},
+                                       ctx.out_dir / "connect")
+            finally:
+                stray = sorted(p for p in root.iterdir() if p.is_dir() and p.name not in folders) \
+                    if root.is_dir() else []
+                for path in stray:
+                    shutil.rmtree(path, ignore_errors=True)
+                    ctx.log(f"removed the hand folder {path} the run created")
+        metrics.append(Metric("stray hand folders removed", ", ".join(p.name for p in stray) or "none",
+                              ok=None if not stray else False))
         data = result.get("data") or {}
         metrics += [Metric("connected", "yes" if result.get("ok") else result.get("error"), ok=bool(result.get("ok"))),
                     Metric("same hand folder", data.get("hand_dir"), ok=data.get("hand_dir") == str(_hand_dir(ctx))),

@@ -3,6 +3,7 @@ the hand's files and settings back, and leaves torque off. Plus the safety
 helpers on their own (file restore on a failure, torque read-back)."""
 
 import time
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -172,6 +173,41 @@ def test_the_edited_max_current_is_valid_for_the_family_and_differs_from_the_one
                             calibration_max_current=None, max_current=505)
     chosen = release.edited_max_current(tight)
     assert chosen > 500 and chosen != 505
+
+
+def test_the_edited_copy_runs_as_the_hands_model_and_leaves_the_real_store_as_it_was(tmp_path, monkeypatch):
+    import orca_core
+
+    packaged = str(Path(orca_core.__file__).parent / "models" / "v2" / "orcahand-right" / "config.yaml")
+    hands = tmp_path / "hands"
+    folder = hands / "ser-1"
+    folder.mkdir(parents=True)
+    (folder / "hand.yaml").write_text("id: ser-1\nmodel: orcahand-right\n")
+
+    models = []
+
+    def run(side, scenario, args, out_dir):
+        models.append(Path(args["config_path"]).parent.name)  # orca_core's model name for the run
+        (folder / "hand.yaml").write_text(f"id: ser-1\nmodel: {models[-1]}\nlast_seen: now\n")
+        (hands / "noboard-stray").mkdir()
+        return {"ok": True, "data": {"hand_dir": str(folder)}}
+
+    hand_config = SimpleNamespace(calibration_current=500, wrist_calibration_current=500,
+                                  calibration_max_current=None, max_current=1000)
+    service = SimpleNamespace(supervisor=SimpleNamespace(config=SimpleNamespace(config_path=packaged)),
+                              session=SimpleNamespace(hand=SimpleNamespace(config=hand_config)))
+    sides_runner = SimpleNamespace(available=lambda side: None, run=run)
+    for name, value in {"_ready": lambda ctx: None, "_mock": lambda ctx: False, "hands_root": lambda: hands,
+                        "_hand_dir": lambda ctx: folder, "_reconnect": lambda ctx: None,
+                        "_torque_off_quietly": lambda ctx: None, "_calibration": lambda ctx: {}}.items():
+        monkeypatch.setattr(release, name, value)
+    ctx = SimpleNamespace(service=service, sides=sides_runner, out_dir=tmp_path / "out", log=lambda line: None,
+                          step=SimpleNamespace(params={}))
+    result = release.standalone_config(ctx)
+    assert models == ["orcahand-right"]
+    assert (folder / "hand.yaml").read_text() == "id: ser-1\nmodel: orcahand-right\n"
+    assert sorted(p.name for p in hands.iterdir()) == ["ser-1"]
+    assert result.status == "fail" and "stray hand folders removed" in result.summary
 
 
 def test_the_store_snapshot_sees_any_write_even_a_last_seen_stamp_or_a_lock(tmp_path):
