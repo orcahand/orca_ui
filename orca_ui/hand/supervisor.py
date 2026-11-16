@@ -143,12 +143,15 @@ class HandSupervisor(threading.Thread):
         on_session_ready: Callable[[HandSession], None] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_model_changed: Callable[[object], None] | None = None,
+        on_connection_lost: Callable[[str], None] | None = None,
     ):
         super().__init__(name="HandSupervisor", daemon=True)
         self._settings = settings
         self._on_status = on_status or (lambda snapshot: None)
         self._on_session_ready = on_session_ready or (lambda session: None)
         self._on_error = on_error or (lambda message: None)
+        # A lost or failed connection: a front-end drops it once a session is up again.
+        self._on_connection_lost = on_connection_lost or self._on_error
         self._on_model_changed = on_model_changed or (lambda config: None)
 
         self.config = load_config(settings.config_path)
@@ -791,7 +794,7 @@ class HandSupervisor(threading.Thread):
             return delay
         except Exception as e:
             logger.exception("unexpected connect failure")
-            self._on_error(f"connect failed unexpectedly: {e}")
+            self._on_connection_lost(f"connect failed unexpectedly: {e}")
             self._set_state(HandState.DETECTING, f"connect error: {e} — retrying")
             delay = self._backoff
             self._backoff = min(self._backoff * 1.5, DETECT_BACKOFF_MAX_S)
@@ -923,7 +926,7 @@ class HandSupervisor(threading.Thread):
 
         reason = self._check_health(session)
         if reason:
-            self._on_error(reason)
+            self._on_connection_lost(reason)
             self._teardown_session(reason)
             return 0.1  # go straight back to detection
 

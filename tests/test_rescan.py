@@ -273,3 +273,29 @@ def test_a_device_the_hand_has_is_never_reported_refused(supervisor):
 
     assert payload["missing"] == ["tactile"]
     assert payload["refused"] == []
+
+
+def test_a_lost_bus_is_reported_as_a_connection_loss(supervisor, monkeypatch):
+    """The teardown reason goes out marked as a connection loss, which the console
+    clears once a session is up again; other errors keep the plain channel."""
+    sup, _ = supervisor
+    lost, errors = [], []
+    sup._on_connection_lost, sup._on_error = lost.append, errors.append
+    sup._session = _Session()
+    monkeypatch.setattr(sup, "_check_health", lambda s: "motor bus unresponsive: gone")
+    monkeypatch.setattr(sup, "_teardown_session", lambda reason: None)
+    sup._health_tick()
+    assert lost == ["motor bus unresponsive: gone"] and errors == []
+
+
+def test_the_service_marks_a_connection_loss_for_the_console():
+    from orca_ui.hand.service import HandService
+    from orca_ui.mock import materialize_mock_model
+    from orca_ui.settings import UiSettings
+
+    published = []
+    settings = UiSettings(config_path=materialize_mock_model(), mock=True, open_browser=False)
+    svc = HandService(settings, publish_topic=lambda topic, payload: published.append((topic, payload)))
+    assert svc.supervisor._on_connection_lost == svc._publish_connection_lost
+    svc._publish_connection_lost("motor bus unresponsive: gone")
+    assert published == [("error", {"message": "motor bus unresponsive: gone", "connection": True})]

@@ -241,6 +241,7 @@ class HandService:
             on_session_ready=self._session_ready,
             on_error=self._publish_error,
             on_model_changed=self._model_changed,
+            on_connection_lost=self._publish_connection_lost,
         )
         self.worker = CommandWorker(
             get_session=lambda: self.supervisor.session,
@@ -895,6 +896,12 @@ class HandService:
         return out
 
     # ----- session bootstrap ---------------------------------------------------
+
+    def _publish_connection_lost(self, message: str) -> None:
+        """An error that ends with the connection: marked so the console clears it on reconnect."""
+        from orca_ui.streaming import topics as T
+
+        self._publish_topic(T.ERROR, {"message": message, "connection": True})
 
     def _model_changed(self, config) -> None:
         """The supervisor swapped in the model the hardware reports (a hand
