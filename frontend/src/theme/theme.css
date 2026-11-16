@@ -966,6 +966,16 @@ header h1 {
   font-size: 11px;
 }
 
+/* The motors-holding banner once a reconnect confirmed every motor off. */
+.error-panel.holding-confirmed {
+  background: rgb(var(--ok-rgb) / 0.1);
+  border-color: rgb(var(--ok-rgb) / 0.3);
+}
+
+.error-panel.holding-confirmed .error-message {
+  color: var(--ok);
+}
+
 /* --- Motor fault popup --- */
 
 .fault-popup {

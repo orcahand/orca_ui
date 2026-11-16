@@ -184,6 +184,15 @@ export interface ControlState {
   pose_source: PoseSource
   // What "auto" resolved to right now; equals pose_source when pinned.
   effective_pose_source: 'estimate' | 'target'
+  // Motors an operation could not confirm off; `confirmed` once a later
+  // connection switched them all off.
+  motors_holding?: MotorsHolding | null
+}
+
+export interface MotorsHolding {
+  motors: number[]
+  joints: (string | null)[]
+  confirmed: boolean
 }
 
 // Control-table facts for a model a bench knows how to drive. `source` says

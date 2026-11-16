@@ -1,37 +1,45 @@
-import { useEffect, useRef } from 'react'
-import type { TorqueOffFailed } from '../../api/types'
+import { api } from '../../api/rest'
+import type { MotorsHolding } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
-import { useOperationStore } from '../../state/operationStore'
 
-// Motors left holding are reported as a routine lets go, often once its dialog
-// is gone (Cancel, Hide) or for a run with none: the banner carries it for any
-// operation, once per run.
-function useTorqueOffBanner() {
-  const operation = useOperationStore((s) => s.operation)
-  const failed = (operation?.extra as { torque_off_failed?: TorqueOffFailed } | null)?.torque_off_failed
-  const runId = operation?.run_id
-  const reported = useRef<string | null>(null)
-  useEffect(() => {
-    if (!failed || !runId || reported.current === runId) return
-    reported.current = runId
-    const named = failed.motors.map((m, i) => `M${m}${failed.joints[i] ? ` (${failed.joints[i]})` : ''}`).join(', ')
-    useAppStore
-      .getState()
-      .setError(`Torque off was not confirmed on ${named}: they may still be holding. Press E-STOP or power-cycle the hand.`)
-  }, [failed, runId])
+// Motors an operation could not switch off get their own banner, so another
+// error never replaces it; the backend clears it once a connection confirms them off.
+function HoldingBanner({ holding }: { holding: MotorsHolding }) {
+  const setError = useAppStore((s) => s.setError)
+  const dismiss = () =>
+    void api.motorsHoldingDismiss().catch((e: Error) => setError(String(e?.message ?? e)))
+  const named = holding.motors
+    .map((m, i) => `M${m}${holding.joints[i] ? ` (${holding.joints[i]})` : ''}`)
+    .join(', ')
+  return (
+    <div className={holding.confirmed ? 'error-panel holding-confirmed' : 'error-panel'}>
+      <span className="error-message">
+        {holding.confirmed
+          ? 'Torque off is now confirmed on all motors.'
+          : `Torque off was not confirmed on ${named}: they may still be holding. Press E-STOP or power-cycle the hand.`}
+      </span>
+      <button className="btn btn-secondary" onClick={dismiss}>
+        Dismiss
+      </button>
+    </div>
+  )
 }
 
 export function ErrorBanner() {
   const error = useAppStore((s) => s.error)
   const setError = useAppStore((s) => s.setError)
-  useTorqueOffBanner()
-  if (!error) return null
+  const holding = useAppStore((s) => s.control?.motors_holding ?? null)
   return (
-    <div className="error-panel">
-      <span className="error-message">{error}</span>
-      <button className="btn btn-secondary" onClick={() => setError(null)}>
-        Dismiss
-      </button>
-    </div>
+    <>
+      {holding && <HoldingBanner holding={holding} />}
+      {error && (
+        <div className="error-panel">
+          <span className="error-message">{error}</span>
+          <button className="btn btn-secondary" onClick={() => setError(null)}>
+            Dismiss
+          </button>
+        </div>
+      )}
+    </>
   )
 }

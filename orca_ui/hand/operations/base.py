@@ -63,6 +63,11 @@ class OpContext:
     def log(self, line: str) -> None:
         self._manager.append_log(line)
 
+    @property
+    def torque_off_report(self) -> dict | None:
+        """Motors this run could not confirm off (``motors``, ``joints``), or None."""
+        return self._torque_off_failed
+
     def torque_off_failed(self, event: dict) -> None:
         """orca_core's ``torque_off_failed``: motors that may still hold after a
         routine let go. Logged, and kept on ``extra`` for the console's banner."""

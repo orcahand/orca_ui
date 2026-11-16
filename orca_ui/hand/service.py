@@ -231,6 +231,9 @@ class HandService:
         # The hand the hand block describes: the connected one, else the last to
         # connect, until a Disconnect.
         self._last_hand_id: str | None = None
+        # Motors an operation could not confirm off: warned about until a working
+        # connection confirms them off or the operator dismisses it.
+        self._motors_holding: dict | None = None
 
         self.supervisor = HandSupervisor(
             settings,
@@ -857,6 +860,7 @@ class HandService:
                 "direct_motor_mode": self._direct_motor_mode,
                 "pose_source": self._pose_source,
                 "effective_pose_source": effective_source,
+                "motors_holding": dict(self._motors_holding) if self._motors_holding else None,
             }
 
     def stats(self) -> dict:
@@ -925,6 +929,8 @@ class HandService:
         self._last_hand_id = hand_id
         if session.caps.motors:
             self._apply_default_profile(session)
+        if session.caps.motors:
+            self._recheck_motors_holding(session)
         if session.caps.tactile:
             try:
                 zeroing.apply_saved_offsets(session)
@@ -1112,7 +1118,8 @@ class HandService:
         try:
             session = self.session
             if session is not None and session.caps.motors:
-                session.hand.disable_torque()
+                not_acked = session.hand.disable_torque()
+                self._settle_motors_holding(not_acked, checked=session.hand.config.motor_ids)
                 self.supervisor.set_torque_flag(False)
                 self.worker.reset()
                 self._publish_control_state()
@@ -1134,6 +1141,58 @@ class HandService:
         return report
 
     # ----- motor control ---------------------------------------------------------
+
+    # ----- motors left holding ---------------------------------------------------------
+
+    def motors_may_hold(self, report: dict) -> None:
+        """An operation could not confirm torque off on ``report["motors"]``: warn,
+        then switch them off again over the console's own connection."""
+        joint_of = dict(zip(report.get("motors") or [], report.get("joints") or []))
+        with self._state_lock:
+            held = self._motors_holding
+            if held and not held["confirmed"]:
+                joint_of = {**dict(zip(held["motors"], held["joints"])), **joint_of}
+            motors = sorted(joint_of)
+            self._motors_holding = {"motors": motors, "joints": [joint_of[m] for m in motors],
+                                    "confirmed": False}
+        self._publish_control_state()
+        self._recheck_motors_holding()
+
+    def _recheck_motors_holding(self, session: HandSession | None = None) -> None:
+        """Torque off again on the flagged motors once no operation holds the hand;
+        only disables, never enables."""
+        with self._state_lock:
+            held = self._motors_holding
+        manager = self._operation_manager
+        session = session or self.session
+        if not held or held["confirmed"] or (manager is not None and manager.active()) \
+                or session is None or not session.caps.motors:
+            return
+        try:
+            not_acked = session.hand.disable_torque(list(held["motors"]))
+        except Exception as e:
+            logger.warning("torque off re-check failed: %s", e)
+            return
+        self._settle_motors_holding(not_acked, checked=held["motors"])
+
+    def _settle_motors_holding(self, not_acked, *, checked) -> None:
+        """Clear the ``checked`` motors that acknowledged torque off; when none is
+        left, the warning becomes a confirmation."""
+        not_acked, checked = set(not_acked or []), set(checked)
+        with self._state_lock:
+            held = self._motors_holding
+            if not held or held["confirmed"]:
+                return
+            keep = [(m, j) for m, j in zip(held["motors"], held["joints"])
+                    if m in not_acked or m not in checked]
+            self._motors_holding = {"motors": [m for m, _ in keep], "joints": [j for _, j in keep],
+                                    "confirmed": not keep}
+        self._publish_control_state()
+
+    def dismiss_motors_holding(self) -> None:
+        with self._state_lock:
+            self._motors_holding = None
+        self._publish_control_state()
 
     def _publish_control_state(self) -> None:
         from orca_ui.streaming import topics as T

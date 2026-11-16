@@ -184,6 +184,8 @@ export const api = {
   estop: () =>
     post<{ ok: boolean; report: Record<string, unknown> }>('/api/estop'),
 
+  motorsHoldingDismiss: () => post<{ ok: boolean }>('/api/motors-holding/dismiss'),
+
   torqueEnable: () =>
     post<{ seed: Record<string, number> }>('/api/torque/enable'),
   torqueDisable: () => post('/api/torque/disable'),

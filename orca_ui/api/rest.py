@@ -282,6 +282,11 @@ def build_router(service: HandService) -> APIRouter:
         # Never raises; always 200 with a report of what was actioned.
         return {"ok": True, "report": service.estop()}
 
+    @router.post("/motors-holding/dismiss")
+    def motors_holding_dismiss():
+        service.dismiss_motors_holding()
+        return {"ok": True}
+
     # ----- teleoperation ------------------------------------------------------------
 
     def _teleop():
