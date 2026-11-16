@@ -48,10 +48,13 @@ def test_hand_info_and_geometry(client):
     assert len(info["joints"]) == 17
     # The hand menu, Calibrate step and notices read these.
     hand = info["hand"]
-    assert {"id", "nickname", "calibration", "joint_ranges",
+    assert {"id", "folder", "nickname", "calibration", "joint_ranges",
             "board_calibration_newer", "legacy_files"} <= set(hand)
     assert {"calibrated_at", "path", "previous_available", "previous_at"} <= set(hand["calibration"])
     assert hand["joint_ranges"]["source"] in ("model", "measured")
+    # The menu's tooltips name the hand's folder and its joint ranges file.
+    if hand["folder"]:
+        assert hand["joint_ranges"]["path"] == os.path.join(hand["folder"], "joint_ranges.yaml")
     geometry = client.get("/api/tactile/geometry").json()
     assert set(geometry) == {"thumb", "index", "middle", "ring", "pinky"}
     assert geometry["index"]["frame"] == "sensor"

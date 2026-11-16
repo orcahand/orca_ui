@@ -99,7 +99,15 @@ export function HandDetails({ hand }: { hand: HandStoreInfo }) {
     <div className="hand-details">
       <div className="hand-line">
         <span className="hand-key">hand</span>
-        <code title="Serial, else board ID: the hand's folder in the hand store">{hand.id}</code>
+        <code
+          title={
+            hand.folder
+              ? `The calibration and setup files for this specific hand are saved under ${hand.folder}`
+              : undefined
+          }
+        >
+          {hand.id}
+        </code>
         <NicknameField hand={hand} />
       </div>
       <div className="hand-line">
@@ -113,7 +121,13 @@ export function HandDetails({ hand }: { hand: HandStoreInfo }) {
       </div>
       <div className="hand-line">
         <span className="hand-key">joint ranges</span>
-        <span>
+        <span
+          title={
+            ranges.path
+              ? `Joint ranges on this hand are read from ${ranges.path}`
+              : undefined
+          }
+        >
           {ranges.source === 'measured'
             ? `measured on this hand${ranges.measured_at ? ` (${shortDate(ranges.measured_at)})` : ''}`
             : 'model defaults'}

@@ -70,7 +70,8 @@ function LegacyFilesNotice() {
   return (
     <div className="hand-notice">
       <span title={files.join('\n')}>
-        Older calibration and setup files from before this version were found and aren't used
+        Older calibration and setup files from before this version were found and are
+        intentionally not used (files are now kept per hand)
         {calibrated ? '.' : '; please calibrate.'}
       </span>
       <button className="btn btn-secondary btn-sm" onClick={dismiss}>

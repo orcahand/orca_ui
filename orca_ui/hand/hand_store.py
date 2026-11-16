@@ -9,6 +9,7 @@ a change in core's API is a change here and nowhere else.
 from __future__ import annotations
 
 import dataclasses
+import os
 from typing import Any, Callable
 
 from orca_core import hand_store as core_store
@@ -86,6 +87,7 @@ def details(hand, hand_id: str) -> dict:
     ``hand`` is the connected hand, or None."""
     return {
         "id": hand_id,
+        "folder": (hand.hand_dir or None) if hand is not None else None,
         "nickname": hand.nickname if hand is not None else None,
         "calibration": calibration_record(hand),
         "joint_ranges": joint_ranges(hand),
@@ -116,9 +118,11 @@ def calibration_record(hand) -> dict:
 
 def joint_ranges(hand) -> dict:
     """``source`` is ``model`` (the model's defaults) or ``measured`` (on this
-    hand, at ``measured_at``)."""
+    hand, at ``measured_at``); ``path`` is where measured ranges are read from."""
     info = hand.joint_ranges_info if hand is not None else {}
-    return {"source": info.get("source", "model"), "measured_at": info.get("measured_at")}
+    folder = getattr(hand, "hand_dir", None) if hand is not None else None
+    return {"source": info.get("source", "model"), "measured_at": info.get("measured_at"),
+            "path": os.path.join(folder, core_store.JOINT_RANGES_FILE) if folder else None}
 
 
 def restore_previous_calibration(hand) -> str:

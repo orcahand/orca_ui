@@ -64,7 +64,7 @@ export function HardwareVersionBadge() {
         title={
           busy
             ? 'An operation is running — stop it first.'
-            : 'Hardware version. A version picked here runs the connected hand for this session only; nothing is saved.'
+            : 'Set the hardware version you want this ORCA UI session to run with. It is not saved.'
         }
         aria-label="Hardware version"
       >

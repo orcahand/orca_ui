@@ -252,6 +252,8 @@ export interface CoreSourceInfo {
 export interface HandStoreInfo {
   // Serial, else board ID; `noboard-<model>` for a hand that reports neither.
   id: string
+  // The hand's own folder; null when no hand is connected.
+  folder: string | null
   nickname: string | null
   calibration: {
     calibrated_at: string | null
@@ -264,6 +266,8 @@ export interface HandStoreInfo {
   joint_ranges: {
     source: 'model' | 'measured'
     measured_at: string | null
+    // Where ranges measured on this hand are read from.
+    path: string | null
   }
   // Set when the board holds a newer calibration than this computer.
   board_calibration_newer: {
