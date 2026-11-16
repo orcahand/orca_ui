@@ -72,6 +72,59 @@
 
 =========================================================================== -->
 
+## UI 0.6.0 — 2026-11-16
+Core: 0.14.0
+
+## Features
+
+### One folder per hand
+
+Each hand now keeps its calibration and setup records in its own folder, `~/.orca/hands/<hand id>`, so two hands of the same model no longer share or overwrite their calibrations and records. The console's own library, recordings and assembly progress move once from `~/.orca_ui` to `~/.orca/ui`; a link is created pointing at the old location (macOS and Linux only, no link is created on Windows).
+
+> After the update every hand reads as uncalibrated once, unless its board holds a calibration. Calibrate it once in *Setup → Calibrate*.
+
+### Hand menu
+
+Click the hand chip in the header to see which hand is connected: its id, a nickname you can set, when it was calibrated, and where its joint ranges come from. Hover the id to see the hand's folder.
+
+### Restore previous calibration
+
+The console keeps the calibration before the current one. *restore previous calibration* in the hand menu swaps back to it; press it again to undo. Switch torque off first.
+
+### Hardware version for this session
+
+The version picker in the header now applies to this session only and is never saved. A choice made for one hand stays with that hand; plugging in another hand goes back to what its board reports.
+
+### Notice for older files
+
+Calibration and setup files from before this version are listed once and left untouched; they are no longer used.
+
+### Motors-holding warning
+
+If a routine ends without confirming that every motor switched torque off, for example after a USB drop, a red banner names the motors that may still be holding. Press E-STOP or power-cycle the hand. Once the hand reconnects and every motor confirms torque off, the banner turns green.
+
+## Bugfixes
+
+### Stop after a USB error
+
+Stop and Disconnect now switch torque off even after a USB error in the middle of a motor command.
+
+### Guided tensioning scores and clicks
+
+The score screen no longer says every joint passed when nothing was checked in that round. A joint you test again, or one that was never swept, gets the right number of clicks.
+
+### Unchecked joints in guided tensioning
+
+Joints that were not range-checked show *not checked* and get no clicks. A banner says when live readings stop or when torque could not be confirmed off.
+
+### Slack test with every joint skipped
+
+A slack test where you skipped every joint shows as nothing tested, and no longer lifts an earlier block on calibration.
+
+### Faster first load
+
+The console opens faster: the 3D tower preview in the Setup dialogs loads when you first open it, and tries again if loading fails.
+
 ## UI 0.5.0 — 2026-11-11
 Core: 0.13.0
 
