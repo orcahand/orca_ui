@@ -262,8 +262,12 @@ def require_config(run: Run) -> str:
 def load(run: Run, *, engage_feedback: bool = True, engage_sensors: bool = True):
     from orca_core import load_hand
 
+    config_path = require_config(run)
     kwargs = {
-        "config_path": require_config(run),
+        "config_path": config_path,
+        # The calibration copy beside the config: an orca_core with a hand store
+        # would otherwise use the hand's own folder.
+        "calibration_path": os.path.join(os.path.dirname(config_path), "calibration.yaml"),
         "mock": run.mock,
         "engage_feedback": engage_feedback,
         "engage_sensors": engage_sensors,
@@ -271,6 +275,11 @@ def load(run: Run, *, engage_feedback: bool = True, engage_sensors: bool = True)
             run.args.get("detected_hardware_version")),
     }
     hand = load_hand(**accepted(load_hand, kwargs, run, "load_hand"))
+    session_version = run.args.get("session_hardware_version")
+    # An orca_core with session versions puts the board over a config pin; this is how to choose one.
+    if session_version is not None and hasattr(hand, "set_hardware_version"):
+        hand.set_hardware_version(side_hardware_version(session_version))
+        run.note(f"hardware version {session_version} chosen for this run")
     run.hand_info = describe_hand(hand)
     return hand
 

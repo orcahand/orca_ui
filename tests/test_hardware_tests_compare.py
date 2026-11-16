@@ -221,6 +221,10 @@ def test_pin_must_win_and_be_named_in_a_warning():
     assert compare.judge_pin(result, 200, 210, False)[0] == "fail"
     assert compare.judge_pin(dict(result, data={"hardware_version": 210}), 200, 210, True)[0] == "fail"
     assert compare.judge_pin({"data": {"hardware_version": 2}, "log": result["log"]}, 200, 210, True)[0] == "pass"
+    # From 0.14 the board wins over the pin.
+    assert compare.judge_pin(dict(result, data={"hardware_version": 210}), 200, 210, True, board_wins=True)[0] == "pass"
+    assert compare.judge_pin(result, 200, 210, True, board_wins=True)[0] == "fail"
+    assert compare.board_beats_pin("0.14.0") and not compare.board_beats_pin("0.13.1")
 
 
 def test_guided_tension_gate_refuses_plainly_and_starts_with_the_override():
@@ -241,7 +245,8 @@ def test_scripts_must_keep_starting_and_keep_their_shared_flags():
     assert compare.judge_scripts(main, same)[1] == []
     lost = dict(same, **{"calibrate.py": {"help_ok": True, "shared_flags": ["--mock"], "mock_run": ok_run}})
     assert compare.judge_scripts(main, lost)[1] == ["calibrate.py (lost --hardware-version)"]
-    ignored = dict(same, **{"calibrate.py": dict(main["calibrate.py"], mock_run=dict(ok_run, pin_written=False))})
+    # The flag's version is never written down any more; a mock run that fails still counts.
+    ignored = dict(same, **{"calibrate.py": dict(main["calibrate.py"], mock_run=dict(ok_run, ok=False))})
     assert "mock run" in compare.judge_scripts(main, ignored)[1][0]
     gone = {k: v for k, v in same.items() if k != "detect.py"}
     assert compare.judge_scripts(main, gone)[1] == ["detect.py (does not start)"]

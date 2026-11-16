@@ -9,8 +9,11 @@ or ``<branch parent>/worktrees/orca_core-main``).
 
 While a scenario that needs the hand runs, the console lets go of it
 (``service.disconnect()``) and takes it back afterwards. Each run gets its own
-copy of the side's packaged config for the hand's model, with the hand's
-calibration beside it; the step's overrides go into that copy only.
+complete (standalone) copy of the side's config for the hand's model, made with
+that side's own orca_core, with a copy of the hand's calibration beside it; the
+step's overrides go into that copy only. Each run also gets its own
+``ORCA_HOME`` inside its folder, so a side never writes the hand store the
+console uses; a check that means to use the real store asks for it.
 """
 
 from __future__ import annotations
@@ -196,12 +199,17 @@ def _version_key(name: str) -> tuple:
 
 
 def copy_config(source: Path, dest_dir: Path, *, calibration: Optional[Path] = None,
-                overrides: Optional[Mapping] = None) -> Path:
+                overrides: Optional[Mapping] = None, document: Optional[Mapping] = None) -> Path:
     """Copy ``source`` into ``dest_dir`` with ``calibration`` beside it and
-    ``overrides`` applied to the copy's top-level keys; returns the copy's path."""
+    ``overrides`` applied to the copy's top-level keys; returns the copy's path.
+    ``document`` (the config's effective content) is written instead of the
+    file itself, so a packaged config that leans on shared.yaml stays complete."""
     dest_dir.mkdir(parents=True, exist_ok=True)
     target = dest_dir / "config.yaml"
-    shutil.copyfile(source, target)
+    if document is not None:
+        target.write_text(yaml.safe_dump(dict(document), sort_keys=False))
+    else:
+        shutil.copyfile(source, target)
     if calibration is not None and calibration.is_file():
         shutil.copyfile(calibration, dest_dir / "calibration.yaml")
     if overrides:
@@ -277,10 +285,12 @@ def run_process(cmd: list[str], *, cwd: Path, env: Mapping[str, str], stdout_pat
                 stderr_path: Path, timeout_s: float, stop_event: threading.Event,
                 stop_file: Optional[Path] = None, forward: Optional[_LineForwarder] = None,
                 stop_grace_s: float = STOP_GRACE_S, term_grace_s: float = TERM_GRACE_S,
-                poll_s: float = 0.2) -> ProcessOutcome:
+                poll_s: float = 0.2, interrupt_after_s: Optional[float] = None) -> ProcessOutcome:
     """Run ``cmd`` to the end, its output in two files. On a stop or the timeout it
     first creates ``stop_file`` (when given) and waits ``stop_grace_s`` for a clean
-    exit, then SIGTERMs and finally SIGKILLs the process group."""
+    exit, then SIGTERMs and finally SIGKILLs the process group. ``interrupt_after_s``
+    sends SIGINT once, as Ctrl-C would."""
+    interrupted = False
     start = time.monotonic()
     timed_out = stopped = False
     wind_down_until: Optional[float] = None
@@ -297,6 +307,9 @@ def run_process(cmd: list[str], *, cwd: Path, env: Mapping[str, str], stdout_pat
             if forward is not None:
                 forward.poll()
             now = time.monotonic()
+            if interrupt_after_s is not None and not interrupted and now - start >= interrupt_after_s:
+                interrupted = True
+                _signal_group(proc, signal.SIGINT)
             if wind_down_until is None:
                 if stop_event.is_set():
                     stopped = True
@@ -418,19 +431,56 @@ class SideRunner:
         raise RuntimeError(f"{side}'s orca_core packages no model {name!r}"
                            + (f" under {version}" if version else ""))
 
+    def hand_calibration(self) -> Optional[Path]:
+        """The calibration file the console's hand runs with (in its hand folder)."""
+        config = getattr(getattr(self.service, "supervisor", None), "config", None)
+        path = getattr(config, "calibration_path", None)
+        if path:
+            return Path(path)
+        console = self.console_config()
+        return console.parent / "calibration.yaml" if console else None
+
+    def effective_config(self, side: str, source: Path, out_dir: Path) -> Optional[dict]:
+        """``source`` as ``side``'s orca_core loads it, merged with its shared.yaml;
+        None for an orca_core that has no shared model data (its configs are complete)."""
+        checkout = self._require(side)
+        try:
+            text = (checkout / "orca_core" / "hand_config.py").read_text()
+        except OSError:
+            text = ""
+        if "def load_config(" not in text:
+            return None
+        out_dir.mkdir(parents=True, exist_ok=True)
+        self._prepare_env(side, out_dir)
+        target = out_dir / "effective-config.json"
+        code = ("import json, sys; from orca_core import load_config; "
+                "json.dump(load_config(config_path=sys.argv[1]), open(sys.argv[2], 'w'))")
+        outcome = run_process(uv_command(self._uv, checkout, self._python, "-c", code, str(source), str(target)),
+                              cwd=out_dir, env=self._env, stdout_path=out_dir / "effective.stdout.log",
+                              stderr_path=out_dir / "effective.stderr.log", timeout_s=120.0,
+                              stop_event=self._stop_event)
+        if outcome.stopped:
+            raise StopRequested()
+        try:
+            return json.loads(target.read_text())
+        except (OSError, ValueError):
+            raise RuntimeError(f"{side}'s orca_core could not load {_display(source)}: "
+                               + _tail(out_dir / "effective.stderr.log", 600).strip())
+
     def prepare_config(self, side: str, out_dir: Path,
                        overrides: Optional[Mapping] = None) -> Path:
-        """Copy the side's config for the hand into ``out_dir/config`` with the hand's
-        calibration beside it, apply ``overrides``, and return the copy's path."""
+        """Write a complete copy of the side's config for the hand into ``out_dir/config``
+        with the hand's calibration beside it, apply ``overrides``, and return its path."""
         source, origin = self.config_source(side)
-        console = self.console_config()
-        calibration = console.parent / "calibration.yaml" if console else None
+        calibration = self.hand_calibration()
+        document = self.effective_config(side, source, out_dir)
         path = copy_config(source, out_dir / "config", calibration=calibration,
-                           overrides=overrides)
+                           overrides=overrides, document=document)
         (out_dir / "config" / "source.json").write_text(json.dumps({
             "config": str(source), "origin": origin,
             "calibration": str(calibration) if calibration and calibration.is_file() else None,
             "overrides": dict(overrides or {}),
+            "standalone": document is not None,
         }, indent=2))
         return path
 
@@ -533,6 +583,7 @@ class SideRunner:
         self._prepare_env(side, out_dir)
         args = dict(args)
         overrides = args.pop("config_overrides", None)
+        env = self.run_env(out_dir, real_store=bool(args.pop("real_store", False)))
         if scenario not in NO_CONFIG_SCENARIOS and "config_path" not in args:
             args["config_path"] = str(self.prepare_config(side, out_dir, overrides))
         stop_file = out_dir / "STOP"
@@ -549,7 +600,7 @@ class SideRunner:
         self._log(f"{side}: {scenario} started")
         with released:
             outcome = run_process(
-                cmd, cwd=out_dir, env=self._env, stdout_path=out_dir / "stdout.log",
+                cmd, cwd=out_dir, env=env, stdout_path=out_dir / "stdout.log",
                 stderr_path=out_dir / "stderr.log",
                 timeout_s=SCENARIO_TIMEOUT_S.get(scenario, DEFAULT_TIMEOUT_S),
                 stop_event=self._stop_event, stop_file=stop_file,
@@ -561,6 +612,16 @@ class SideRunner:
         if outcome.stopped:
             raise StopRequested()
         return result
+
+    def run_env(self, out_dir: Path, *, real_store: bool = False,
+                extra: Optional[Mapping[str, str]] = None) -> dict:
+        """The child's environment: its own ``ORCA_HOME`` in ``out_dir`` unless
+        ``real_store`` (the console's hand store, for checks that mean to use it)."""
+        env = dict(self._env)
+        if not real_store:
+            env["ORCA_HOME"] = str(Path(out_dir) / "orca_home")
+        env.update(extra or {})
+        return env
 
     @staticmethod
     def _read_result(out_dir: Path, outcome: ProcessOutcome) -> dict:
@@ -580,10 +641,14 @@ class SideRunner:
                          + _tail(out_dir / "stderr.log", 600).strip()}
 
     def run_script(self, side: str, script: str, argv: list[str], out_dir: Path, *,
-                   timeout_s: float = 60.0) -> dict:
-        """Run ``scripts/<script>`` of ``side``'s checkout with ``argv`` (no hand released).
+                   timeout_s: float = 60.0, real_store: bool = False,
+                   env: Optional[Mapping[str, str]] = None,
+                   interrupt_after_s: Optional[float] = None) -> dict:
+        """Run ``scripts/<script>`` of ``side``'s checkout with ``argv`` (no hand released;
+        wrap in :meth:`hand_released` for a script that opens the hand).
 
-        Returns the exit code, whether it timed out, and the output's tail."""
+        ``interrupt_after_s`` sends Ctrl-C (SIGINT) then. Returns the exit code,
+        whether it timed out, and the output's tail."""
         checkout = self._require(side)
         if self._stop_event.is_set():
             raise StopRequested()
@@ -593,11 +658,11 @@ class SideRunner:
         stem = Path(script).stem
         cmd = uv_command(self._uv, checkout, self._python,
                          str(checkout / "scripts" / script), *argv)
-        outcome = run_process(cmd, cwd=out_dir, env=self._env,
+        outcome = run_process(cmd, cwd=out_dir, env=self.run_env(out_dir, real_store=real_store, extra=env),
                               stdout_path=out_dir / f"{stem}.stdout.log",
                               stderr_path=out_dir / f"{stem}.stderr.log",
                               timeout_s=timeout_s, stop_event=self._stop_event,
-                              term_grace_s=2.0)
+                              term_grace_s=2.0, interrupt_after_s=interrupt_after_s)
         if outcome.stopped:
             raise StopRequested()
         return {**outcome.as_dict(), "command": cmd,

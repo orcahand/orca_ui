@@ -168,6 +168,14 @@ def _args(ctx: CheckContext, **extra) -> dict:
     return {"detected_hardware_version": ctx.hand.hardware_version, **extra}
 
 
+def side_document(ctx: CheckContext, side: str, out: Path) -> dict:
+    """``side``'s packaged config for the hand as its orca_core loads it (shared.yaml merged)."""
+    source = ctx.sides.config_source(side)[0]
+    effective = getattr(ctx.sides, "effective_config", None)
+    document = effective(side, source, out) if callable(effective) else None
+    return document if document is not None else (yaml.safe_load(source.read_text()) or {})
+
+
 def _run(ctx: CheckContext, side: str, scenario: str, args: dict, out: Path) -> dict:
     ctx.check_stop()
     result = ctx.sides.run(side, scenario, args, out)
@@ -376,7 +384,7 @@ def plain_pass_overrides(ctx: CheckContext) -> tuple[dict, str]:
     if version is not None and version // 10 == V21 // 10:
         data = {}
         with contextlib.suppress(Exception):
-            data = yaml.safe_load(ctx.sides.config_source("branch")[0].read_text()) or {}
+            data = side_document(ctx, "branch", ctx.out_dir / "effective")
         v21_map = data.get("joint_to_motor_map_v21")
         if v21_map and v21_map != data.get("joint_to_motor_map"):
             return ({"calibration_travel_retries": 0},
@@ -454,7 +462,9 @@ def mapping_overrides(ctx: CheckContext) -> tuple[dict, dict]:
     path = console() if callable(console) else None
     if path is None or not Path(path).is_file():
         return {}, {"source": None, "fields": [], "reason": "the console has no config file to take them from"}
-    data = yaml.safe_load(Path(path).read_text()) or {}
+    from orca_core import load_config
+
+    data = load_config(config_path=str(path))
     overrides = {k: data[k] for k in MAPPING_FIELDS if k in data}
     return overrides, {"source": str(path), "fields": sorted(overrides)}
 
@@ -955,6 +965,7 @@ def mock_run(ctx: CheckContext, side: str, script: str, folder: Path) -> dict:
     ran = ctx.sides.run_script(side, script, [str(config), "--mock", "--hardware-version",
                                               str(SCRIPT_PIN)], folder,
                                timeout_s=SCRIPT_TIMEOUT_S)
+    # Only an orca_core before the hand store writes the flag's version to local_config.yaml.
     local = config.parent / "local_config.yaml"
     pinned = None
     if local.is_file():
@@ -975,7 +986,7 @@ def _script_text(entry: Optional[dict]) -> str:
         parts.append(" ".join(entry["shared_flags"]))
     run = entry.get("mock_run")
     if run:
-        effects = run["ok"] and run["mock_loaded"] and run["pin_written"]
+        effects = run["ok"] and run["mock_loaded"]
         parts.append("mock run ok" if effects else
                      f"mock run {'failed' if not run['ok'] else 'without the flags taking effect'}")
     return "; ".join(parts)
@@ -994,8 +1005,8 @@ def judge_scripts(main: dict, branch: dict) -> tuple[list[Metric], list[str]]:
                 if lost:
                     why.append("lost " + ", ".join(sorted(lost)))
                 mr, br = m.get("mock_run"), b.get("mock_run")
-                if mr and mr["ok"] and mr["mock_loaded"] and mr["pin_written"]:
-                    if not (br and br["ok"] and br["mock_loaded"] and br["pin_written"]):
+                if mr and mr["ok"] and mr["mock_loaded"]:
+                    if not (br and br["ok"] and br["mock_loaded"]):
                         why.append("mock run fails or ignores its flags")
         if why:
             problems.append(f"{script} ({', '.join(why)})")
@@ -1163,9 +1174,8 @@ def calibration_redrive(ctx: CheckContext) -> CheckResult:
         return missing
     params = ctx.step.params or {}
     margin = float(params.get("margin", 0.01))
-    console = getattr(ctx.sides, "console_config", lambda: None)()
-    calibration = _yaml_file(Path(console).parent / "calibration.yaml" if console else None)
-    source = _yaml_file(ctx.sides.config_source("branch")[0])
+    calibration = _yaml_file(ctx.sides.hand_calibration())
+    source = side_document(ctx, "branch", ctx.out_dir / "effective")
     per_hand = dict(source.get("joint_motor_travel") or {})
     joint, baseline, why = pick_redrive_joint(calibration.get("motor_travel_measured") or {}, per_hand,
                                               source.get("joint_motor_travel_v21") or {},
@@ -1239,16 +1249,19 @@ def _digests(folder: Optional[Path]) -> dict:
     return {name: file_digest(folder / name) for name in ("config.yaml", "local_config.yaml")}
 
 
-def judge_pin(result: dict, pin: int, board: int,
-              unchanged: Optional[bool]) -> tuple[str, str, list[Metric]]:
-    """``unchanged`` is ``None`` when the packaged config could not be located to compare."""
+def judge_pin(result: dict, pin: int, board: int, unchanged: Optional[bool],
+              board_wins: bool = False) -> tuple[str, str, list[Metric]]:
+    """``unchanged`` is ``None`` when the packaged config could not be located to compare.
+    ``board_wins``: from orca_core 0.14 the board's report beats a config.yaml pin."""
+    expected = board if board_wins else pin
     in_force = three_digit((result.get("data") or {}).get("hardware_version"))
     warnings = [r.get("message", "") for r in result.get("log") or []
-                if "hardware_version" in r.get("message", "")]
+                if "hardware_version" in r.get("message", "") or "hardware version" in r.get("message", "")]
     named = [w for w in warnings
-             if re.search(rf"\b{pin}\b", w) and re.search(rf"\b{board}\b", w)]
+             if re.search(rf"\b{pin}\b|v{pin // 100}\.{pin // 10 % 10}", w)
+             and re.search(rf"\b{board}\b|v{board // 100}\.{board // 10 % 10}", w)]
     metrics = [
-        Metric("version in force", in_force, ok=in_force == pin),
+        Metric("version in force", in_force, ok=in_force == expected),
         Metric("pinned", pin), Metric("board", board),
         Metric("warning names both", named[0] if named else (warnings[0] if warnings else "none"),
                ok=bool(named)),
@@ -1258,7 +1271,15 @@ def judge_pin(result: dict, pin: int, board: int,
     problems = [m.name for m in metrics if m.ok is False]
     if problems:
         return "fail", "Not as specified: " + ", ".join(problems), metrics
+    if board_wins:
+        return "pass", f"The board's {board} wins over the pin {pin}, a warning names both, and the packaged config is unchanged", metrics
     return "pass", f"The pin {pin} wins over the board's {board}, a warning names both, and the packaged config is unchanged", metrics
+
+
+def board_beats_pin(version: Optional[str]) -> bool:
+    """orca_core 0.14 and later put the board's version over a config.yaml pin."""
+    numbers = tuple(int(n) for n in re.findall(r"\d+", version or "")[:2])
+    return len(numbers) == 2 and numbers >= (0, 14)
 
 
 @register("hardware_version_pin")
@@ -1288,7 +1309,8 @@ def hardware_version_pin(ctx: CheckContext) -> CheckResult:
     if failed:
         return failed
     status, summary, metrics = judge_pin(result, pin, board,
-                                         before == after if packaged is not None else None)
+                                         before == after if packaged is not None else None,
+                                         board_wins=board_beats_pin(getattr(ctx.sides, "version", lambda s: None)("branch")))
     if note:
         summary += f" ({note})"
     return CheckResult(status, summary, metrics=metrics,
@@ -1328,7 +1350,7 @@ def guided_tension_refusal(ctx: CheckContext) -> CheckResult:
         return missing
     ctx.progress(0.0, "starting guided tensioning pinned to v2.0")
     result = _run(ctx, "branch", "guided_tension_gate",
-                  _args(ctx, any_hardware=[False, True],
+                  _args(ctx, any_hardware=[False, True], session_hardware_version=V20,
                         config_overrides={"hardware_version": V20}),
                   ctx.out_dir / "branch")
     failed = _failed_runs(ctx, {"branch": result})

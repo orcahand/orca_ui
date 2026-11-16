@@ -35,24 +35,39 @@ SLACK_BACK_SUFFIX = ": back — testing it again"
 
 
 def hardware_version_source(service, status: Optional[dict] = None) -> Optional[str]:
-    """Where the version in force came from: ``picker`` (local_config.yaml
-    beside the hand's config), ``pin`` (config.yaml), ``board``, or None."""
+    """Where the version in force came from: ``session`` (chosen in the
+    console for this session), ``board``, ``pin`` (config.yaml), or None."""
     status = status or service.status()
     version = status.get("hardware_version")
     if version is None:
         return None
-    if status.get("hardware_version_pinned"):
-        from orca_core.constants import HARDWARE_VERSION
-        from orca_core.hand_config import read_local_config
-
-        try:
-            local = read_local_config(service.supervisor.config.config_path)
-        except Exception:
-            local = {}
-        return "picker" if local.get(HARDWARE_VERSION) is not None else "pin"
+    if status.get("hardware_version_override") is not None:
+        return "session"
     if status.get("board_hardware_version") == version:
         return "board"
+    if config_pins_version(service):
+        return "pin"
     return None
+
+
+def config_pins_version(service) -> bool:
+    """Whether the console's config.yaml pins a hardware version (not ``auto``)."""
+    from orca_core import load_config
+
+    path = getattr(getattr(service.supervisor, "config", None), "config_path", None)
+    try:
+        pinned = load_config(config_path=path).get("hardware_version") if path else None
+    except Exception:
+        return False
+    return pinned not in (None, "auto")
+
+
+def all_slack_tests(config) -> dict:
+    """Every slack test on the hand by key: setup.yaml keeps the newest, the archive the rest."""
+    from orca_ui.hand import slack_tests
+    from orca_ui.hand.hand_store import archived_records
+
+    return {**archived_records(config, slack_tests.SECTION), **slack_tests._load(config)["tests"]}
 
 
 def _parse_time(text: Optional[str]) -> Optional[datetime]:
@@ -221,15 +236,14 @@ def _readings(test: dict) -> int:
 def slack_test_saved(ctx: CheckContext) -> CheckResult:
     """A1: a slack test saved during the step covers every joint at the family's
     default current, and Back retested a joint (possibly in another run of the step)."""
-    from orca_ui.hand import slack_tests
     from orca_ui.hand.operations import hand_ops
 
     service = ctx.service
     config = service.supervisor.config
     since = _step_started(ctx)
-    saved = slack_tests.for_hand(config, service.supervisor.hand_id)
+    saved = list(all_slack_tests(config).items())
     if not saved:
-        return CheckResult(status="fail", summary="no slack test is saved beside the calibration (setup.yaml slack_tests)")
+        return CheckResult(status="fail", summary="no slack test is saved in the hand's folder (setup.yaml slack_tests)")
     during = [kv for kv in saved if _is_new(kv[1].get("recorded_at"), since)]
     # The fullest run decides coverage, so a short run made only to try Back doesn't hide it.
     key, test = max(during or saved, key=lambda kv: (_readings(kv[1]), kv[1].get("recorded_at", ""), kv[0]))
@@ -403,7 +417,7 @@ def tension_sweep_runs(ctx: CheckContext) -> CheckResult:
     supervisor = service.supervisor
     config = supervisor.config
     expected = _finger_joints(config, _absent_joints(service))
-    before = {name for name, _ in sweeps.for_hand(config, supervisor.hand_id)}
+    before = set(sweeps._all(config))
     ctx.progress(0.05, "tension sweep running")
     try:
         snapshot = _run_operation(ctx, "tension_sweep", {"note": f"hardware test {ctx.step.id}"})
@@ -530,13 +544,14 @@ def hardware_version_reported(ctx: CheckContext) -> CheckResult:
         Metric("hardware version", version, ok=version is not None),
         Metric("source", source or "unknown", ok=source is not None),
         Metric("board reports", status.get("board_hardware_version")),
-        Metric("pinned in config", "yes" if status.get("hardware_version_pinned") else "no"),
+        Metric("chosen for this session", status.get("hardware_version_override") or "no"),
+        Metric("pinned in config", "yes" if config_pins_version(ctx.service) else "no"),
     ]
     if version is None:
         return CheckResult(status="fail", summary="the console has no hardware version for this hand", metrics=metrics)
     if source is None:
         return CheckResult(status="fail", summary=f"version {version} is in force but neither the board "
-                           f"({status.get('board_hardware_version')}) nor a pin accounts for it", metrics=metrics)
+                           f"({status.get('board_hardware_version')}), a session choice nor a pin accounts for it", metrics=metrics)
     return CheckResult(status="pass", summary=f"version {version}, from the {source}", metrics=metrics)
 
 

@@ -32,7 +32,7 @@ class FakeService:
     def status(self):
         return {"state": "connected", "model": "orcahand-right", "side": "right",
                 "capabilities": {"tactile": False, "encoders": True}, "hardware_version": 210,
-                "hardware_version_pinned": False, "board_hardware_version": 210}
+                "hardware_version_override": None, "board_hardware_version": 210}
 
 
 class FakeReadings:
@@ -162,7 +162,6 @@ def test_the_automatic_run_waits_for_hands_on_steps_reports_errors_and_stops(tmp
 
 
 def test_slack_check_takes_the_fullest_run_of_the_step_and_a_real_retest(monkeypatch):
-    from orca_ui.hand import slack_tests
     from orca_ui.hardware_tests.checks import console
 
     joints = ["thumb_cmc", "thumb_mcp"]
@@ -175,7 +174,7 @@ def test_slack_check_takes_the_fullest_run_of_the_step_and_a_real_retest(monkeyp
 
     saved = [("full", test("2026-01-01T10:01:00+00:00", [1, 1])),
              ("short", test("2026-01-01T10:02:00+00:00", [1, 0]))]
-    monkeypatch.setattr(slack_tests, "for_hand", lambda config, hand: saved)
+    monkeypatch.setattr(console, "all_slack_tests", lambda config: dict(saved))
     lines = ["thumb_mcp: 3° free (1 + 2)", "thumb_mcp: back — testing it again", "thumb_mcp: skipped",
              "thumb_cmc: back — testing it again", "thumb_cmc: 4° free (2 + 2)"]
     service = SimpleNamespace(

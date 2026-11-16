@@ -20,7 +20,8 @@ steps:
     check: guided_tension_refusal
     instructions: >
       The check starts guided tensioning with the branch's orca_core on a copy of this hand's config
-      pinned to v2.0, once plainly and once with the any-hardware override.
+      run as v2.0 (chosen for the run, and pinned in the copy for an orca_core before 0.14), once
+      plainly and once with the any-hardware override.
     pass_rule: Pinned to v2.0 it refuses with a message; with the override it starts.
   - id: A4c
     title: In-run controls work and every current limit lands

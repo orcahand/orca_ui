@@ -122,7 +122,7 @@ def test_recorder_writes_the_hardware_version_in_each_sides_encoding(monkeypatch
 
 def _packaged_copy(tmp_path: Path, model: str = "orcahand-right") -> Path:
     source = Path(orca_core.__file__).parent / "models" / "v2" / model / "config.yaml"
-    return sides.copy_config(source, tmp_path / "config")
+    return sides.copy_config(source, tmp_path / "config", document=orca_core.load_config(config_path=str(source)))
 
 
 def test_recorder_calibrates_the_mock_hand_into_its_copy_and_always_writes_a_result(tmp_path):
@@ -225,8 +225,10 @@ def test_side_run_copies_the_config_releases_the_hand_and_reconnects(tmp_path):
                          "detected_hardware_version": 210}, tmp_path / "pin")
     assert loaded["ok"], loaded.get("error")
     assert service.calls == []
-    assert loaded["data"]["hardware_version"] in (2, 200)
-    assert (tmp_path / "pin" / "config" / "config.yaml").is_file()
+    # This orca_core puts the board's version over the copy's pin, and the copy is complete.
+    assert loaded["data"]["hardware_version"] == 210
+    copy = (tmp_path / "pin" / "config" / "config.yaml").read_text()
+    assert "hardware_version: 200" in copy and "joint_roms:" in copy
     assert (tmp_path / "pin" / "stdout.log").is_file() and (tmp_path / "pin" / "stderr.log").is_file()
 
     detected = runner.run("main", "detect", {}, tmp_path / "detect")
