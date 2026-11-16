@@ -182,6 +182,42 @@ def test_run_process_asks_by_stop_file_then_terminates(tmp_path):
     assert outcome.timed_out and outcome.returncode != 0
     assert time.monotonic() - start < 10
 
+    # Ctrl-C before SIGTERM, so a script's finally (torque off) runs.
+    script = [sys.executable, "-c", "import time\ntry:\n    while True: time.sleep(0.05)\n"
+              "except KeyboardInterrupt:\n    pass\nfinally:\n    print('torque off')"]
+    outcome = sides.run_process(script, cwd=tmp_path, env={}, stdout_path=tmp_path / "o3.log",
+                                stderr_path=tmp_path / "e3.log", timeout_s=0.3,
+                                stop_event=threading.Event(), poll_s=0.02)
+    assert outcome.timed_out and (tmp_path / "o3.log").read_text().strip() == "torque off"
+
+
+def test_a_ctrl_c_waits_for_its_marker_and_needs_the_script_still_running(tmp_path):
+    script = [sys.executable, "-c", "input('Press Enter ')\nprint('holding')\n"
+              "try:\n    input()\nexcept KeyboardInterrupt:\n    print('interrupted')"]
+    run = dict(cwd=tmp_path, env={}, timeout_s=20, stop_event=threading.Event(), poll_s=0.02,
+               interrupt_after_s=0.1, interrupt_on="holding")
+    outcome = sides.run_process(script, stdout_path=tmp_path / "o.log", stderr_path=tmp_path / "e.log",
+                                stdin_text="\n", **run)
+    assert outcome.interrupted_s is not None and "interrupted" in (tmp_path / "o.log").read_text()
+    # Without an answer the script ends on its first prompt and is never interrupted.
+    outcome = sides.run_process(script, stdout_path=tmp_path / "o2.log", stderr_path=tmp_path / "e2.log", **run)
+    assert outcome.interrupted_s is None and outcome.returncode != 0
+
+
+def test_a_console_that_keeps_the_hand_is_not_run_beside(tmp_path, monkeypatch):
+    console = Path(orca_core.__file__).parent / "models" / "v2" / "orcahand-right" / "config.yaml"
+
+    class Clinging(_Service):
+        def disconnect(self):
+            self.calls.append("disconnect")
+
+    service = Clinging(console)
+    monkeypatch.setattr(sides, "RELEASE_WAIT_S", 0.1)
+    with pytest.raises(RuntimeError, match="did not let go"):
+        with _runner(tmp_path, service).hand_released():
+            pytest.fail("ran while the console still had the hand")
+    assert service.calls == ["disconnect", "reconnect"]
+
 
 class _Service:
     def __init__(self, config_path: Path, *, busy: bool = False):

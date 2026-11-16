@@ -57,6 +57,8 @@ ENV_PREPARE_TIMEOUT_S = 900.0
 """The first run in a checkout builds its environment, which can take minutes."""
 STOP_GRACE_S = 20.0
 """How long a recorder gets to wind down (torque off, disconnect) after the stop file."""
+INT_GRACE_S = 5.0
+"""How long a process gets to finish on Ctrl-C (its finally switches torque off) before SIGTERM."""
 TERM_GRACE_S = 5.0
 RELEASE_WAIT_S = 10.0
 RELEASE_SETTLE_S = 1.0
@@ -242,10 +244,13 @@ class ProcessOutcome:
     duration_s: float
     timed_out: bool = False
     stopped: bool = False
+    interrupted_s: Optional[float] = None
+    """When ``interrupt_after_s``'s Ctrl-C went, seconds after the start; None if it never did."""
 
     def as_dict(self) -> dict:
         return {"returncode": self.returncode, "duration_s": round(self.duration_s, 3),
-                "timed_out": self.timed_out, "stopped": self.stopped}
+                "timed_out": self.timed_out, "stopped": self.stopped,
+                "interrupted_s": None if self.interrupted_s is None else round(self.interrupted_s, 3)}
 
 
 class _LineForwarder:
@@ -290,19 +295,32 @@ def run_process(cmd: list[str], *, cwd: Path, env: Mapping[str, str], stdout_pat
                 stderr_path: Path, timeout_s: float, stop_event: threading.Event,
                 stop_file: Optional[Path] = None, forward: Optional[_LineForwarder] = None,
                 stop_grace_s: float = STOP_GRACE_S, term_grace_s: float = TERM_GRACE_S,
-                poll_s: float = 0.2, interrupt_after_s: Optional[float] = None) -> ProcessOutcome:
+                int_grace_s: float = INT_GRACE_S, poll_s: float = 0.2,
+                interrupt_after_s: Optional[float] = None, interrupt_on: Optional[str] = None,
+                stdin_text: Optional[str] = None) -> ProcessOutcome:
     """Run ``cmd`` to the end, its output in two files. On a stop or the timeout it
     first creates ``stop_file`` (when given) and waits ``stop_grace_s`` for a clean
-    exit, then SIGTERMs and finally SIGKILLs the process group. ``interrupt_after_s``
-    sends SIGINT once, as Ctrl-C would."""
-    interrupted = False
+    exit, then sends SIGINT (Ctrl-C, so a script's ``finally`` switches torque off),
+    then SIGTERM and finally SIGKILL to the process group.
+
+    ``interrupt_after_s`` sends SIGINT once, that long after the start, or after
+    ``interrupt_on`` first shows in its output. ``stdin_text`` is written to its
+    input, which stays open (an EOF would end a script waiting for Enter)."""
+    interrupted_s: Optional[float] = None
+    seen_at: Optional[float] = None
     start = time.monotonic()
     timed_out = stopped = False
     wind_down_until: Optional[float] = None
+    term_at: Optional[float] = None
     kill_at: Optional[float] = None
     with open(stdout_path, "wb") as out, open(stderr_path, "wb") as err:
         proc = subprocess.Popen(cmd, cwd=str(cwd), env=dict(env), stdout=out, stderr=err,
-                                stdin=subprocess.DEVNULL, start_new_session=True)
+                                stdin=subprocess.DEVNULL if stdin_text is None else subprocess.PIPE,
+                                start_new_session=True)
+        if stdin_text is not None:
+            with contextlib.suppress(OSError):
+                proc.stdin.write(stdin_text.encode())
+                proc.stdin.flush()
         while True:
             try:
                 returncode = proc.wait(timeout=poll_s)
@@ -312,8 +330,12 @@ def run_process(cmd: list[str], *, cwd: Path, env: Mapping[str, str], stdout_pat
             if forward is not None:
                 forward.poll()
             now = time.monotonic()
-            if interrupt_after_s is not None and not interrupted and now - start >= interrupt_after_s:
-                interrupted = True
+            if interrupt_on is not None and seen_at is None and interrupt_on in _tail(stdout_path):
+                seen_at = now
+            since = start if interrupt_on is None else seen_at
+            if interrupt_after_s is not None and interrupted_s is None and since is not None \
+                    and now - since >= interrupt_after_s:
+                interrupted_s = now - start
                 _signal_group(proc, signal.SIGINT)
             if wind_down_until is None:
                 if stop_event.is_set():
@@ -326,16 +348,25 @@ def run_process(cmd: list[str], *, cwd: Path, env: Mapping[str, str], stdout_pat
                         wind_down_until = now + stop_grace_s
                     else:
                         wind_down_until = now
-            elif kill_at is None and now >= wind_down_until:
-                _signal_group(proc, signal.SIGTERM)
-                kill_at = now + term_grace_s
-            elif kill_at is not None and now >= kill_at:
+            elif term_at is None:
+                if now >= wind_down_until:
+                    # Ctrl-C first: KeyboardInterrupt runs the script's finally (torque off); SIGTERM skips it.
+                    _signal_group(proc, signal.SIGINT)
+                    term_at = now + int_grace_s
+            elif kill_at is None:
+                if now >= term_at:
+                    _signal_group(proc, signal.SIGTERM)
+                    kill_at = now + term_grace_s
+            elif now >= kill_at:
                 _signal_group(proc, getattr(signal, "SIGKILL", signal.SIGTERM))
                 returncode = proc.wait()
                 break
+        if proc.stdin is not None:
+            with contextlib.suppress(OSError):
+                proc.stdin.close()
     if forward is not None:
         forward.poll()
-    return ProcessOutcome(returncode, time.monotonic() - start, timed_out, stopped)
+    return ProcessOutcome(returncode, time.monotonic() - start, timed_out, stopped, interrupted_s)
 
 
 def _tail(path: Path, limit: int = OUTPUT_TAIL_CHARS) -> str:
@@ -520,7 +551,11 @@ class SideRunner:
                                "check releases the hand")
         self._log("console lets go of the hand")
         self.service.disconnect()
-        self._wait(lambda: getattr(self.service, "session", None) is None, RELEASE_WAIT_S)
+        if not self._wait(lambda: getattr(self.service, "session", None) is None, RELEASE_WAIT_S):
+            # Two processes on one port would fight over the motors: refuse, and take the hand back.
+            with contextlib.suppress(Exception):
+                self.service.reconnect()
+            raise RuntimeError(f"the console did not let go of the hand within {RELEASE_WAIT_S:g} s")
         if self.release_settle_s:
             time.sleep(self.release_settle_s)
         self._release_depth = 1
@@ -652,12 +687,14 @@ class SideRunner:
     def run_script(self, side: str, script: str, argv: list[str], out_dir: Path, *,
                    timeout_s: float = 60.0, real_store: bool = False,
                    env: Optional[Mapping[str, str]] = None,
-                   interrupt_after_s: Optional[float] = None) -> dict:
+                   interrupt_after_s: Optional[float] = None, interrupt_on: Optional[str] = None,
+                   stdin_text: Optional[str] = None) -> dict:
         """Run ``scripts/<script>`` of ``side``'s checkout with ``argv`` (no hand released;
         wrap in :meth:`hand_released` for a script that opens the hand).
 
-        ``interrupt_after_s`` sends Ctrl-C (SIGINT) then. Returns the exit code,
-        whether it timed out, and the output's tail."""
+        ``interrupt_after_s`` sends Ctrl-C (SIGINT) then (counted from when ``interrupt_on``
+        shows in its output, when given); ``stdin_text`` answers its prompts. Returns the
+        exit code, whether it timed out, when the Ctrl-C went, and the output's tail."""
         checkout = self._require(side)
         if self._stop_event.is_set():
             raise StopRequested()
@@ -671,7 +708,8 @@ class SideRunner:
                               stdout_path=out_dir / f"{stem}.stdout.log",
                               stderr_path=out_dir / f"{stem}.stderr.log",
                               timeout_s=timeout_s, stop_event=self._stop_event,
-                              term_grace_s=2.0, interrupt_after_s=interrupt_after_s)
+                              term_grace_s=2.0, interrupt_after_s=interrupt_after_s,
+                              interrupt_on=interrupt_on, stdin_text=stdin_text)
         if outcome.stopped:
             raise StopRequested()
         return {**outcome.as_dict(), "command": cmd,
