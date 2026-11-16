@@ -1369,15 +1369,26 @@ def tactile_zero_kept(ctx: CheckContext) -> CheckResult:
                            "so it keeps no zero")
     with hand_files_restored(ctx, ("calibration.yaml",)):
         ctx.service.zero_tactile()
+        zeroed = getattr(ctx.service.session.tactile_client, "taxel_offsets", None)
         saved = _sensor_offsets(calibration_file(ctx))
         _reconnect(ctx)
         live = getattr(ctx.service.session.tactile_client, "taxel_offsets", None)
-    ok = saved is not None and live is not None and json.dumps(live, sort_keys=True, default=str) == \
-        json.dumps(saved, sort_keys=True, default=str)
-    return _fail_or_pass([] if ok else ["the sensors did not get the saved zero back after reconnecting"],
-                         "the zero is saved in the hand's calibration and back on the sensors after a reconnect.",
-                         [Metric("zero saved", "yes" if saved else "no", ok=saved is not None),
-                          Metric("zero back after reconnect", "yes" if ok else "no", ok=ok)])
+    return judge_tactile_zero(zeroed, saved, live)
+
+
+def judge_tactile_zero(zeroed: Any, saved: Any, live: Any) -> CheckResult:
+    """The zero just taken must be the one saved and the one back after the reconnect:
+    a lost write that leaves an older zero in the file fails."""
+    same = lambda a, b: a is not None and b is not None and \
+        json.dumps(a, sort_keys=True, default=str) == json.dumps(b, sort_keys=True, default=str)  # noqa: E731
+    metrics = [Metric("zero taken", "yes" if zeroed is not None else "no", ok=zeroed is not None),
+               Metric("saved zero is the one just taken", "yes" if same(zeroed, saved) else
+                      ("no zero saved" if saved is None else "an older zero"), ok=same(zeroed, saved)),
+               Metric("zero back after reconnect is the one just taken", "yes" if same(zeroed, live) else "no",
+                      ok=same(zeroed, live))]
+    return _fail_or_pass([m.name for m in metrics if m.ok is False],
+                         "the zero just taken is saved in the hand's calibration and back on the sensors after a "
+                         "reconnect.", metrics)
 
 
 # ----- 11. records per hand ---------------------------------------------------------------

@@ -107,6 +107,15 @@ def test_the_consoles_torque_read_after_its_reconnect_is_only_recorded_unless_a_
     assert metric.ok is False and problems == ["motor(s) 2 read torque on even after the reconnect"]
 
 
+def test_the_tactile_zero_must_be_the_one_just_taken_not_an_older_one_in_the_file():
+    new, old = {"thumb": [[1, 2]]}, {"thumb": [[9, 9]]}
+    assert release.judge_tactile_zero(new, new, new).status == "pass"
+    # The write was lost: the file (and so the reconnect) still has the older zero.
+    result = release.judge_tactile_zero(new, old, old)
+    assert result.status == "fail" and "saved zero is the one just taken" in result.summary
+    assert release.judge_tactile_zero(None, None, None).status == "fail"
+
+
 def _stopped_ctx(monkeypatch, snapshot, states, connected=True):
     def wait_connected(ctx):
         if not connected:
