@@ -1126,7 +1126,8 @@ class HandService:
             session = self.session
             if session is not None and session.caps.motors:
                 not_acked = session.hand.disable_torque()
-                self._settle_motors_holding(not_acked, checked=session.hand.config.motor_ids)
+                self._settle_motors_holding(not_acked, checked=session.hand.config.motor_ids,
+                                            session=session)
                 self.supervisor.set_torque_flag(False)
                 self.worker.reset()
                 self._publish_control_state()
@@ -1180,12 +1181,14 @@ class HandService:
         except Exception as e:
             logger.warning("torque off re-check failed: %s", e)
             return
-        self._settle_motors_holding(not_acked, checked=held["motors"])
+        self._settle_motors_holding(not_acked, checked=held["motors"], session=session)
 
-    def _settle_motors_holding(self, not_acked, *, checked) -> None:
+    def _settle_motors_holding(self, not_acked, *, checked, session: HandSession) -> None:
         """Clear the ``checked`` motors that acknowledged torque off; when none is
         left, the warning becomes a confirmation."""
-        not_acked, checked = set(not_acked or []), set(checked)
+        # A motor that did not answer at connect is never written to, so its silence is no ack.
+        absent = getattr(session.hand, "absent_motor_ids", None) or []
+        not_acked, checked = set(not_acked or []) | set(absent), set(checked)
         with self._state_lock:
             held = self._motors_holding
             if not held or held["confirmed"]:

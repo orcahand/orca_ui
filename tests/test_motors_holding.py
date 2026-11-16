@@ -74,3 +74,13 @@ def test_a_motor_that_does_not_acknowledge_stays_in_the_warning(client, monkeypa
     assert _holding(client) == {"motors": [7], "joints": ["ring_mcp"], "confirmed": False}
     # The torque flag is never raised by the re-check.
     assert service.control_state()["torque_enabled"] is False
+
+
+def test_a_motor_that_never_answered_is_not_confirmed_off(client, monkeypatch):
+    service = client.app.state.service
+    # Motor 7 missed the connect ping: the client skips it and reports no failure for it.
+    monkeypatch.setattr(service.session.hand.motor_client, "absent_motor_ids", lambda: [7])
+    service.motors_may_hold({"motors": [3, 7], "joints": ["index_mcp", "ring_mcp"]})
+    assert _holding(client) == {"motors": [7], "joints": ["ring_mcp"], "confirmed": False}
+    assert service.estop()["torque_disabled"] is True
+    assert _holding(client) == {"motors": [7], "joints": ["ring_mcp"], "confirmed": False}
