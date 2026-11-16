@@ -42,7 +42,15 @@ def client():
 
 
 def _holding(client):
-    return client.app.state.service.control_state()["motors_holding"]
+    held = client.app.state.service.control_state()["motors_holding"]
+    return held and {k: v for k, v in held.items() if k != "hand_id"}
+
+
+def _flag_3_and_7(service, monkeypatch):
+    """Raise the warning while the console's own connection can't switch them off either."""
+    with monkeypatch.context() as m:
+        m.setattr(service.session.hand, "disable_torque", lambda ids=None: list(ids or []))
+        service.motors_may_hold({"motors": [3, 7], "joints": ["index_mcp", "ring_mcp"]})
 
 
 def test_a_failed_run_still_warns_until_the_motors_are_confirmed_off(client, monkeypatch):
@@ -84,3 +92,29 @@ def test_a_motor_that_never_answered_is_not_confirmed_off(client, monkeypatch):
     assert _holding(client) == {"motors": [7], "joints": ["ring_mcp"], "confirmed": False}
     assert service.estop()["torque_disabled"] is True
     assert _holding(client) == {"motors": [7], "joints": ["ring_mcp"], "confirmed": False}
+
+
+def test_a_reconnect_confirms_the_motors_off_once_nothing_holds_the_hand(client, monkeypatch):
+    service = client.app.state.service
+    _flag_3_and_7(service, monkeypatch)
+    with monkeypatch.context() as m:
+        m.setattr(service._operation_manager, "active", lambda: True)
+        service._session_ready(service.session)
+    assert _holding(client) == {"motors": [3, 7], "joints": ["index_mcp", "ring_mcp"], "confirmed": False}
+    with monkeypatch.context() as m:
+        m.setattr(service.session.hand.motor_client, "absent_motor_ids", lambda: [7])
+        service._session_ready(service.session)
+    assert _holding(client) == {"motors": [7], "joints": ["ring_mcp"], "confirmed": False}
+    service._session_ready(service.session)
+    assert _holding(client) == {"motors": [], "joints": [], "confirmed": True}
+
+
+def test_another_hand_cannot_confirm_the_warning(client, monkeypatch):
+    service = client.app.state.service
+    monkeypatch.setattr(service, "_last_hand_id", "hand-a")
+    _flag_3_and_7(service, monkeypatch)
+    service._session_ready(service.session)
+    service.estop()
+    held = service.control_state()["motors_holding"]
+    assert held == {"hand_id": "hand-a", "motors": [3, 7], "joints": ["index_mcp", "ring_mcp"],
+                    "confirmed": False}

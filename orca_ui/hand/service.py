@@ -1156,25 +1156,32 @@ class HandService:
         """An operation could not confirm torque off on ``report["motors"]``: warn,
         then switch them off again over the console's own connection."""
         joint_of = dict(zip(report.get("motors") or [], report.get("joints") or []))
+        # The hand the operation ran on: only a session of that hand can confirm these motors.
+        hand_id = self._last_hand_id
         with self._state_lock:
             held = self._motors_holding
             if held and not held["confirmed"]:
-                joint_of = {**dict(zip(held["motors"], held["joints"])), **joint_of}
+                if held["hand_id"] == hand_id:
+                    joint_of = {**dict(zip(held["motors"], held["joints"])), **joint_of}
+                else:
+                    logger.warning("hand %s may still have motors %s holding; the warning "
+                                   "now shows hand %s", held["hand_id"], held["motors"], hand_id)
             motors = sorted(joint_of)
-            self._motors_holding = {"motors": motors, "joints": [joint_of[m] for m in motors],
-                                    "confirmed": False}
+            self._motors_holding = {"hand_id": hand_id, "motors": motors,
+                                    "joints": [joint_of[m] for m in motors], "confirmed": False}
         self._publish_control_state()
         self._recheck_motors_holding()
 
     def _recheck_motors_holding(self, session: HandSession | None = None) -> None:
-        """Torque off again on the flagged motors once no operation holds the hand;
-        only disables, never enables."""
+        """Torque off again on the flagged motors once no operation holds the hand
+        and it is the hand that raised the warning; only disables, never enables."""
         with self._state_lock:
             held = self._motors_holding
         manager = self._operation_manager
         session = session or self.session
         if not held or held["confirmed"] or (manager is not None and manager.active()) \
-                or session is None or not session.caps.motors:
+                or session is None or not session.caps.motors \
+                or getattr(session.hand, "hand_id", None) != held["hand_id"]:
             return
         try:
             not_acked = session.hand.disable_torque(list(held["motors"]))
@@ -1191,12 +1198,14 @@ class HandService:
         not_acked, checked = set(not_acked or []) | set(absent), set(checked)
         with self._state_lock:
             held = self._motors_holding
-            if not held or held["confirmed"]:
+            # Another hand's motors are not the ones just switched off.
+            if not held or held["confirmed"] \
+                    or held["hand_id"] != getattr(session.hand, "hand_id", None):
                 return
             keep = [(m, j) for m, j in zip(held["motors"], held["joints"])
                     if m in not_acked or m not in checked]
-            self._motors_holding = {"motors": [m for m, _ in keep], "joints": [j for _, j in keep],
-                                    "confirmed": not keep}
+            self._motors_holding = {**held, "motors": [m for m, _ in keep],
+                                    "joints": [j for _, j in keep], "confirmed": not keep}
         self._publish_control_state()
 
     def dismiss_motors_holding(self) -> None:

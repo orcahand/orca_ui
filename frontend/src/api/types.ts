@@ -190,6 +190,8 @@ export interface ControlState {
 }
 
 export interface MotorsHolding {
+  // The hand that raised the warning; only a connection to it can confirm the motors off.
+  hand_id: string | null
   motors: number[]
   joints: (string | null)[]
   confirmed: boolean
