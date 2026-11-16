@@ -33,7 +33,8 @@ export function SetupView() {
   const calibration = handInfo?.calibration
   const calibrated =
     calibration?.motors === true && calibration.missing_anchors.length === 0
-  const ranIn = readRunInDone(handInfo?.hand?.id) !== null || runInCompleted(operation)
+  const handId = handInfo?.hand?.id
+  const ranIn = readRunInDone(handId) !== null || runInCompleted(operation, handId)
 
   const tension: StepState = tensioned ? 'done' : 'next'
   const calibrate: StepState = calibrated ? 'done' : tensioned ? 'next' : 'todo'

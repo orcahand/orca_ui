@@ -24,9 +24,32 @@ export function readRunInDone(handId: string | null | undefined): string | null 
   }
 }
 
-// A stopped run also ends "done", but without a result.
-export function runInCompleted(operation: OperationSnapshot | null): boolean {
-  return operation?.kind === 'run_in' && operation.state === 'done' && operation.result != null
+// A finished run-in of this hand; a stopped run also ends "done", but without a result.
+export function runInCompleted(
+  operation: OperationSnapshot | null,
+  handId: string | null | undefined,
+): boolean {
+  return (
+    Boolean(handId) &&
+    operation?.kind === 'run_in' &&
+    operation.state === 'done' &&
+    operation.result != null &&
+    operation.params.hand_id === handId
+  )
+}
+
+// Writes the date only when this hand's run is seen going from running to done,
+// never for an old snapshot sent again after a reload or a hand change.
+export function recordRunInFinish(
+  previous: OperationSnapshot | null,
+  snapshot: OperationSnapshot,
+  handId: string | null | undefined,
+): void {
+  const wasRunning =
+    previous?.run_id === snapshot.run_id && previous.state !== 'done' && previous.state !== 'error'
+  if (wasRunning && handId && runInCompleted(snapshot, handId)) {
+    writeRunInDone(handId, new Date().toISOString())
+  }
 }
 
 export function writeRunInDone(handId: string, iso: string): void {
