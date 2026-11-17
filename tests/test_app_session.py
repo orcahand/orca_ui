@@ -368,6 +368,25 @@ def test_targets_after_a_hold_ramp_in_again(client):
     assert _commanded(client)[joint] == pytest.approx(first[joint])  # no jump
 
 
+def test_a_hold_during_a_slow_engage_keeps_its_speed(client):
+    link, reply = _connected(client)
+    client.post("/api/torque/enable")
+    start = client.app_state.service.current_pose()
+    assert client.post("/api/app/engage", json={"ramp_s": 10.0}).status_code == 200
+    target = _pose(reply, 0.9)
+    joint = max(target, key=lambda j: abs(target[j] - start[j]))
+
+    _targets(client, link, target)
+    _apps(client).clock.now += 2.0
+    _targets(client, link, target)  # 20% of the way
+    _later(client, 0.3)  # held
+    _targets(client, link, target)
+    _apps(client).clock.now += 1.0
+    _targets(client, link, target)
+    done = (_commanded(client)[joint] - start[joint]) / (target[joint] - start[joint])
+    assert done == pytest.approx(0.2 + 0.8 / 7.7, abs=0.01)  # the 7.7 s left, not 1 s
+
+
 def test_torque_off_auto_disengages(client):
     _engaged(client)
     client.post("/api/torque/disable")

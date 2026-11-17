@@ -540,13 +540,12 @@ class AppSessions:
             engaged = self._state == ENGAGED
             if self._app_tracking and self._lost_since is not None:
                 # Back from a hold: ramp again from the last command, never jump.
-                self._lost_since = None
+                held_at, self._lost_since = self._lost_since, None
                 changed = True
                 # An engage ramp nothing has used yet stays as it is.
                 if engaged and not (self._ramp and not self._ramp.began):
-                    duration = self._ramp.duration if self._ramp else self._settings.app_ramp_s
                     self._ramp = _Ramp(dict(self._last_forwarded),
-                                       min(max(duration, MIN_RAMP_S), RE_RAMP_MAX_S))
+                                       self._resume_ramp_s_locked(held_at))
             if engaged and self._app_tracking:
                 ramping = self._ramp is not None
                 forward = self._blend_locked(clean, now)
@@ -562,6 +561,17 @@ class AppSessions:
                 logger.debug("app targets refused: %s", e)
         if changed:
             self._publish_state()
+
+    def _resume_ramp_s_locked(self, held_at: float) -> float:
+        """Short after a hold, but a hold mid-ramp resumes with what was left of
+        that ramp (from its latest joint), so the speed the user chose holds."""
+        ramp = self._ramp
+        base = ramp.duration if ramp else self._settings.app_ramp_s
+        duration = min(max(base, MIN_RAMP_S), RE_RAMP_MAX_S)
+        if ramp is not None and ramp.began:
+            ran = max(held_at - max(ramp.began.values()), 0.0)
+            duration = max(duration, ramp.duration - ran)
+        return duration
 
     def _blend_locked(self, target: dict[str, float], now: float) -> dict[str, float]:
         ramp = self._ramp
