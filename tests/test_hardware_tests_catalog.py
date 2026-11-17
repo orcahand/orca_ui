@@ -65,3 +65,25 @@ def test_a_broken_definition_fails_at_load(tmp_path):
         "  - {id: X1, title: t, kind: auto, instructions: i, pass_rule: p}\n")
     with pytest.raises(cat.CatalogError, match="needs a check"):
         cat.load_catalog(definitions, plans)
+
+
+def test_plan_includes_resolve_and_fail_loudly(tmp_path):
+    definitions, plans = tmp_path / "definitions", tmp_path / "plans"
+    definitions.mkdir()
+    plans.mkdir()
+    for fid, sid in (("f1", "X1"), ("f2", "X2"), ("f3", "X3")):
+        (definitions / f"{fid}.yaml").write_text(
+            f"id: {fid}\ntitle: t\nsummary: s\ngroup: new\nsteps:\n"
+            f"  - {{id: {sid}, title: t, kind: manual, instructions: i, pass_rule: p}}\n")
+    (plans / "base.yaml").write_text("id: base\ntitle: b\nsummary: s\nfeatures: [f1, f2]\n")
+    (plans / "rel.yaml").write_text("id: rel\ntitle: r\nsummary: s\nincludes: [base]\nfeatures: [f3, f1]\n")
+    catalog = cat.load_catalog(definitions, plans)
+    assert catalog.plans["rel"].features == ("f1", "f2", "f3")
+    assert catalog.plan_chain("rel") == ["rel", "base"]
+
+    (plans / "base.yaml").write_text("id: base\ntitle: b\nsummary: s\nincludes: [rel]\nfeatures: [f1]\n")
+    with pytest.raises(cat.CatalogError, match="cycle"):
+        cat.load_catalog(definitions, plans)
+    (plans / "base.yaml").write_text("id: base\ntitle: b\nsummary: s\nincludes: [nope]\nfeatures: [f1]\n")
+    with pytest.raises(cat.CatalogError, match="unknown plan 'nope'"):
+        cat.load_catalog(definitions, plans)

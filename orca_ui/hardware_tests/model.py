@@ -3,7 +3,8 @@ and the REST API.
 
 A *feature definition* (one YAML file per feature under ``definitions/``)
 lists the steps that test one feature on a real hand. A *plan* (under
-``plans/``) names the features one test session covers. A *session* runs a
+``plans/``) names the features one test session covers, and may include other
+plans (``base`` holds the checks every plan must pass). A *session* runs a
 plan on one hand; its results are stored per feature under
 ``<bench>/<hand>/tests/<feature>/<session>/``.
 """
@@ -71,8 +72,12 @@ class Plan:
     title: str
     summary: str
     features: tuple[str, ...]
+    """Resolved by the catalog: the included plans' features first, then the
+    plan's own, each once, in order."""
     default: bool = False
     """The plan the Tests tab offers first."""
+    includes: tuple[str, ...] = ()
+    """Ids of the plans whose features this plan runs too."""
 
 
 @dataclass(frozen=True)

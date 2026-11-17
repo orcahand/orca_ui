@@ -2,8 +2,9 @@
 apply to the hand under test.
 
 Definitions are YAML files under ``definitions/`` (one per feature) and plans
-YAML files under ``plans/``; their keys map one to one onto the dataclasses in
-:mod:`orca_ui.hardware_tests.model`. Structural problems fail loudly at load.
+YAML files under ``plans/`` (one per plan, named after its id); their keys map
+one to one onto the dataclasses in :mod:`orca_ui.hardware_tests.model`. A
+plan's ``includes`` are resolved here into its ``features``. Structural problems fail loudly at load.
 Whether every named check is registered is a separate question
 (:func:`unregistered_checks`), because checks live in modules that import the
 console.
@@ -11,7 +12,7 @@ console.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -55,6 +56,13 @@ class Catalog:
 
     def plan_features(self, plan_id: str) -> list[FeatureDefinition]:
         return [self.features[f] for f in self.plan(plan_id).features]
+
+    def plan_chain(self, plan_id: str) -> list[str]:
+        """``plan_id`` and every plan it includes, recursively, each once."""
+        out = [plan_id]
+        for included in self.plan(plan_id).includes:
+            out += [p for p in self.plan_chain(included) if p not in out]
+        return out
 
 
 def _tuple(value, where: str, cast=str) -> tuple:
@@ -163,23 +171,49 @@ def load_feature(path: Path) -> FeatureDefinition:
 
 
 def load_plan(path: Path) -> Plan:
+    """One plan file as written: ``features`` are its own, unresolved."""
     raw = _load_yaml(path)
-    for key in ("id", "title", "summary", "features"):
+    for key in ("id", "title", "summary"):
         if not raw.get(key):
             raise CatalogError(f"{path.name}: missing {key!r}")
+    if raw["id"] != path.stem:
+        raise CatalogError(f"{path.name}: id {raw['id']!r} does not match the file name")
+    unknown = set(raw) - {"id", "title", "summary", "features", "includes", "default"}
+    if unknown:
+        raise CatalogError(f"{path.name}: unknown keys {sorted(unknown)}")
+    features = _tuple(raw.get("features"), f"{path.name}.features")
+    includes = _tuple(raw.get("includes"), f"{path.name}.includes")
+    if not features and not includes:
+        raise CatalogError(f"{path.name}: a plan needs features or includes")
+    if len(set(features)) != len(features):
+        raise CatalogError(f"plan {raw['id']!r} lists a feature twice")
     return Plan(
         id=str(raw["id"]),
         title=str(raw["title"]),
         summary=str(raw["summary"]).strip(),
-        features=_tuple(raw["features"], f"{path.name}.features"),
+        features=features,
         default=bool(raw.get("default", False)),
+        includes=includes,
     )
+
+
+def _resolve(plan_id: str, raw: dict[str, Plan], chain: tuple[str, ...] = ()) -> tuple[str, ...]:
+    """``plan_id``'s features: its includes' (recursively) first, then its own, each once."""
+    if plan_id in chain:
+        raise CatalogError(f"plans include each other in a cycle: {' -> '.join(chain + (plan_id,))}")
+    out: list[str] = []
+    for included in raw[plan_id].includes:
+        if included not in raw:
+            raise CatalogError(f"plan {plan_id!r} includes unknown plan {included!r}")
+        out += _resolve(included, raw, chain + (plan_id,))
+    out += raw[plan_id].features
+    return tuple(dict.fromkeys(out))
 
 
 def load_catalog(definitions_dir: Path = DEFINITIONS_DIR, plans_dir: Path = PLANS_DIR) -> Catalog:
     """Every feature and plan, validated: unique ids, unique step ids across
-    all features (the REST API addresses steps by id), and plans naming only
-    known features."""
+    all features (the REST API addresses steps by id), plans naming only
+    known features and including only known plans, without cycles."""
     features: dict[str, FeatureDefinition] = {}
     step_owner: dict[str, str] = {}
     for path in sorted(definitions_dir.glob("*.yaml")):
@@ -190,17 +224,14 @@ def load_catalog(definitions_dir: Path = DEFINITIONS_DIR, plans_dir: Path = PLAN
                     f"step id {step.id!r} is used by both {step_owner[step.id]} and {feature.id}")
             step_owner[step.id] = feature.id
         features[feature.id] = feature
-    plans: dict[str, Plan] = {}
+    raw_plans: dict[str, Plan] = {}
     for path in sorted(plans_dir.glob("*.yaml")):
         plan = load_plan(path)
-        if plan.id in plans:
-            raise CatalogError(f"plan id {plan.id!r} is defined twice")
         missing = [f for f in plan.features if f not in features]
         if missing:
             raise CatalogError(f"plan {plan.id!r} names unknown features {missing}")
-        if len(set(plan.features)) != len(plan.features):
-            raise CatalogError(f"plan {plan.id!r} lists a feature twice")
-        plans[plan.id] = plan
+        raw_plans[plan.id] = plan
+    plans = {pid: replace(plan, features=_resolve(pid, raw_plans)) for pid, plan in raw_plans.items()}
     if sum(p.default for p in plans.values()) > 1:
         raise CatalogError("more than one plan is marked default")
     # The default plan first: the tab offers the first plan it is given.
