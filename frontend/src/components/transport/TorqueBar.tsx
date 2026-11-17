@@ -1,6 +1,6 @@
 // Torque strip: shows on every tab whenever the motors are energized, so the
 // control that de-energizes the hand is never a tab away. Stacks with the
-// operation and teleop bars — torque is on during most operations, and the
+// operation and app session bars — torque is on during most operations, and the
 // operator may need to drop it mid-run.
 
 import { useState } from 'react'

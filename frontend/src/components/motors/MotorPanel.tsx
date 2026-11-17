@@ -47,7 +47,7 @@ export function MotorPanel() {
   const seeded = useRef(false)
   const wasLocked = useRef(false)
 
-  // Re-seed after control returns to manual: a replay/teleop session moved
+  // Re-seed after control returns to manual: a replay/app session moved
   // the hand, so the latched slider values are stale and the first touch
   // would yank the joint back to wherever the slider was left.
   useEffect(() => {

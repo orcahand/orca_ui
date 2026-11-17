@@ -16,7 +16,7 @@ import type {
   TaxelGeometry,
 } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
-import { isTeleopActive, useTeleopStore } from '../../state/teleopStore'
+import { isAppActive, useAppSessionStore } from '../../state/appSessionStore'
 import { subscribeFrames } from '../../state/streamStore'
 import { ForceArrowLayer } from './ForceArrowLayer'
 import { JointGlowLayer } from './JointGlowLayer'
@@ -41,12 +41,12 @@ export interface HandAssets {
 interface Rig {
   robot: URDFRobot
   ghost: URDFRobot | null
-  // Accent-colored second ghost posed from the raw teleop retargeter output
-  // (teleop.targets) — during an engaged ramp it visibly leads the hand.
-  teleopGhost: URDFRobot | null
+  // Accent-colored second ghost posed from the running app's targets
+  // (app.targets) — during an engaged ramp it visibly leads the hand.
+  appGhost: URDFRobot | null
   adapter: JointPoseAdapter
   ghostAdapter: JointPoseAdapter | null
-  teleopGhostAdapter: JointPoseAdapter | null
+  appGhostAdapter: JointPoseAdapter | null
   glow: JointGlowLayer
   arrows: ForceArrowLayer
   // Measured from the bare robot BEFORE overlay layers attach: the arrow
@@ -85,18 +85,18 @@ function HandRig({
         const ghost = makeGhost(robot, scene.ghost)
         // Emissive accent so it can't be confused with the gray motor ghost;
         // the static tower/forearm never move, so ghosting them adds nothing.
-        const teleopGhost = makeGhost(robot, {
-          ...scene.teleopGhost,
+        const appGhost = makeGhost(robot, {
+          ...scene.appGhost,
           hideLinks: ['tower', 'forearm'],
         })
         built = {
           robot,
           ghost,
-          teleopGhost,
+          appGhost,
           adapter: new JointPoseAdapter(robot, joints),
           ghostAdapter: ghost ? new JointPoseAdapter(ghost, joints) : null,
-          teleopGhostAdapter: teleopGhost
-            ? new JointPoseAdapter(teleopGhost, joints)
+          appGhostAdapter: appGhost
+            ? new JointPoseAdapter(appGhost, joints)
             : null,
           glow: new JointGlowLayer(robot),
           arrows: new ForceArrowLayer(
@@ -135,8 +135,8 @@ function HandRig({
   useEffect(() => {
     if (!rig) return
     if (rig.ghost) setGhostAppearance(rig.ghost, sceneColors.ghost)
-    if (rig.teleopGhost) {
-      setGhostAppearance(rig.teleopGhost, sceneColors.teleopGhost)
+    if (rig.appGhost) {
+      setGhostAppearance(rig.appGhost, sceneColors.appGhost)
     }
     invalidate()
   }, [rig, sceneColors, invalidate])
@@ -189,16 +189,16 @@ function HandRig({
         if (showGhost) rig.ghostAdapter?.apply(frames.joints.estimate)
       }
 
-      if (rig.teleopGhost) {
-        // Self-hides when no teleop session streams targets; the adapter
+      if (rig.appGhost) {
+        // Self-hides when no app session streams targets; the adapter
         // ROM-clamps + calibrates identically to every other stream.
-        const showTeleop =
-          scene.teleopGhost &&
-          isTeleopActive(useTeleopStore.getState().session) &&
-          Object.keys(frames.joints.teleopTarget).length > 0
-        rig.teleopGhost.visible = showTeleop
-        if (showTeleop) {
-          rig.teleopGhostAdapter?.apply(frames.joints.teleopTarget)
+        const showApp =
+          scene.appGhost &&
+          isAppActive(useAppSessionStore.getState().session) &&
+          Object.keys(frames.joints.appTarget).length > 0
+        rig.appGhost.visible = showApp
+        if (showApp) {
+          rig.appGhostAdapter?.apply(frames.joints.appTarget)
         }
       }
 
@@ -235,7 +235,7 @@ function HandRig({
     <>
       <primitive object={rig.robot} />
       {rig.ghost && <primitive object={rig.ghost} />}
-      {rig.teleopGhost && <primitive object={rig.teleopGhost} />}
+      {rig.appGhost && <primitive object={rig.appGhost} />}
     </>
   )
 }

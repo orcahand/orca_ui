@@ -14,7 +14,7 @@ import {
   isOperationActive,
   useOperationStore,
 } from '../../state/operationStore'
-import { isTeleopEngaged, useTeleopStore } from '../../state/teleopStore'
+import { isAppEngaged, useAppSessionStore } from '../../state/appSessionStore'
 import { Panel } from '../common/Panel'
 
 function fail(error: unknown) {
@@ -28,7 +28,7 @@ function chainExtra(op: OperationSnapshot | null): MotorChainExtra | null {
 
 export function MotorChainPanel() {
   const operation = useOperationStore((s) => s.operation)
-  const teleopEngaged = useTeleopStore((s) => isTeleopEngaged(s.session))
+  const appEngaged = useAppSessionStore((s) => isAppEngaged(s.session))
   const [confirmingReset, setConfirmingReset] = useState(false)
 
   const anyOpActive = isOperationActive(operation)
@@ -37,15 +37,15 @@ export function MotorChainPanel() {
   const chainActive = chainOp !== null && isOperationActive(chainOp)
   const extra = chainExtra(chainOp)
 
-  const startBlocked = anyOpActive || teleopEngaged
+  const startBlocked = anyOpActive || appEngaged
   const startReason = anyOpActive
     ? `${operation!.kind} is running — stop it first`
-    : teleopEngaged
-      ? 'teleop is engaged — disengage first'
+    : appEngaged
+      ? 'an app is engaged — disengage first'
       : null
 
   // An armed confirmation must not survive a state change: if an operation
-  // starts (or teleop engages) while "Yes, reset" sits on screen, the next
+  // starts (or an app engages) while "Yes, reset" sits on screen, the next
   // click after it clears would fire the destructive reset with one click.
   useEffect(() => {
     if (startBlocked) setConfirmingReset(false)

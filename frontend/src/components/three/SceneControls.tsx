@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { api } from '../../api/rest'
 import type { PoseSource } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
-import { isTeleopActive, useTeleopStore } from '../../state/teleopStore'
+import { isAppActive, useAppSessionStore } from '../../state/appSessionStore'
 
 // Which stream poses the model. "auto" is what you want almost always: the
 // motors are polled while limp and left alone once torque is on, so reads stop
@@ -67,7 +67,7 @@ export function SceneControls() {
   const setError = useAppStore((s) => s.setError)
   const [sweeping, setSweeping] = useState<string | null>(null)
   const [sweepJoint, setSweepJoint] = useState('index_mcp')
-  const teleopActive = useTeleopStore((s) => isTeleopActive(s.session))
+  const appActive = useAppSessionStore((s) => isAppActive(s.session))
 
   const caps = status?.capabilities
 
@@ -92,7 +92,7 @@ export function SceneControls() {
   const showGhost = Boolean(caps?.motors && caps?.encoders)
   const showForces = Boolean(caps?.tactile)
   const showGlow = Boolean(caps?.encoders)
-  const anyToggle = showGhost || showForces || showGlow || teleopActive
+  const anyToggle = showGhost || showForces || showGlow || appActive
 
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -149,17 +149,17 @@ export function SceneControls() {
               joint glow
             </label>
           )}
-          {teleopActive && (
+          {appActive && (
             <label
               className="toggle-label"
-              title="cyan ghost posed from the live teleop retargeter output"
+              title="cyan ghost posed from what the running app commands"
             >
               <input
                 type="checkbox"
-                checked={scene.teleopGhost}
-                onChange={(e) => setScene({ teleopGhost: e.target.checked })}
+                checked={scene.appGhost}
+                onChange={(e) => setScene({ appGhost: e.target.checked })}
               />
-              teleop ghost
+              app ghost
             </label>
           )}
         </div>

@@ -4,7 +4,6 @@
 
 import { useAppStore } from '../../state/appStore'
 import { MotorPanel } from '../motors/MotorPanel'
-import { CameraPreview } from '../teleop/CameraPreview'
 import { HandScenePanel } from '../three/HandScenePanel'
 
 export function ThreeDView() {
@@ -20,11 +19,7 @@ export function ThreeDView() {
       }}
     >
       <HandScenePanel height="calc(100vh - 240px)" />
-      {/* CameraPreview self-hides unless a camera teleop session is live. */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {caps?.motors && <MotorPanel />}
-        <CameraPreview />
-      </div>
+      {caps?.motors && <MotorPanel />}
     </div>
   )
 }

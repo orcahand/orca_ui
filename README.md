@@ -95,18 +95,18 @@ sweep) and disables torque.
 - **Poses** — click through some basic pose presets or record your own
   poses and trajectories and replay them, all in this handy panel.
   
-- **Teleop** — Not Fully Implemented! Drive the hand with your own: webcam (MediaPipe), Manus
-  gloves, Apple Vision Pro, or a synthetic waveform (no hardware). The
-  retargeting pipeline runs as a separate `orca_teleop` process (spawned with
-  `uv run --frozen` in the `orca_teleop` checkout, or launched manually/remotely
-  in *external* mode with a session token). Sessions start in **preview** —
-  retargeted poses render as a cyan ghost in the 3D view and the hand never
-  moves — then **engage** takes the control channel (manual sliders lock,
-  named owner tooltips) and ramps in from the current pose. Tracking loss
-  holds the last pose and auto-disengages after a timeout; E-stop ends the
-  whole session. Webcam sessions get a live annotated camera preview
-  (landmarks green when the orientation gate passes).
-  
+- **Teleop** and **RL** — In progress. Each tab runs an app that drives the
+  hand: `orca_teleop` (your hand, tracked by a camera) or `orca_rl` (a trained
+  policy). The console starts the app from the command you set once in the
+  tab, and the app describes its own settings, which the tab draws as a form.
+  Sessions start in **preview**: the app's targets pose a cyan ghost in the 3D
+  view and the hand never moves. **Engage** takes the hand (manual control
+  locks) and ramps in from the current pose. No fresh targets hold the pose,
+  and a long hold disengages. Disengage holds the pose; Stop, or the app
+  ending while engaged, turns torque off where the hand is; E-STOP cuts torque
+  first. The contract between the console and an app is
+  [docs/app-contract.md](docs/app-contract.md).
+
 - **Setup** — This menu contains all functionality you will need to build,
   tension and calibrate your ORCA Hand: the step-by-step assembly guide, a
   maintenance walkthrough, the slack test, tensioning (guided on hardware 2.1
@@ -120,7 +120,7 @@ sweep) and disables torque.
   the effect your tuning has on the performed trajectory.
 
 While anything long-running is active (calibration, tensioning, playback, 
-recording, a teleop session) a status tab will appear on the ui with 
+recording, an app session) a status tab will appear on the ui with 
 progress reports, relevant interactive prompts, and stop work from every tab.
 
 ### Mock mode
@@ -162,13 +162,14 @@ mock hand — for unattended runs).
 `orca_park`), motion (`orca_set_joints` — ROM-clamped, convergence-verified;
 `orca_apply_pose`), library writes (`orca_save_pose`, `orca_delete_asset`),
 operations (`orca_start_operation`, `orca_control_operation`,
-`orca_send_operation_input`), tactile (`orca_configure_tactile`), and teleop
-(`orca_teleop_start`, `orca_teleop_engage`, `orca_teleop_stop`). Run `/mcp`
+`orca_send_operation_input`), tactile (`orca_configure_tactile`), and app
+sessions (`orca_app_start`, `orca_app_engage`, `orca_app_stop`,
+`orca_get_app_picture`). Run `/mcp`
 in Claude Code to inspect the live catalog.
 
 Safety model: motion needs torque explicitly enabled; nothing enables it
 implicitly. On real hardware the first torque enable, maintenance operations
-(calibrate/tension), teleop engage, and current-limit raises require a
+(calibrate/tension), app engage, and current-limit raises require a
 `confirm` argument — against `--mock` the gates are inactive, so develop
 there. De-escalation (e-stop, torque off, `orca_park`, stop/disengage) is
 never gated. Assembly-time tools (`configure_chain`, `wizard`) and PID gain

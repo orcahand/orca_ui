@@ -5,7 +5,7 @@ import { refreshHandInfo } from '../components/hand/handStore'
 import { useAppStore } from '../state/appStore'
 import { useEventLogStore } from '../state/eventLogStore'
 import { useOperationStore } from '../state/operationStore'
-import { useTeleopStore } from '../state/teleopStore'
+import { useAppSessionStore } from '../state/appSessionStore'
 import {
   latest,
   markDirty,
@@ -13,6 +13,8 @@ import {
 } from '../state/streamStore'
 import { api } from './rest'
 import type {
+  AppFrames,
+  AppSnapshot,
   ControlState,
   MotorsFaults,
   OperationLogPayload,
@@ -20,14 +22,13 @@ import type {
   SensorsHealth,
   ServerMessage,
   StatusSnapshot,
-  TeleopSnapshot,
 } from './types'
 import { TOPICS } from './types'
 
-// teleop.preview (base64 JPEG frames) is opt-in: the CameraPreview component
-// subscribes while visible via subscribeTopic/unsubscribeTopic below.
+// app.frames (base64 JPEG pictures) is opt-in: picture tiles subscribe while
+// visible via subscribeTopic/unsubscribeTopic below.
 const DEFAULT_TOPICS = Object.values(TOPICS).filter(
-  (topic) => topic !== TOPICS.teleopPreview,
+  (topic) => topic !== TOPICS.appFrames,
 )
 const BACKOFF_START_MS = 500
 const BACKOFF_MAX_MS = 5000
@@ -38,7 +39,8 @@ let counters: Record<string, number> = {}
 let started = false
 // The banner text of the last error that ended a connection, cleared on reconnect.
 let connectionError: string | null = null
-const extraTopics = new Set<string>()
+// Opt-in topics, counted: several components may want the same one.
+const extraTopics = new Map<string, number>()
 
 export function startStreamClient(): void {
   if (started) return
@@ -60,8 +62,9 @@ export function sendCommand(angles: Record<string, number>): boolean {
 // Dynamic (non-default) topic subscriptions. Re-applied on reconnect because
 // onopen subscribes DEFAULT_TOPICS ∪ extraTopics.
 export function subscribeTopic(topic: string): void {
-  extraTopics.add(topic)
-  if (socket && socket.readyState === WebSocket.OPEN) {
+  const count = extraTopics.get(topic) ?? 0
+  extraTopics.set(topic, count + 1)
+  if (count === 0 && socket && socket.readyState === WebSocket.OPEN) {
     socket.send(
       JSON.stringify({ type: 'subscribe', data: { topics: [topic] } }),
     )
@@ -69,6 +72,11 @@ export function subscribeTopic(topic: string): void {
 }
 
 export function unsubscribeTopic(topic: string): void {
+  const count = (extraTopics.get(topic) ?? 0) - 1
+  if (count > 0) {
+    extraTopics.set(topic, count)
+    return
+  }
   extraTopics.delete(topic)
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(
@@ -79,7 +87,8 @@ export function unsubscribeTopic(topic: string): void {
 
 function connect(): void {
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const ws = new WebSocket(`${protocol}//${location.host}/ws`)
+  // client=browser: the app session disengages when the last tab is gone.
+  const ws = new WebSocket(`${protocol}//${location.host}/ws?client=browser`)
   socket = ws
 
   ws.onopen = () => {
@@ -88,14 +97,14 @@ function connect(): void {
     ws.send(
       JSON.stringify({
         type: 'subscribe',
-        data: { topics: [...DEFAULT_TOPICS, ...extraTopics] },
+        data: { topics: [...DEFAULT_TOPICS, ...extraTopics.keys()] },
       }),
     )
     // Hardware may have been swapped while we were away.
     void refreshHandInfo()
     // Hub retention covers reconnects to the SAME backend; after a backend
     // restart there is nothing retained, so a stale 'running' operation or
-    // teleop session would wedge every start-gate. REST is authoritative.
+    // app session would wedge every start-gate. REST is authoritative.
     void resyncControlPlanes()
   }
 
@@ -127,10 +136,11 @@ async function resyncControlPlanes(): Promise<void> {
     /* keep whatever we have; topic pushes will correct it */
   }
   try {
-    useTeleopStore.getState().setSession((await api.teleopState()).session)
+    useAppSessionStore.getState().setSession((await api.appState()).session)
   } catch {
-    /* teleop may be disabled (--no-teleop) */
+    /* app sessions may be disabled (--no-apps) */
   }
+  void useAppSessionStore.getState().refreshApps()
 }
 
 // Event-log entries for measured-stream fallback transitions: which joint
@@ -306,33 +316,45 @@ function dispatch(message: ServerMessage): void {
         .getState()
         .mergeLog(data as unknown as OperationLogPayload)
       break
-    case TOPICS.teleopState: {
-      const session = data as unknown as TeleopSnapshot
-      useTeleopStore.getState().setSession(session)
-      if (session.state === 'idle' || session.state === 'error') {
-        // Stale ghost poses must not survive the session.
-        for (const key of Object.keys(latest.joints.teleopTarget)) {
-          delete latest.joints.teleopTarget[key]
-        }
-        latest.teleop.preview = null
-        markDirty()
+    case TOPICS.appState: {
+      const session = data as unknown as AppSnapshot
+      const previous = useAppSessionStore.getState().session
+      useAppSessionStore.getState().setSession(session)
+      if (
+        session.state !== 'preview' &&
+        session.state !== 'engaged' &&
+        session.state !== 'starting'
+      ) {
+        clearAppFrames()
+      } else if (previous && previous.session_id !== session.session_id) {
+        clearAppFrames()
       }
       break
     }
-    case TOPICS.teleopTargets:
-      Object.assign(latest.joints.teleopTarget, data.angles as object)
-      latest.joints.tTeleopTarget = t ?? Date.now()
+    case TOPICS.appTargets: {
+      const sessionId = useAppSessionStore.getState().session?.session_id
+      if (data.session_id !== sessionId) {
+        // A cleared ghost, or one from an earlier session.
+        clearGhost()
+        break
+      }
+      Object.assign(latest.joints.appTarget, data.angles as object)
+      latest.joints.tAppTarget = t ?? Date.now()
       markDirty()
       break
-    case TOPICS.teleopLog:
-      useTeleopStore
+    }
+    case TOPICS.appLog:
+      useAppSessionStore
         .getState()
         .mergeLog(data as unknown as OperationLogPayload)
       break
-    case TOPICS.teleopPreview:
-      latest.teleop.preview = data as { jpeg: string; seq: number | null }
+    case TOPICS.appFrames: {
+      const frames = data as unknown as AppFrames
+      const sessionId = useAppSessionStore.getState().session?.session_id
+      latest.app.frames = frames.session_id === sessionId ? frames.streams : {}
       markDirty()
       break
+    }
     case TOPICS.error: {
       const message = (data.message as string) ?? 'unknown error'
       connectionError = data.connection ? message : null
@@ -341,6 +363,19 @@ function dispatch(message: ServerMessage): void {
       break
     }
   }
+}
+
+function clearGhost(): void {
+  for (const key of Object.keys(latest.joints.appTarget)) {
+    delete latest.joints.appTarget[key]
+  }
+  markDirty()
+}
+
+// Stale ghost poses and pictures must not survive their session.
+function clearAppFrames(): void {
+  clearGhost()
+  latest.app.frames = {}
 }
 
 function publishRates(): void {

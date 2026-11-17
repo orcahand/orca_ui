@@ -132,8 +132,8 @@ export interface Palette {
     lights: [number, number, number, number, string][]
     /** Motor-estimate ghost. */
     ghost: { color: number; opacity: number; emissiveIntensity: number }
-    /** Teleop retargeter ghost — always the accent color. */
-    teleopGhost: { color: number; opacity: number; emissiveIntensity: number }
+    /** The running app's ghost — always the accent color. */
+    appGhost: { color: number; opacity: number; emissiveIntensity: number }
     /**
      * Joint-glow rings. Additive blending is invisible over a light ground
      * (it can only brighten, and paper is already near-max), so light mode
@@ -235,7 +235,7 @@ const DARK: Palette = {
       [0.25, 0.7, -1.0, 0.8, '#8fa6c8'], // rim: from behind, lifts the silhouette
     ],
     ghost: { color: 0x7f8ea2, opacity: 0.22, emissiveIntensity: 0 },
-    teleopGhost: { color: 0x22d3ee, opacity: 0.45, emissiveIntensity: 0.6 },
+    appGhost: { color: 0x22d3ee, opacity: 0.45, emissiveIntensity: 0.6 },
     glow: {
       low: '#7f8ea2',
       mid: '#f59e0b',
@@ -355,7 +355,7 @@ const LIGHT: Palette = {
     ghost: { color: 0x4f4a3c, opacity: 0.3, emissiveIntensity: 0.0 },
     // Still unmistakably the accent, but self-lit far less: emissive at 0.6
     // on paper reads as a pale wash instead of a solid lead.
-    teleopGhost: { color: 0x0f6f78, opacity: 0.5, emissiveIntensity: 0.18 },
+    appGhost: { color: 0x0f6f78, opacity: 0.5, emissiveIntensity: 0.18 },
     glow: {
       low: '#6b6555',
       mid: '#d97706',

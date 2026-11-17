@@ -43,6 +43,7 @@ const TABS: { id: ViewName; label: string }[] = [
   { id: '3d', label: '3D' },
   { id: 'poses', label: 'Poses' },
   { id: 'teleop', label: 'Teleop' },
+  { id: 'rl', label: 'RL' },
   { id: 'setup', label: 'Setup' },
   { id: 'motors', label: 'Motors' },
 ]

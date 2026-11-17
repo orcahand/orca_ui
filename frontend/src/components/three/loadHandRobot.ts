@@ -168,7 +168,7 @@ export function makeGhost(
   }
   const material = new THREE.MeshStandardMaterial({
     color,
-    // Self-lit ghosts (teleop) stay recognizably colored from any angle
+    // Self-lit ghosts (the app ghost) stay recognizably colored from any angle
     // instead of washing out to gray under the scene lights.
     emissive: emissiveIntensity > 0 ? color : 0x000000,
     emissiveIntensity,

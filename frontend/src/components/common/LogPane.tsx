@@ -1,4 +1,4 @@
-// Scroll-stick log body shared by the operation and teleop log panes.
+// Scroll-stick log body shared by the operation and app log panes.
 // Auto-scrolls to the newest line unless the user has scrolled up.
 
 import { useEffect, useRef } from 'react'

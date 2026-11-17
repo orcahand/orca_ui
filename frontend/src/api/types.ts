@@ -151,8 +151,8 @@ export interface CalibrationInfo {
   hint: string | null
 }
 
-// Who owns the joint-target channel. TELEOP is reserved for orca_teleop.
-export type ControlSource = 'manual' | 'operation' | 'teleop'
+// Who owns the joint-target channel; 'app' is an engaged app session.
+export type ControlSource = 'manual' | 'operation' | 'app'
 
 export interface JointGains {
   kp: number
@@ -702,67 +702,71 @@ export interface OperationLogPayload {
   lines: OperationLogLine[]
 }
 
-// ----- teleoperation (orca_ui/hand/teleop/) ----------------------------------
+// ----- app sessions (orca_ui/hand/app/, docs/app-contract.md) ---------------
 
-export type TeleopSourceId = 'mediapipe' | 'manus' | 'avp' | 'synthetic'
+export type AppId = 'teleop' | 'rl'
 
 // 'idle' means no session; the backend always publishes a full snapshot.
-export type TeleopSessionState =
+export type AppSessionState =
   | 'idle'
-  | 'starting' // child spawning / waiting for its hello
-  | 'preview' // targets flow to the 3D ghost only, hand untouched
-  | 'engaged' // arbiter owned as TELEOP; sub-flags ramping/tracking
-  | 'error' // sticky until the next start/stop
+  | 'starting' // the app is starting / hasn't said hello yet
+  | 'preview' // targets pose the ghost only, the hand is untouched
+  | 'engaged' // the session owns control as APP; sub-flags ramping/tracking
+  | 'stopping' // ending: the app process is being stopped
+  | 'error' // until the next start or stop
 
-export interface TeleopSnapshot {
-  state: TeleopSessionState
-  source: TeleopSourceId | null
+// One setting an app describes (a JSON Schema subset).
+export interface AppSetting {
+  key: string
+  type: 'boolean' | 'integer' | 'number' | 'string' | 'enum'
+  title?: string
+  help?: string
+  default?: unknown
+  minimum?: number
+  maximum?: number
+  choices?: { value: unknown; title?: string }[]
+  restart?: boolean // takes effect on the next start
+  live?: boolean // may change while engaged
+}
+
+export interface AppSettings {
+  schema: AppSetting[]
+  values: Record<string, unknown>
+  errors: Record<string, string>
+}
+
+export interface AppSnapshot {
+  state: AppSessionState
+  app: AppId | null
+  title: string | null
   session_id: string | null
   mode: 'managed' | 'external' | null
   engaged: boolean
   ramping: boolean
   tracking: 'ok' | 'lost'
-  calibrating: { done: boolean; frames: number; needed: number } | null
-  child: {
-    mode: string | null
-    pid: number | null
-    connected: boolean
-  } | null
-  stats: {
-    ingress_fps?: number
-    retarget_ms?: number
-    target_hz: number | null
-    last_target_age_ms: number | null
-  }
-  config: Record<string, unknown>
-  availability: { available: boolean; detail: string | null }
-  // Last automatic transition, e.g. "auto-disengaged — tracking lost for
-  // 10s". Cleared on the next engage/stop/start.
+  info: Record<string, string> // the app's own status, shown as-is
+  settings: AppSettings
+  stats: { target_hz: number | null; last_target_age_ms: number | null }
+  process: { pid: number | null; connected: boolean } | null
+  // Last automatic transition, e.g. "auto-disengaged — no targets for 10 s".
   notice: string | null
   error: string | null
 }
 
-export interface TeleopSourceAvailability {
-  installed: boolean
-  ready: boolean
-  detail: string | null
+// What the console remembers per app, shown before the app runs.
+export interface AppEntry {
+  id: AppId
+  title: string
+  command: string
+  example_command: string
+  schema: AppSetting[]
+  values: Record<string, unknown>
 }
 
-export interface TeleopCamera {
-  index: number
-  name: string | null // host camera name (macOS), e.g. "FaceTime HD Camera"
-  width: number | null
-  height: number | null
-  // False: the OS knows this camera but the probe couldn't open it — e.g.
-  // an iPhone Continuity Camera that's asleep. Selectable anyway.
-  available: boolean
-}
-
-export interface TeleopSourcesInfo {
-  runner: { available: boolean; detail: string | null }
-  sources: Record<TeleopSourceId, TeleopSourceAvailability>
-  cameras: TeleopCamera[] | null // null = never scanned
-  default_camera_index: number | null // built-in preferred over Continuity
+// Latest picture per stream; seq rises with every new frame of any stream.
+export interface AppFrames {
+  session_id: string | null
+  streams: Record<string, { jpeg: string; seq: number }>
 }
 
 // ----- library: poses / trajectories / demos (orca_ui/library.py) -----------
@@ -920,10 +924,10 @@ export const TOPICS = {
   motorsFaults: 'motors.faults',
   stats: 'stats',
   sensorsHealth: 'sensors.health',
-  teleopState: 'teleop.state',
-  teleopTargets: 'teleop.targets',
-  teleopLog: 'teleop.log',
-  teleopPreview: 'teleop.preview',
+  appState: 'app.state',
+  appTargets: 'app.targets',
+  appLog: 'app.log',
+  appFrames: 'app.frames',
 } as const
 
 export interface ServerMessage {

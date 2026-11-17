@@ -1,43 +1,42 @@
 // Thin fetch wrappers over the REST API. Errors carry the backend's detail.
 
 import type {
-  MotorConfigSchema,
-  MotorConfigValues,
-  MotorConfigWriteResult,
-  BusBaudInfo,
-  ChangelogDoc,
-  BusBaudResult,
+  AppEntry,
+  AppId,
+  AppSnapshot,
   BoardsInfo,
+  BusBaudInfo,
+  BusBaudResult,
+  ChangelogDoc,
+  ControlState,
   DemoEntry,
   DirectMotorSnapshot,
   HandInfo,
   HandStoreInfo,
   ModelMetadata,
-  MotorModelInfo,
   ModelsInfo,
+  MotorConfigSchema,
+  MotorConfigValues,
+  MotorConfigWriteResult,
+  MotorModelInfo,
   OperationLogPayload,
   OperationSnapshot,
   PortInfo,
   PoseEntry,
+  PoseSource,
+  ServoGains,
+  ServoGainsMap,
+  ServoLimits,
+  ServoProfile,
+  ServoProfileMap,
   Stats,
   StatusSnapshot,
   TactileMode,
   TaxelGeometry,
-  TeleopCamera,
-  TeleopSnapshot,
-  TeleopSourceId,
-  TeleopSourcesInfo,
-  TrajectoryData,
   TensionSweeps,
-  TravelBaselines,
+  TrajectoryData,
   TrajectoryEntry,
-  ServoGains,
-  PoseSource,
-  ServoGainsMap,
-  ServoProfile,
-  ServoLimits,
-  ServoProfileMap,
-  ControlState,
+  TravelBaselines,
 } from './types'
 
 export class ApiError extends Error {
@@ -313,34 +312,26 @@ export const api = {
     post('/api/tactile/zero', { num_samples: numSamples }),
   clearTactileZero: () => post('/api/tactile/clear_zero'),
 
-  teleopState: () => request<{ session: TeleopSnapshot }>('/api/teleop/state'),
-  teleopSources: () => request<TeleopSourcesInfo>('/api/teleop/sources'),
-  // Slow (probes each device through the streamer child); 409 mid-session.
-  teleopScanCameras: () =>
-    post<{ cameras: TeleopCamera[]; default_camera_index: number | null }>(
-      '/api/teleop/cameras/scan',
+  appState: () => request<{ session: AppSnapshot }>('/api/app/state'),
+  appLog: () => request<OperationLogPayload>('/api/app/log'),
+  appList: () => request<{ apps: AppEntry[] }>('/api/app/list'),
+  appSetCommand: (app: AppId, command: string) =>
+    put<{ apps: AppEntry[] }>(`/api/app/${app}/command`, { command }),
+  // Sent to the running app (which confirms on app.state), else remembered.
+  appSetValues: (app: AppId, values: Record<string, unknown>) =>
+    post<{ sent: boolean; values?: Record<string, unknown> }>(
+      `/api/app/${app}/settings`,
+      { values },
     ),
-  teleopLog: () => request<OperationLogPayload>('/api/teleop/log'),
-  teleopStart: (
-    source: TeleopSourceId,
-    mode: 'managed' | 'external',
-    config: Record<string, unknown> = {},
-  ) =>
-    post<{ session: TeleopSnapshot; token?: string }>('/api/teleop/start', {
-      source,
-      mode,
-      config,
-    }),
-  teleopStop: () => post<{ ok: boolean; stopped: boolean }>('/api/teleop/stop'),
-  teleopEngage: (rampS?: number) =>
-    post<{ session: TeleopSnapshot }>(
-      '/api/teleop/engage',
+  appStart: (app: AppId) =>
+    post<{ session: AppSnapshot }>('/api/app/start', { app, mode: 'managed' }),
+  appStop: () => post<{ ok: boolean; stopped: boolean }>('/api/app/stop'),
+  appEngage: (rampS?: number) =>
+    post<{ session: AppSnapshot }>(
+      '/api/app/engage',
       rampS === undefined ? {} : { ramp_s: rampS },
     ),
-  teleopDisengage: () =>
-    post<{ session: TeleopSnapshot }>('/api/teleop/disengage'),
-  teleopConfig: (config: Record<string, unknown>) =>
-    post<{ config: Record<string, unknown> }>('/api/teleop/config', { config }),
+  appDisengage: () => post<{ session: AppSnapshot }>('/api/app/disengage'),
 
   modelMetadata: () => request<ModelMetadata>('/api/model/metadata'),
   modelFingertips: () =>

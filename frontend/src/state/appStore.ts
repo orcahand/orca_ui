@@ -16,6 +16,7 @@ export type ViewName =
   | '3d'
   | 'poses'
   | 'teleop'
+  | 'rl'
   | 'setup'
   | 'motors'
 
@@ -35,8 +36,8 @@ export interface SceneSettings {
   // Each taxel's outward surface normal, to check the per-taxel axes.
   taxelNormals: boolean
   jointGlow: boolean
-  // Accent-colored ghost posed from the live teleop retargeter output.
-  teleopGhost: boolean
+  // Accent-colored ghost posed from the running app's targets.
+  appGhost: boolean
 }
 
 interface AppState {
@@ -70,7 +71,7 @@ const SCENE_DEFAULTS: SceneSettings = {
   forceTaxels: true,
   taxelNormals: false,
   jointGlow: false,
-  teleopGhost: true,
+  appGhost: true,
 }
 
 // Bumped when a default changes: stored settings win over defaults, so a new

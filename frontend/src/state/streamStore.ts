@@ -10,13 +10,13 @@ export interface LatestFrames {
     measured: Record<string, number>
     estimate: Record<string, number>
     target: Record<string, number>
-    // Raw (clamped) teleop retargeter output — the 3D "teleop ghost". Flows
-    // in preview AND engaged; cleared when the teleop session ends.
-    teleopTarget: Record<string, number>
+    // The app's clamped targets — the 3D app ghost. Flows in preview AND
+    // engaged; cleared when the app session ends.
+    appTarget: Record<string, number>
     trim: Record<string, number>
     tMeasured: number // ms epoch of last measured update
     tTarget: number
-    tTeleopTarget: number
+    tAppTarget: number
   }
   tactile: {
     forces: Partial<Record<Finger, Vec3>> | null
@@ -41,8 +41,9 @@ export interface LatestFrames {
     // Per-motor fault table (bus errors + command adherence), 1 Hz.
     faults: MotorsFaults | null
   }
-  teleop: {
-    preview: { jpeg: string; seq: number | null } | null
+  // Latest picture per app stream (app.frames); cleared at session end.
+  app: {
+    frames: Record<string, { jpeg: string; seq: number }>
   }
   stats: Record<string, unknown> | null
   health: SensorsHealth | null
@@ -53,17 +54,17 @@ export const latest: LatestFrames = {
     measured: {},
     estimate: {},
     target: {},
-    teleopTarget: {},
+    appTarget: {},
     trim: {},
     tMeasured: 0,
     tTarget: 0,
-    tTeleopTarget: 0,
+    tAppTarget: 0,
   },
   tactile: { forces: null, taxels: null, tForces: 0, tTaxels: 0 },
   motors: { temps: {}, currents: {}, positions: {}, maxTempC: null,
             shutdownTemps: {},
             faults: null },
-  teleop: { preview: null },
+  app: { frames: {} },
   stats: null,
   health: null,
 }

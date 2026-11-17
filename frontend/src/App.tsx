@@ -17,7 +17,7 @@ import { DashboardView } from './components/views/DashboardView'
 import { MotorsView } from './components/views/MotorsView'
 import { PosesView } from './components/views/PosesView'
 import { SetupView } from './components/views/SetupView'
-import { TeleopView } from './components/views/TeleopView'
+import { AppView } from './components/app/AppView'
 import { useAppStore } from './state/appStore'
 import { hasUnseenChangelog, useChangelogStore } from './state/changelogStore'
 import { useOperationActive } from './state/operationStore'
@@ -85,13 +85,14 @@ export default function App() {
         <AssemblyCard />
       ) : booting ? (
         // Some tabs stay reachable while the backend is up but no hand
-        // session exists: Teleop (test a camera/glove against the 3D ghost)
-        // and Motors (chain configuration happens at ASSEMBLY time, when
-        // there is no connectable hand at all). Hardware actions remain
+        // session exists: the app tabs (start an app, check its pictures and
+        // settings) and Motors (chain configuration happens at ASSEMBLY time,
+        // when there is no connectable hand at all). Hardware actions remain
         // backend-gated.
-        wsConnected && (view === 'teleop' || view === 'motors') ? (
+        wsConnected && (view === 'teleop' || view === 'rl' || view === 'motors') ? (
           <>
-            {view === 'teleop' && <TeleopView />}
+            {view === 'teleop' && <AppView key="teleop" app="teleop" withHand={false} />}
+            {view === 'rl' && <AppView key="rl" app="rl" withHand={false} />}
             {view === 'motors' && <MotorsView />}
           </>
         ) : (
@@ -111,7 +112,8 @@ export default function App() {
             </Suspense>
           )}
           {view === 'poses' && <PosesView />}
-          {view === 'teleop' && <TeleopView />}
+          {view === 'teleop' && <AppView key="teleop" app="teleop" withHand />}
+          {view === 'rl' && <AppView key="rl" app="rl" withHand />}
           {view === 'setup' && <SetupView />}
           {view === 'motors' && <MotorsView />}
         </>

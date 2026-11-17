@@ -1,7 +1,7 @@
 // Seq-merge for CUMULATIVE log payloads ({run_id, next_seq, lines}) — the
 // hub coalesces latest-wins, so every publish carries the run's whole bounded
 // buffer; append only lines newer than what we have, reset on a new run_id.
-// Shared by the operation and teleop log stores.
+// Shared by the operation and app log stores.
 
 import type { OperationLogLine, OperationLogPayload } from '../api/types'
 

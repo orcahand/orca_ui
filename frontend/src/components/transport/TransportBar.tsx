@@ -1,8 +1,7 @@
 // Global operation strip, rendered under the header on every tab while an
 // operation is active (or its terminal snapshot is still on display).
 // Kind-aware renderers; awaiting_input prompts become inline buttons so any
-// tab can answer them. Designed as a generic control-session strip — a
-// future teleop session adds a renderer here, not a redesign.
+// tab can answer them. The app session strip stacks under it.
 
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../../api/rest'
@@ -10,7 +9,7 @@ import type { OperationSnapshot } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
 import { operationLabel, useOperationStore } from '../../state/operationStore'
 import { PowerFaultBar } from './PowerFaultBar'
-import { TeleopBar } from './TeleopBar'
+import { SessionBar } from '../app/SessionBar'
 
 const DONE_LINGER_MS = 3000
 
@@ -37,16 +36,16 @@ function fmtSeconds(seconds: number): string {
 }
 
 export function TransportBar() {
-  // Two independent control-session strips stack: an operation bar and a
-  // teleop bar. The arbiter guarantees at most one of them OWNS the hand,
-  // but a teleop preview under a running operation is legitimate.
+  // Two independent control-session strips stack: an operation bar and an
+  // app session bar. The arbiter guarantees at most one of them OWNS the
+  // hand, but an app in preview under a running operation is legitimate.
   return (
     <>
       {/* First, and red: a supply or wiring fault means power the hand down,
           which outranks anything else on this strip. */}
       <PowerFaultBar />
       <OperationBar />
-      <TeleopBar />
+      <SessionBar />
     </>
   )
 }

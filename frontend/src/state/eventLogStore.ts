@@ -7,7 +7,7 @@ import { create } from 'zustand'
 export interface UiEvent {
   id: number
   t: number // ms epoch
-  kind: 'status' | 'error' | 'operation' | 'teleop'
+  kind: 'status' | 'error' | 'operation' | 'app'
   text: string
 }
 

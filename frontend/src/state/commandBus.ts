@@ -24,7 +24,7 @@ export function sendTarget(joint: string, deg: number): void {
 function flush(): void {
   frame = null
   if (!pending.size) return
-  // A flush can race a control-source change (operation start, teleop
+  // A flush can race a control-source change (operation start, app
   // engage): the sliders are already disabled, so drop the stale targets
   // instead of bouncing a 409 into the error banner.
   const control = useAppStore.getState().control

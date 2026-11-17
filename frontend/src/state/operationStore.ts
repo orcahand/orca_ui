@@ -13,7 +13,7 @@ import type {
 import { useAppStore } from './appStore'
 import { useEventLogStore } from './eventLogStore'
 import { mergeLogPayload } from './logMerge'
-import { isTeleopEngaged, useTeleopStore } from './teleopStore'
+import { isAppEngaged, useAppSessionStore } from './appSessionStore'
 
 export function isOperationActive(op: OperationSnapshot | null): boolean {
   return op !== null && op.state !== 'done' && op.state !== 'error'
@@ -99,7 +99,7 @@ export function useControlOwner(): string {
 export interface ControlGate {
   source: ControlSource
   owner: string
-  // False while an operation/teleop owns the target channel or the hand is
+  // False while an operation/app owns the target channel or the hand is
   // in maintenance; `reason` then names the owner for tooltips.
   manualAllowed: boolean
   reason: string | null
@@ -115,7 +115,7 @@ export function useStartGate(requires: 'motors' | 'encoders' | 'joints'): {
   const activeKind = useOperationStore((s) =>
     isOperationActive(s.operation) ? s.operation!.kind : null,
   )
-  const teleopEngaged = useTeleopStore((s) => isTeleopEngaged(s.session))
+  const appEngaged = useAppSessionStore((s) => isAppEngaged(s.session))
   const caps = useAppStore((s) => s.status?.capabilities)
   if (activeKind) {
     return {
@@ -124,11 +124,11 @@ export function useStartGate(requires: 'motors' | 'encoders' | 'joints'): {
     }
   }
   // Mirrors the backend's require_manual_control gate on operation start.
-  // A teleop PREVIEW deliberately does not block — it owns nothing.
-  if (teleopEngaged) {
+  // An app in PREVIEW deliberately does not block — it owns nothing.
+  if (appEngaged) {
     return {
       blocked: true,
-      reason: 'teleop is engaged — disengage first',
+      reason: 'an app is engaged — disengage first',
     }
   }
   // 'joints' = any joint-angle source: encoders, or motors (calibrated

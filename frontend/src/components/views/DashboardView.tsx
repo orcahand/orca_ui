@@ -11,8 +11,6 @@ import { EncoderPanel } from '../encoders/EncoderPanel'
 import { HealthSummary } from '../monitor/HealthSummary'
 import { MotorPanel } from '../motors/MotorPanel'
 import { TactilePanel } from '../tactile/TactilePanel'
-import { TeleopStatusCard } from '../teleop/TeleopStatusCard'
-import { CameraPreview } from '../teleop/CameraPreview'
 import { HandScenePanel } from '../three/HandScenePanel'
 
 export function DashboardView() {
@@ -26,7 +24,6 @@ export function DashboardView() {
 
   return (
     <>
-      <TeleopStatusCard />
       {/* Always rendered: with no session the health strip below is empty and
           this is the only way back without leaving the page. */}
       <section
@@ -66,11 +63,7 @@ export function DashboardView() {
           }}
         >
           <HandScenePanel height="min(52vh, 560px)" />
-          {/* CameraPreview self-hides unless a camera teleop session is live. */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {caps?.motors && <MotorPanel />}
-            <CameraPreview />
-          </div>
+          {caps?.motors && <MotorPanel />}
         </div>
       )}
       {caps?.tactile && <TactilePanel />}
