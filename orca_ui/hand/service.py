@@ -87,6 +87,8 @@ _MOVE_STEP_S = 0.02
 _MOVE_MIN_S = 0.5
 _MOVE_MAX_S = 3.0
 
+_HALTED = "motion is halted by E-STOP — enable torque to resume"
+
 
 def _read_optional(hand, method: str) -> dict:
     """One optional per-motor read, empty when the family cannot do it.
@@ -1011,6 +1013,8 @@ class HandService:
         session = self._require_motors()
         if not self.supervisor.status().torque_enabled:
             raise ServiceError("torque is disabled — enable it first", status_code=409)
+        if self.worker.halted:
+            raise ServiceError(_HALTED, status_code=409)
         return session
 
     def require_manual_control(self) -> None:
@@ -1088,15 +1092,27 @@ class HandService:
     def estop(self) -> dict:
         """Best-effort emergency stop: never raises.
 
-        Stops the active operation (whose own cleanup handles op-owned
+        Halts the command worker and app forwarding (until torque is enabled
+        again), stops the active operation (whose own cleanup handles op-owned
         hardware, e.g. a maintenance calibrate disables torque on its own
         hand), disables torque on the supervisor session if one exists, then
         ends any app session without waiting for its process, and stops the
         mock sweeper. Reports what was actioned.
         """
         report: dict = {}
-        # Before anything else: a bench sequence is a live motion source that
-        # keeps writing on its own timer.
+        # Before anything touches the bus, every motion source stops writing, using
+        # in-process locks only: targets are refused, the ramp and queued ops dropped.
+        try:
+            self.worker.halt()
+        except Exception:
+            logger.exception("estop: command worker halt failed")
+        apps = self._apps
+        if apps is not None:
+            try:
+                apps.halt_forwarding()
+            except Exception:
+                logger.exception("estop: app forwarding halt failed")
+        # A bench sequence is a live motion source that keeps writing on its own timer.
         try:
             report["playback_stopped"] = self.stop_all_playback()
         except Exception:
@@ -1113,9 +1129,17 @@ class HandService:
         try:
             session = self.session
             if session is not None and session.caps.motors:
-                not_acked = session.hand.disable_torque()
-                self._settle_motors_holding(not_acked, checked=session.hand.config.motor_ids,
-                                            session=session)
+                # A write already in flight finished inside halt(); torque off follows it on the bus.
+                motor_ids = list(session.hand.config.motor_ids)
+                try:
+                    not_acked = session.hand.disable_torque()
+                except Exception:
+                    # Nothing is confirmed off: warn for every motor; the torque flag and halt stay.
+                    self._flag_motors_holding(session, motor_ids)
+                    raise
+                if not_acked:
+                    self._flag_motors_holding(session, not_acked)
+                self._settle_motors_holding(not_acked, checked=motor_ids, session=session)
                 self.supervisor.set_torque_flag(False)
                 self.worker.reset()
                 self._publish_control_state()
@@ -1126,7 +1150,6 @@ class HandService:
             logger.exception("estop: disable_torque failed")
             report["torque_disabled"] = False
             report["torque_error"] = str(e)
-        apps = self._apps
         if apps is not None:
             # After torque is off: nothing an app sends can move the hand, and
             # ending it (which may wait for its process) runs on its own thread.
@@ -1150,7 +1173,17 @@ class HandService:
         then switch them off again over the console's own connection."""
         joint_of = dict(zip(report.get("motors") or [], report.get("joints") or []))
         # The hand the operation ran on: only a session of that hand can confirm these motors.
-        hand_id = self._last_hand_id
+        self._raise_motors_holding(self._last_hand_id, joint_of)
+        self._recheck_motors_holding()
+
+    def _flag_motors_holding(self, session: HandSession, motors) -> None:
+        """E-STOP could not confirm torque off on ``motors`` of this session's hand: warn.
+        No re-check here: another E-STOP or the next session of this hand confirms them."""
+        names = getattr(session.hand.config, "motor_to_joint_dict", None) or {}
+        self._raise_motors_holding(getattr(session.hand, "hand_id", None),
+                                   {m: names.get(m) for m in motors})
+
+    def _raise_motors_holding(self, hand_id, joint_of: dict) -> None:
         with self._state_lock:
             held = self._motors_holding
             if held and not held["confirmed"]:
@@ -1163,7 +1196,6 @@ class HandService:
             self._motors_holding = {"hand_id": hand_id, "motors": motors,
                                     "joints": [joint_of[m] for m in motors], "confirmed": False}
         self._publish_control_state()
-        self._recheck_motors_holding()
 
     def _recheck_motors_holding(self, session: HandSession | None = None) -> None:
         """Torque off again on the flagged motors once no operation holds the hand
@@ -1235,6 +1267,8 @@ class HandService:
         # The hand may have been posed by hand while limp: the interpolator
         # must ramp out of where it actually is, not where it last drove to.
         self.worker.reset(seed)
+        # Torque on is the only way out of an E-STOP halt.
+        self.worker.resume()
         with self._state_lock:
             self._targets = dict(seed)
         self._publish_control_state()
@@ -1315,7 +1349,8 @@ class HandService:
             if rom is not None:
                 value = min(max(value, float(rom[0])), float(rom[1]))
             clean[joint] = value
-        self.worker.submit_targets(clean)
+        if not self.worker.submit_targets(clean):
+            raise ServiceError(_HALTED, status_code=409)
         with self._state_lock:
             self._targets.update(clean)
         self._publish_targets()

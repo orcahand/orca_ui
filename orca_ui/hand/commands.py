@@ -79,6 +79,10 @@ class CommandWorker(threading.Thread):
         # this never resurrects a stale target for a joint nobody commanded.
         self._applied: dict[str, float] = {}
         self._writes = 0
+        # E-STOP: nothing is written until resume(). A write holds the gate from
+        # its halt check to the bus, so halt() can wait out the one in flight.
+        self._halted = False
+        self._write_gate = threading.Lock()
 
     def applied_targets(self) -> dict[str, float]:
         """The last angle written per joint.
@@ -101,9 +105,12 @@ class CommandWorker(threading.Thread):
                 "ramping": bool(self._to),
             }
 
-    def submit_targets(self, angles: dict[str, float]) -> None:
+    def submit_targets(self, angles: dict[str, float]) -> bool:
+        """False, with nothing queued, while halted."""
         now = self._clock()
         with self._lock:
+            if self._halted:
+                return False
             if self._commanded_at:
                 gap = now - self._commanded_at
                 if MIN_COMMAND_PERIOD_S <= gap <= MAX_COMMAND_PERIOD_S:
@@ -127,12 +134,37 @@ class CommandWorker(threading.Thread):
                 self._ramp_start[joint] = now
             self._commanded_at = now
         self._wake.set()
+        return True
 
-    def submit_op(self, op: Callable[[], None]) -> None:
-        """Queue an exclusive operation (e.g. go-to-neutral)."""
+    def submit_op(self, op: Callable[[], None]) -> bool:
+        """Queue an exclusive operation (e.g. go-to-neutral). False while halted."""
         with self._lock:
+            if self._halted:
+                return False
             self._ops.append(op)
         self._wake.set()
+        return True
+
+    @property
+    def halted(self) -> bool:
+        with self._lock:
+            return self._halted
+
+    def halt(self) -> None:
+        """E-STOP, before torque off: drop the ramp and queued ops; write nothing until resume().
+        Waits only for a write already in flight, as torque off would on the bus lock."""
+        with self._lock:
+            self._halted = True
+            self._ops.clear()
+            self._from.clear()
+            self._to.clear()
+            self._ramp_start.clear()
+        with self._write_gate:
+            pass
+
+    def resume(self) -> None:
+        with self._lock:
+            self._halted = False
 
     def reset(self, pose: dict[str, float] | None = None) -> None:
         """Drop the ramp and re-seed where joints are believed to be.
@@ -245,7 +277,11 @@ class CommandWorker(threading.Thread):
         if session is None or not session.caps.motors:
             return
         try:
-            session.hand.set_joint_positions(pose)
+            with self._write_gate:
+                with self._lock:
+                    if self._halted:
+                        return
+                session.hand.set_joint_positions(pose)
             with self._lock:
                 self._writes += 1
         except Exception as e:

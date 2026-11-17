@@ -510,6 +510,34 @@ def test_estop_cuts_torque_at_once_and_the_app_is_really_gone(client, tmp_path):
     assert _wait_for(lambda: client.get("/api/app/state").json()["session"]["state"] == "idle")
 
 
+def test_estop_writes_no_position_once_torque_off_has_started(client, monkeypatch):
+    link, reply = _engaged(client)
+    service = client.app_state.service
+    hand = service.session.hand
+    bus = []
+    real_write, real_off = hand.set_joint_positions, hand.disable_torque
+
+    def disable_torque(ids=None):
+        bus.append("torque off")
+        # The app keeps streaming while torque goes off, and the worker keeps its feed.
+        _targets(client, link, _pose(reply, 0.9))
+        time.sleep(0.15)
+        return real_off(ids)
+
+    monkeypatch.setattr(hand, "set_joint_positions",
+                        lambda pose, *a, **k: bus.append("position") or real_write(pose, *a, **k))
+    monkeypatch.setattr(hand, "disable_torque", disable_torque)
+    service.worker.submit_targets(_pose(reply, 0.2))
+    time.sleep(0.15)
+    service.worker.submit_targets(_pose(reply, 0.4))  # a ramp over the measured 150 ms gap
+    assert service.worker.stats()["ramping"]
+
+    assert client.post("/api/estop").json()["report"]["torque_disabled"] is True
+    time.sleep(0.1)
+    assert "position" in bus[:bus.index("torque off")]
+    assert bus[bus.index("torque off") + 1:] == []
+
+
 def test_app_exit_ends_the_session_and_takes_what_it_started(client, tmp_path):
     grandchild, argv = _start_script(client, tmp_path, QUITTING_APP)
     assert argv.startswith("--connect ws://127.0.0.1:") and "/ws/app --token " in argv

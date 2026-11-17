@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from orca_ui.hand.operations.base import Operation
+from orca_ui.hand.service import ServiceError
 from orca_ui.mock import materialize_mock_model
 from orca_ui.server import create_app
 from orca_ui.settings import UiSettings
@@ -118,3 +119,25 @@ def test_another_hand_cannot_confirm_the_warning(client, monkeypatch):
     held = service.control_state()["motors_holding"]
     assert held == {"hand_id": "hand-a", "motors": [3, 7], "joints": ["index_mcp", "ring_mcp"],
                     "confirmed": False}
+
+
+def test_a_failed_estop_keeps_torque_on_refuses_targets_and_warns_for_every_motor(client, monkeypatch):
+    service = client.app.state.service
+    assert client.post("/api/torque/enable").status_code == 200
+    joint = service.session.hand.config.joint_ids[0]
+
+    def unplugged(ids=None):
+        raise OSError("write failed: [Errno 6] Device not configured")
+
+    with monkeypatch.context() as m:
+        m.setattr(service.session.hand, "disable_torque", unplugged)
+        assert service.estop()["torque_disabled"] is False
+    assert service.control_state()["torque_enabled"] is True
+    held = _holding(client)
+    assert held["motors"] == sorted(service.session.hand.config.motor_ids)
+    assert None not in held["joints"] and held["confirmed"] is False
+    with pytest.raises(ServiceError, match="halted by E-STOP"):
+        service.set_targets({joint: 0.0})
+    # Torque on again is the way out.
+    assert client.post("/api/torque/enable").status_code == 200
+    service.set_targets({joint: 0.0})

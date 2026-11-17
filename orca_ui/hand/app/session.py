@@ -116,6 +116,7 @@ class AppSessions:
         self._target_times: deque[float] = deque(maxlen=512)
         self._ramp: _Ramp | None = None
         self._last_forwarded: dict[str, float] = {}   # full pose while engaged
+        self._halted = False   # E-STOP: forward nothing until the next start
         self._frames: dict[str, dict] = {}
         self._frame_seq = 0
         self._browser_seen = False
@@ -317,6 +318,7 @@ class AppSessions:
         self._target_times.clear()
         self._ramp = None
         self._last_forwarded = {}
+        self._halted = False
         self._frames = {}
         self._unknown_warned = False
         self._notice = None
@@ -337,6 +339,11 @@ class AppSessions:
             self._error = None
         self._publish_state()
         return True
+
+    def halt_forwarding(self) -> None:
+        """E-STOP, before torque off: forward no more targets to the hand. Only takes the lock."""
+        with self._lock:
+            self._halted = True
 
     def estop(self) -> bool:
         """E-STOP hook, called after torque is already off. Never blocks or raises."""
@@ -563,7 +570,7 @@ class AppSessions:
                 if engaged and not (self._ramp and not self._ramp.began):
                     self._ramp = _Ramp(dict(self._last_forwarded),
                                        self._resume_ramp_s_locked(held_at))
-            if engaged and self._app_tracking:
+            if engaged and self._app_tracking and not self._halted:
                 ramping = self._ramp is not None
                 forward = self._blend_locked(clean, now)
                 self._last_forwarded.update(forward)
