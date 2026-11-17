@@ -58,11 +58,8 @@ class Catalog:
         return [self.features[f] for f in self.plan(plan_id).features]
 
     def plan_chain(self, plan_id: str) -> list[str]:
-        """``plan_id`` and every plan it includes, recursively, each once."""
-        out = [plan_id]
-        for included in self.plan(plan_id).includes:
-            out += [p for p in self.plan_chain(included) if p not in out]
-        return out
+        self.plan(plan_id)
+        return include_chain(plan_id, self.plans)
 
 
 def _tuple(value, where: str, cast=str) -> tuple:
@@ -142,16 +139,32 @@ def _step(raw, where: str) -> Step:
 
 def _load_yaml(path: Path) -> dict:
     try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError) as e:
+        text = path.read_text(encoding="utf-8")
+    except OSError as e:
         raise CatalogError(f"{path.name}: {e}")
+    return _yaml_mapping(text, path.name)
+
+
+def _yaml_mapping(text: str, name: str) -> dict:
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError as e:
+        raise CatalogError(f"{name}: {e}")
     if not isinstance(data, dict):
-        raise CatalogError(f"{path.name}: expected a mapping at the top level")
+        raise CatalogError(f"{name}: expected a mapping at the top level")
     return data
 
 
 def load_feature(path: Path) -> FeatureDefinition:
-    raw = _load_yaml(path)
+    return parse_feature(_load_yaml(path), path)
+
+
+def feature_from_text(text: str, name: str) -> FeatureDefinition:
+    """A definition from a file's contents, e.g. as stored in a git commit."""
+    return parse_feature(_yaml_mapping(text, name), Path(name))
+
+
+def parse_feature(raw: dict, path: Path) -> FeatureDefinition:
     for key in ("id", "title", "summary", "group", "steps"):
         if not raw.get(key):
             raise CatalogError(f"{path.name}: missing {key!r}")
@@ -172,7 +185,15 @@ def load_feature(path: Path) -> FeatureDefinition:
 
 def load_plan(path: Path) -> Plan:
     """One plan file as written: ``features`` are its own, unresolved."""
-    raw = _load_yaml(path)
+    return parse_plan(_load_yaml(path), path)
+
+
+def plan_from_text(text: str, name: str) -> Plan:
+    """A plan from a file's contents, as written (its includes unresolved)."""
+    return parse_plan(_yaml_mapping(text, name), Path(name))
+
+
+def parse_plan(raw: dict, path: Path) -> Plan:
     for key in ("id", "title", "summary"):
         if not raw.get(key):
             raise CatalogError(f"{path.name}: missing {key!r}")
@@ -197,7 +218,7 @@ def load_plan(path: Path) -> Plan:
     )
 
 
-def _resolve(plan_id: str, raw: dict[str, Plan], chain: tuple[str, ...] = ()) -> tuple[str, ...]:
+def resolve_features(plan_id: str, raw: dict[str, Plan], chain: tuple[str, ...] = ()) -> tuple[str, ...]:
     """``plan_id``'s features: its includes' (recursively) first, then its own, each once."""
     if plan_id in chain:
         raise CatalogError(f"plans include each other in a cycle: {' -> '.join(chain + (plan_id,))}")
@@ -205,9 +226,17 @@ def _resolve(plan_id: str, raw: dict[str, Plan], chain: tuple[str, ...] = ()) ->
     for included in raw[plan_id].includes:
         if included not in raw:
             raise CatalogError(f"plan {plan_id!r} includes unknown plan {included!r}")
-        out += _resolve(included, raw, chain + (plan_id,))
+        out += resolve_features(included, raw, chain + (plan_id,))
     out += raw[plan_id].features
     return tuple(dict.fromkeys(out))
+
+
+def include_chain(plan_id: str, plans: dict[str, Plan]) -> list[str]:
+    """``plan_id`` and every plan it includes, recursively, each once."""
+    out = [plan_id]
+    for included in plans[plan_id].includes:
+        out += [p for p in include_chain(included, plans) if p not in out]
+    return out
 
 
 def load_catalog(definitions_dir: Path = DEFINITIONS_DIR, plans_dir: Path = PLANS_DIR) -> Catalog:
@@ -231,7 +260,7 @@ def load_catalog(definitions_dir: Path = DEFINITIONS_DIR, plans_dir: Path = PLAN
         if missing:
             raise CatalogError(f"plan {plan.id!r} names unknown features {missing}")
         raw_plans[plan.id] = plan
-    plans = {pid: replace(plan, features=_resolve(pid, raw_plans)) for pid, plan in raw_plans.items()}
+    plans = {pid: replace(plan, features=resolve_features(pid, raw_plans)) for pid, plan in raw_plans.items()}
     if sum(p.default for p in plans.values()) > 1:
         raise CatalogError("more than one plan is marked default")
     # The default plan first: the tab offers the first plan it is given.
