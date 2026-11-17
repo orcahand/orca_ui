@@ -220,7 +220,7 @@ class HandService:
         self._control_owner_label = ControlSource.MANUAL.value
         self._operation_manager = None  # attached post-construction (server.py)
         self._sweeper = None  # mock-only dev sweeper, for estop
-        self._teleop_manager = None  # attached post-construction (server.py)
+        self._apps = None  # attached post-construction (server.py)
         self._telemetry = None  # attached in server.py
         # Gains connect() installed from config.yaml — what "reset" restores.
         # Live gains are read back from the controller, never shadowed here.
@@ -1015,7 +1015,7 @@ class HandService:
 
     def require_manual_control(self) -> None:
         """409 unless MANUAL owns the joint-target channel. Public: the
-        operation manager gates op starts on it (an operation or teleop
+        operation manager gates op starts on it (an operation or app
         session must not be yanked by another control session starting)."""
         with self._state_lock:
             source = self._control_source
@@ -1053,7 +1053,7 @@ class HandService:
 
     def release_control(self, expected: ControlSource | None = None) -> None:
         """Return the channel to MANUAL. With ``expected`` set, a release from
-        a stale owner (e.g. a teleop disengage racing an operation start) is a
+        a stale owner (e.g. an app disengage racing an operation start) is a
         logged no-op instead of stomping the new owner."""
         with self._state_lock:
             if expected is not None and self._control_source != expected:
@@ -1078,24 +1078,21 @@ class HandService:
     def attach_sweeper(self, sweeper) -> None:
         self._sweeper = sweeper
 
-    def attach_teleop_manager(self, manager) -> None:
-        self._teleop_manager = manager
+    def attach_apps(self, apps) -> None:
+        self._apps = apps
 
     @property
     def operation_manager(self):
         return self._operation_manager
-
-    @property
-    def teleop_manager(self):
-        return getattr(self, "_teleop_manager", None)
 
     def estop(self) -> dict:
         """Best-effort emergency stop: never raises.
 
         Stops the active operation (whose own cleanup handles op-owned
         hardware, e.g. a maintenance calibrate disables torque on its own
-        hand), disables torque on the supervisor session if one exists, and
-        stops the mock sweeper. Reports what was actioned.
+        hand), disables torque on the supervisor session if one exists, then
+        ends any app session without waiting for its process, and stops the
+        mock sweeper. Reports what was actioned.
         """
         report: dict = {}
         # Before anything else: a bench sequence is a live motion source that
@@ -1104,15 +1101,6 @@ class HandService:
             report["playback_stopped"] = self.stop_all_playback()
         except Exception:
             logger.exception("estop: bench playback stop failed")
-        teleop = self.teleop_manager
-        if teleop is not None:
-            # First: teleop is the one source still streaming new motion.
-            try:
-                report["teleop_stopped"] = teleop.estop()
-            except Exception as e:
-                logger.exception("estop: teleop stop failed")
-                report["teleop_stopped"] = False
-                report["teleop_error"] = str(e)
         manager = self._operation_manager
         if manager is not None:
             try:
@@ -1138,6 +1126,11 @@ class HandService:
             logger.exception("estop: disable_torque failed")
             report["torque_disabled"] = False
             report["torque_error"] = str(e)
+        apps = self._apps
+        if apps is not None:
+            # After torque is off: nothing an app sends can move the hand, and
+            # ending it (which may wait for its process) runs on its own thread.
+            report["app_stopped"] = apps.estop()
         sweeper = self._sweeper
         if sweeper is not None:
             try:
@@ -1266,15 +1259,19 @@ class HandService:
         return {j: float(v) for j, v in (estimate or {}).items()}
 
     def current_pose(self) -> dict:
-        """Best current joint pose (degrees): measured, else the motor-derived
-        estimate, else the last accepted targets. Used as the teleop ramp-in
-        start pose; empty dict when nothing is known."""
-        session = self.session
-        pose = self._current_pose(session) if session is not None else {}
-        if pose:
-            return pose
+        """Best known pose per joint (degrees): measured, else the motor-derived
+        estimate, else the last accepted target. Where an app's ramp-in
+        starts; a joint nothing is known about is left out."""
         with self._state_lock:
-            return dict(self._targets)
+            pose = dict(self._targets)
+        session = self.session
+        if session is None:
+            return pose
+        measured = {j: float(v) for j, v in (session.measured_joints() or {}).items()}
+        if set(session.hand.config.joint_ids) - set(measured):
+            pose.update({j: float(v) for j, v in (session.estimate_joints() or {}).items()})
+        pose.update(measured)
+        return pose
 
     def set_targets(
         self, angles: dict[str, float], source: ControlSource = ControlSource.MANUAL

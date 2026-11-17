@@ -558,7 +558,7 @@ class TelemetryService:
 
     def _telemetry_is_stale(self) -> bool:
         """True once telemetry is old enough to be worth one hitch, so a long
-        replay or teleop session cannot hide an overheating motor."""
+        replay or app session cannot hide an overheating motor."""
         return (time.monotonic() - self._last_bus_read) > MAX_TELEMETRY_STALENESS_S
 
     def _bus_read_tick(self, session) -> None:
@@ -785,7 +785,7 @@ class TelemetryService:
             return
         # Deferred while the hand is driven, but not indefinitely: a motor
         # overheats under exactly the sustained load that keeps the hand
-        # driven, so a long replay or teleop session must not be able to hide
+        # driven, so a long replay or app session must not be able to hide
         # it. Same trade the health read already makes. A motor that faulted
         # has stopped itself, so recovering it mid-run costs bus time, not
         # motion.

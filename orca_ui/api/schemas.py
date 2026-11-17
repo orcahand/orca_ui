@@ -196,24 +196,27 @@ class PoseCaptureRequest(BaseModel):
     name: str
 
 
-class TeleopStartRequest(BaseModel):
-    """Start a teleop session. ``managed`` spawns the orca_teleop streamer
-    child; ``external`` just mints a token for a manually-launched one."""
+class AppStartRequest(BaseModel):
+    """Start an app session. ``managed`` runs the app's remembered command;
+    ``external`` only issues a token for an app started by hand."""
 
-    source: str
+    app: str
     mode: Literal["managed", "external"] = "managed"
-    config: dict = Field(default_factory=dict)
 
 
-class TeleopEngageRequest(BaseModel):
-    ramp_s: Optional[float] = Field(default=None, ge=0, le=10)
+class AppEngageRequest(BaseModel):
+    # No instant engage: the hand always ramps in from where it is.
+    ramp_s: Optional[float] = Field(default=None, ge=0.5, le=10)
 
 
-class TeleopConfigRequest(BaseModel):
-    """Partial config update, forwarded to the streamer child (recognized
-    keys are filtered by the manager)."""
+class AppCommandRequest(BaseModel):
+    command: str = Field(max_length=2000)
 
-    config: dict = Field(default_factory=dict)
+
+class AppSettingsRequest(BaseModel):
+    """Changed settings, keyed by the setting keys the app described."""
+
+    values: dict = Field(default_factory=dict)
 
 
 class TrajectoryToMotorRequest(BaseModel):

@@ -29,13 +29,13 @@ ACTIVE_OP_STATES = {"starting", "running", "paused", "awaiting_input",
                     "stopping"}
 
 # Topics an agent can sample. Deliberately excluded: operation.log /
-# teleop.log (covered by orca_get_operation), teleop.preview (image tool),
+# app.log (covered by orca_get_operation), app.frames (image tool),
 # error (translated passthrough).
 Topic = Literal[
     "joints.measured", "joints.estimate", "joints.target",
     "joints.correction", "tactile.forces", "tactile.taxels",
     "motors.telemetry", "stats", "status", "control.state",
-    "operation.state", "teleop.state", "teleop.targets",
+    "operation.state", "app.state", "app.targets",
 ]
 
 CALIBRATE_WHAT = (
@@ -51,11 +51,11 @@ TENSION_WHAT = (
     "a human should be at the hand.")
 
 ENGAGE_WHAT = (
-    "What this does: the physical hand starts mirroring live tracked "
-    "human-hand motion immediately (ramped in). The motion source is "
-    "external and unpredictable. Before confirming: verify the preview "
-    "(orca_get_camera_preview), ensure the workspace is clear, and confirm "
-    "the user asked for this.")
+    "What this does: the physical hand starts following the app (a tracked "
+    "human hand for Teleop, a policy for RL) immediately, ramped in. The "
+    "motion source is external and unpredictable. Before confirming: check "
+    "the app's picture (orca_get_app_picture) and ghost, ensure the workspace "
+    "is clear, and confirm the user asked for this.")
 
 
 def _ann(title: str, *, read_only: bool = False, destructive: bool = False,
@@ -87,8 +87,8 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
 
     @tool(annotations=_ann("EMERGENCY STOP", idempotent=True))
     async def orca_estop() -> dict:
-        """EMERGENCY STOP — immediately stops teleop, aborts any running
-        operation, and disables torque on all motors. Always safe to call;
+        """EMERGENCY STOP — immediately disables torque on all motors, aborts
+        any running operation, and ends any app session (Teleop, RL). Always safe to call;
         never requires confirmation; use whenever anything looks wrong.
 
         Note: aborts an in-progress recording WITHOUT saving. This is a
@@ -98,7 +98,7 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
         return {
             "ok": True,
             "summary": (
-                f"teleop stopped={report.get('teleop_stopped', 'n/a')}, "
+                f"app stopped={report.get('app_stopped', 'n/a')}, "
                 f"operation stopped={report.get('operation_stopped', 'n/a')}, "
                 f"torque disabled={report.get('torque_disabled', 'n/a')}"),
             "report": report,
@@ -110,7 +110,7 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
                            idempotent=True))
     async def orca_get_status() -> dict:
         """One-call situational overview: torque, real-vs-mock, connection
-        state/capabilities, control owner, active operation, teleop session,
+        state/capabilities, control owner, active operation, app session,
         frame health. Call this first — motion tools need torque enabled AND
         control_owner 'manual'."""
         status = await backend.get("/api/status")
@@ -145,14 +145,12 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
         except BackendError:
             out["operation"] = None
         try:
-            session = (await backend.get("/api/teleop/state")).get("session")
-            active = bool(session and session.get("state") != "idle")
-            out["teleop"] = session and {
-                "active": active, "state": session.get("state"),
-                "source": session.get("source"),
+            session = (await backend.get("/api/app/state")).get("session")
+            out["app_session"] = session and {
+                "state": session.get("state"), "app": session.get("app"),
                 "engaged": session.get("engaged")}
         except BackendError:
-            out["teleop"] = None
+            out["app_session"] = None
         try:
             out["frame_health"] = await backend.get("/api/stats")
         except BackendError:
@@ -205,43 +203,31 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
             backend.url, list(topics), duration_s=duration_s,
             sample_hz=sample_hz)
 
-    @tool(annotations=_ann("Teleop camera preview", read_only=True,
-                           idempotent=True))
-    async def orca_get_camera_preview() -> Image:
-        """Grab a FRESH teleop camera frame (with hand-tracking overlay) as
-        an image — use it to verify the camera sees the operator's hand
-        before orca_teleop_engage. Requires an active teleop session
-        (orca_teleop_start) with source='mediapipe' (the only source that
-        publishes camera frames); frame publishing is enabled automatically
-        if the session doesn't have it on."""
-        session = (await backend.get("/api/teleop/state")).get("session")
-        active = bool(session
-                      and session.get("state") not in (None, "idle", "error"))
-        if not active:
-            raise BackendError(
-                "no active teleop session — orca_teleop_start first (only "
-                "source='mediapipe' publishes camera preview frames).")
-        if not (session.get("config") or {}).get("preview"):
-            # The streamer only publishes frames while config.preview is on
-            # (normally toggled by the browser panel).
-            await backend.post("/api/teleop/config",
-                               {"config": {"preview": True}})
-        # Windowed read + age check: the hub replays the last-EVER frame on
-        # subscribe, which may be from an ended session — only a frame
-        # captured within the window (10 Hz ceiling) counts as live.
-        snap = await telemetry.ws_snapshot(backend.url, ["teleop.preview"],
+    @tool(annotations=_ann("App picture", read_only=True, idempotent=True))
+    async def orca_get_app_picture(
+        stream: Annotated[str | None, Field(
+            description="picture stream name; omit for the first one")] = None,
+    ) -> Image:
+        """Grab a FRESH picture from the running app (Teleop: the camera with
+        the tracked hand drawn in; RL: the simulation, if the app sends one)
+        — use it to check what the app sees before orca_app_engage."""
+        session = (await backend.get("/api/app/state")).get("session")
+        if not (session and session.get("state") in ("preview", "engaged")):
+            raise BackendError("no running app session — orca_app_start first.")
+        # Windowed read: only a frame sent within the window counts as live.
+        snap = await telemetry.ws_snapshot(backend.url, ["app.frames"],
                                            duration_s=2.0, sample_hz=10)
-        topic = (snap.get("topics") or {}).get("teleop.preview") or {}
+        topic = (snap.get("topics") or {}).get("app.frames") or {}
         samples = topic.get("samples") or []
-        jpeg = (samples[-1]["data"] or {}).get("jpeg") if samples else None
-        age_ms = (snap.get("age_ms") or {}).get("teleop.preview")
-        if not jpeg or age_ms is None or age_ms > 2500:
+        streams = ((samples[-1]["data"] or {}).get("streams") or {}) if samples else {}
+        frame = streams.get(stream) if stream else next(iter(streams.values()), None)
+        age_s = time.time() - frame.get("t", 0) if frame else None
+        if not frame or age_s is None or age_s > 2.5:
             raise BackendError(
-                "no fresh camera preview frame (the only available frame is "
-                "stale or absent) — the session's source may not support "
-                "preview (only 'mediapipe' does), or the streamer is still "
+                "no fresh picture — the app may not send pictures, the stream "
+                f"name may be wrong (have: {sorted(streams)}), or it is still "
                 "starting; retry in a moment or check orca_get_status.")
-        return Image(data=base64.b64decode(jpeg), format="jpeg")
+        return Image(data=base64.b64decode(frame["jpeg"]), format="jpeg")
 
     @tool(annotations=_ann("List poses/trajectories/demos",
                            read_only=True, idempotent=True))
@@ -409,7 +395,7 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
     ) -> dict:
         """Leave the hand safe: neutral pose, dwell for the move, then
         disable torque. The standard way to end a motion session. Refuses to
-        yank control from a running operation or an engaged teleop session —
+        yank control from a running operation or an engaged app session —
         stop those first."""
         try:
             op = (await backend.get("/api/operation")).get("operation")
@@ -422,13 +408,13 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
                 "it (orca_control_operation(action='stop')) or wait "
                 "(orca_get_operation(wait_s=...)) first.")
         try:
-            session = (await backend.get("/api/teleop/state")).get("session")
+            session = (await backend.get("/api/app/state")).get("session")
         except BackendError:
             session = None
         if session and session.get("engaged"):
             return refusal(
-                "teleop is engaged — most likely a human operator. If the "
-                "user wants to park, orca_teleop_stop first.")
+                f"the {session.get('title')} app is engaged — most likely a human "
+                "is operating it. If the user wants to park, orca_app_stop first.")
         status = await backend.get("/api/status")
         if not status.get("torque_enabled"):
             return await with_state(state, {
@@ -787,47 +773,38 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
             applied["cleared_zero"] = True
         return {"ok": True, "applied": applied}
 
-    # ----- teleoperation --------------------------------------------------------------
+    # ----- app sessions (Teleop, RL) ------------------------------------------------
 
-    @tool(annotations=_ann("Start teleop (preview)"))
-    async def orca_teleop_start(
-        source: Literal["mediapipe", "manus", "avp", "synthetic"],
-        config: Annotated[dict | None, Field(
-            description="optional source config: camera_index, zmq_addr, "
-                        "avp_ip, retargeter, rate, preview (bool — publish "
-                        "camera frames for orca_get_camera_preview; "
-                        "mediapipe only)")] = None,
-    ) -> dict:
-        """Start a teleop session in PREVIEW: the tracker runs and streams
-        ghost targets, but the hand does NOT move until orca_teleop_engage.
-        Inspect with orca_get_camera_preview and
-        orca_read_telemetry(['teleop.targets'])."""
+    @tool(annotations=_ann("Start an app (preview)"))
+    async def orca_app_start(app: Literal["teleop", "rl"]) -> dict:
+        """Start an app session in PREVIEW with its remembered command and
+        settings: the app runs and its targets pose the ghost, but the hand
+        does NOT move until orca_app_engage. Inspect with orca_get_app_picture
+        and orca_read_telemetry(['app.targets'])."""
         gate = await mock_gate(state)
         if gate:
             return gate
-        result = await backend.post("/api/teleop/start", {
-            "source": source, "mode": "managed", "config": config or {}})
+        result = await backend.post("/api/app/start", {"app": app, "mode": "managed"})
         return {
             "ok": True, "session": result.get("session"),
-            "note": ("PREVIEW — the hand does not move until "
-                     "orca_teleop_engage"),
+            "note": "PREVIEW — the hand does not move until orca_app_engage",
         }
 
-    @tool(annotations=_ann("ENGAGE teleop (hand follows tracking)",
+    @tool(annotations=_ann("ENGAGE the app (hand follows it)",
                            destructive=True, idempotent=True))
-    async def orca_teleop_engage(
+    async def orca_app_engage(
         confirm: Annotated[bool, Field(
             description="required on real hardware; ignored on mock")]
         = False,
         ramp_s: Annotated[float | None, Field(
-            ge=0, le=10,
+            ge=0.5, le=10,
             description="blend-in ramp seconds (backend default when "
                         "omitted)")] = None,
     ) -> dict:
-        """Engage teleop: the physical hand starts mirroring the tracked
-        human hand (ROM-clamped, ramped in, staleness-watchdogged). Needs an
-        active preview session and torque enabled. Only engage when the user
-        asked — a human is usually on the other end."""
+        """Engage the app: the physical hand starts following its targets
+        (range-clamped, ramped in, held when targets stop). Needs a session
+        in preview and torque enabled. Only engage when the user asked — a
+        human is usually on the other end."""
         gate = await mock_gate(state)
         if gate:
             return gate
@@ -835,19 +812,19 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
         if gate:
             return gate
         body = {"ramp_s": ramp_s} if ramp_s is not None else None
-        result = await backend.post("/api/teleop/engage", body)
+        result = await backend.post("/api/app/engage", body)
         return await with_state(
             state, {"ok": True, "session": result.get("session")})
 
-    @tool(annotations=_ann("Stop/disengage teleop", idempotent=True))
-    async def orca_teleop_stop(
+    @tool(annotations=_ann("Stop/disengage the app", idempotent=True))
+    async def orca_app_stop(
         action: Literal["stop", "disengage"] = "stop",
     ) -> dict:
-        """'disengage' drops back to safe preview (session keeps running);
-        'stop' ends the session entirely and releases control ownership
-        (needed before manual motion or operations)."""
+        """'disengage' returns to preview with the hand holding its pose
+        (the app keeps running); 'stop' ends the app and, if it was engaged,
+        turns torque off where the hand is."""
         if action == "disengage":
-            result = await backend.post("/api/teleop/disengage")
+            result = await backend.post("/api/app/disengage")
             return {"ok": True, "session": result.get("session")}
-        result = await backend.post("/api/teleop/stop")
+        result = await backend.post("/api/app/stop")
         return {"ok": True, "stopped": result.get("stopped")}

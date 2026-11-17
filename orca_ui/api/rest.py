@@ -3,7 +3,9 @@ FastAPI's threadpool, never on the event loop."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+import ipaddress
+
+from fastapi import APIRouter, HTTPException, Request
 
 from orca_ui.api import schemas
 from orca_ui import changelog as changelog_doc
@@ -12,7 +14,7 @@ from orca_ui.hand.service import HandService, ServiceError
 from orca_ui.hand.taxel_geometry import get_taxel_geometry
 
 
-def build_router(service: HandService) -> APIRouter:
+def build_router(service: HandService, apps=None) -> APIRouter:
     router = APIRouter(prefix="/api")
 
     def guard(fn, *args, **kwargs):
@@ -287,53 +289,57 @@ def build_router(service: HandService) -> APIRouter:
         service.dismiss_motors_holding()
         return {"ok": True}
 
-    # ----- teleoperation ------------------------------------------------------------
+    # ----- app sessions (orca_ui/hand/app) ----------------------------------------
 
-    def _teleop():
-        teleop = service.teleop_manager
-        if teleop is None:
-            raise HTTPException(status_code=503, detail="teleop unavailable")
-        return teleop
+    def _apps():
+        if apps is None:
+            raise HTTPException(status_code=503, detail="app sessions are disabled")
+        return apps
 
-    @router.get("/teleop/state")
-    def teleop_state():
-        return {"session": _teleop().snapshot()}
+    @router.get("/app/state")
+    def app_state():
+        return {"session": _apps().snapshot()}
 
-    @router.get("/teleop/sources")
-    def teleop_sources():
-        return _teleop().sources()
+    @router.get("/app/log")
+    def app_log():
+        return _apps().log_payload()
 
-    @router.post("/teleop/cameras/scan")
-    def teleop_scan_cameras():
-        # Slow (probes each device through the streamer child); the frontend
-        # shows a scanning state. 409 while a session owns the camera.
-        return guard(_teleop().scan_cameras)
+    @router.get("/app/list")
+    def app_list():
+        return {"apps": _apps().apps()}
 
-    @router.get("/teleop/log")
-    def teleop_log():
-        return _teleop().log_payload()
+    @router.put("/app/{app_id}/command")
+    def app_command(app_id: str, body: schemas.AppCommandRequest, request: Request):
+        # The command runs on this machine, so only this machine may set it:
+        # the caller must be local, and the Host check stops DNS rebinding.
+        if not _is_local(request):
+            raise HTTPException(
+                status_code=403,
+                detail="an app's command can only be set on this computer (open the "
+                       "console at http://localhost)")
+        guard(_apps().set_command, app_id, body.command)
+        return {"apps": _apps().apps()}
 
-    @router.post("/teleop/start")
-    def teleop_start(body: schemas.TeleopStartRequest):
-        return guard(_teleop().start, body.source, body.mode, body.config)
+    @router.post("/app/{app_id}/settings")
+    def app_settings(app_id: str, body: schemas.AppSettingsRequest):
+        return guard(_apps().set_values, app_id, body.values)
 
-    @router.post("/teleop/stop")
-    def teleop_stop():
-        stopped = _teleop().stop()
-        return {"ok": True, "stopped": stopped}
+    @router.post("/app/start")
+    def app_start(body: schemas.AppStartRequest):
+        return guard(_apps().start, body.app, body.mode)
 
-    @router.post("/teleop/engage")
-    def teleop_engage(body: schemas.TeleopEngageRequest | None = None):
+    @router.post("/app/stop")
+    def app_stop():
+        return {"ok": True, "stopped": _apps().stop()}
+
+    @router.post("/app/engage")
+    def app_engage(body: schemas.AppEngageRequest | None = None):
         ramp_s = body.ramp_s if body else None
-        return {"session": guard(_teleop().engage, ramp_s)}
+        return {"session": guard(_apps().engage, ramp_s)}
 
-    @router.post("/teleop/disengage")
-    def teleop_disengage():
-        return {"session": guard(_teleop().disengage)}
-
-    @router.post("/teleop/config")
-    def teleop_config(body: schemas.TeleopConfigRequest):
-        return {"config": guard(_teleop().set_config, body.config)}
+    @router.post("/app/disengage")
+    def app_disengage():
+        return {"session": guard(_apps().disengage)}
 
     # ----- motor control -------------------------------------------------------
 
@@ -717,3 +723,14 @@ def build_router(service: HandService) -> APIRouter:
             return {"ok": True, "sweeping": sweeper.active_joint}
 
     return router
+
+
+def _is_local(request: Request) -> bool:
+    """Both the caller's address and the Host it asked for are this computer."""
+    host = request.headers.get("host", "")
+    host = host[1:host.find("]")] if host.startswith("[") else host.split(":")[0]
+    try:
+        client = ipaddress.ip_address(request.client.host if request.client else "")
+    except ValueError:
+        return False
+    return client.is_loopback and host in ("localhost", "127.0.0.1", "::1")

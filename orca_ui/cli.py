@@ -86,16 +86,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--library-dir", type=os.path.expanduser, default=None,
                         help="Pose/trajectory library root "
                              "(default ~/.orca/ui/library; $ORCA_HOME moves ~/.orca).")
-    parser.add_argument("--teleop-dir", type=str, default=None,
-                        help="Path to an orca_teleop checkout; the streamer "
-                             "child is launched with `uv run --project <dir>` "
-                             "(default: $ORCA_TELEOP_DIR or the sibling "
-                             "checkout next to this repo).")
-    parser.add_argument("--teleop-cmd", type=str, default=None,
-                        help="Explicit command to launch the teleop streamer "
-                             "(overrides --teleop-dir).")
-    parser.add_argument("--no-teleop", action="store_true",
-                        help="Disable the teleoperation subsystem entirely.")
+    parser.add_argument("--no-apps", action="store_true",
+                        help="Disable app sessions (the Teleop and RL tabs).")
     return parser.parse_args(argv)
 
 
@@ -216,9 +208,7 @@ def build_settings(argv=None) -> UiSettings:
         mid_hz=args.mid_hz,
         slow_hz=args.slow_hz,
         library_dir=args.library_dir,
-        teleop_enabled=not args.no_teleop,
-        teleop_cmd=args.teleop_cmd,
-        teleop_dir=args.teleop_dir,
+        apps_enabled=not args.no_apps,
     )
 
 

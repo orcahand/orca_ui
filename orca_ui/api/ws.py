@@ -1,6 +1,8 @@
 """WebSocket endpoint: topic subscriptions + the hot slider-command path.
 
-Protocol (JSON text frames, envelope ``{type, seq?, t?, data}``):
+Protocol (JSON text frames, envelope ``{type, seq?, t?, data}``). The
+console's own page connects as ``/ws?client=browser``, so the app session
+can tell when its last browser tab is gone.
 
   client -> server
     {"type": "subscribe",   "data": {"topics": ["joints.measured", ...]}}
@@ -32,7 +34,8 @@ def build_ws_router(service: HandService, hub: StreamHub) -> APIRouter:
     @router.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket):
         await websocket.accept()
-        client = ClientConnection(websocket)
+        client = ClientConnection(
+            websocket, browser=websocket.query_params.get("client") == "browser")
         hub.register(client)
         sender = asyncio.create_task(client.sender_loop())
         try:

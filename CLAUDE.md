@@ -32,7 +32,7 @@ existing one rather than add to the count.
   current ceilings; ROM clamping; unknown-joint rejection; anything that
   refuses a dangerous command.
 - **Ownership and arbitration.** Only one operation at a time; the
-  control-source arbiter; leases released on failure; teleop yielding on
+  control-source arbiter; leases released on failure; app sessions yielding on
   torque loss or tracking loss; operations blocking a disconnect or a model
   change.
 - **Letting go of the hardware.** Disconnect leaves torque off and refuses

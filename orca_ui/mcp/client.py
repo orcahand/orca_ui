@@ -29,14 +29,14 @@ def _translate(status: int, detail: str) -> str:
         return (f"hand not connected: {detail} — check orca_get_status; "
                 "orca_reconnect may help.")
     if status == 409:
-        if "owned by teleop" in low:
+        if "owned by app" in low:
             return (
-                f"conflict: {detail}. An active teleop session is most likely "
-                "a HUMAN operator tracking their own hand — do not take "
-                "control unless the user explicitly asked you to. If they "
-                "did: orca_teleop_stop(action='disengage'), then retry. "
-                "Emergency only: orca_estop (stops teleop AND disables "
-                "torque). Do not retry this call unchanged."
+                f"conflict: {detail}. An engaged app session (Teleop, RL) is "
+                "most likely watched by a HUMAN operator — do not take control "
+                "unless the user explicitly asked you to. If they did: "
+                "orca_app_stop(action='disengage'), then retry. Emergency "
+                "only: orca_estop (disables torque AND ends the app). Do not "
+                "retry this call unchanged."
             )
         if "owned by" in low:
             return (

@@ -23,7 +23,7 @@ INSTRUCTIONS = """MCP access to an ORCA robotic hand through the orca-ui backend
 
 This server may be connected to REAL HARDWARE — check the `hand` field of
 orca_get_status before any motion; everything you command happens physically.
-The backend is shared with the browser UI: a human may own control (teleop or
+The backend is shared with the browser UI: a human may own control (an app or
 an operation); never take control from them without being asked.
 
 Ground rules:

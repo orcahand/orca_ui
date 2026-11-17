@@ -37,11 +37,11 @@ def create_app(settings: UiSettings) -> FastAPI:
     )
     operations = build_operation_manager(service, settings, hub.publish)
     service.attach_operation_manager(operations)
-    teleop = None
-    if settings.teleop_enabled:
-        from orca_ui.hand.teleop import build_teleop_manager
-        teleop = build_teleop_manager(service, settings, hub.publish)
-        service.attach_teleop_manager(teleop)
+    apps = None
+    if settings.apps_enabled:
+        from orca_ui.hand.app import AppSessions
+        apps = AppSessions(service, settings, hub.publish, browsers=hub.browser_count)
+        service.attach_apps(apps)
     telemetry = TelemetryService(service, hub, settings)
     service.attach_telemetry(telemetry)
 
@@ -54,9 +54,10 @@ def create_app(settings: UiSettings) -> FastAPI:
             yield
         finally:
             broadcaster.cancel()
-            # Teleop first: no targets may race into a dying stack.
-            if teleop is not None:
-                teleop.shutdown()
+            # Apps first: no targets may race into a dying stack.
+            if apps is not None:
+                # Off the event loop, so the app's stop frame can still go out.
+                await asyncio.to_thread(apps.shutdown)
             operations.shutdown()
             telemetry.stop()
             service.stop()
@@ -66,15 +67,15 @@ def create_app(settings: UiSettings) -> FastAPI:
     app.state.service = service
     app.state.hub = hub
     app.state.operations = operations
-    app.state.teleop = teleop
+    app.state.apps = apps
 
-    app.include_router(build_rest_router(service))
+    app.include_router(build_rest_router(service, apps))
     app.include_router(build_assets_router(service))
     app.include_router(build_assembly_router())
     app.include_router(build_ws_router(service, hub))
-    if teleop is not None:
-        from orca_ui.api.teleop_ws import build_teleop_ws_router
-        app.include_router(build_teleop_ws_router(teleop))
+    if apps is not None:
+        from orca_ui.api.app_ws import build_app_ws_router
+        app.include_router(build_app_ws_router(apps))
     # Order matters: /assets/hand (bundle) must register before the frontend's
     # /assets mount so the more specific prefix wins.
     mount_assets(app)

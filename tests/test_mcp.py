@@ -108,7 +108,7 @@ def mcp(backend_url):
 
 @pytest.fixture(autouse=True)
 def _leave_hand_safe(backend_url):
-    # Every test ends de-escalated (torque off, operations/teleop stopped),
+    # Every test ends de-escalated (torque off, operations/apps stopped),
     # so module-scoped backend state never leaks across tests.
     yield
     httpx.post(backend_url + "/api/estop", timeout=5.0)
@@ -366,7 +366,7 @@ def test_change_filter_keeps_last_frame_so_preview_stays_fresh():
 
 
 def test_change_filter_never_touches_undeadbanded_payloads():
-    # teleop.preview (jpeg) / stats have no deadband — pass them through whole.
+    # app.frames (jpeg) / stats have no deadband — pass them through whole.
     frames = [{"t": i * 0.1, "data": {"jpeg": "same"}} for i in range(4)]
     kept, dropped = telemetry._change_filter(frames)
     assert len(kept) == 4 and dropped == 0
@@ -402,10 +402,10 @@ def test_telemetry_unknown_topic_lists_valid(backend_url):
 
 def test_telemetry_missing_topic_times_out_gracefully(mcp):
     start = time.time()
-    out = _call(mcp, "orca_read_telemetry", topics=["teleop.targets"])
+    out = _call(mcp, "orca_read_telemetry", topics=["app.targets"])
     assert time.time() - start < 6.0
-    assert out["missing"] == ["teleop.targets"]
-    assert out["topics"]["teleop.targets"] is None
+    assert out["missing"] == ["app.targets"]
+    assert out["topics"]["app.targets"] is None
 
 
 # ----- operations ------------------------------------------------------------------

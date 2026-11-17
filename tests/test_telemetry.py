@@ -136,7 +136,7 @@ def _build(ramping=False, op_active=False, feedback_loop=True,
 
 
 def test_no_bus_reads_while_a_target_ramp_is_in_flight():
-    """Streamed motion (slider, replay, demo, teleop) must not be interrupted."""
+    """Streamed motion (slider, replay, demo, app) must not be interrupted."""
     telemetry, session = _build(ramping=True)
     for _ in range(5):
         telemetry._slow_tick()

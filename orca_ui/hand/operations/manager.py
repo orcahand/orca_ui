@@ -113,7 +113,7 @@ class OperationManager:
         with self._lock:
             _conflict_check()
         # No op may start while another control session owns the joint-target
-        # channel: an engaged teleop must not have the hand yanked away by a
+        # channel: an engaged app must not have the hand yanked away by a
         # maintenance lease, and arbiter-acquiring ops get a synchronous 409
         # instead of an async ERROR snapshot.
         self._service.require_manual_control()

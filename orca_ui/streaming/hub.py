@@ -22,8 +22,10 @@ SEND_TIMEOUT_S = 1.0
 
 
 class ClientConnection:
-    def __init__(self, websocket):
+    def __init__(self, websocket, browser: bool = False):
         self.websocket = websocket
+        # A console browser tab (``/ws?client=browser``), not MCP or an app.
+        self.browser = browser
         self.subscriptions: set[str] = set()
         self.last_seq: dict[str, int] = {}
         self.last_sent: dict[str, float] = {}
@@ -75,6 +77,10 @@ class StreamHub:
         client.alive = False
         with self._clients_lock:
             self._clients.discard(client)
+
+    def browser_count(self) -> int:
+        with self._clients_lock:
+            return sum(1 for client in self._clients if client.browser)
 
     def snapshot_message(self, topic: str) -> str | None:
         """Latest message for a topic, for send-on-subscribe."""

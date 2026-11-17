@@ -47,15 +47,11 @@ class UiSettings:
     mid_hz: float = 10.0
     slow_hz: float = 1.0
 
-    # Teleoperation. The streamer child runs in the orca_teleop env, launched
-    # via teleop_cmd (explicit command) or `uv run --project <teleop_dir>`
-    # (teleop_dir / $ORCA_TELEOP_DIR / auto-detected sibling checkout).
-    teleop_enabled: bool = True
-    teleop_cmd: str | None = None
-    teleop_dir: str | None = None
-    # orcahand_description checkout for the retargeter's URDF; None ->
-    # auto-detect the sibling checkout, exported as ORCAHAND_DESCRIPTION_DIR.
-    teleop_urdf_dir: str | None = None
-    teleop_ramp_s: float = 2.0             # engage ramp-in duration
-    teleop_hold_after_ms: int = 250        # target silence -> tracking lost
-    teleop_disengage_after_s: float = 10.0  # lost this long -> auto-disengage (0 = never)
+    # App sessions (orca_ui/hand/app), e.g. orca_teleop and orca_rl. What the
+    # console remembers per app lives in apps_dir; None -> ~/.orca/ui/apps.
+    apps_enabled: bool = True
+    apps_dir: str | None = None
+    app_ramp_s: float = 2.0             # engage ramp-in duration
+    app_hold_after_ms: int = 250        # no targets this long -> hold the pose
+    app_disengage_after_s: float = 10.0  # held this long -> auto-disengage (0 = never)
+    app_browser_grace_s: float = 2.0    # no browser tab this long -> disengage (0 = never)

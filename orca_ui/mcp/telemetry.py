@@ -33,7 +33,7 @@ MAX_SAMPLES_PER_TOPIC = 150
 # unit. A frame survives only if some value moved further than its band.
 # Keyed by the payload's inner group name, because that is what fixes the
 # unit: {"angles": {...}}, {"forces": {...}}, {"temps": ..., "currents": ...}.
-# Groups absent here (stats, control.state, teleop.preview's jpeg, …) are
+# Groups absent here (stats, control.state, app.frames' jpegs, …) are
 # never filtered — an unknown shape must pass through untouched.
 DEADBANDS: dict[str, tuple[float, str]] = {
     "angles": (0.5, "°"),
@@ -132,7 +132,7 @@ async def ws_snapshot(base_url: str, topics: list[str],
                       snapshot_timeout: float = 2.0) -> dict:
     """Latest value per topic (``duration_s=0``) or a sampled window.
 
-    Topics with no publisher yet (e.g. ``teleop.preview`` without a session)
+    Topics with no publisher yet (e.g. ``app.frames`` without a session)
     are reported under ``missing`` instead of hanging the call.
     """
     _check_topics(topics)
@@ -217,14 +217,14 @@ async def ws_snapshot(base_url: str, topics: list[str],
         out = {"topics": {t: latest.get(t) for t in topics}}
     # Frame ages (the hub replays the last-ever value on subscribe, so a
     # topic can answer instantly with data that is minutes old — e.g. a
-    # preview frame from an ended teleop session).
+    # picture from an ended app session).
     out["age_ms"] = {t: int(now_ms - wall_t[t]) for t in topics
                      if t in wall_t}
     if missing:
         out["missing"] = missing
         out["note"] = (
             "missing topics have no publisher right now (needs the matching "
-            "capability, tactile mode, or an active teleop session)")
+            "capability, tactile mode, or a running app session)")
     return out
 
 

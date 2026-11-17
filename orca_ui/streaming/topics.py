@@ -35,15 +35,12 @@ STATS = "stats"
 # scripts/monitor_sensors.py). 1 Hz, assembled by telemetry's slow tick.
 SENSORS_HEALTH = "sensors.health"
 
-# Teleoperation. teleop.targets streams the retargeter's (clamped) output in
-# preview AND engaged — the 3D ghost renders raw intent while joints.target
-# carries the post-arbiter ramped command. teleop.log is cumulative like
-# operation.log; teleop.preview carries base64 JPEG camera frames (opt-in
-# subscription on the frontend).
-TELEOP_STATE = "teleop.state"
-TELEOP_TARGETS = "teleop.targets"
-TELEOP_LOG = "teleop.log"
-TELEOP_PREVIEW = "teleop.preview"
+# App sessions: app.targets is the ghost (clamped, unramped); app.log is cumulative
+# like operation.log; app.frames holds the latest JPEG per picture stream (opt-in).
+APP_STATE = "app.state"
+APP_TARGETS = "app.targets"
+APP_LOG = "app.log"
+APP_FRAMES = "app.frames"
 
 ALL_TOPICS = [
     STATUS, CONTROL_STATE, ERROR,
@@ -51,7 +48,7 @@ ALL_TOPICS = [
     TACTILE_FORCES, TACTILE_TAXELS,
     JOINTS_MEASURED, JOINTS_ESTIMATE, JOINTS_TARGET, JOINTS_CORRECTION,
     MOTORS_TELEMETRY, MOTORS_FAULTS, STATS, SENSORS_HEALTH,
-    TELEOP_STATE, TELEOP_TARGETS, TELEOP_LOG, TELEOP_PREVIEW,
+    APP_STATE, APP_TARGETS, APP_LOG, APP_FRAMES,
 ]
 
 # Broadcast min-interval in seconds (rate ceiling toward the browser).
@@ -59,8 +56,8 @@ MIN_INTERVAL_S = {
     JOINTS_MEASURED: 1.0 / 60.0,
     TACTILE_FORCES: 1.0 / 30.0,
     TACTILE_TAXELS: 1.0 / 30.0,
-    TELEOP_TARGETS: 1.0 / 30.0,
-    TELEOP_PREVIEW: 1.0 / 10.0,
+    APP_TARGETS: 1.0 / 30.0,
+    APP_FRAMES: 1.0 / 10.0,
 }
 
 BROADCAST_TICK_S = 1.0 / 60.0

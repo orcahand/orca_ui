@@ -19,14 +19,13 @@ class HandState(str, Enum):
 class ControlSource(str, Enum):
     """Who owns the joint-target channel. Exactly one owner at a time.
 
-    TELEOP is reserved for the planned orca_teleop integration (a separate
-    process streaming retargeted joint targets); engaging it will acquire
-    control the same way an operation does.
+    APP is an engaged app session (orca_ui/hand/app), such as orca_teleop or
+    orca_rl streaming joint targets.
     """
 
     MANUAL = "manual"
     OPERATION = "operation"
-    TELEOP = "teleop"
+    APP = "app"
 
 
 @dataclass(frozen=True)
