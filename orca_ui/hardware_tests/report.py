@@ -1,13 +1,14 @@
 """A strict, machine-readable report of one finished hardware-test session,
 for a contributor to commit to a PR and a maintainer's agent to check.
 
-    python -m orca_ui.hardware_tests.report export <session.json> --out <file>
+    python -m orca_ui.hardware_tests.report export <session.json> (--out <file> | --out-dir <dir>)
     python -m orca_ui.hardware_tests.report verify <report.json> [--repo <checkout>] [--expect-commit <sha>]
 
 ``export`` reads a stored session (its index, events and result files, see
 :mod:`orca_ui.hardware_tests.store`) and describes the code it ran on from the
 orca_ui checkout running the export and the orca_core this process imports, so
-run it from the checkout and environment the console ran from.
+run it from the checkout and environment the console ran from. Reports go
+under ``hardware-test-reports/`` at the root of the repo the PR targets.
 
 ``verify`` prints one line per problem and ``VERIFIED`` or ``REJECTED``. It
 reads the plan and definitions from the tested orca_ui commit itself, so a
@@ -288,11 +289,20 @@ def build_report(session_path: Path, *, allow_dirty: bool = False, root: Optiona
     return report
 
 
-def export(session_path: Path, *, out: Path, allow_dirty: bool = False, root: Optional[Path] = None,
-           core: Optional[dict] = None) -> Path:
+def report_name(report: dict) -> str:
+    """``<YYYY-MM-DD>_<plan id>_<model_name>_<motor_family>.json``, dated when the session started."""
+    day = str(report["session"].get("started_at") or "")[:10] or "undated"
+    parts = (day, report["plan"]["id"], report["hand"].get("model_name") or "unknown-model",
+             report["hand"].get("motor_family") or "unknown-motors")
+    return "_".join(store.safe_name(str(p)) for p in parts) + ".json"
+
+
+def export(session_path: Path, *, out: Optional[Path] = None, out_dir: Optional[Path] = None,
+           allow_dirty: bool = False, root: Optional[Path] = None, core: Optional[dict] = None) -> Path:
     report = build_report(session_path, allow_dirty=allow_dirty, root=root, core=core)
-    store.write_text(out, dumps(report))
-    return out
+    target = out if out is not None else Path(out_dir) / report_name(report)
+    store.write_text(target, dumps(report))
+    return target
 
 
 # ----- verify -------------------------------------------------------------------------
@@ -585,7 +595,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     ex = sub.add_parser("export", help="build a report from a stored, finished session")
     ex.add_argument("session", type=Path, help="the session's index, <bench>/<hand>/tests/sessions/<stamp> <plan>.json")
-    ex.add_argument("--out", type=Path, required=True, help="the report file to write")
+    where = ex.add_mutually_exclusive_group(required=True)
+    where.add_argument("--out", type=Path, help="the report file to write")
+    where.add_argument("--out-dir", type=Path,
+                       help=f"a folder (e.g. {REPORTS_DIR}/) to write <date>_<plan>_<model>_<motors>.json into")
     ex.add_argument("--allow-dirty", action="store_true",
                     help="export from a modified checkout; the report records it and verify rejects it")
     ve = sub.add_parser("verify", help="check a report strictly; exit 0 only when VERIFIED")
@@ -603,7 +616,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if args.command == "export":
         try:
-            path = export(args.session, out=args.out, allow_dirty=args.allow_dirty)
+            path = export(args.session, out=args.out, out_dir=args.out_dir, allow_dirty=args.allow_dirty)
         except (ReportError, cat.CatalogError) as e:
             print(f"export refused: {e}", file=sys.stderr)
             return 1

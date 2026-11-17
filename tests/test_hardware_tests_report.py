@@ -81,7 +81,8 @@ def test_an_honest_session_round_trips_to_verified(tmp_path, repo):
     with pytest.raises(rp.ReportError, match="not finished"):
         rp.build_report(_session(tmp_path, finished=False), root=repo, core=CORE)
 
-    out = rp.export(_session(tmp_path), out=repo / rp.REPORTS_DIR / "report.json", root=repo, core=CORE)
+    out = rp.export(_session(tmp_path), out_dir=repo / rp.REPORTS_DIR, root=repo, core=CORE)
+    assert out.name == "2026-02-01_rel_orcahand-right_feetech.json"
     text = out.read_text(encoding="utf-8")
     assert LABEL not in text and str(Path.home()) not in text
     report = json.loads(text)
