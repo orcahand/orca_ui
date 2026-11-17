@@ -69,9 +69,10 @@ export const useAppSessionStore = create<AppSessionState>((set, get) => ({
       useEventLogStore.getState().pushEvent('app', `${name} → ${session.state}`)
     } else if (previous && previous.state !== 'idle') {
       useEventLogStore.getState().pushEvent('app', `${name} session ended`)
-      // The app may have sent new settings; show them before the next start.
-      void get().refreshApps()
     }
+    // Any end (error too): the app may have sent new settings; show what was saved.
+    if (previous && (session.state === 'idle' || session.state === 'error'))
+      void get().refreshApps()
   },
 
   setApps: (apps) => set({ apps }),
