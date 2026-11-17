@@ -1280,9 +1280,12 @@ class HandService:
         # A running sequence would keep writing goal positions into a limp
         # motor and then snap it to the next point when torque returned.
         self.stop_all_playback()
+        # As in E-STOP: no ramp write may follow torque off. If it raises, the worker stays halted.
+        self.worker.halt()
         session.hand.disable_torque()
         self.supervisor.set_torque_flag(False)
         self.worker.reset()
+        self.worker.resume()  # the cleared torque flag now refuses new targets
         self._publish_control_state()
 
     def _current_pose(self, session: HandSession) -> dict:
