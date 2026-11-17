@@ -12,6 +12,12 @@ build, and working against an unreleased `orca_core`.
 **Before any merge, release or PR of a UI branch**, whoever proposes it: raise
 the changelog first. See [Versioning and the changelog](#versioning-and-the-changelog).
 
+**Before any merge into `main`**, the change must be tested on a real hand with
+the console's Tests tab, and the PR must carry a hardware-test report that
+passes `verify`. Read [the hardware-test rules](docs/hardware-tests.md) before
+proposing a merge, and tell your user what to test, on which hands and
+how, as its section 10 says. Never mark, edit or fake a result.
+
 ---
 
 ## Testing policy

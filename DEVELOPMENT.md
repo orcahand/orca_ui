@@ -28,6 +28,15 @@ appears only on your machine is usually the console disagreeing with an
 unreleased `orca_core`. The header's DEV CORE
 badge and the startup banner both name the source that is actually imported.
 
+## Hardware tests before merging
+
+Every change to orca_ui or orca_core is tested on a real ORCA hand with the
+console's Tests tab before it is merged into `main`, and the pull request
+carries the exported report under `hardware-test-reports/`. This holds for the
+ORCA team and outside contributors alike. What to test, on which hands, how to
+set up and run it, and how the report is checked:
+[docs/hardware-tests.md](docs/hardware-tests.md).
+
 ## Frontend
 
 The built frontend (`orca_ui/webui/`) is committed so npm-less machines run
