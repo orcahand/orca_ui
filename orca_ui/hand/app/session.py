@@ -366,28 +366,33 @@ class AppSessions:
         self._publish_state()
 
         def finish() -> None:
-            if was_engaged:
-                if torque_off:
-                    self._torque_off()
-                self._release_control()
-            if link is not None:
-                try:
-                    link.send_json({"type": protocol.MSG_STOP, "data": {}})
-                    link.close()
-                except Exception:
-                    logger.debug("app link close failed", exc_info=True)
-            self._process.terminate()
-            # Still STOPPING here, so no new session can start and receive these.
-            self._append_log(f"session ended: {reason}"
-                             + (" — torque off" if was_engaged and torque_off else ""))
-            self._publish_topic(T.APP_TARGETS, {"session_id": None, "angles": {},
-                                                "tracking": False})
-            self._publish_topic(T.APP_FRAMES, {"session_id": None, "streams": {}})
-            with self._lock:
-                if self._session_id == session_id:
-                    self._state = ERROR if error else IDLE
-                    self._error = error
-            self._publish_state()
+            try:
+                if was_engaged:
+                    if torque_off:
+                        self._torque_off()
+                    self._release_control()
+                if link is not None:
+                    try:
+                        link.send_json({"type": protocol.MSG_STOP, "data": {}})
+                        link.close()
+                    except Exception:
+                        logger.debug("app link close failed", exc_info=True)
+                self._process.terminate()
+                # Still STOPPING here, so no new session can start and receive these.
+                self._append_log(f"session ended: {reason}"
+                                 + (" — torque off" if was_engaged and torque_off else ""))
+                self._publish_topic(T.APP_TARGETS, {"session_id": None, "angles": {},
+                                                    "tracking": False})
+                self._publish_topic(T.APP_FRAMES, {"session_id": None, "streams": {}})
+            except Exception:
+                logger.exception("app session end: cleanup failed")
+            finally:
+                # Whatever failed above, a session never stays in STOPPING.
+                with self._lock:
+                    if self._session_id == session_id:
+                        self._state = ERROR if error else IDLE
+                        self._error = error
+                self._publish_state()
 
         if wait:
             finish()

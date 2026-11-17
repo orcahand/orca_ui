@@ -4,7 +4,8 @@ An app runs in its own Python environment (often a different Python), so it
 is always a child process: the remembered command plus
 ``--connect <url> --token <token>``. It gets its own process group, and
 ending it always signals the whole group, so nothing ``uv run`` started
-outlives the console.
+outlives the console. Windows has no process-group signals: there the group
+gets CTRL_BREAK, then ``taskkill /T /F`` takes the tree.
 """
 
 from __future__ import annotations
@@ -24,6 +25,8 @@ logger = logging.getLogger(__name__)
 STOP_GRACE_S = 1.0   # to exit by itself after the protocol's stop
 TERM_GRACE_S = 3.0
 KILL_GRACE_S = 2.0
+
+_WINDOWS = os.name == "nt"
 
 
 def split_command(command: str) -> list[str]:
@@ -56,11 +59,11 @@ class AppProcess:
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
-                    start_new_session=True,
                     text=True,
                     encoding="utf-8",
                     errors="replace",
                     bufsize=1,
+                    **_new_group(),
                 )
             except OSError as e:
                 raise RuntimeError(f"can't start {argv[0]!r}: {e.strerror or e}")
@@ -84,34 +87,85 @@ class AppProcess:
         return proc.poll() if proc is not None else None
 
     def terminate(self) -> None:
-        """Give the app STOP_GRACE_S to exit, then SIGTERM the process group,
-        then SIGKILL what is left. Blocks for at most the three graces; never
-        raises."""
+        """Give the app STOP_GRACE_S to exit, then ask its group to stop, then
+        kill what is left. Blocks for at most the three graces; never raises."""
         with self._lock:
             proc = self._proc
             self._proc = None
         if proc is None:
             return
-        group = proc.pid
-        for sig, grace in ((None, STOP_GRACE_S),
-                           (signal.SIGTERM, TERM_GRACE_S),
-                           (signal.SIGKILL, KILL_GRACE_S)):
-            if not _group_alive(proc, group):
-                return
-            try:
-                if sig is not None:
-                    os.killpg(group, sig)
-            except ProcessLookupError:
-                return
-            except PermissionError:
-                logger.warning("not allowed to signal app process group %s", group)
-                return
-            deadline = time.monotonic() + grace
-            while time.monotonic() < deadline:
-                if not _group_alive(proc, group):
-                    return
-                time.sleep(0.05)
-        logger.warning("app process group %s survived SIGKILL", group)
+        try:
+            if _WINDOWS:
+                _end_windows(proc)
+            else:
+                _end_group(proc)
+        except Exception:
+            logger.exception("couldn't end app process %s", proc.pid)
+
+
+def _new_group() -> dict:
+    if _WINDOWS:
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
+
+
+def _end_group(proc: subprocess.Popen) -> None:
+    """POSIX: SIGTERM the process group, then SIGKILL what is left."""
+    group = proc.pid
+    for sig, grace in ((None, STOP_GRACE_S),
+                       (signal.SIGTERM, TERM_GRACE_S),
+                       (signal.SIGKILL, KILL_GRACE_S)):
+        if not _group_alive(proc, group):
+            return
+        try:
+            if sig is not None:
+                os.killpg(group, sig)
+        except ProcessLookupError:
+            return
+        except PermissionError:
+            logger.warning("not allowed to signal app process group %s", group)
+            return
+        if _wait(lambda: not _group_alive(proc, group), grace):
+            return
+    logger.warning("app process group %s survived SIGKILL", group)
+
+
+def _end_windows(proc: subprocess.Popen) -> None:
+    """Windows: CTRL_BREAK to the group (else terminate), then taskkill the tree."""
+    def ask():
+        try:
+            proc.send_signal(signal.CTRL_BREAK_EVENT)
+        except OSError:  # no console to send it through
+            proc.terminate()
+
+    def kill():
+        try:
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)],
+                           capture_output=True, timeout=KILL_GRACE_S)
+        except (OSError, subprocess.SubprocessError):
+            logger.warning("taskkill failed for app process %s", proc.pid, exc_info=True)
+        try:
+            proc.kill()
+        except OSError:
+            pass  # gone already
+
+    for step, grace in ((None, STOP_GRACE_S), (ask, TERM_GRACE_S), (kill, KILL_GRACE_S)):
+        if proc.poll() is not None:
+            return
+        if step is not None:
+            step()
+        if _wait(lambda: proc.poll() is not None, grace):
+            return
+    logger.warning("app process %s survived taskkill", proc.pid)
+
+
+def _wait(done: Callable[[], bool], grace: float) -> bool:
+    deadline = time.monotonic() + grace
+    while time.monotonic() < deadline:
+        if done():
+            return True
+        time.sleep(0.05)
+    return False
 
 
 def _group_alive(proc: subprocess.Popen, group: int) -> bool:

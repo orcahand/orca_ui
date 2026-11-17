@@ -424,6 +424,18 @@ def test_ending_an_engaged_session_turns_torque_off_and_clears_the_ghost(client)
     assert _hub(client, T.APP_FRAMES)["streams"] == {}
 
 
+def test_an_end_never_wedges_in_stopping_when_the_app_cant_be_killed(client, monkeypatch):
+    _connected(client)
+
+    def broken():
+        raise AttributeError("module 'os' has no attribute 'killpg'")  # as on Windows
+
+    with monkeypatch.context() as patch:
+        patch.setattr(_apps(client)._process, "terminate", broken)
+        assert client.post("/api/app/stop").json()["stopped"] is True
+    assert client.get("/api/app/state").json()["session"]["state"] == "idle"
+
+
 def test_hand_change_ends_the_session(client):
     link, _ = _connected(client)
     supervisor = client.app_state.service.supervisor
