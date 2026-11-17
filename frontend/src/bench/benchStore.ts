@@ -112,6 +112,9 @@ interface BenchState {
   settings: CycleSettings
   // The last bus scan's answer, kept after the operation slot moves on.
   scan: BusScanResult | null
+  // Bus ids picked on the tower view. Empty means every motor; otherwise
+  // the cycle and thermal panels show and run only these.
+  selected: number[]
   // Write every sample of a run to CSV under the model's logs/ folder, in
   // numbered parts of at most logPartMb each.
   logCsv: boolean
@@ -121,6 +124,8 @@ interface BenchState {
   setLogCsv(on: boolean): void
   setLogPartMb(mb: number): void
   setScan(scan: BusScanResult | null): void
+  setSelected(ids: number[]): void
+  toggleSelected(id: number): void
   setEndpoint(id: number, which: EndName, value: number | null): void
   patchMotor(id: number, patch: Partial<MotorSetup>): void
   patchSettings(patch: Partial<CycleSettings>): void
@@ -154,10 +159,16 @@ export const useBenchStore = create<BenchState>((set, get) => ({
   setup: {},
   settings: DEFAULT_SETTINGS,
   scan: null,
+  selected: [],
   logCsv: false,
   logPartMb: DEFAULT_LOG_PART_MB,
 
   setScan: (scan) => set({ scan }),
+  setSelected: (selected) => set({ selected }),
+  toggleSelected: (id) => {
+    const { selected } = get()
+    set({ selected: selected.includes(id) ? selected.filter((m) => m !== id) : [...selected, id] })
+  },
 
   setLogCsv: (logCsv) => {
     const { model, setup, settings, logPartMb } = get()
@@ -197,9 +208,11 @@ export const useBenchStore = create<BenchState>((set, get) => ({
         ...(stored.motors[motor.id] ?? {}),
       }
     }
+    const ids = new Set(motors.map((m) => m.id))
     set({
       model: info.model_name,
       motors,
+      selected: get().selected.filter((id) => ids.has(id)),
       setup,
       settings,
       logCsv: stored.logCsv,
@@ -233,6 +246,11 @@ export const useBenchStore = create<BenchState>((set, get) => ({
     if (model) save(model, next, settings, logCsv, logPartMb)
   },
 }))
+
+/** The motors the tower selection narrows the panels to: all when none is picked. */
+export function selectedOr(motors: BenchMotor[], selected: number[]): BenchMotor[] {
+  return selected.length === 0 ? motors : motors.filter((m) => selected.includes(m.id))
+}
 
 export interface MotorCycleParams {
   id: number

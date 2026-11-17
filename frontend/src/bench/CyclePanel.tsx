@@ -12,7 +12,7 @@ import {
   operationLabel,
   useOperationStore,
 } from '../state/operationStore'
-import { runnableMotors, useBenchStore } from './benchStore'
+import { runnableMotors, selectedOr, useBenchStore } from './benchStore'
 import { CycleFields } from './CycleFields'
 
 export function CyclePanel({ connected }: { connected: boolean }) {
@@ -22,8 +22,12 @@ export function CyclePanel({ connected }: { connected: boolean }) {
   // Derived outside the selector: a selector returning a fresh array every
   // call would re-render forever.
   const motors = useBenchStore((s) => s.motors)
+  const selected = useBenchStore((s) => s.selected)
   const setup = useBenchStore((s) => s.setup)
-  const runnable = useMemo(() => runnableMotors(motors, setup), [motors, setup])
+  const runnable = useMemo(
+    () => runnableMotors(selectedOr(motors, selected), setup),
+    [motors, selected, setup],
+  )
   const logCsv = useBenchStore((s) => s.logCsv)
   const setLogCsv = useBenchStore((s) => s.setLogCsv)
   const logPartMb = useBenchStore((s) => s.logPartMb)

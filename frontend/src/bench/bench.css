@@ -755,3 +755,153 @@
   font-size: 9px;
   vertical-align: middle;
 }
+
+/* --- Tower --- */
+
+.bench-tower {
+  padding: 10px 12px;
+}
+
+.tower-body {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(240px, 2fr);
+  gap: 12px;
+  margin-top: 10px;
+}
+
+@media (max-width: 760px) {
+  .tower-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tower-canvas {
+  position: relative;
+  height: 420px;
+  border: 1px solid var(--panel-border-strong);
+  background: var(--panel-strong);
+  overflow: hidden;
+}
+
+.tower-canvas > .tower-note {
+  padding: 12px;
+}
+
+.tower-label {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 1px 5px;
+  font-size: 10px;
+  white-space: nowrap;
+  color: var(--muted);
+  background: var(--panel-strong);
+  border: 1px solid var(--panel-border-strong);
+  transition: opacity 0.15s;
+  user-select: none;
+}
+
+.tower-label b {
+  color: var(--text-bright);
+  font-size: 11px;
+}
+
+.tower-label.empty {
+  color: var(--dimmer);
+}
+
+.tower-label[data-picked='1'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.tower-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.tower-inspector h3 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-bright);
+  margin: 0 0 6px;
+}
+
+.tower-inspector-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.tower-inspector-head span {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.tower-readout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  margin: 4px 0 8px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tower-readout dt {
+  color: var(--dim);
+}
+
+.tower-readout dd {
+  margin: 0;
+  color: var(--text-bright);
+}
+
+.tower-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.tower-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tower-note {
+  font-size: 11px;
+  color: var(--dim);
+  margin: 4px 0;
+}
+
+.tower-live {
+  font-size: 13px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  margin: 8px 0;
+}
+
+.tower-found {
+  font-size: 12px;
+  color: var(--ok);
+  margin: 4px 0;
+}
+
+.tower-warn,
+.tower-fault {
+  font-size: 11px;
+  color: var(--warn);
+  margin: 4px 0;
+}
+
+.tower-fault {
+  color: var(--err);
+}
+
+.tower-inspector h3.tower-found {
+  color: var(--ok);
+}

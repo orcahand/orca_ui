@@ -60,6 +60,10 @@ def test_cycle_runs_in_motor_space_behind_the_torque_gate(bench):
     assert bench.post("/api/motors/1/torque", json={"enabled": True}).status_code == 200
     assert bench.get("/api/status").json()["torque_enabled"] is True
     assert bench.get("/api/hand/info").json()["control"]["held_motors"] == [1]
+    # Releasing the only held motor leaves nothing held, not everything.
+    assert bench.post("/api/motors/1/torque", json={"enabled": False}).json()["held_motors"] == []
+    assert bench.get("/api/status").json()["torque_enabled"] is False
+    assert bench.post("/api/motors/1/torque", json={"enabled": True}).status_code == 200
     assert _start(bench, motors=motors).status_code == 409
     assert bench.post("/api/motors/2/torque", json={"enabled": True}).status_code == 200
     # What the page does on load: keep reading the shafts while torque is on.

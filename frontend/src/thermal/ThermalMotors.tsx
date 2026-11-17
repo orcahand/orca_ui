@@ -19,7 +19,14 @@ import { formatDeg, formatMa, useMotorLive } from '../bench/useMotorLive'
 import { useAppStore } from '../state/appStore'
 import { useOperationActive, useOperationStore } from '../state/operationStore'
 import { checkPair, MAX_STEP_DEG, MIN_STEP_DEG } from './pairCheck'
-import { type MotorPair, pairKey, pairsInOrder, partnerOf, useThermalStore } from './thermalStore'
+import {
+  inTowerSelection,
+  type MotorPair,
+  pairKey,
+  pairsInOrder,
+  partnerOf,
+  useThermalStore,
+} from './thermalStore'
 
 const STATE_LABEL: Record<ThermalMotorState, string> = {
   driving: 'driving',
@@ -436,6 +443,8 @@ export function ThermalMotors({ connected }: { connected: boolean }) {
   const extra = ours ? ((operation?.extra ?? null) as ThermalExtra | null) : null
   const running = ours && active
   const reports = new Map((extra?.motors ?? []).map((m) => [m.id, m]))
+  const selected = useBenchStore((s) => s.selected)
+  const shown = running ? motors : inTowerSelection(motors, selected, free ? [] : pairs)
   const numberOf = (id: number) => motors.find((m) => m.id === id)?.number ?? id
 
   if (motors.length === 0) {
@@ -465,7 +474,7 @@ export function ThermalMotors({ connected }: { connected: boolean }) {
         </button>
       </div>
       <div className="thermal-grid">
-        {motors.map((motor) => (
+        {shown.map((motor) => (
           <Tile
             key={motor.id}
             motor={motor}

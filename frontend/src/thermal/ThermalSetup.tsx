@@ -15,6 +15,7 @@ import {
   peakMa,
   partnerOf,
   runParams,
+  inTowerSelection,
   selectedMotors,
   selectedFree,
   selectedPairs,
@@ -60,8 +61,13 @@ export function ThermalSetup({ connected }: { connected: boolean }) {
   const patch = useThermalStore((st) => st.patchSettings)
   const setup = useThermalStore((st) => st.motors)
   const pairs = useThermalStore((st) => st.pairs)
-  const motors = useBenchStore((st) => st.motors)
+  const allMotors = useBenchStore((st) => st.motors)
+  const towerPick = useBenchStore((st) => st.selected)
   const free = s.load === 'free'
+  const motors = useMemo(
+    () => inTowerSelection(allMotors, towerPick, free ? [] : pairs),
+    [allMotors, towerPick, free, pairs],
+  )
   const selected = useMemo(
     () => (free ? selectedFree(motors, setup) : selectedMotors(motors, setup, pairs)),
     [free, motors, setup, pairs],

@@ -917,9 +917,9 @@ class HandService:
         """Motor ids with torque on. Every motor once ``enable_torque`` ran,
         the individually held ones otherwise."""
         with self._state_lock:
-            held = [m for m, on in self._motor_torque.items() if on]
-        if held:
-            return sorted(held)
+            states = dict(self._motor_torque)
+        if states:
+            return sorted(m for m, on in states.items() if on)
         session = self.session
         if session is not None and self.supervisor.status().torque_enabled:
             return [int(m) for m in session.hand.config.motor_ids]

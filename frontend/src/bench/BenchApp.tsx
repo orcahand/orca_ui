@@ -23,13 +23,14 @@ import { ThermalMotors } from '../thermal/ThermalMotors'
 import { ThermalRun } from '../thermal/ThermalRun'
 import { ThermalSetup } from '../thermal/ThermalSetup'
 import { useThermalStore } from '../thermal/thermalStore'
-import { type BenchMode, useBenchStore } from './benchStore'
+import { type BenchMode, selectedOr, useBenchStore } from './benchStore'
 import { BenchLog } from './BenchLog'
 import { BusPanel } from './BusPanel'
 import { CyclePanel } from './CyclePanel'
 import { MotorCard } from './MotorCard'
 import { RunPanel } from './RunPanel'
 import { TorqueBar } from './TorqueBar'
+import { TowerPanel } from './tower/TowerPanel'
 import { UsbIndicator } from './UsbIndicator'
 
 const STATE_CLASS: Record<HandState, string> = {
@@ -79,6 +80,7 @@ export function BenchApp() {
   const handInfo = useAppStore((s) => s.handInfo)
   const poseSource = useAppStore((s) => s.control?.pose_source ?? null)
   const motors = useBenchStore((s) => s.motors)
+  const selected = useBenchStore((s) => s.selected)
   const model = useBenchStore((s) => s.model)
   const adoptHand = useBenchStore((s) => s.adoptHand)
   const mode = useBenchStore((s) => s.mode)
@@ -213,6 +215,7 @@ export function BenchApp() {
         }
       />
       <BusPanel connected={connected} />
+      <TowerPanel connected={connected} />
       {mode === 'fingers' ? (
         <FingerWorkflow connected={connected} />
       ) : mode === 'thermal' ? (
@@ -233,7 +236,7 @@ export function BenchApp() {
             </section>
           ) : (
             <div className="bench-motors" style={{ '--count': motors.length } as React.CSSProperties}>
-              {motors.map((motor) => (
+              {selectedOr(motors, selected).map((motor) => (
                 <MotorCard key={motor.id} motor={motor} connected={connected} />
               ))}
             </div>

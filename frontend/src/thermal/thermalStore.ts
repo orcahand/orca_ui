@@ -223,6 +223,21 @@ export interface ThermalRunParams {
   log_part_mb: number
 }
 
+/** The tower selection, widened by each picked motor's partner: a pair is driven as a unit. */
+export function inTowerSelection(
+  motors: BenchMotor[],
+  selected: number[],
+  pairs: MotorPair[],
+): BenchMotor[] {
+  if (selected.length === 0) return motors
+  const ids = new Set(selected)
+  for (const id of selected) {
+    const pair = partnerOf(pairs, id)
+    if (pair) ids.add(pair.a === id ? pair.b : pair.a)
+  }
+  return motors.filter((m) => ids.has(m.id))
+}
+
 /** Motors in the test, the partner of an opposed pair inverted. */
 export function selectedMotors(
   motors: BenchMotor[],
