@@ -51,8 +51,15 @@ def repo(tmp_path) -> Path:
     return root
 
 
-def _session(tmp_path, *, mock=False, finished=True, **overrides) -> Path:
-    """A stored ``rel`` session on disk; ``overrides`` replace step results by id."""
+def _code(repo: Path, commit: str = "HEAD") -> dict:
+    """The code-under-test block a session records at its start."""
+    return {"orca_ui": {"version": "9.9.9", "commit": _git(repo, "rev-parse", commit), "branch": "main",
+                        "dirty": False}, "orca_core": CORE}
+
+
+def _session(tmp_path, repo, *, mock=False, finished=True, code="HEAD", code_changed=False, **overrides) -> Path:
+    """A stored ``rel`` session on disk, started on ``code`` (a commit of ``repo``, or None for a
+    session from before sessions recorded it); ``overrides`` replace step results by id."""
     paths = store.SessionPaths(tmp_path / "bench", LABEL, "rel", STAMP)
     hand = {"label": LABEL, "model_name": "orcahand-right", "motor_family": "feetech", "hardware_version": 210,
             "hardware_version_source": "board", "side": "right", "capabilities": [], "mock": mock}
@@ -73,15 +80,18 @@ def _session(tmp_path, *, mock=False, finished=True, **overrides) -> Path:
         "id": session_id, "plan_id": "rel", "plan_title": "Rel", "stamp": STAMP, "label": LABEL, "hand": hand,
         "started_at": "2026-02-01T10:00:00.000+01:00",
         "finished_at": "2026-02-01T11:00:00.000+01:00" if finished else None,
-        "sides": {"main": {"available": True, "reason": None, "version": "0.13.0"}}})
+        "sides": {"main": {"available": True, "reason": None, "version": "0.13.0"}},
+        **({"code_under_test": _code(repo, code), "code_changed": code_changed} if code else {})})
     return paths.index_json
 
 
 def test_an_honest_session_round_trips_to_verified(tmp_path, repo):
     with pytest.raises(rp.ReportError, match="not finished"):
-        rp.build_report(_session(tmp_path, finished=False), root=repo, core=CORE)
+        rp.build_report(_session(tmp_path, repo, finished=False), root=repo)
+    with pytest.raises(rp.ReportError, match="no record of the code it ran on"):
+        rp.build_report(_session(tmp_path, repo, code=None), root=repo)
 
-    out = rp.export(_session(tmp_path), out_dir=repo / rp.REPORTS_DIR, root=repo, core=CORE)
+    out = rp.export(_session(tmp_path, repo), out_dir=repo / rp.REPORTS_DIR, root=repo)
     assert out.name == "2026-02-01_rel_orcahand-right_feetech.json"
     text = out.read_text(encoding="utf-8")
     assert LABEL not in text and str(Path.home()) not in text
@@ -104,7 +114,7 @@ def test_an_honest_session_round_trips_to_verified(tmp_path, repo):
 
 
 def test_an_edited_report_is_rejected(tmp_path, repo):
-    report = rp.build_report(_session(tmp_path), root=repo, core=CORE)
+    report = rp.build_report(_session(tmp_path, repo), root=repo)
     report["steps"][0]["note"] = "all good"
     problems = rp.verify(report, ui_repo=repo).problems
     assert len(problems) == 1 and "integrity" in problems[0], problems
@@ -116,6 +126,24 @@ def test_an_edited_report_is_rejected(tmp_path, repo):
     (dict(mock=True), "a real hand is required"),
 ])
 def test_a_report_breaking_a_rule_is_rejected(tmp_path, repo, session, problem):
-    report = rp.build_report(_session(tmp_path, **session), root=repo, core=CORE)
+    report = rp.build_report(_session(tmp_path, repo, **session), root=repo)
     problems = rp.verify(report, ui_repo=repo).problems
     assert len(problems) == 1 and problem in problems[0], problems
+
+
+def test_export_uses_the_code_recorded_at_session_start(tmp_path, repo):
+    started_on = _git(repo, "rev-parse", "HEAD")
+    session = _session(tmp_path, repo)
+    # The checkout moves on after the session: a new step in a base feature.
+    fb = repo / rp.DEFINITIONS_PATH / "fb.yaml"
+    fb.write_text(fb.read_text() + "  - {id: B3, title: t, kind: manual, instructions: i, pass_rule: p}\n")
+    _git(repo, "commit", "-q", "-am", "later")
+
+    report = rp.build_report(session, root=repo)
+    assert report["code_under_test"]["orca_ui"]["commit"] == started_on
+    assert report["generator"]["commit"] != started_on
+    assert [s["id"] for s in report["steps"]] == ["B1", "B2", "R1", "R2"]
+    assert rp.verify(report, ui_repo=repo).problems == []
+
+    with pytest.raises(rp.ReportError, match="code changed during session"):
+        rp.build_report(_session(tmp_path, repo, code_changed=True), root=repo)

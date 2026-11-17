@@ -26,6 +26,7 @@ from typing import Any, Callable, Optional
 
 from orca_ui.hardware_tests import catalog as cat
 from orca_ui.hardware_tests import store, tab_enabled
+from orca_ui.hardware_tests.report import code_identity, code_under_test
 from orca_ui.hardware_tests.checks.base import StopRequested
 from orca_ui.hardware_tests.model import (
     DECIDED,
@@ -317,6 +318,15 @@ class _Context:
 # ----- session ----------------------------------------------------------------------------
 
 
+def _probe_code() -> Optional[dict]:
+    """The code under test right now; None (logged) when it cannot be told."""
+    try:
+        return code_under_test()
+    except Exception:
+        logger.exception("could not record the code under test")
+        return None
+
+
 def _status_for(kind: str, check_status: str) -> str:
     """An observe step records; it never passes or fails."""
     if kind == "observe" and check_status in ("pass", "fail"):
@@ -358,11 +368,18 @@ class TestSession:
         self._auto: dict = {"state": "idle", "current_step": None, "progress": 0.0, "detail": ""}
         self._auto_thread: Optional[threading.Thread] = None
         self._auto_stop: Optional[threading.Event] = None
+        self.code_under_test: Optional[dict] = None
+        self.code_changed = False
         if resumed:
             self._load()
         self.refresh_sides()
+        code = _probe_code()
+        if not resumed:
+            self.code_under_test = code
         self.event("session_resumed" if resumed else "session_started", plan=plan.id, label=label,
-                   hand=self.hand.as_dict(), sides=self.sides_info)
+                   hand=self.hand.as_dict(), sides=self.sides_info, code_under_test=code)
+        if resumed:
+            self._check_code(code, "resume")
         with self._lock:
             self._save()
 
@@ -371,6 +388,8 @@ class TestSession:
     def _load(self) -> None:
         index = store.read_json(self.paths.index_json) or {}
         self.started_at = index.get("started_at") or self.started_at
+        self.code_under_test = index.get("code_under_test")
+        self.code_changed = bool(index.get("code_changed"))
         for feature in self.features:
             data = store.read_json(self.paths.feature_result(feature.id)) or {}
             for sid, raw in (data.get("steps") or {}).items():
@@ -381,6 +400,14 @@ class TestSession:
                 if result.status == "running":
                     result.status = "pending"
                 self.results[sid] = result
+
+    def _check_code(self, current: Optional[dict], when: str) -> None:
+        """Mark the session when the code differs from what it started on; its results then cannot be exported."""
+        if self.code_under_test is None or current is None:
+            return
+        if code_identity(current) != code_identity(self.code_under_test):
+            self.code_changed = True
+            self.event("code_changed", when=when, started_on=self.code_under_test, now=current)
 
     def _feature_payload(self, feature: FeatureDefinition) -> dict:
         return {
@@ -408,6 +435,8 @@ class TestSession:
             "finished_at": self.finished_at,
             "hand": self.hand.as_dict(),
             "sides": self.sides_info,
+            "code_under_test": self.code_under_test,
+            "code_changed": self.code_changed,
             "results_dir": store.display_path(self.paths.tests_dir),
             "events_file": store.display_path(self.paths.events),
         }
@@ -562,6 +591,7 @@ class TestSession:
                 "events_file": store.display_path(self.paths.events),
                 "hand": self.hand.as_dict(),
                 "sides": {side: dict(self.sides_info.get(side) or {}) for side in SIDES},
+                "code_changed": self.code_changed,
                 "auto": {**self._auto, "log": list(self._log)},
                 "open_step": self.open_step,
                 "features": features,
@@ -835,6 +865,7 @@ class TestSession:
                 self._close_locked(self.open_step)
             for step_id in list(self._recorders):
                 self._stop_recorder(step_id)
+            self._check_code(_probe_code(), "end")
             self.finished_at = store.now_iso()
             self.event("session_ended")
             self._save()

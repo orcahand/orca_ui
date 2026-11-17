@@ -232,3 +232,28 @@ def test_a_session_started_on_an_older_plan_resumes_with_the_new_steps(tmp_path)
     assert resumed.results["S1"].status == "pending"
     assert {f.id for f in resumed.features} == set(plan.features)
     assert any(e["type"] == "session_resumed" for e in store.read_jsonl(resumed.paths.events))
+
+
+def test_a_session_resumed_on_other_code_is_marked_and_cannot_be_exported(tmp_path, monkeypatch):
+    from orca_ui.hardware_tests import report
+    from orca_ui.hardware_tests import session as hw_session
+
+    started_on = {"orca_ui": {"version": "0.6.0", "commit": "a" * 40, "branch": "x", "dirty": False},
+                  "orca_core": {"version": "0.14.0", "source": "pypi", "commit": None, "branch": None, "dirty": None}}
+    monkeypatch.setattr(hw_session, "code_under_test", lambda: started_on)
+    first = _tests(tmp_path)
+    session = first.start(PLAN, "")
+    first.shutdown()
+    index = store.read_json(session.paths.index_json)
+    assert index["code_under_test"] == started_on and index["code_changed"] is False
+
+    moved = {**started_on, "orca_ui": {**started_on["orca_ui"], "commit": "b" * 40}}
+    monkeypatch.setattr(hw_session, "code_under_test", lambda: moved)
+    second = _tests(tmp_path)
+    assert second.start(PLAN, "").id == session.id
+    second.end()
+    index = store.read_json(session.paths.index_json)
+    assert index["code_under_test"] == started_on and index["code_changed"] is True
+    assert any(e["type"] == "code_changed" for e in store.read_jsonl(session.paths.events))
+    with pytest.raises(report.ReportError, match="code changed during session"):
+        report.build_report(session.paths.index_json)

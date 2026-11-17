@@ -187,6 +187,13 @@ def render_markdown(session: dict, rows: Iterable[dict]) -> str:
         info = sides.get(side) or {}
         state = f"orca_core {info.get('version')}" if info.get("available") else f"unavailable: {info.get('reason')}"
         lines.append(f"- {side} side: {state}")
+    code = session.get("code_under_test") or {}
+    for name in ("orca_ui", "orca_core"):
+        info = code.get(name) or {}
+        commit = (info.get("commit") or "")[:12] or info.get("source") or "unknown"
+        lines.append(f"- {name} at start: {info.get('version')} {commit}" + (" (modified)" if info.get("dirty") else ""))
+    if session.get("code_changed"):
+        lines.append("- **The code changed during this session; its results cannot be exported.**")
     lines += [
         f"- Results: `{session.get('results_dir')}`",
         f"- Events: `{session.get('events_file')}`",

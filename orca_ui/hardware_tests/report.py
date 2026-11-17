@@ -5,10 +5,11 @@ for a contributor to commit to a PR and a maintainer's agent to check.
     python -m orca_ui.hardware_tests.report verify <report.json> [--repo <checkout>] [--expect-commit <sha>]
 
 ``export`` reads a stored session (its index, events and result files, see
-:mod:`orca_ui.hardware_tests.store`) and describes the code it ran on from the
-orca_ui checkout running the export and the orca_core this process imports, so
-run it from the checkout and environment the console ran from. Reports go
-under ``hardware-test-reports/`` at the root of the repo the PR targets.
+:mod:`orca_ui.hardware_tests.store`). The code it ran on is what the session
+recorded when it started (:func:`code_under_test`), and the plan and
+definitions are read from that orca_ui commit; the exporting checkout is only
+recorded as the generator. Reports go under ``hardware-test-reports/`` at the
+root of the repo the PR targets.
 
 ``verify`` prints one line per problem and ``VERIFIED`` or ``REJECTED``. It
 reads the plan and definitions from the tested orca_ui commit itself, so a
@@ -25,12 +26,13 @@ import os
 import subprocess
 import sys
 from datetime import datetime
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
 
 from orca_ui.hardware_tests import catalog as cat
 from orca_ui.hardware_tests import store
-from orca_ui.hardware_tests.model import HandFacts
+from orca_ui.hardware_tests.model import FeatureDefinition, HandFacts
 
 SCHEMA = "orca-hardware-test-report/1"
 REPORTS_DIR = "hardware-test-reports"
@@ -142,6 +144,98 @@ def core_state(source=None) -> dict:
     return out
 
 
+def code_under_test(root: Optional[Path] = None) -> dict:
+    """orca_ui's version, commit, branch and dirty flag, and orca_core's as
+    :func:`core_state` gives it, as a session records them when it starts."""
+    root = root or ui_root()
+    ui = checkout_state(root)
+    return {"orca_ui": {"version": ui_version(root), "commit": ui["commit"], "branch": ui["branch"],
+                        "dirty": ui["dirty"]},
+            "orca_core": core_state()}
+
+
+def code_identity(code: Optional[dict]) -> tuple:
+    """What must stay the same for a session's results to belong to one code state."""
+    code = code or {}
+    ui, core = code.get("orca_ui") or {}, code.get("orca_core") or {}
+    return (ui.get("version"), ui.get("commit"), ui.get("dirty"),
+            core.get("version"), core.get("source"), core.get("commit"), core.get("dirty"))
+
+
+# ----- the plan as one commit defines it ------------------------------------------------
+
+
+@dataclass
+class PlanSource:
+    features: tuple[str, ...]
+    definitions: list[FeatureDefinition]
+    plan_files: dict[str, str]
+    """Repo path -> sha256, for the plan and every plan it includes."""
+    definition_files: dict[str, str]
+    base_features: Optional[frozenset[str]]
+    """None when there is no loadable base plan."""
+    title: str
+
+
+def load_plan_source(read: Callable[[str], Optional[bytes]], plan_id: str) -> PlanSource:
+    """``plan_id`` resolved from files ``read`` returns by repo path (a commit or a folder)."""
+    raw: dict = {}
+    blobs: dict[str, bytes] = {}
+
+    def text(path: str) -> str:
+        blob = read(path)
+        if blob is None:
+            raise ReportError(f"{path} is missing")
+        blobs[path] = blob
+        try:
+            return blob.decode("utf-8")
+        except UnicodeDecodeError as e:
+            raise ReportError(f"{path}: {e}")
+
+    def load(pid: str) -> None:
+        if pid not in raw:
+            path = f"{PLANS_PATH}/{pid}.yaml"
+            raw[pid] = cat.plan_from_text(text(path), Path(path).name)
+            for included in raw[pid].includes:
+                load(included)
+
+    try:
+        load(plan_id)
+        features = cat.resolve_features(plan_id, raw)
+        chain = cat.include_chain(plan_id, raw)
+        definitions = [cat.feature_from_text(text(f"{DEFINITIONS_PATH}/{fid}.yaml"), f"{fid}.yaml")
+                       for fid in features]
+    except cat.CatalogError as e:
+        raise ReportError(str(e))
+    try:
+        load(BASE_PLAN)
+        base: Optional[frozenset[str]] = frozenset(cat.resolve_features(BASE_PLAN, raw))
+    except (ReportError, cat.CatalogError):
+        base = None
+    return PlanSource(
+        features=features,
+        definitions=definitions,
+        plan_files={f"{PLANS_PATH}/{p}.yaml": sha256_bytes(blobs[f"{PLANS_PATH}/{p}.yaml"]) for p in chain},
+        definition_files={f"{DEFINITIONS_PATH}/{f}.yaml": sha256_bytes(blobs[f"{DEFINITIONS_PATH}/{f}.yaml"])
+                          for f in features},
+        base_features=base,
+        title=raw[plan_id].title,
+    )
+
+
+def commit_reader(repo: Path, commit: str) -> Callable[[str], Optional[bytes]]:
+    return lambda path: _git(repo, "show", f"{commit}:{path}", binary=True)
+
+
+def folder_reader(root: Path) -> Callable[[str], Optional[bytes]]:
+    def read(path: str) -> Optional[bytes]:
+        try:
+            return (root / path).read_bytes()
+        except OSError:
+            return None
+    return read
+
+
 # ----- export -------------------------------------------------------------------------
 
 
@@ -186,37 +280,52 @@ def summarize(steps: list[dict]) -> tuple[dict, str]:
     return counts, verdict
 
 
-def build_report(session_path: Path, *, allow_dirty: bool = False, root: Optional[Path] = None,
-                 core: Optional[dict] = None) -> dict:
-    """The report of the finished session at ``session_path``; raises ReportError when it may not be made."""
+def build_report(session_path: Path, *, allow_dirty: bool = False, root: Optional[Path] = None) -> dict:
+    """The report of the finished session at ``session_path``; raises ReportError when it may not be made.
+
+    ``root`` is the orca_ui checkout exporting it, which must hold the commit
+    the session recorded."""
     index = store.read_json(session_path)
     if not isinstance(index, dict) or not index.get("plan_id") or not index.get("stamp"):
         raise ReportError(f"{session_path} is not a stored hardware-test session")
+    sid = index.get("id")
     if not index.get("finished_at"):
-        raise ReportError(f"session {index.get('id')!r} is not finished; end it in the Tests tab first")
+        raise ReportError(f"session {sid!r} is not finished; end it in the Tests tab first")
+    code = index.get("code_under_test")
+    if not isinstance(code, dict):
+        raise ReportError(f"session {sid!r} has no record of the code it ran on (it was started before "
+                          "sessions recorded it); run the plan again")
+    if index.get("code_changed"):
+        raise ReportError(f"the code changed during session {sid!r}, so its results cannot be exported; "
+                          "run the plan again on one commit")
+    ui, core = code.get("orca_ui") or {}, code.get("orca_core") or {}
+    dirty = [name for name, state in (("orca_ui", ui), ("orca_core", core))
+             if (name == "orca_ui" or state.get("source") == "local") and state.get("dirty") is not False]
+    if dirty and not allow_dirty:
+        raise ReportError(f"the {' and '.join(dirty)} checkout was modified, or not a git checkout, when session "
+                          f"{sid!r} started (commit and run the plan again, or pass --allow-dirty to export a "
+                          "report verify will reject)")
 
     root = root or ui_root()
-    package = root / PACKAGE_PATH
-    catalog = cat.load_catalog(package / "definitions", package / "plans")
-    plan = catalog.plan(index["plan_id"])
-
-    ui = {"version": ui_version(root), **checkout_state(root)}
-    core = core or core_state()
-    dirty = [name for name, state in (("orca_ui", ui), ("orca_core", core))
-             if (name == "orca_ui" or state["source"] == "local") and state["dirty"] is not False]
-    if dirty and not allow_dirty:
-        raise ReportError(f"the {' and '.join(dirty)} checkout is modified or not a git checkout "
-                          "(commit first, or pass --allow-dirty to export a report verify will reject)")
+    generator = checkout_state(root)
+    if ui.get("commit"):
+        if not _commit_exists(root, ui["commit"]):
+            raise ReportError(f"the tested orca_ui commit {ui['commit'][:12]} is not in {root}; "
+                              "export from the checkout the session ran on")
+        read = commit_reader(root, ui["commit"])
+    else:
+        read = folder_reader(root)
+    source = load_plan_source(read, index["plan_id"])
 
     label = str((index.get("hand") or {}).get("label") or index.get("label") or "")
     redact = redactor(label)
     hand = hand_facts(index.get("hand") or {})
     tests_dir = session_path.resolve().parent.parent
-    base_features = set(catalog.plans[BASE_PLAN].features) if BASE_PLAN in catalog.plans else set()
+    base_features = source.base_features or frozenset()
 
     results_sha: dict[str, str] = {}
     steps: list[dict] = []
-    for feature in catalog.plan_features(plan.id):
+    for feature in source.definitions:
         result_path = tests_dir / feature.id / index["stamp"] / "result.json"
         stored = store.read_json(result_path)
         stored_steps = {}
@@ -249,23 +358,22 @@ def build_report(session_path: Path, *, allow_dirty: bool = False, root: Optiona
     main = (index.get("sides") or {}).get("main") or {}
     report = {
         "schema": SCHEMA,
-        "generator": {"tool": "orca_ui.hardware_tests.report", "orca_ui_version": ui["version"],
-                      "commit": ui["commit"], "branch": ui["branch"], "dirty": ui["dirty"],
-                      "reason": ui["reason"]},
+        "generator": {"tool": "orca_ui.hardware_tests.report", "orca_ui_version": ui_version(root),
+                      "commit": generator["commit"], "branch": generator["branch"], "dirty": generator["dirty"],
+                      "reason": generator["reason"]},
         "code_under_test": {
-            "orca_ui": {k: ui[k] for k in ("version", "commit", "branch", "dirty")},
-            "orca_core": core,
+            "recorded": "at session start",
+            "orca_ui": {k: ui.get(k) for k in ("version", "commit", "branch", "dirty")},
+            "orca_core": {k: core.get(k) for k in ("version", "source", "commit", "branch", "dirty")},
             "main_side": {"available": bool(main.get("available")), "version": main.get("version"),
                           "reason": redact(main.get("reason")) or None},
         },
         "plan": {
-            "id": plan.id,
-            "title": plan.title,
-            "features": list(plan.features),
-            "plan_files": {f"{PLANS_PATH}/{pid}.yaml": sha256_file(package / "plans" / f"{pid}.yaml")
-                           for pid in catalog.plan_chain(plan.id)},
-            "definition_files": {f"{DEFINITIONS_PATH}/{fid}.yaml": sha256_file(package / "definitions" / f"{fid}.yaml")
-                                 for fid in plan.features},
+            "id": index["plan_id"],
+            "title": source.title,
+            "features": list(source.features),
+            "plan_files": source.plan_files,
+            "definition_files": source.definition_files,
         },
         "hand": {
             "model_name": hand.model_name, "side": hand.side, "motor_family": hand.motor_family,
@@ -277,6 +385,7 @@ def build_report(session_path: Path, *, allow_dirty: bool = False, root: Optiona
             "id": index.get("id"),
             "started_at": index.get("started_at"),
             "finished_at": index.get("finished_at"),
+            "code_changed": bool(index.get("code_changed")),
             "events_sha256": sha256_file(events),
             "results_sha256": results_sha,
         },
@@ -298,8 +407,8 @@ def report_name(report: dict) -> str:
 
 
 def export(session_path: Path, *, out: Optional[Path] = None, out_dir: Optional[Path] = None,
-           allow_dirty: bool = False, root: Optional[Path] = None, core: Optional[dict] = None) -> Path:
-    report = build_report(session_path, allow_dirty=allow_dirty, root=root, core=core)
+           allow_dirty: bool = False, root: Optional[Path] = None) -> Path:
+    report = build_report(session_path, allow_dirty=allow_dirty, root=root)
     target = out if out is not None else Path(out_dir) / report_name(report)
     store.write_text(target, dumps(report))
     return target
@@ -366,71 +475,33 @@ def _check_plan(report: dict, f: _Findings, ui_repo: Path, commit: str) -> tuple
 
     Returns step id -> kind and step id -> in base, as the commit defines them."""
     plan = report.get("plan") or {}
-
-    def read(path: str) -> Optional[bytes]:
-        return _git(ui_repo, "show", f"{commit}:{path}", binary=True)
-
-    raw_plans: dict = {}
-    plan_blobs: dict[str, bytes] = {}
-
-    def load(pid: str) -> bool:
-        """Read ``pid`` and what it includes from the commit; False after a problem."""
-        if pid in raw_plans:
-            return True
-        path = f"{PLANS_PATH}/{pid}.yaml"
-        blob = read(path)
-        if blob is None:
-            f.problem(f"{path} is not in the tested orca_ui commit {commit[:12]}")
-            return False
-        try:
-            raw_plans[pid] = cat.plan_from_text(blob.decode("utf-8"), Path(path).name)
-        except (cat.CatalogError, UnicodeDecodeError) as e:
-            f.problem(f"{path} in the tested commit does not load: {e}")
-            return False
-        plan_blobs[path] = blob
-        return all(load(included) for included in raw_plans[pid].includes)
-
-    if not load(str(plan.get("id"))):
-        return {}, {}
     try:
-        features = cat.resolve_features(plan["id"], raw_plans)
-        chain = cat.include_chain(plan["id"], raw_plans)
-        base_features = set(cat.resolve_features(BASE_PLAN, raw_plans)) if load(BASE_PLAN) else set()
-    except cat.CatalogError as e:
-        f.problem(f"the tested commit's plans do not resolve: {e}")
+        source = load_plan_source(commit_reader(ui_repo, commit), str(plan.get("id")))
+    except ReportError as e:
+        f.problem(f"the plan does not load from the tested orca_ui commit {commit[:12]}: {e}")
         return {}, {}
-
-    expected_plans = {p: sha256_bytes(plan_blobs[p]) for p in (f"{PLANS_PATH}/{c}.yaml" for c in chain)}
-    if (plan.get("plan_files") or {}) != expected_plans:
+    if (plan.get("plan_files") or {}) != source.plan_files:
         f.problem("the plan files' sha256 differ from the tested commit's (a plan edited after testing?)")
-    if list(plan.get("features") or []) != list(features):
+    if (plan.get("definition_files") or {}) != source.definition_files:
+        f.problem("the definition files' sha256 differ from the tested commit's (a step edited after testing?)")
+    if list(plan.get("features") or []) != list(source.features):
         f.problem("the report's feature list is not what the tested commit's plan resolves to")
-    if base_features and not base_features <= set(features):
-        f.problem(f"plan {plan['id']!r} does not include the base plan")
+    if source.base_features is None:
+        f.problem("the tested orca_ui commit has no loadable base plan")
+    elif not source.base_features <= set(source.features):
+        f.problem(f"plan {plan.get('id')!r} does not include the base plan")
 
-    expected_defs, kinds, base, expected_steps = {}, {}, {}, []
-    for fid in features:
-        path = f"{DEFINITIONS_PATH}/{fid}.yaml"
-        blob = read(path)
-        if blob is None:
-            f.problem(f"{path} is not in the tested orca_ui commit")
-            continue
-        expected_defs[path] = sha256_bytes(blob)
-        try:
-            feature = cat.feature_from_text(blob.decode("utf-8"), Path(path).name)
-        except (cat.CatalogError, UnicodeDecodeError) as e:
-            f.problem(f"{path} in the tested commit does not load: {e}")
-            continue
+    hand = hand_facts(report.get("hand") or {})
+    kinds, base, expected = {}, {}, []
+    for feature in source.definitions:
         for step in feature.steps:
             kinds[step.id] = step.kind
-            base[step.id] = fid in base_features
-            expected_steps.append((step.id, fid, step.kind, cat.applicability(step, hand_facts(report["hand"]))[0]))
-    if (plan.get("definition_files") or {}) != expected_defs:
-        f.problem("the definition files' sha256 differ from the tested commit's (a step edited after testing?)")
+            base[step.id] = feature.id in (source.base_features or ())
+            expected.append((step.id, feature.id, step.kind, cat.applicability(step, hand)[0]))
     listed = [(s.get("id"), s.get("feature"), s.get("kind"), s.get("applicable")) for s in report.get("steps") or []]
-    if listed != expected_steps:
-        missing = [e[0] for e in expected_steps if e not in listed]
-        extra = [s[0] for s in listed if s not in expected_steps]
+    if listed != expected:
+        missing = [e[0] for e in expected if e not in listed]
+        extra = [s[0] for s in listed if s not in expected]
         f.problem("the report's steps differ from the tested plan's (id, feature, kind, applicable): "
                   f"missing or changed {missing or '-'}, unexpected {extra or '-'}")
     return kinds, base
@@ -518,6 +589,8 @@ def verify(report: dict, *, repo: Optional[Path] = None, expect_commit: Optional
     if verdict != report.get("verdict"):
         f.problem(f"the verdict {report.get('verdict')!r} does not match the steps ({verdict!r})")
 
+    if (report.get("session") or {}).get("code_changed") is not False:
+        f.problem("the report does not say the code stayed the same during the session")
     if (report.get("hand") or {}).get("mock") is not False:
         f.problem("the session ran on a mock hand; a real hand is required")
     code = report.get("code_under_test") or {}
@@ -600,7 +673,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     where.add_argument("--out-dir", type=Path,
                        help=f"a folder (e.g. {REPORTS_DIR}/) to write <date>_<plan>_<model>_<motors>.json into")
     ex.add_argument("--allow-dirty", action="store_true",
-                    help="export from a modified checkout; the report records it and verify rejects it")
+                    help="export a session whose checkout was modified when it started; "
+                         "the report records it and verify rejects it")
     ve = sub.add_parser("verify", help="check a report strictly; exit 0 only when VERIFIED")
     ve.add_argument("report", type=Path)
     ve.add_argument("--repo", type=Path, help="a checkout of the repo the PR targets (orca_ui or orca_core)")
