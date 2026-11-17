@@ -69,7 +69,7 @@ class AppInfo:
 
 # The apps the console has a tab for. Adding one is one entry here and one tab.
 APPS = {
-    "teleop": AppInfo("Teleop", "uv run --frozen --project <orca_teleop folder> orca-teleop-streamer"),
+    "teleop": AppInfo("Teleop", "uv run --frozen --project <orca_teleop folder> --extra teleop orca-teleop-streamer"),
     "rl": AppInfo("RL", "uv run --frozen --project <orca_rl folder> orca-rl-console"),
 }
 
