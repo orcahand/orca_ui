@@ -689,7 +689,9 @@ class AppSessions:
 
     def _rule_app_exited(self, now: float) -> None:
         """An app process that exits ends its session."""
-        if self._state_now() in LIVE and self._mode == "managed":
+        with self._lock:
+            managed = self._state in LIVE and self._mode == "managed"
+        if managed:
             code = self._process.poll()
             if code is not None:
                 self._end(f"the app exited (code {code})",
