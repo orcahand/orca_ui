@@ -76,7 +76,8 @@ values for the next start. A setting is a small JSON Schema subset:
 - `live: true`: may change while engaged. Every other setting is locked while
   engaged ("disengage to change").
 - The console keeps only the fields above and drops a malformed setting (an
-  unknown type, an enum without valid choices), so check the tab after a change.
+  unknown type, an enum without valid choices) and any NaN or Infinity in a
+  bound, default, choice or value, so check the tab after a change.
 - Apply the `values` from `hello_ok` before opening devices.
 - Answer every `set` with a full `settings` message: the values actually
   applied, and an error text for each refused key. The tab shows exactly that.

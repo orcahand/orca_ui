@@ -24,6 +24,7 @@ types and unknown fields are ignored, so either side may add optional ones.
 
 from __future__ import annotations
 
+import json
 import math
 import secrets
 
@@ -110,14 +111,14 @@ def clean_schema(schema) -> list[dict]:
             if entry.get(text) is not None:
                 setting[text] = str(entry[text])
         for bound in ("minimum", "maximum"):
-            if isinstance(entry.get(bound), (int, float)) and not isinstance(entry[bound], bool):
+            if _finite_number(entry.get(bound)):
                 setting[bound] = entry[bound]
-        if "default" in entry:
+        if "default" in entry and json_safe(entry["default"]):
             setting["default"] = entry["default"]
         if kind == "enum":
             choices = [{"value": c["value"], "title": str(c.get("title", c["value"]))}
                        for c in _list(entry.get("choices"))
-                       if isinstance(c, dict) and "value" in c]
+                       if isinstance(c, dict) and "value" in c and json_safe(c["value"])]
             if not choices:
                 continue
             setting["choices"] = choices
@@ -126,6 +127,28 @@ def clean_schema(schema) -> list[dict]:
         if len(out) >= MAX_SETTINGS:
             break
     return out
+
+
+def clean_values(values) -> dict:
+    """Setting values the console can keep and publish: anything holding NaN
+    or Infinity (which Python's json reads) would break every strict send."""
+    if not isinstance(values, dict):
+        return {}
+    return {str(k): v for k, v in values.items() if json_safe(v)}
+
+
+def json_safe(value) -> bool:
+    """True when ``value`` survives strict JSON: no NaN or Infinity anywhere."""
+    try:
+        json.dumps(value, allow_nan=False)
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
+def _finite_number(value) -> bool:
+    return (isinstance(value, (int, float)) and not isinstance(value, bool)
+            and math.isfinite(value))
 
 
 def _list(value) -> list:

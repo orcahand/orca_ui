@@ -13,6 +13,8 @@ import os
 import threading
 from pathlib import Path
 
+from orca_ui.hand.app.protocol import clean_values
+
 logger = logging.getLogger(__name__)
 
 FIELDS = ("command", "schema", "values")
@@ -55,5 +57,5 @@ class AppStore:
         return {
             "command": str(data.get("command") or ""),
             "schema": schema if isinstance(schema, list) else [],
-            "values": values if isinstance(values, dict) else {},
+            "values": clean_values(values),  # a hand-edited NaN must not wedge a start
         }

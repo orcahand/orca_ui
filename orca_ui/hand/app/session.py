@@ -263,6 +263,18 @@ class AppSessions:
             self._started_at = self.clock()
             self._schema = protocol.clean_schema(record["schema"])
             self._values = dict(record["values"])
+        try:
+            return self._launch(app, mode, command, session_id, token)
+        except ServiceError:
+            raise
+        except Exception as e:
+            # Never leave a session in STARTING behind, nor its process running.
+            logger.exception("app start failed")
+            self._end(f"start failed: {e}", error=f"start failed: {e}", wait=True)
+            raise ServiceError(f"couldn't start {APPS[app].title}: {e}", status_code=500)
+
+    def _launch(self, app: str, mode: str, command: str, session_id: str,
+                token: str) -> dict:
         self._append_log(f"session {session_id}: starting {APPS[app].title} ({mode})")
         self._ensure_watchdog()
         if mode == "managed":
@@ -562,7 +574,7 @@ class AppSessions:
 
     def _on_settings(self, data: dict) -> None:
         schema = protocol.clean_schema(data.get("schema"))
-        values = data.get("values") if isinstance(data.get("values"), dict) else {}
+        values = protocol.clean_values(data.get("values"))
         errors = data.get("errors") if isinstance(data.get("errors"), dict) else {}
         with self._lock:
             self._schema, self._values = schema, dict(values)

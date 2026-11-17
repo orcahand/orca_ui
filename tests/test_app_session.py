@@ -18,6 +18,7 @@ from orca_ui.mock import materialize_mock_model
 from orca_ui.server import create_app
 from orca_ui.settings import UiSettings
 from orca_ui.streaming import topics as T
+from orca_ui.streaming.hub import _envelope
 
 LIVE = {"key": "speed", "type": "number", "minimum": 0, "maximum": 1, "live": True}
 LOCKED = {"key": "camera", "type": "enum", "choices": [{"value": "0"}, {"value": "1"}]}
@@ -183,6 +184,25 @@ def test_remembered_command_and_settings_reach_the_next_start(client):
     assert client.post("/api/app/teleop/settings", json={"values": {"bogus": 1}}).status_code == 400
     _, reply = _connected(client)
     assert reply["values"] == {"speed": 0.5, "camera": "0"}
+
+
+def test_infinity_or_nan_from_an_app_never_breaks_the_tab_or_the_next_start(client):
+    link, _ = _connected(client)
+    inf, nan = float("inf"), float("nan")  # Python's json reads both
+    _apps(client).on_message(link, "settings", {
+        "schema": [{"key": "gain", "type": "number", "maximum": inf, "default": nan},
+                   {"key": "mode", "type": "enum", "choices": [{"value": inf}, {"value": 1}]}],
+        "values": {"gain": inf, "mode": 1}})
+    _envelope(T.APP_STATE, 1, 0.0, _hub(client, T.APP_STATE))  # strict JSON, as /ws sends it
+    assert client.get("/api/app/state").json()["session"]["settings"]["values"] == {"mode": 1}
+    client.post("/api/app/stop")
+
+    # A stored file holding Infinity (hand-edited, or from an older console).
+    stored = _apps(client)._store._root / "teleop.json"
+    stored.write_text('{"command": "", "schema": [], "values": {"gain": Infinity, "mode": 1}}')
+    assert client.get("/api/app/list").status_code == 200
+    response = client.post("/api/app/start", json={"app": "teleop", "mode": "external"})
+    assert response.status_code == 200 and response.json()["session"]["state"] == "starting"
 
 
 # ----- preview -------------------------------------------------------------------------
