@@ -319,7 +319,11 @@ export const api = {
     put<{ apps: AppEntry[] }>(`/api/app/${app}/command`, { command }),
   // Sent to the running app (which confirms on app.state), else remembered.
   appSetValues: (app: AppId, values: Record<string, unknown>) =>
-    post<{ sent: boolean; values?: Record<string, unknown> }>(
+    post<{
+      sent: boolean
+      values?: Record<string, unknown>
+      errors: Record<string, string> // refused keys, with why
+    }>(
       `/api/app/${app}/settings`,
       { values },
     ),

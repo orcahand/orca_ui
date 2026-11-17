@@ -22,16 +22,34 @@ export function SettingsForm({
   const live = isAppActive(session)
   const schema = live ? session!.settings.schema : (entry?.schema ?? [])
   const values = live ? session!.settings.values : (entry?.values ?? {})
-  const errors = live ? session!.settings.errors : {}
   const engaged = session?.state === 'engaged'
+  // Refusals by the console itself, kept only for the session they came from.
+  const scope = live ? session!.session_id : null
+  const [refused, setRefused] = useState<{
+    scope: string | null
+    errors: Record<string, string>
+  }>({ scope: null, errors: {} })
+  const local = refused.scope === scope ? refused.errors : {}
+  const errors = { ...(live ? session!.settings.errors : {}), ...local }
 
-  const change = (key: string, value: unknown) =>
+  const refuse = (key: string, error: string | undefined) =>
+    setRefused((r) => {
+      const { [key]: _, ...rest } = r.scope === scope ? r.errors : {}
+      return { scope, errors: error ? { ...rest, [key]: error } : rest }
+    })
+
+  const change = (setting: AppSetting, value: unknown) => {
+    const problem = checkValue(setting, value)
+    refuse(setting.key, problem)
+    if (problem) return
     void api
-      .appSetValues(app, { [key]: value })
-      .then(() => {
+      .appSetValues(app, { [setting.key]: value })
+      .then((reply) => {
+        refuse(setting.key, reply.errors?.[setting.key])
         if (!live) void useAppSessionStore.getState().refreshApps()
       })
       .catch(fail)
+  }
 
   return (
     <Panel title="Settings">
@@ -62,7 +80,7 @@ export function SettingsForm({
                   setting={setting}
                   value={values[setting.key] ?? setting.default}
                   disabled={locked}
-                  onChange={(value) => change(setting.key, value)}
+                  onChange={(value) => change(setting, value)}
                 />
               </Field>
             )
@@ -71,6 +89,19 @@ export function SettingsForm({
       )}
     </Panel>
   )
+}
+
+// The same check the backend makes, so a bad number is flagged before it's sent.
+function checkValue(setting: AppSetting, value: unknown): string | undefined {
+  if (setting.type !== 'number' && setting.type !== 'integer') return undefined
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 'must be a number'
+  if (setting.type === 'integer' && !Number.isInteger(value))
+    return 'must be a whole number'
+  if (setting.minimum !== undefined && value < setting.minimum)
+    return `must be at least ${setting.minimum}`
+  if (setting.maximum !== undefined && value > setting.maximum)
+    return `must be at most ${setting.maximum}`
+  return undefined
 }
 
 function Field({
@@ -164,7 +195,7 @@ function TypedInput({
   const numeric = setting.type === 'number' || setting.type === 'integer'
   const commit = (raw: string) => {
     const next = numeric ? Number(raw) : raw
-    if (raw === '' || (numeric && !Number.isFinite(next)) || next === value) return
+    if (raw === '' || next === value) return
     setCommits((n) => n + 1)
     onChange(next)
   }

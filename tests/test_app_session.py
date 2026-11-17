@@ -182,6 +182,8 @@ def test_remembered_command_and_settings_reach_the_next_start(client):
     # Changed while no app runs: remembered, and handed to the next app.
     assert client.post("/api/app/teleop/settings", json={"values": {"camera": "0"}}).status_code == 200
     assert client.post("/api/app/teleop/settings", json={"values": {"bogus": 1}}).status_code == 400
+    refused = client.post("/api/app/teleop/settings", json={"values": {"speed": 5, "camera": "7"}})
+    assert set(refused.json()["errors"]) == {"speed", "camera"}  # out of range, not a choice
     _, reply = _connected(client)
     assert reply["values"] == {"speed": 0.5, "camera": "0"}
 

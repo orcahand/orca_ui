@@ -81,6 +81,7 @@ values for the next start. A setting is a small JSON Schema subset:
 - Apply the `values` from `hello_ok` before opening devices.
 - Answer every `set` with a full `settings` message: the values actually
   applied, and an error text for each refused key. The tab shows exactly that.
+  The console only sends values that fit the setting's type, range and choices.
 
 ## What the console does with targets
 

@@ -211,7 +211,8 @@ class AppSessions:
 
     def set_values(self, app: str, values: dict) -> dict:
         """A settings change from the user. Sent to the running app, which
-        answers with ``settings``; remembered for the next start otherwise."""
+        answers with ``settings``; remembered for the next start otherwise.
+        Values that don't fit the schema are refused, each with its reason."""
         _require_app(app)
         if not isinstance(values, dict) or not values:
             raise ServiceError("no settings given", status_code=400)
@@ -229,14 +230,18 @@ class AppSessions:
                 if locked:
                     raise ServiceError(
                         f"disengage to change {', '.join(locked)}", status_code=409)
+            errors = {k: e for k, v in values.items()
+                      if (e := protocol.check_value(by_key[k], v))}
+            good = {k: v for k, v in values.items() if k not in errors}
             if live and self._link is not None:
-                self._send_locked(protocol.MSG_SET, dict(values))
-                return {"sent": True}
+                if good:
+                    self._send_locked(protocol.MSG_SET, good)
+                return {"sent": bool(good), "errors": errors}
             if live:
-                self._values.update(values)
-        record = self._store.update(app, values={**stored["values"], **values})
+                self._values.update(good)
+        record = self._store.update(app, values={**stored["values"], **good}) if good else stored
         self._publish_state()
-        return {"sent": False, "values": record["values"]}
+        return {"sent": False, "values": record["values"], "errors": errors}
 
     # ----- lifecycle ---------------------------------------------------------------------
 

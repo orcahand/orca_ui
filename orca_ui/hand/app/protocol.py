@@ -129,6 +129,29 @@ def clean_schema(schema) -> list[dict]:
     return out
 
 
+def check_value(setting: dict, value) -> str | None:
+    """Why ``value`` doesn't fit a cleaned ``setting``, or None when it does."""
+    kind = setting["type"]
+    if kind == "boolean":
+        return None if isinstance(value, bool) else "must be true or false"
+    if kind == "string":
+        return None if isinstance(value, str) else "must be text"
+    if kind == "enum":
+        fits = any(c["value"] == value
+                   and isinstance(c["value"], bool) == isinstance(value, bool)
+                   for c in setting["choices"])
+        return None if fits else "not one of the choices"
+    if not _finite_number(value):
+        return "must be a number"
+    if kind == "integer" and not isinstance(value, int):
+        return "must be a whole number"
+    if "minimum" in setting and value < setting["minimum"]:
+        return f"must be at least {setting['minimum']}"
+    if "maximum" in setting and value > setting["maximum"]:
+        return f"must be at most {setting['maximum']}"
+    return None
+
+
 def clean_values(values) -> dict:
     """Setting values the console can keep and publish: anything holding NaN
     or Infinity (which Python's json reads) would break every strict send."""
