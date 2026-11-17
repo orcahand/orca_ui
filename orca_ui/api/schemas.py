@@ -204,7 +204,12 @@ class AppStartRequest(BaseModel):
     mode: Literal["managed", "external"] = "managed"
 
 
-class AppEngageRequest(BaseModel):
+class AppSessionRequest(BaseModel):
+    # The session the caller is looking at: a different current one is refused.
+    session_id: Optional[str] = None
+
+
+class AppEngageRequest(AppSessionRequest):
     # No instant engage: the hand always ramps in from where it is.
     ramp_s: Optional[float] = Field(default=None, ge=0.5, le=10)
 

@@ -56,6 +56,9 @@ ENGAGE_WHAT = (
     "motion source is external and unpredictable. Before confirming: check "
     "the app's picture (orca_get_app_picture) and ghost, ensure the workspace "
     "is clear, and confirm the user asked for this.")
+SESSION_ID_HELP = (
+    "the app session you mean (from orca_app_start or orca_get_status); "
+    "refused if another session is current. Pass it whenever you have it.")
 
 
 def _ann(title: str, *, read_only: bool = False, destructive: bool = False,
@@ -148,6 +151,7 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
             session = (await backend.get("/api/app/state")).get("session")
             out["app_session"] = session and {
                 "state": session.get("state"), "app": session.get("app"),
+                "session_id": session.get("session_id"),
                 "engaged": session.get("engaged")}
         except BackendError:
             out["app_session"] = None
@@ -800,6 +804,8 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
             ge=0.5, le=10,
             description="blend-in ramp seconds (backend default when "
                         "omitted)")] = None,
+        session_id: Annotated[str | None, Field(
+            description=SESSION_ID_HELP)] = None,
     ) -> dict:
         """Engage the app: the physical hand starts following its targets
         (range-clamped, ramped in, held when targets stop). Needs a session
@@ -811,20 +817,24 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
         gate = await confirm_gate(state, confirm, ENGAGE_WHAT)
         if gate:
             return gate
-        body = {"ramp_s": ramp_s} if ramp_s is not None else None
-        result = await backend.post("/api/app/engage", body)
+        body = {k: v for k, v in (("ramp_s", ramp_s), ("session_id", session_id))
+                if v is not None}
+        result = await backend.post("/api/app/engage", body or None)
         return await with_state(
             state, {"ok": True, "session": result.get("session")})
 
     @tool(annotations=_ann("Stop/disengage the app", idempotent=True))
     async def orca_app_stop(
         action: Literal["stop", "disengage"] = "stop",
+        session_id: Annotated[str | None, Field(
+            description=SESSION_ID_HELP)] = None,
     ) -> dict:
         """'disengage' returns to preview with the hand holding its pose
         (the app keeps running); 'stop' ends the app and, if it was engaged,
         turns torque off where the hand is."""
+        body = {"session_id": session_id} if session_id else None
         if action == "disengage":
-            result = await backend.post("/api/app/disengage")
+            result = await backend.post("/api/app/disengage", body)
             return {"ok": True, "session": result.get("session")}
-        result = await backend.post("/api/app/stop")
+        result = await backend.post("/api/app/stop", body)
         return {"ok": True, "stopped": result.get("stopped")}

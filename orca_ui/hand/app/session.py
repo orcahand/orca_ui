@@ -324,11 +324,13 @@ class AppSessions:
         self._log.clear()
         self._log_seq = 0
 
-    def stop(self) -> bool:
-        """End the session and wait until the app is gone. Clears an error."""
-        if self._end("stopped", wait=True):
+    def stop(self, session_id: str | None = None) -> bool:
+        """End the session and wait until the app is gone. Clears an error.
+        With ``session_id``, only that session (409 when another is current)."""
+        if self._end("stopped", wait=True, expected=session_id):
             return True
         with self._lock:
+            _check_session_locked(self._session_id, session_id)
             if self._state != ERROR:
                 return False
             self._state = IDLE
@@ -357,11 +359,13 @@ class AppSessions:
             watchdog.join(timeout=1.0)
 
     def _end(self, reason: str, *, error: str | None = None,
-             torque_off: bool = True, wait: bool = False) -> bool:
+             torque_off: bool = True, wait: bool = False,
+             expected: str | None = None) -> bool:
         """The one end path. False when no session was live."""
         with self._lock:
             if self._state not in LIVE:
                 return False
+            _check_session_locked(self._session_id, expected)
             was_engaged = self._state == ENGAGED
             self._state = STOPPING
             self._ramp = None
@@ -414,10 +418,11 @@ class AppSessions:
 
     # ----- engage / disengage --------------------------------------------------------
 
-    def engage(self, ramp_s: float | None = None) -> dict:
+    def engage(self, ramp_s: float | None = None, *, session_id: str | None = None) -> dict:
         """Take the hand. Allowed while tracking is lost: the hand holds until
         targets arrive, then ramps in from where it is."""
         with self._lock:
+            _check_session_locked(self._session_id, session_id)
             if self._state != PREVIEW:
                 raise ServiceError(f"the app is not in preview (state: {self._state})",
                                    status_code=409)
@@ -465,13 +470,15 @@ class AppSessions:
         self._publish_state()
         return self.snapshot()
 
-    def disengage(self) -> dict:
-        self._disengage("disengaged")
+    def disengage(self, session_id: str | None = None) -> dict:
+        self._disengage("disengaged", expected=session_id)
         return self.snapshot()
 
-    def _disengage(self, reason: str, auto: bool = False) -> None:
+    def _disengage(self, reason: str, auto: bool = False,
+                   expected: str | None = None) -> None:
         """Back to preview; the hand holds its pose with torque on."""
         with self._lock:
+            _check_session_locked(self._session_id, expected)
             if self._state != ENGAGED:
                 return
             self._state = PREVIEW
@@ -765,6 +772,14 @@ class AppSessions:
 
     def _publish_state(self) -> None:
         self._publish_topic(T.APP_STATE, self.snapshot())
+
+
+def _check_session_locked(current: str | None, expected: str | None) -> None:
+    """A caller naming a session acts only on that one (a stale tab or agent)."""
+    if expected is not None and expected != current:
+        raise ServiceError(f"app session {expected} is no longer the current one "
+                           f"(now {current or 'none'}) — refresh and try again",
+                           status_code=409)
 
 
 def _require_app(app: str) -> None:

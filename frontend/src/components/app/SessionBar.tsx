@@ -29,7 +29,7 @@ export function SessionBar() {
       const app = useAppStore.getState()
       if (app.error === banner) app.setError(null)
       setDismissedSession(session.session_id)
-      void api.appStop().catch(() => undefined) // clears the error
+      void api.appStop(session.session_id).catch(() => undefined) // clears the error
     }
     return (
       <div className="transport-bar error">
@@ -84,7 +84,7 @@ export function SessionBar() {
               className="btn btn-danger"
               disabled={gate !== null}
               title={gate ?? 'the hand follows the app, ramping in from where it is'}
-              onClick={engage}
+              onClick={() => engage(session)}
             >
               ⚡ engage
             </button>
@@ -94,7 +94,7 @@ export function SessionBar() {
           <button
             className="btn btn-secondary"
             title="back to preview — the hand holds its pose"
-            onClick={disengage}
+            onClick={() => disengage(session)}
           >
             disengage
           </button>
@@ -107,7 +107,7 @@ export function SessionBar() {
                 ? 'end the app — torque goes off where the hand is'
                 : 'end the app'
             }
-            onClick={stop}
+            onClick={() => stop(session)}
           >
             ■ stop
           </button>

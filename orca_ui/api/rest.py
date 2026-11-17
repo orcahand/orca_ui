@@ -329,17 +329,19 @@ def build_router(service: HandService, apps=None) -> APIRouter:
         return guard(_apps().start, body.app, body.mode)
 
     @router.post("/app/stop")
-    def app_stop():
-        return {"ok": True, "stopped": _apps().stop()}
+    def app_stop(body: schemas.AppSessionRequest | None = None):
+        session_id = body.session_id if body else None
+        return {"ok": True, "stopped": guard(_apps().stop, session_id)}
 
     @router.post("/app/engage")
     def app_engage(body: schemas.AppEngageRequest | None = None):
-        ramp_s = body.ramp_s if body else None
-        return {"session": guard(_apps().engage, ramp_s)}
+        body = body or schemas.AppEngageRequest()
+        return {"session": guard(_apps().engage, body.ramp_s, session_id=body.session_id)}
 
     @router.post("/app/disengage")
-    def app_disengage():
-        return {"session": guard(_apps().disengage)}
+    def app_disengage(body: schemas.AppSessionRequest | None = None):
+        session_id = body.session_id if body else None
+        return {"session": guard(_apps().disengage, session_id)}
 
     # ----- motor control -------------------------------------------------------
 

@@ -329,13 +329,20 @@ export const api = {
     ),
   appStart: (app: AppId) =>
     post<{ session: AppSnapshot }>('/api/app/start', { app, mode: 'managed' }),
-  appStop: () => post<{ ok: boolean; stopped: boolean }>('/api/app/stop'),
-  appEngage: (rampS?: number) =>
-    post<{ session: AppSnapshot }>(
-      '/api/app/engage',
-      rampS === undefined ? {} : { ramp_s: rampS },
-    ),
-  appDisengage: () => post<{ session: AppSnapshot }>('/api/app/disengage'),
+  // Each names the session the caller shows; another current session is a 409.
+  appStop: (sessionId: string | null) =>
+    post<{ ok: boolean; stopped: boolean }>('/api/app/stop', {
+      session_id: sessionId,
+    }),
+  appEngage: (sessionId: string | null, rampS?: number) =>
+    post<{ session: AppSnapshot }>('/api/app/engage', {
+      session_id: sessionId,
+      ...(rampS === undefined ? {} : { ramp_s: rampS }),
+    }),
+  appDisengage: (sessionId: string | null) =>
+    post<{ session: AppSnapshot }>('/api/app/disengage', {
+      session_id: sessionId,
+    }),
 
   modelMetadata: () => request<ModelMetadata>('/api/model/metadata'),
   modelFingertips: () =>

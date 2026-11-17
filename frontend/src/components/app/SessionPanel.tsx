@@ -85,23 +85,23 @@ export function SessionPanel({ app, entry }: { app: AppId; entry: AppEntry | nul
                 className="btn btn-danger"
                 disabled={!gate.allowed}
                 title={gate.reason ?? 'the hand follows the app, ramping in'}
-                onClick={engage}
+                onClick={() => mine && engage(mine)}
               >
                 ⚡ Engage
               </button>
             )}
             {mine?.state === 'engaged' && (
-              <button className="btn btn-secondary" onClick={disengage}>
+              <button className="btn btn-secondary" onClick={() => mine && disengage(mine)}>
                 Disengage
               </button>
             )}
-            <button className="btn btn-secondary" onClick={stop}>
+            <button className="btn btn-secondary" onClick={() => mine && stop(mine)}>
               ■ Stop
             </button>
           </>
         )}
         {mine?.state === 'error' && (
-          <button className="btn btn-secondary" onClick={stop}>
+          <button className="btn btn-secondary" onClick={() => mine && stop(mine)}>
             clear
           </button>
         )}

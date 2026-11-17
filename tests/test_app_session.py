@@ -232,7 +232,12 @@ def test_engage_needs_torque_and_locks_manual_control_until_disengage(client):
 
     assert client.post("/api/torque/enable").status_code == 200
     assert client.post("/api/app/engage", json={"ramp_s": 0}).status_code == 422  # no instant engage
-    assert client.post("/api/app/engage", json={"ramp_s": 0.5}).status_code == 200
+    # A stale tab or agent naming another session acts on nothing.
+    for action in ("engage", "stop"):
+        assert client.post(f"/api/app/{action}", json={"session_id": "app-old"}).status_code == 409
+    assert client.get("/api/app/state").json()["session"]["state"] == "preview"
+    assert client.post("/api/app/engage", json={"ramp_s": 0.5,
+                                                "session_id": reply["session_id"]}).status_code == 200
     assert link.of_type("engaged") == [{"engaged": True}]
     assert _control(client)["control_source"] == "app"
     joint = reply["hand"]["joints"][0]
