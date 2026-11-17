@@ -1,0 +1,34 @@
+id: base
+title: Base checks that must never fail
+summary: 'What every release of the console and orca_core must keep doing on a real hand: connect and load,
+  pass both suites, keep its defaults and records, survive a damaged file, calibrate as main does, and let go
+  of the hand on Stop and E-STOP. Every other plan includes it.'
+features:
+# Both test suites and the downstream check, on exactly the code under test.
+- software
+# Detection still picks the same model, side, ports and sensors as main.
+- connect-detect
+# Every packaged model config still loads.
+- config-loading
+# Currents left on "default" resolve to the motor family's own safe values.
+- current-defaults
+# Setup records come from the connected hand's own folder, never another hand's.
+- r14-records
+# The console's pages still answer, and Disconnect leaves torque off.
+- r14-console
+# An unreadable hand file is set aside instead of stopping the hand.
+- r14-damaged-file
+# orca_core's scripts still start and take the shared flags.
+- script-flags
+# Neutral matches main; the one hands-on step: every slider moves its joint the right way.
+- neutral-manual
+# Calibration still finds the same hardstops as main.
+- plain-calibration
+# Tactile hands only: sensor health and live data as on main.
+- touch-sensors
+# Tactile hands only: the tactile zero comes back after a reconnect.
+- r14-touch
+# Encoder hands only: the closed loop, and its watchdog when the encoder link is lost.
+- joint-loop
+# Every routine lets go of the hand on Stop and E-STOP. Last: it drives the hand hardest.
+- r14-stops

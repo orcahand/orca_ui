@@ -49,9 +49,13 @@ def test_the_release_plan_is_offered_first_and_people_only_get_hands_on_steps():
     catalog = cat.load_catalog()
     assert next(iter(catalog.plans)) == PLAN
     features = catalog.plan_features(PLAN)
-    assert features[0].id == "r14-hands-on"
+    base = catalog.plans["base"].features
+    assert tuple(f.id for f in features[:len(base)]) == base and features[len(base)].id == "r14-hands-on"
+    base_steps = {s.id for fid in base for s in catalog.features[fid].steps}
     hands_on = [s for f in features for s in f.steps if cat.is_hands_on(s)]
-    assert hands_on and all(s.id.startswith("H") for s in hands_on)
+    assert all(s.id.startswith("H") for s in hands_on if s.id not in base_steps)
+    # The base plan asks a person for at most a couple of things.
+    assert 0 < len([s for s in hands_on if s.id in base_steps]) <= 2
 
 
 def test_release_checks_run_on_the_mock_hand_and_put_everything_back(client):
