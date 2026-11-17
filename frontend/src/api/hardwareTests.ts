@@ -139,6 +139,8 @@ export interface HwSession {
   auto: HwAutoState
   open_step: string | null
   features: HwFeature[]
+  // The code differs from what the session started on; its results cannot be exported.
+  code_changed?: boolean
 }
 
 export interface HwPlanSummary {

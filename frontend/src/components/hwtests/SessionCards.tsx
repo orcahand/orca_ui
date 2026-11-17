@@ -95,6 +95,11 @@ export function SessionCard({ session }: { session: HwSession }) {
         {session.finished_at && <span>finished {formatTime(session.finished_at)}</span>}
         <StepCounts steps={steps} />
       </div>
+      {session.code_changed && (
+        <div className="hwt-hint warn">
+          The code changed during this session; its results can't be exported.
+        </div>
+      )}
       <div className="hwt-facts">
         <span className="capability-badge on">{hand.label}</span>
         <span className="capability-badge">{hand.model_name ?? 'model unknown'}</span>
