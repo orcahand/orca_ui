@@ -30,7 +30,8 @@ def service():
     svc._test_statuses = statuses
     svc._test_errors = errors
     svc.start()
-    assert _wait_for(lambda: svc.status()["state"] == "connected"), svc.status()
+    # "connected" is published before the session's own setup (tactile stream) has run.
+    assert _wait_for(lambda: svc.status()["state"] == "connected" and svc.session_ready), svc.status()
     try:
         yield svc
     finally:
