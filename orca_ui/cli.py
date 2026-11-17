@@ -97,9 +97,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--no-teleop", action="store_true",
                         help="Disable the teleoperation subsystem entirely.")
     parser.add_argument("--hardware-tests", action="store_true",
-                        help="Show the Tests tab (hardware tests for a plan) even "
-                             "with a released orca_core; it is always shown with "
-                             "a development one.")
+                        help="Show the Tests tab (hardware tests for a plan); "
+                             "it is hidden without this flag.")
     parser.add_argument("--bench-dir", type=str, default=None,
                         help="Root folder for hardware-test results "
                              "(default ~/orca_bench).")

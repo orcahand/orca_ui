@@ -42,8 +42,7 @@ export function TestsView() {
     return (
       <Panel title="Hardware tests">
         <div className="panel-empty">
-          The Tests tab is off. It turns on when the console runs a development orca_core or is
-          started with --hardware-tests.
+          The Tests tab is off. It turns on when the console is started with --hardware-tests.
         </div>
       </Panel>
     )

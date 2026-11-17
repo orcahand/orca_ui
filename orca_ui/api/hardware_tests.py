@@ -36,7 +36,7 @@ def build_router(tests: HardwareTests) -> APIRouter:
 
     def guard(fn, *args, **kwargs):
         if not tests.enabled:
-            raise HTTPException(404, "the Tests tab is not enabled (start with --hardware-tests or a development orca_core)")
+            raise HTTPException(404, "the Tests tab is not enabled (start the console with --hardware-tests)")
         try:
             return fn(*args, **kwargs)
         except HardwareTestsError as e:

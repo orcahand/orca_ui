@@ -60,7 +60,7 @@ class UiSettings:
     teleop_hold_after_ms: int = 250        # target silence -> tracking lost
     teleop_disengage_after_s: float = 10.0  # lost this long -> auto-disengage (0 = never)
 
-    # Hardware tests tab: shown with this flag or on a development orca_core.
+    # Hardware tests tab: shown only with this flag (--hardware-tests).
     # Results go under <bench_dir>/<hand>/tests/ (None -> ~/orca_bench);
     # main_core is main's orca_core checkout for main-vs-branch comparisons.
     hardware_tests: bool = False

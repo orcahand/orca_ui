@@ -7,7 +7,9 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
+from orca_ui import core_source
 from orca_ui.hardware_tests import session as hw_session
+from orca_ui.hardware_tests import tab_enabled
 from orca_ui.mock import materialize_mock_model
 from orca_ui.server import create_app
 from orca_ui.settings import UiSettings
@@ -32,6 +34,14 @@ def client(tmp_path):
     with TestClient(create_app(settings)) as test_client:
         assert _wait_for(lambda: test_client.get("/api/status").json()["state"] == "connected")
         yield test_client
+
+
+def test_only_the_flag_shows_the_tab(monkeypatch):
+    # The Tests tab moves the hand; a development orca_core alone must not show it.
+    monkeypatch.setattr(core_source, "resolve_cached",
+                        lambda: core_source.CoreSource(version="0.14.0", kind="local"))
+    assert not tab_enabled(UiSettings(config_path="config.yaml"))
+    assert tab_enabled(UiSettings(config_path="config.yaml", hardware_tests=True))
 
 
 def test_disabled_tab_answers_state_and_refuses_writes(client, monkeypatch):
