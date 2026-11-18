@@ -12,7 +12,7 @@ import { FingerMonitor } from './FingerMonitor'
 import { FingerPresets } from './FingerPresets'
 import { FingerRange } from './FingerRange'
 import { FingerTendons } from './FingerTendons'
-import { STEPS, hasRange, readyJoints, resolve, useFingerStore } from './fingerStore'
+import { STEPS, drivableJoints, hasRange, resolve, useFingerStore } from './fingerStore'
 
 export function FingerWorkflow({ connected }: { connected: boolean }) {
   const step = useFingerStore((s) => s.step)
@@ -33,7 +33,7 @@ export function FingerWorkflow({ connected }: { connected: boolean }) {
       tendons: `${tendons.filter((t) => t.motor !== null).length}/${tendons.length} on a motor`,
       coupling: `${solvable.length}/${joints.length} solvable`,
       range: `${resolved.filter(hasRange).length}/${joints.length} captured`,
-      control: `${readyJoints(resolved).length} ready`,
+      control: `${drivableJoints(resolved).length} drivable`,
     }
   }, [tendons, joints])
 
@@ -55,7 +55,7 @@ export function FingerWorkflow({ connected }: { connected: boolean }) {
       </nav>
       <FingerPresets locked={engaged} />
       {step === 'tendons' && <FingerTendons connected={connected} locked={engaged} />}
-      {step === 'coupling' && <FingerCoupling locked={engaged} />}
+      {step === 'coupling' && <FingerCoupling connected={connected} locked={engaged} />}
       {step === 'range' && <FingerRange connected={connected} locked={engaged} />}
       {step === 'control' && (
         <div className="bench-main fingers-main">

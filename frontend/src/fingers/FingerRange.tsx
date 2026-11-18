@@ -23,7 +23,7 @@ const DEG = Math.PI / 180
 
 // Hold or release every motor of the joint's coupling, and jog the joint in
 // joint degrees through the inverse of the coupling.
-function JointHandles({
+export function JointHandles({
   joint,
   coupling,
   connected,

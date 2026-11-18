@@ -496,6 +496,8 @@ export interface FingerJointStored {
   open_deg: number | null
   closed_deg: number | null
   group: string
+  // The operator checked this equation on the hand: locked.
+  confirmed?: boolean
 }
 
 // A named pose: a fraction per joint name, 0 open to 1 closed.

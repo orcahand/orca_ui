@@ -191,7 +191,10 @@ def _clean_joint(entry, index: int) -> dict:
                 raise ServiceError(who + f"{key} must be a number or null")
         ends[key] = value
     group = str(entry.get("group") or "").strip()[:32]
-    return {"name": name, "terms": terms, "group": group, **ends}
+    out = {"name": name, "terms": terms, "group": group, **ends}
+    if entry.get("confirmed") is True:
+        out["confirmed"] = True
+    return out
 
 
 def clean_joints(raw) -> list[dict]:

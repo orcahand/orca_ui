@@ -187,14 +187,6 @@ function TendonRow({
         <span className="finger-live" title="live shaft position">
           <span ref={posRef}>—</span>
         </span>
-        <button
-          className={`btn btn-secondary finger-direction ${(tendon.direction ?? 1) < 0 ? 'on' : ''}`}
-          disabled={locked}
-          title="winding sense: flip when the tendon is wound the other way round its spool, so + turns pay it out instead of pulling it in"
-          onClick={() => patchTendon(index, { direction: (tendon.direction ?? 1) < 0 ? 1 : -1 })}
-        >
-          {(tendon.direction ?? 1) < 0 ? 'wound −' : 'wound +'}
-        </button>
         <MotorHandles motorId={tendon.motor} connected={connected} />
         <span className="finger-span">{movers.length ? `moves ${movers.join(', ')}` : 'moves nothing yet'}</span>
         <span className="finger-row-tools">
@@ -226,8 +218,7 @@ export function FingerTendons({ connected, locked }: { connected: boolean; locke
         <h2>Tendons</h2>
         <small className="finger-hint">
           name each tendon and pick the motor it is wound on, here or by clicking the motor on the tower —
-          hold a motor and jog it to see which tendon moves; hold all to tension the spools. If the MCP and PIP of a finger come out swapped, flip the
-          winding sense of one of its tendons
+          hold a motor and jog it to see which tendon moves; hold all to tension the spools. Which way a tendon is wound is the + or − of its terms in the Coupling step
         </small>
         <HoldAll connected={connected} />
         <button

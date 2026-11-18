@@ -3,6 +3,8 @@
 // joints together. The sliders can be kept as named poses, and the run can
 // cycle through the poses in order. Everything the operation validates is
 // gated here too, so Engage says why it is off instead of bouncing a 409.
+// A joint whose ends are not captured yet is driven inside a window of ±
+// a few joint degrees around where it is at Engage.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api/rest'
@@ -12,18 +14,31 @@ import { useMotorLive } from '../bench/useMotorLive'
 import { useAppStore } from '../state/appStore'
 import { isOperationActive, operationLabel, useOperationStore } from '../state/operationStore'
 import { type MotorJoint, couplingsOf, jointAnglesOf } from './coupling'
-import { type FingerPose, fractionOf, groupsOf, readyJoints, resolve, useFingerStore } from './fingerStore'
+import {
+  type FingerPose,
+  WINDOW_DEG,
+  drivableJoints,
+  fractionOf,
+  groupsOf,
+  hasRange,
+  resolve,
+  useFingerStore,
+  windowed,
+} from './fingerStore'
 
 function JointSlider({
   joint,
   all,
   engaged,
   short,
+  window,
 }: {
   joint: MotorJoint
   all: MotorJoint[]
   engaged: boolean
   short: Record<string, number>
+  // Half-width of the window the joint is driven in, when it has no captured range.
+  window: number | null
 }) {
   const motors = useBenchStore((s) => s.motors)
   const shortText = Object.entries(short)
@@ -61,7 +76,17 @@ function JointSlider({
       className="finger-slider"
       title={`${joint.name} = ${joint.terms.map((t) => `${t.gain} · θ(motor ${t.motor})`).join(' + ')}`}
     >
-      <span className="finger-slider-name">{joint.name}</span>
+      <span className="finger-slider-name">
+        {joint.name}
+        {window !== null && (
+          <small
+            className="finger-slider-window"
+            title="no range captured: driven this far either way from where the joint was at Engage (50%)"
+          >
+            ±{window}°
+          </small>
+        )}
+      </span>
       <span className="finger-slider-track">
         <input
           type="range"
@@ -95,12 +120,14 @@ function GroupSlider({
   all,
   engaged,
   shorts,
+  windows,
 }: {
   group: string
   joints: MotorJoint[]
   all: MotorJoint[]
   engaged: boolean
   shorts: Record<string, Record<string, number>>
+  windows: Record<string, number>
 }) {
   const targets = useFingerStore((s) => s.targets)
   const setTargets = useFingerStore((s) => s.setTargets)
@@ -145,7 +172,14 @@ function GroupSlider({
         </span>
       </div>
       {joints.map((joint) => (
-        <JointSlider key={joint.name} joint={joint} all={all} engaged={engaged} short={shorts[joint.name] ?? {}} />
+        <JointSlider
+          key={joint.name}
+          joint={joint}
+          all={all}
+          engaged={engaged}
+          short={shorts[joint.name] ?? {}}
+          window={windows[joint.name] ?? null}
+        />
       ))}
     </div>
   )
@@ -309,7 +343,9 @@ export function FingerControl({ connected }: { connected: boolean }) {
   // Latched hardware errors by motor id, from the fault stream; a latched
   // motor acks torque and never moves, so it must be cleared before Engage.
   const [faults, setFaults] = useState<Record<number, HwErrorInfo>>({})
+  const positions = useRef<Record<string, number>>({})
   useMotorLive((frames) => {
+    positions.current = frames.motors.positions
     const next: Record<number, HwErrorInfo> = {}
     for (const [id, entry] of Object.entries(frames.motors.faults?.motors ?? {})) {
       if (entry.hw_error) next[Number(id)] = entry.hw_error
@@ -331,7 +367,8 @@ export function FingerControl({ connected }: { connected: boolean }) {
   const ours = active && operation?.kind === 'finger_control'
   const extra = ours ? (operation?.extra as FingerExtra | null) : null
   const resolved = useMemo(() => resolve(joints, tendons), [joints, tendons])
-  const ready = useMemo(() => readyJoints(resolved), [resolved])
+  const ready = useMemo(() => drivableJoints(resolved), [resolved])
+  const unranged = ready.filter((j) => !hasRange(j))
   const held = control?.held_motors ?? []
   // While engaged the run's joints are the sliders, whatever the file says now.
   const shown = useMemo<MotorJoint[]>(
@@ -352,6 +389,17 @@ export function FingerControl({ connected }: { connected: boolean }) {
     [ours, extra, resolved, ready],
   )
   const groups = useMemo(() => groupsOf(shown), [shown])
+  // While engaged, the half-width each unranged joint was engaged with.
+  const windows = useMemo<Record<string, number>>(() => {
+    const out: Record<string, number> = {}
+    for (const j of shown) {
+      const stored = resolved.find((s) => s.name === j.name)
+      if (stored && !hasRange(stored) && j.open_deg !== null && j.closed_deg !== null)
+        out[j.name] = Math.round(Math.abs(j.closed_deg - j.open_deg) / 2)
+      else if (stored && !hasRange(stored)) out[j.name] = settings.windowDeg
+    }
+    return out
+  }, [shown, resolved, settings.windowDeg])
   const shorts = useMemo(
     () => Object.fromEntries((extra?.joints ?? []).map((j) => [j.name, j.short ?? {}])),
     [extra],
@@ -374,7 +422,7 @@ export function FingerControl({ connected }: { connected: boolean }) {
   else if (active) blocked = `${operationLabel(operation!.kind)} is running`
   else if (control && control.control_source !== 'manual')
     blocked = `control is owned by ${control.control_owner}`
-  else if (ready.length === 0) blocked = 'no joint is complete — tendons, coupling and both ends'
+  else if (ready.length === 0) blocked = 'no joint can be driven — put its tendons on motors, with a solvable coupling'
   else {
     const inPlay = [...new Set(ready.flatMap((j) => j.terms.map((t) => t.motor)))]
     const tripped = inPlay.filter((m) => faults[m])
@@ -402,9 +450,13 @@ export function FingerControl({ connected }: { connected: boolean }) {
   }
 
   const engage = () =>
-    call(() =>
-      api.operationStart('finger_control', {
-        joints: ready.map((j) => ({
+    call(() => {
+      const angles = jointAnglesOf(couplingsOf(ready), zeros, positions.current)
+      const blind = unranged.filter((j) => angles[j.name] === undefined).map((j) => j.name)
+      if (blind.length) throw new Error(`no shaft reading for ${blind.join(', ')} — cannot place its window`)
+      const sent = ready.map((j) => (hasRange(j) ? j : windowed(j, angles[j.name], settings.windowDeg)))
+      return api.operationStart('finger_control', {
+        joints: sent.map((j) => ({
           name: j.name,
           group: j.group,
           open_deg: j.open_deg,
@@ -413,8 +465,8 @@ export function FingerControl({ connected }: { connected: boolean }) {
         })),
         zeros,
         speed_deg_s: settings.speedDegS,
-      }),
-    )
+      })
+    })
   const disengage = () => call(() => api.operationStop())
   const allNames = groups.flatMap((g) => g.joints.map((j) => j.name))
   const setAll = (fraction: number) => setTargets(Object.fromEntries(allNames.map((n) => [n, fraction])))
@@ -425,6 +477,10 @@ export function FingerControl({ connected }: { connected: boolean }) {
     patchSettings({ speedDegS: value })
     if (ours) api.fingerTargets({}, value).catch(() => undefined)
   }
+  const windowDeg = (text: string) => {
+    const value = parseFloat(text)
+    if (Number.isFinite(value) && value >= WINDOW_DEG.min && value <= WINDOW_DEG.max) patchSettings({ windowDeg: value })
+  }
 
   return (
     <section className="panel finger-control">
@@ -434,6 +490,22 @@ export function FingerControl({ connected }: { connected: boolean }) {
           speed
           <input type="number" min={1} max={2000} step={10} value={settings.speedDegS} onChange={(e) => speed(e.target.value)} />
           °/s
+        </label>
+        <label
+          className="stress-field"
+          title="a joint without a captured range is driven this many joint degrees either way from where it is at Engage — capture its ends in Range to use the real ones"
+        >
+          window ±
+          <input
+            type="number"
+            min={WINDOW_DEG.min}
+            max={WINDOW_DEG.max}
+            step={5}
+            value={settings.windowDeg}
+            disabled={!!ours}
+            onChange={(e) => windowDeg(e.target.value)}
+          />
+          °
         </label>
       </div>
       <div className="bench-run-buttons">
@@ -460,7 +532,10 @@ export function FingerControl({ connected }: { connected: boolean }) {
         <span className="bench-run-hint">
           {ours
             ? `${extra?.joints.length ?? 0} joint(s) engaged — the motors stay held when you disengage`
-            : blocked ?? `${ready.length} joint(s) ready${skipped ? `, ${skipped} not yet` : ''}`}
+            : blocked ??
+              `${ready.length} joint(s) ready` +
+                (unranged.length ? `, ${unranged.length} on a ±${settings.windowDeg}° window` : '') +
+                (skipped ? `, ${skipped} not drivable yet` : '')}
         </span>
       </div>
       {Object.entries(faults).map(([id, fault]) => {
@@ -481,7 +556,7 @@ export function FingerControl({ connected }: { connected: boolean }) {
       })}
       <PosePanel engaged={!!ours} extra={extra} names={shown.map((j) => j.name)} />
       {groups.length === 0 ? (
-        <p className="panel-empty">The sliders appear once a joint has its tendons, a solvable coupling and both ends.</p>
+        <p className="panel-empty">The sliders appear once a joint's tendons are on motors and its coupling can be solved.</p>
       ) : (
         groups.map((g) => (
           <GroupSlider
@@ -491,6 +566,7 @@ export function FingerControl({ connected }: { connected: boolean }) {
             all={shown}
             engaged={!!ours || !!extra?.cycle}
             shorts={shorts}
+            windows={windows}
           />
         ))
       )}

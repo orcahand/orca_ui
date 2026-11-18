@@ -15,7 +15,6 @@ export function TowerTendon({ motor }: { motor: BenchMotor }) {
   const locked = useOperationActive()
   const [name, setName] = useState('')
   const index = tendons.findIndex((t) => t.motor === motor.id)
-  const tendon = index >= 0 ? tendons[index] : null
 
   const pick = (value: string) => {
     if (value === '') {
@@ -62,16 +61,6 @@ export function TowerTendon({ motor }: { motor: BenchMotor }) {
             </option>
           ))}
         </select>
-        {tendon && (
-          <button
-            className={`btn btn-secondary finger-direction ${(tendon.direction ?? 1) < 0 ? 'on' : ''}`}
-            disabled={locked}
-            title="winding sense: flip when + turns pay the tendon out instead of pulling it in"
-            onClick={() => patchTendon(index, { direction: (tendon.direction ?? 1) < 0 ? 1 : -1 })}
-          >
-            {(tendon.direction ?? 1) < 0 ? 'wound −' : 'wound +'}
-          </button>
-        )}
       </div>
       <div className="tower-actions">
         <input

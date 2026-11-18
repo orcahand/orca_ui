@@ -39,6 +39,12 @@ export interface FingerSettings {
   // Cycling through the poses: rounds (0: until stopped) and the hold at each.
   cycleCount: number
   cycleDwellS: number
+  // A joint without a captured range is driven ± this many joint degrees
+  // around where it is at Engage.
+  windowDeg: number
+  // Which flexion tendon of a finger is U (the + in both MCP and PIP):
+  // `<finger>_1` or `<finger>_2`; the other is C.
+  uTendon: 1 | 2
 }
 
 export const DEFAULT_SETTINGS: FingerSettings = {
@@ -48,14 +54,18 @@ export const DEFAULT_SETTINGS: FingerSettings = {
   pipRadiusMm: 16.6,
   cycleCount: 10,
   cycleDwellS: 0.5,
+  windowDeg: 30,
+  uTendon: 2,
 }
+export const WINDOW_DEG = { min: 2, max: 90 }
 export const NAME_RE = /^[A-Za-z0-9_][A-Za-z0-9_ .-]{0,31}$/
 
 // A hand's tendons and joints by finger: the template a full hand starts
 // from. In every finger MCP and PIP are coupled on two flexion tendons,
-// numbered from the thumb side: 1 is the one nearer the thumb (U in the
-// formula), 2 the other (C); abduction, the thumb's DIP and the two wrist
-// axes are a tendon each.
+// numbered from the thumb side: 1 is the one nearer the thumb, 2 the
+// other; which is U and which C in the formula is the uTendon setting
+// (2 by default). Abduction, the thumb's DIP and the two wrist axes are a
+// tendon each.
 const FINGERS = ['index', 'middle', 'ring', 'pinky']
 export const HAND_TENDONS: string[] = [
   'thumb_abd', 'thumb_1', 'thumb_2', 'thumb_dip',
@@ -106,6 +116,45 @@ function send(targets: Record<string, number>): void {
   }, SEND_INTERVAL_MS)
 }
 
+/** A setup saved with winding senses on its tendons, as plain signs: the
+ *  gain of every term on a tendon wound − is negated, and no tendon keeps a
+ *  winding. Null when there was nothing to fold. */
+function foldWindings(
+  tendons: FingerTendon[],
+  joints: FingerJoint[],
+): { tendons: FingerTendon[]; joints: FingerJoint[] } | null {
+  const flipped = new Set(tendons.filter((t) => t.direction === -1).map((t) => t.name))
+  if (flipped.size === 0) return null
+  return {
+    tendons: tendons.map(({ name, motor }) => ({ name, motor })),
+    joints: joints.map((j) => ({
+      ...j,
+      terms: j.terms.map((t) => (t.tendon !== undefined && flipped.has(t.tendon) ? { ...t, gain: -t.gain } : t)),
+    })),
+  }
+}
+
+/** The gains an equation term offers, by name: the routing's two ratios and
+ *  plain numbers. */
+export function gainPresets(settings: FingerSettings): { label: string; value: number }[] {
+  const round = (v: number) => Math.round(v * 10000) / 10000
+  return [
+    { label: 'r_s/r_MCP', value: round(settings.spoolRadiusMm / settings.mcpRadiusMm) },
+    { label: 'r_s/r_PIP', value: round(settings.spoolRadiusMm / settings.pipRadiusMm) },
+    { label: '1', value: 1 },
+    { label: '0.5', value: 0.5 },
+  ]
+}
+
+/** [U, C] of a finger's flexion tendons: by their `_1`/`_2` suffix when
+ *  both carry one, U being the one `uTendon` names; else in order. */
+export function flexionPair(names: string[], uTendon: 1 | 2): [string?, string?] {
+  const one = names.find((n) => /_1$/.test(n))
+  const two = names.find((n) => /_2$/.test(n))
+  if (one && two) return uTendon === 2 ? [two, one] : [one, two]
+  return [names[0], names[1]]
+}
+
 /** The tendons a joint's dropdown offers: those of its own finger (named
  *  `<finger>_…`), plus whatever it already names; every tendon when the
  *  finger has none of its own. */
@@ -127,7 +176,7 @@ export function resolve(joints: FingerJoint[], tendons: FingerTendon[]): MotorJo
       const tendon = term.tendon !== undefined ? tendonOf.get(term.tendon) : undefined
       const motor = term.tendon !== undefined ? tendon?.motor : term.motor
       if (motor === null || motor === undefined) unresolved.push(term.tendon ?? '?')
-      else terms.push({ motor, gain: term.gain * (tendon?.direction ?? 1) })
+      else terms.push({ motor, gain: term.gain })
     }
     return {
       name: joint.name,
@@ -141,20 +190,26 @@ export function resolve(joints: FingerJoint[], tendons: FingerTendon[]): MotorJo
 }
 
 /** A joint with both ends captured and apart; whether its coupling can be
- *  driven is the coupling's question (see `readyJoints`). */
+ *  driven is the coupling's question (see `drivableJoints`). */
 export function hasRange(joint: { open_deg: number | null; closed_deg: number | null }): boolean {
   return (
     joint.open_deg !== null && joint.closed_deg !== null && Math.abs(joint.closed_deg - joint.open_deg) >= 1
   )
 }
 
-/** The joints Engage sends: every joint of every coupling that is complete
- *  and solvable. A coupling with one unfinished joint is left out whole —
- *  its motors cannot be driven for the others alone. */
-export function readyJoints(resolved: MotorJoint[]): MotorJoint[] {
+/** The joints Engage sends: every joint of every coupling whose tendons
+ *  are on motors and that can be solved. Ranged or not — one without a
+ *  range is driven inside a window around where it is at Engage. */
+export function drivableJoints(resolved: MotorJoint[]): MotorJoint[] {
   return couplingsOf(resolved)
-    .filter((c) => couplingProblem(c) === null && c.joints.every(hasRange))
+    .filter((c) => couplingProblem(c) === null)
     .flatMap((c) => c.joints)
+}
+
+/** The joint with a range of ± `windowDeg` around `angle`, for a joint
+ *  that has none captured. */
+export function windowed(joint: MotorJoint, angle: number, windowDeg: number): MotorJoint {
+  return { ...joint, open_deg: angle - windowDeg, closed_deg: angle + windowDeg }
 }
 
 export function fractionOf(
@@ -226,8 +281,15 @@ interface FingerState {
   // PIP of each finger coupled from the radii; replaces both lists.
   addHand(): void
   // Re-derive every finger's MCP/PIP gains from the radii on the tendons
-  // those rows name (the first two distinct ones are tendon 1 U and 2 C).
+  // those rows name: U and C by their _1/_2 suffix and the uTendon setting,
+  // else the first two distinct ones in order.
   coupleFingers(): void
+  // Negate the gains of some of one joint's terms (by term index).
+  flipTerms(index: number, terms: number[]): void
+  // Exchange the tendons of a two-term equation, gains staying in place.
+  swapTerms(index: number): void
+  // A checked equation: locked against edits until unticked.
+  setConfirmed(index: number, confirmed: boolean): void
   setZeros(zeros: Record<string, number>): void
 
   presets: { name: string; saved_at: number }[]
@@ -314,9 +376,12 @@ export const useFingerStore = create<FingerState>((set, get) => ({
     } catch {
       /* backend gone: keep what we have */
     }
+    const joints = (stored.joints ?? []).map((j) => ({ ...j, terms: j.terms ?? [] }))
+    const folded = foldWindings(stored.tendons ?? [], joints)
+    if (folded) save(folded)
     set({
-      tendons: stored.tendons ?? [],
-      joints: (stored.joints ?? []).map((j) => ({ ...j, terms: j.terms ?? [] })),
+      tendons: folded?.tendons ?? stored.tendons ?? [],
+      joints: folded?.joints ?? joints,
       zeros: stored.zeros ?? {},
       settings: { ...DEFAULT_SETTINGS, ...((stored.settings ?? {}) as Partial<FingerSettings>) },
       poses: stored.poses ?? [],
@@ -398,6 +463,7 @@ export const useFingerStore = create<FingerState>((set, get) => ({
   patchJoint: (index, patch) => {
     const joints = get().joints
     if (!joints[index]) return
+    if (joints[index].confirmed && patch.terms !== undefined) return
     const next = joints.map((j, i) => (i === index ? { ...j, ...patch } : j))
     // The file refuses duplicate names; the page keeps them unique as typed,
     // showing the draft without saving it.
@@ -448,18 +514,42 @@ export const useFingerStore = create<FingerState>((set, get) => ({
       const pip = members.find((j) => /_pip$/i.test(j.name))
       if (!mcp || !pip) continue
       const names = [...new Set([...mcp.terms, ...pip.terms].map((t) => t.tendon).filter((t) => t))] as string[]
-      const [u, c] = names
+      const [u, c] = flexionPair(names, settings.uTendon)
       if (!u || !c) continue
-      next[joints.indexOf(mcp)] = {
+      if (!mcp.confirmed) next[joints.indexOf(mcp)] = {
         ...mcp,
         terms: [{ tendon: u, gain: gains.mcp }, { tendon: c, gain: gains.mcp }],
       }
-      next[joints.indexOf(pip)] = {
+      if (!pip.confirmed) next[joints.indexOf(pip)] = {
         ...pip,
         terms: [{ tendon: u, gain: gains.pip }, { tendon: c, gain: -gains.pip }],
       }
     }
     get().setJoints(next)
+  },
+
+  flipTerms: (index, terms) => {
+    const joints = get().joints
+    const joint = joints[index]
+    if (!joint || joint.confirmed) return
+    get().setJoints(
+      joints.map((j, i) =>
+        i === index ? { ...j, terms: j.terms.map((t, k) => (terms.includes(k) ? { ...t, gain: -t.gain } : t)) } : j,
+      ),
+    )
+  },
+
+  swapTerms: (index) => {
+    const joint = get().joints[index]
+    if (!joint || joint.terms.length !== 2) return
+    const [a, b] = joint.terms
+    get().patchJoint(index, { terms: [{ ...a, tendon: b.tendon }, { ...b, tendon: a.tendon }] })
+  },
+
+  setConfirmed: (index, confirmed) => {
+    const joints = get().joints
+    if (!joints[index]) return
+    get().setJoints(joints.map((j, i) => (i === index ? { ...j, confirmed: confirmed || undefined } : j)))
   },
 
   setZeros: (zeros) => {
