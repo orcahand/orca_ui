@@ -450,7 +450,15 @@ export interface SweepJointVerdict {
 
 export interface SweepVerdict {
   joints: Record<string, SweepJointVerdict>
-  bands: { tol_ma: number; tol_share: number; bins: number; slack_deg: number; low?: number; under?: number; over?: number }
+  bands: {
+    tol_ma: number
+    tol_share: number
+    bins: number
+    slack_deg: number
+    low?: number
+    under?: number
+    over?: number
+  }
 }
 
 export interface SweepLive {
@@ -484,7 +492,16 @@ export interface TensionSweepExtra {
 }
 
 export interface SweepLevels {
-  [joint: string]: Record<'flex' | 'extend', { mean_ma: number | null; end_ma: number | null; deadband_deg: number | null; short_deg: number | null; n: number }>
+  [joint: string]: Record<
+    'flex' | 'extend',
+    {
+      mean_ma: number | null
+      end_ma: number | null
+      deadband_deg: number | null
+      short_deg: number | null
+      n: number
+    }
+  >
 }
 
 export interface SweepListing {
@@ -553,7 +570,10 @@ export interface TensionProgress {
   // Fraction scoring: the best fraction per joint so far.
   best?: Record<string, number>
   // Slack scoring: the last scored round, per joint.
-  scores?: Record<string, { slack_deg: number | null; fraction: number | null; status: SpreadStatus }>
+  scores?: Record<
+    string,
+    { slack_deg: number | null; fraction: number | null; status: SpreadStatus }
+  >
 }
 
 export interface LastTension {
@@ -596,26 +616,14 @@ export interface ModelMetadata {
 // ----- operations (orca_ui/hand/operations/) --------------------------------
 
 export type OperationState =
-  | 'starting'
-  | 'running'
-  | 'paused'
-  | 'awaiting_input'
-  | 'stopping'
-  | 'done'
-  | 'error'
+  'starting' | 'running' | 'paused' | 'awaiting_input' | 'stopping' | 'done' | 'error'
 
 // ----- endurance (orca_ui/hand/endurance.py): looping replays, per cycle -----
 
 export interface EnduranceRun {
   run_id: string
   motion: string
-  state:
-    | 'running'
-    | 'done'
-    | 'stopped'
-    | 'e-stopped'
-    | 'error'
-    | 'interrupted'
+  state: 'running' | 'done' | 'stopped' | 'e-stopped' | 'error' | 'interrupted'
   started_at: number // epoch seconds
   last_cycle_at: number | null
   ended_at: number | null
@@ -630,11 +638,28 @@ export interface EnduranceRun {
   tactile_hz: number | null
   bus_errors: number
   latched_motors: number
+  // Per tip (and "board": no frames at all), times it left the force stream;
+  // open_since is set while it is still out. Absent on older records.
+  drops?: Record<string, TipDrops>
+}
+
+export interface TipDrops {
+  count: number
+  last_at: number | null
+  open_since: number | null
+  min_s: number | null // durations of the drops that ended
+  median_s: number | null
+  max_s: number | null
+  interval_mean_s: number | null
+  interval_cv: number | null // ~1 random, <0.5 regular, >1.5 bursty
+  phase_peak: number | null // fraction of the cycle drops gather at
+  phase_p: number | null // Rayleigh p; < 0.05 means they do gather
 }
 
 export interface EnduranceState {
   current: EnduranceRun | null
   runs: EnduranceRun[]
+  server_time?: number // epoch seconds when the state was built
 }
 
 export interface OperationSnapshot {
@@ -676,7 +701,12 @@ export interface ManualCalibrationExtra {
   // Live motor position per joint while the operator moves it, and where it started.
   position_deg: Record<string, number>
   start_deg: Record<string, number>
-  captured: { joint: string; direction: CaptureDirection | null; outcome: 'recorded' | 'skipped'; position_deg: number | null }[]
+  captured: {
+    joint: string
+    direction: CaptureDirection | null
+    outcome: 'recorded' | 'skipped'
+    position_deg: number | null
+  }[]
 }
 
 // ----- fingertip numbering (orca_ui/hand/operations/fingertips.py) ----------
@@ -969,12 +999,7 @@ export interface ServerMessage {
 
 // ----- sensors.health (orca_ui/hand/telemetry.py SensorHealthMonitor) -------
 
-export type EncoderVerdict =
-  | 'live'
-  | 'parity'
-  | 'chip error'
-  | 'no encoder'
-  | 'no frames'
+export type EncoderVerdict = 'live' | 'parity' | 'chip error' | 'no encoder' | 'no frames'
 
 export interface EncoderJointHealth {
   slot: number
@@ -1094,7 +1119,6 @@ export interface TrajectoryData {
   angles?: number[][]
 }
 
-
 // What a servo tunable accepts, and the ceiling that actually binds. The two
 // differ by orders of magnitude: a speed register stores values far faster
 // than the motor turns and never objects, so only the per-motor ceiling tells
@@ -1112,7 +1136,6 @@ export interface ServoLimits {
   tunables?: Record<string, ServoLimitEntry>
   per_motor?: Record<string, { velocity_rad_s: number; acceleration_rad_s2: number }>
 }
-
 
 // ----- configuration registers (bare bench) --------------------------------
 // Rendered from what the connected family declares, never from a list here:
@@ -1185,7 +1208,8 @@ export interface RangeStage {
 // 'fault': the motor has a latched hardware error and is not holding.
 // unconfirmed: within tolerance, but an end was reached only once; slack: a
 // tension probe measured slack above the tolerance, so the sweep cannot pass it.
-export type SpreadStatus = 'pass' | 'unconfirmed' | 'slack' | 'partial' | 'low' | 'unscored' | 'fault'
+export type SpreadStatus =
+  'pass' | 'unconfirmed' | 'slack' | 'partial' | 'low' | 'unscored' | 'fault'
 
 export interface MotorSpread {
   joint: string

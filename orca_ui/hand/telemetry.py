@@ -349,13 +349,15 @@ class TelemetryService:
 
         if session.caps.tactile:
             reading = session.tactile_data()
+            endurance = getattr(self._service, "endurance", None)
+            if reading is None and endurance is not None:
+                endurance.feed_forces(None)
             if reading is not None:
                 forces = getattr(reading.forces, "forces", None)
                 if forces:
                     self._hub.publish(T.TACTILE_FORCES, {"forces": forces})
-                    endurance = getattr(self._service, "endurance", None)
-                    if endurance is not None:
-                        endurance.feed_forces(forces)
+                if endurance is not None and reading.forces is not None:
+                    endurance.feed_forces(forces or {}, getattr(reading, "seq", None))
                 taxels = getattr(reading.taxels, "taxels", None)
                 if taxels:
                     self._hub.publish(T.TACTILE_TAXELS, {"taxels": taxels})

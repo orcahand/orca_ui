@@ -4,7 +4,7 @@
 // it outlives Stop and a console restart.
 
 import { useEffect, useState } from 'react'
-import type { EnduranceRun } from '../../api/types'
+import type { EnduranceRun, TipDrops } from '../../api/types'
 import { useOperationStore } from '../../state/operationStore'
 import { Panel } from '../common/Panel'
 
@@ -27,6 +27,36 @@ function perHour(run: EnduranceRun, now: number): string {
   return hours > 0 && played ? (played / hours).toFixed(0) : '—'
 }
 
+function lastDrop(run: EnduranceRun, finger: string, now: number): string {
+  const d = run.drops?.[finger]
+  if (!d?.last_at) return '—'
+  if (d.open_since) return `out for ${duration(now - d.open_since)}`
+  return `${duration(now - d.last_at)} ago`
+}
+
+function dropsPerHour(run: EnduranceRun, finger: string, now: number): string {
+  const hours = (endOf(run, now) - run.started_at) / 3600
+  const count = run.drops?.[finger]?.count ?? 0
+  // A rate over the first minutes says more about luck than the tip.
+  return hours >= 1 / 6 ? (count / hours).toFixed(1) : '—'
+}
+
+function dropStats(d: TipDrops | undefined): string | undefined {
+  if (!d?.count) return undefined
+  const parts = []
+  if (d.median_s !== null) parts.push(`lasted ${d.min_s}–${d.max_s} s, median ${d.median_s} s`)
+  if (d.interval_mean_s !== null) parts.push(`every ${d.interval_mean_s} s on average`)
+  if (d.interval_cv !== null)
+    parts.push(d.interval_cv < 0.5 ? 'regular' : d.interval_cv > 1.5 ? 'in bursts' : 'at random')
+  if (d.phase_p !== null)
+    parts.push(
+      d.phase_p < 0.05
+        ? `gathered at ${Math.round((d.phase_peak ?? 0) * 100)}% of the cycle`
+        : 'anywhere in the cycle',
+    )
+  return parts.join(' · ')
+}
+
 function outcome(run: EnduranceRun): string {
   if (run.state === 'running') return 'running'
   if (run.state === 'done') return `done after ${run.cycles}`
@@ -40,7 +70,10 @@ function started(run: EnduranceRun): string {
 export function EndurancePanel() {
   const endurance = useOperationStore((s) => s.endurance)
   const current = endurance?.current ?? null
-  const [now, setNow] = useState(() => Date.now() / 1000)
+  const [clock, setNow] = useState(() => Date.now() / 1000)
+  // Times come from the console's clock; this browser's may be off.
+  const skew = useOperationStore((s) => s.enduranceSkew) ?? 0
+  const now = clock + skew
 
   useEffect(() => {
     if (!current) return
@@ -68,10 +101,7 @@ export function EndurancePanel() {
                 title={current.carried_note ?? undefined}
               />
             )}
-            <Stat
-              label="elapsed"
-              value={duration(endOf(current, now) - current.started_at)}
-            />
+            <Stat label="elapsed" value={duration(endOf(current, now) - current.started_at)} />
             <Stat label="cycles / h" value={perHour(current, now)} />
             <Stat
               label="faults"
@@ -84,33 +114,47 @@ export function EndurancePanel() {
                 <th>finger</th>
                 <th>peak last cycle</th>
                 <th>tactile</th>
+                <th>drops</th>
+                <th>last drop</th>
+                <th>drops / h</th>
               </tr>
             </thead>
             <tbody>
-              {Object.entries(current.fingers).map(([finger, f]) => (
-                <tr key={finger}>
-                  <td className="traj-name">{finger}</td>
-                  <td>{f.peak_n === null ? '—' : `${f.peak_n.toFixed(2)} N`}</td>
-                  <td
-                    className={
-                      f.health === 'ok'
-                        ? 'endurance-ok'
-                        : f.health
-                          ? 'endurance-bad'
-                          : undefined
-                    }
-                  >
-                    {f.health ?? 'no sensor'}
-                  </td>
-                </tr>
-              ))}
+              {Object.keys(current.drops ?? current.fingers).map((finger) => {
+                const f = current.fingers[finger]
+                return (
+                  <tr key={finger}>
+                    <td className="traj-name">{finger}</td>
+                    <td>{f?.peak_n == null ? '—' : `${f.peak_n.toFixed(2)} N`}</td>
+                    <td
+                      className={
+                        f?.health === 'ok'
+                          ? 'endurance-ok'
+                          : f?.health
+                            ? 'endurance-bad'
+                            : undefined
+                      }
+                    >
+                      {f ? (f.health ?? 'no sensor') : '—'}
+                    </td>
+                    <td
+                      className={current.drops?.[finger]?.count ? 'endurance-bad' : undefined}
+                      title={dropStats(current.drops?.[finger])}
+                    >
+                      {current.drops?.[finger]?.count ?? '—'}
+                    </td>
+                    <td>{lastDrop(current, finger, now)}</td>
+                    <td>{dropsPerHour(current, finger, now)}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </>
       ) : (
         <div className="panel-hint">
-          loop a trajectory to start an endurance run: every cycle is counted
-          and kept in the hand's folder
+          loop a trajectory to start an endurance run: every cycle is counted and kept in the hand's
+          folder
         </div>
       )}
       {runs.length > 0 && (
@@ -143,6 +187,15 @@ export function EndurancePanel() {
                   >
                     csv
                   </a>
+                  {run.drops && (
+                    <a
+                      className="btn btn-secondary"
+                      href={`/api/endurance/${encodeURIComponent(run.run_id)}-drops.csv`}
+                      download
+                    >
+                      drops
+                    </a>
+                  )}
                 </td>
               </tr>
             ))}
@@ -153,15 +206,7 @@ export function EndurancePanel() {
   )
 }
 
-function Stat({
-  label,
-  value,
-  title,
-}: {
-  label: string
-  value: string
-  title?: string
-}) {
+function Stat({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
     <div className="teleop-stat-row" title={title}>
       <span className="teleop-stat-label">{label}</span>

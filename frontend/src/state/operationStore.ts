@@ -39,6 +39,8 @@ interface OperationStoreState {
   logRunId: string | null
   logLines: OperationLogLine[]
   endurance: EnduranceState | null
+  // Console clock minus this browser's; replayed snapshots only understate it.
+  enduranceSkew: number | null
 
   setEndurance(state: EnduranceState): void
   // null clears the plane (REST resync after a backend restart found no op).
@@ -51,8 +53,17 @@ export const useOperationStore = create<OperationStoreState>((set, get) => ({
   logRunId: null,
   logLines: [],
   endurance: null,
+  enduranceSkew: null,
 
-  setEndurance: (endurance) => set({ endurance }),
+  setEndurance: (endurance) =>
+    set((s) => {
+      if (!endurance.server_time) return { endurance }
+      const skew = endurance.server_time - Date.now() / 1000
+      return {
+        endurance,
+        enduranceSkew: s.enduranceSkew === null ? skew : Math.max(s.enduranceSkew, skew),
+      }
+    }),
   setOperation: (snapshot) => {
     const previous = get().operation
     // Before the store updates, so the Run step reads the new date on its next render.
@@ -60,23 +71,16 @@ export const useOperationStore = create<OperationStoreState>((set, get) => ({
     set({ operation: snapshot })
     if (!snapshot) return
     const changed =
-      !previous ||
-      previous.run_id !== snapshot.run_id ||
-      previous.state !== snapshot.state
+      !previous || previous.run_id !== snapshot.run_id || previous.state !== snapshot.state
     if (!changed) return
     // Terminal snapshots surface on every tab: errors hit the global banner,
     // both terminals land in the Motors tab event log.
     const label = operationLabel(snapshot.kind)
     if (snapshot.state === 'error') {
-      useAppStore
-        .getState()
-        .setError(`${label} failed: ${snapshot.error ?? 'unknown error'}`)
+      useAppStore.getState().setError(`${label} failed: ${snapshot.error ?? 'unknown error'}`)
       useEventLogStore
         .getState()
-        .pushEvent(
-          'operation',
-          `${label} → error: ${snapshot.error ?? 'unknown'}`,
-        )
+        .pushEvent('operation', `${label} → error: ${snapshot.error ?? 'unknown'}`)
     } else if (snapshot.state === 'done') {
       useEventLogStore.getState().pushEvent('operation', `${label} → done`)
     }
@@ -139,9 +143,7 @@ export function useStartGate(requires: 'motors' | 'encoders' | 'joints'): {
   // 'joints' = any joint-angle source: encoders, or motors (calibrated
   // motor-derived estimate; the backend rejects uncalibrated hands).
   const available =
-    requires === 'joints'
-      ? Boolean(caps?.encoders || caps?.motors)
-      : Boolean(caps?.[requires])
+    requires === 'joints' ? Boolean(caps?.encoders || caps?.motors) : Boolean(caps?.[requires])
   if (!available) {
     return {
       blocked: true,

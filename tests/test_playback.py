@@ -383,9 +383,13 @@ def test_looping_replay_keeps_an_endurance_record_the_ui_reads(client):
     assert current["state"] == "running" and current["motion"] == "endure"
     assert {"run_id", "started_at", "last_cycle_at", "ended_at", "cycles",
             "carried_cycles", "continues", "fingers", "tactile_hz",
-            "bus_errors", "latched_motors"} <= current.keys()
+            "bus_errors", "latched_motors", "drops"} <= current.keys()
     assert all({"peak_n", "health"} == f.keys()
                for f in current["fingers"].values())
+    assert {"thumb", "index", "middle", "ring", "pinky", "board"} == current["drops"].keys()
+    assert all({"count", "last_at", "open_since", "min_s", "median_s", "max_s",
+                "interval_mean_s", "interval_cv", "phase_peak", "phase_p"} == d.keys()
+               for d in current["drops"].values())
 
     client.post("/api/operation/stop")
     _wait_op_state(client, "done")

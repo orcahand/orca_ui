@@ -12,6 +12,12 @@ cycle's rows to a writer thread. Nothing here touches the bus: forces arrive
 from the telemetry fast tick (``feed_forces``), health and faults are the
 payloads telemetry already published.
 
+A fingertip the board stops reporting (gone from the force stream) is a drop
+until it comes back; a stream with no new frame for ``STALE_S`` is a drop of
+the whole ``board``. Each drop is a row of ``<run id>-drops.csv`` (start, end,
+cycle, where in the cycle), and the summary keeps per-tip statistics. Only tips
+seen in the stream count, so a hand without a sensor on a finger never drops it.
+
 A run may continue earlier ones (``carried_cycles``, some of them possibly
 estimated): its count starts there, and the CSV's first row says those cycles
 carry no per-cycle data.
@@ -28,6 +34,7 @@ import os
 import queue
 import re
 import threading
+from collections import deque
 import time
 from pathlib import Path
 from typing import Callable
@@ -47,6 +54,11 @@ HEADER = (
     + [f"{f}_tactile" for f in FINGER_NAMES]
     + ["tactile_hz", "bus_errors", "latched_motors", "note"]
 )
+DROP_HEADER = ["tip", "start", "end", "duration_s", "cycle", "s_into_cycle",
+               "cycle_fraction", "joints_at_start", "note"]
+BOARD = "board"
+STALE_S = 0.5
+STATS_WINDOW = 500  # drops the per-tip statistics look back over
 
 
 def endurance_folder(settings, config) -> Path:
@@ -77,6 +89,41 @@ def _write_synced(path: Path, text: str, append: bool = False) -> None:
         os.replace(target, path)
 
 
+def _tip_stats(events, count: int, open_since: float | None,
+               open_mono: float | None) -> dict:
+    """Per-tip summary. ``events`` are the last ``STATS_WINDOW`` closed drops,
+    ``(start, start_mono, duration_s, cycle_fraction)``; ``count`` is all of them
+    plus the open one."""
+    durations = sorted(e[2] for e in events)
+    starts = [e[1] for e in events] + ([open_mono] if open_mono is not None else [])
+    gaps = [b - a for a, b in zip(starts, starts[1:])]
+    mean = sum(gaps) / len(gaps) if gaps else None
+    cv = None
+    if len(gaps) >= 2 and mean:
+        cv = round(math.sqrt(sum((g - mean) ** 2 for g in gaps) / (len(gaps) - 1)) / mean, 2)
+    phases = [e[3] for e in events if e[3] is not None]
+    peak = p = None
+    if len(phases) >= 5:
+        # Rayleigh test: do drops gather at one point of the cycle?
+        c = sum(math.cos(2 * math.pi * x) for x in phases)
+        s = sum(math.sin(2 * math.pi * x) for x in phases)
+        r = math.hypot(c, s) / len(phases)
+        p = round(math.exp(-len(phases) * r * r), 4)
+        peak = round((math.atan2(s, c) / (2 * math.pi)) % 1, 2)
+    return {
+        "count": count,
+        "last_at": open_since or (events[-1][0] if events else None),
+        "open_since": open_since,
+        "min_s": durations[0] if durations else None,
+        "median_s": durations[len(durations) // 2] if durations else None,
+        "max_s": durations[-1] if durations else None,
+        "interval_mean_s": None if mean is None else round(mean, 1),
+        "interval_cv": cv,
+        "phase_peak": peak,
+        "phase_p": p,
+    }
+
+
 def _csv_row(values: list) -> str:
     line = io.StringIO()
     csv.writer(line, lineterminator="\n").writerow(
@@ -85,8 +132,9 @@ def _csv_row(values: list) -> str:
     return line.getvalue()
 
 
-def _stamp(t: float) -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(t))
+def _stamp(t: float, ms: bool = False) -> str:
+    text = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(t))
+    return text + f".{int(t % 1 * 1000):03d}" if ms else text
 
 
 class EnduranceRecorder:
@@ -111,6 +159,14 @@ class EnduranceRecorder:
         self._dir: Path | None = None
         self._peaks: dict[str, float] = {}
         self._bus_last = 0
+        # Tips this hand streams, so a missing one is a drop, not a missing sensor.
+        self._tips: set[str] = set()
+        self._seq = self._seq_at = None
+        self._period: float | None = None
+        self._tips_dir: Path | None = None
+        self._open: dict[str, dict] = {}
+        self._events: dict[str, deque] = {}
+        self._closed: dict[str, int] = {}
         self._writes: queue.Queue = queue.Queue()
         threading.Thread(
             target=self._write_loop, name="endurance-writer", daemon=True
@@ -118,14 +174,104 @@ class EnduranceRecorder:
 
     # ----- feeding --------------------------------------------------------------
 
-    def feed_forces(self, forces: dict) -> None:
+    def feed_forces(self, forces: dict | None, seq: int | None = None) -> None:
+        """One telemetry tick: ``forces`` per streamed tip (``None``: no reading
+        at all), ``seq`` the frame number, unchanged while no new frame came."""
+        wall, mono = time.time(), time.monotonic()
         with self._lock:
-            if self._run is None:
+            if seq is not None and seq != self._seq:
+                self._seq, self._seq_at = seq, mono
+            stale = (
+                self._seq_at is not None
+                and (forces is None or seq is not None)
+                and mono - self._seq_at > STALE_S
+            )
+            if forces and not stale:
+                self._tips.update(f for f in forces if f in FINGER_NAMES)
+            if self._run is None or (forces is None and not stale):
                 return
-            for finger, vector in forces.items():
-                value = _magnitude(vector)
-                if value is not None and value > self._peaks.get(finger, -1.0):
-                    self._peaks[finger] = value
+            changed = False
+            if stale:
+                # It went quiet at its last new frame, not when that was noticed.
+                quiet = self._seq_at
+                changed = self._drop_open(BOARD, wall - (mono - quiet), quiet)
+            else:
+                for finger, vector in forces.items():
+                    value = _magnitude(vector)
+                    if value is not None and value > self._peaks.get(finger, -1.0):
+                        self._peaks[finger] = value
+                board = self._open.get(BOARD)
+                took_over = False
+                for tip in self._tips:
+                    if tip in forces:
+                        changed |= self._drop_close(tip, mono)
+                    elif board:
+                        # The board stalls while it drops a tip: that is the tip's drop.
+                        took_over |= self._drop_open(tip, board["start"], board["start_mono"])
+                    else:
+                        changed |= self._drop_open(tip, wall, mono)
+                if board:
+                    if took_over:
+                        del self._open[BOARD]
+                        self._set_tip(BOARD)
+                    else:
+                        self._drop_close(BOARD, mono)
+                    changed = True
+            if changed:
+                self._publish_locked()
+
+    def _drop_open(self, tip: str, start: float, start_mono: float) -> bool:
+        if tip in self._open:
+            return False
+        run = self._run
+        if start < run["started_at"]:
+            start_mono += run["started_at"] - start
+            start = run["started_at"]
+        cycle, since = run["cycles"] + 1, run["last_cycle_at"] or run["started_at"]
+        if start < since and self._period:
+            cycle, since = cycle - 1, since - self._period
+        into = max(0.0, start - since)
+        angles = self._payload_of(T.JOINTS_TARGET).get("angles") or {}
+        self._open[tip] = {
+            "start": start,
+            "start_mono": start_mono,
+            "cycle": cycle,
+            "s_into_cycle": round(into, 3),
+            "cycle_fraction": round(into / self._period % 1, 3) if self._period else None,
+            "joints": ";".join(
+                f"{j}={float(a):.1f}" for j, a in sorted(angles.items())
+                if tip == BOARD or j.startswith(f"{tip}_")
+            ),
+        }
+        self._set_tip(tip)
+        return True
+
+    def _drop_close(self, tip: str, mono: float, note: str | None = None) -> bool:
+        drop = self._open.pop(tip, None)
+        if drop is None:
+            return False
+        duration = round(mono - drop["start_mono"], 3)
+        self._events.setdefault(tip, deque(maxlen=STATS_WINDOW)).append(
+            (drop["start"], drop["start_mono"], duration, drop["cycle_fraction"]))
+        self._closed[tip] = self._closed.get(tip, 0) + 1
+        self._set_tip(tip)
+        row = [tip, _stamp(drop["start"], ms=True), _stamp(drop["start"] + duration, ms=True),
+               duration, drop["cycle"], drop["s_into_cycle"], drop["cycle_fraction"],
+               drop["joints"], note]
+        self._writes.put(([(self._dir / f"{self._run['run_id']}-drops.csv",
+                            _csv_row(row), True)], None))
+        return True
+
+    def _set_tip(self, tip: str) -> None:
+        # Replaced, never changed in place: published snapshots share it.
+        drop = self._open.get(tip)
+        stats = _tip_stats(
+            self._events.get(tip, ()),
+            self._closed.get(tip, 0) + (1 if drop else 0),
+            drop and drop["start"],
+            drop and drop["start_mono"],
+        )
+        self._run["drops"] = {**self._run["drops"], tip: stats}
 
     def _payload_of(self, topic: str) -> dict:
         entry = self._latest(topic)
@@ -167,6 +313,8 @@ class EnduranceRecorder:
             "tactile_hz": None,
             "bus_errors": 0,
             "latched_motors": 0,
+            "drops": {f: _tip_stats([], 0, None, None) for f in [*FINGER_NAMES, BOARD]},
+            "tips": [],
         }
         text = ",".join(HEADER) + "\n"
         if carried_cycles:
@@ -188,11 +336,13 @@ class EnduranceRecorder:
             folder = self._folder()
             folder.mkdir(parents=True, exist_ok=True)
             taken = 1
-            while (folder / f"{run['run_id']}.json").exists():
+            while any((folder / f"{run['run_id']}{end}").exists()
+                      for end in (".json", ".csv", "-drops.csv")):
                 taken += 1
                 run["run_id"] = f"{run_id}-{taken}"
             run_id = run["run_id"]
             _write_synced(folder / f"{run_id}.csv", text)
+            _write_synced(folder / f"{run_id}-drops.csv", ",".join(DROP_HEADER) + "\n")
             _write_synced(folder / f"{run_id}.json", json.dumps(run))
         except Exception:
             logger.exception("could not start the endurance record")
@@ -204,6 +354,15 @@ class EnduranceRecorder:
             self._peaks = {}
             self._bus_last = bus
             self._recent = recent
+            self._period, self._open, self._events, self._closed = None, {}, {}, {}
+            if self._tips_dir not in (None, folder):  # another hand
+                self._tips = set()
+            self._tips_dir = folder
+            # A tip already out when the console started still counts.
+            for earlier in recent:
+                if earlier.get("tips"):
+                    self._tips.update(earlier["tips"])
+                    break
             self._publish_locked()
 
     def cycle_done(self, cycles: int) -> None:
@@ -243,10 +402,13 @@ class EnduranceRecorder:
                     "peak_n": None if peak is None else round(peak, 3),
                     "health": state,
                 }
+            if run["last_cycle_at"]:
+                self._period = now - run["last_cycle_at"]
             run.update(
                 cycles=run["carried_cycles"] + cycles,
                 last_cycle_at=now,
                 fingers=fingers,
+                tips=sorted(self._tips),
             )
             row = (
                 [run["cycles"], _stamp(now), round(now - run["started_at"], 1)]
@@ -271,7 +433,10 @@ class EnduranceRecorder:
             run = self._run
             if run is None:
                 return
-            run.update(state=state, ended_at=time.time())
+            now, mono = time.time(), time.monotonic()
+            for tip in list(self._open):
+                self._drop_close(tip, mono, note="still out when the run ended")
+            run.update(state=state, ended_at=now, tips=sorted(self._tips))
             self._run, self._ended = None, run
             path = self._dir / f"{run['run_id']}.json"
             summary = json.dumps(run)
@@ -352,7 +517,8 @@ class EnduranceRecorder:
             runs.append(run)
         # Live runs newer than the last read of the folder go first.
         runs = sorted(live.values(), key=lambda r: r["started_at"], reverse=True) + runs
-        return {"current": current, "runs": runs[:RECENT_RUNS]}
+        # Server clock, so a browser on another machine can time drops without skew.
+        return {"current": current, "runs": runs[:RECENT_RUNS], "server_time": time.time()}
 
     def _publish_locked(self) -> None:
         # Under the lock, so an older snapshot can never land after a newer one.
