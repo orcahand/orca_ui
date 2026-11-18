@@ -290,6 +290,7 @@ class EnduranceRecorder:
         carried_estimated: int = 0,
         continues: str | None = None,
         carried_note: str | None = None,
+        speed: float | None = None,
     ) -> None:
         """``carried_cycles`` (of which ``carried_estimated`` are an estimate)
         start the count; they ran before this run, mostly in ``continues``."""
@@ -300,6 +301,7 @@ class EnduranceRecorder:
         run = {
             "run_id": run_id,
             "motion": motion,
+            "speed": speed,
             "state": "running",
             "started_at": now,
             "last_cycle_at": None,

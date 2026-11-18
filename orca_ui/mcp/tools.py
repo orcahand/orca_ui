@@ -18,12 +18,14 @@ from mcp.server.fastmcp import FastMCP, Image
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from orca_ui.library import REPLAY_SPEEDS
 from orca_ui.mcp import telemetry
 from orca_ui.mcp.client import BackendError
 from orca_ui.mcp.server import (ServerState, confirm_gate, mock_gate,
                                 refusal, with_state)
 
 NAME_PATTERN = r"^[a-zA-Z0-9_-]{1,64}$"
+SPEED_CHOICES = ", ".join(f"{s:g}" for s in REPLAY_SPEEDS)
 
 ACTIVE_OP_STATES = {"starting", "running", "paused", "awaiting_input",
                     "stopping"}
@@ -638,8 +640,8 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
                         "trajectory name (record); required for those "
                         "kinds")] = None,
         speed: Annotated[float, Field(
-            description="replay only; one of 0.5, 1.0, 2.0",
-            json_schema_extra={"enum": [0.5, 1.0, 2.0]})] = 1.0,
+            description=f"replay only; one of {SPEED_CHOICES}",
+            json_schema_extra={"enum": list(REPLAY_SPEEDS)})] = 1.0,
         loop: Annotated[bool, Field(
             description="replay/demo: run until stopped — prefer cycles for "
                         "unattended runs")] = False,
@@ -671,10 +673,10 @@ def register_tools(mcp: FastMCP, state: ServerState) -> None:   # noqa: C901
             raise BackendError(
                 f"kind '{kind}' requires name= (orca_list_library shows "
                 "trajectories and demos)")
-        if kind == "replay" and speed not in (0.5, 1.0, 2.0):
+        if kind == "replay" and speed not in REPLAY_SPEEDS:
             raise BackendError(
                 f"speed={speed} is not supported — the backend accepts "
-                "exactly 0.5, 1.0, or 2.0")
+                f"exactly {SPEED_CHOICES}")
         if kind == "calibrate":
             gate = await confirm_gate(state, confirm, CALIBRATE_WHAT)
         elif kind == "tension":

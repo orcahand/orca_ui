@@ -538,6 +538,10 @@ def test_motor_waypoints_record_then_replay_in_motor_space(client):
     assert "joint_ids" not in saved["metadata"]
 
     client.post("/api/torque/enable")
+    # Each step is a bus write: no speed may push them past 50 Hz.
+    response = client.post("/api/operation/replay/start", json={"params": {
+        "name": "mw", "interp_steps": 1, "step_period_s": 0.02, "speed": 2.0}})
+    assert response.status_code == 400 and "×1 is the fastest" in response.text
     response = client.post("/api/operation/replay/start", json={"params": {
         "name": "mw", "interp_steps": 1, "step_period_s": 0.02}})
     assert response.status_code == 200, response.text

@@ -19,7 +19,7 @@ const WaypointEditor = lazy(() =>
   import('./WaypointEditor').then((m) => ({ default: m.WaypointEditor })),
 )
 
-const SPEEDS = [0.5, 1, 2]
+const SPEEDS = [0.25, 0.5, 1, 2, 4, 8] // orca_ui.library.REPLAY_SPEEDS
 
 function fail(error: unknown) {
   useAppStore.getState().setError(String((error as Error).message ?? error))

@@ -24,11 +24,19 @@ from orca_ui.hand.operations import hand_ops
 from orca_ui.hand.operations.base import OpContext, Operation
 from orca_ui.hand.operations.events import OperationStopped
 from orca_ui.hand.states import ControlSource
-from orca_ui.library import CONTINUOUS, MOTOR_WAYPOINTS, WAYPOINTS, LibraryError
+from orca_ui.library import (
+    CONTINUOUS,
+    MOTOR_WAYPOINTS,
+    REPLAY_SPEEDS,
+    WAYPOINTS,
+    LibraryError,
+)
 
 logger = logging.getLogger(__name__)
 
-SPEEDS = (0.5, 1.0, 2.0)
+# Speed never raises the stream rate (glides are built at speed, continuous
+# recordings thinned) and never steps faster than MIN_STEP_PERIOD_S. Nothing
+# caps joint velocity: at x8 the motors and the current ceiling are the limit.
 WAYPOINT_SPEED_DEG_S = 60.0   # cruise speed for synthesized waypoint segments
 MIN_SEGMENT_S = 0.3           # floor so near-identical waypoints still glide
 # Half the worker's feed rate — upsampling to the loop rate is its job, not
@@ -347,10 +355,10 @@ def play_frames(ctx: OpContext, *, name: str, joint_ids: list[str],
 
     # Approach glide runs once, at cruise pacing regardless of the
     # playback speed multiplier — it is not part of the recording.
-    approach = _lead_in(ctx.service, joint_ids, frames[0], rate_hz)
+    approach = _lead_in(ctx.service, joint_ids, frames[0], WAYPOINT_RATE_HZ)
     if approach:
         ctx.set_phase("approach", detail=f"{name} · moving to start")
-        _stream(ctx, joint_ids, approach, 1.0 / rate_hz)
+        _stream(ctx, joint_ids, approach, 1.0 / WAYPOINT_RATE_HZ)
 
     ctx.set_phase("playing", progress=0.0,
                   detail=f"{name} · {duration_s:.1f}s @ ×{speed:g}")
@@ -430,8 +438,8 @@ class ReplayOperation(Operation):
             raise ServiceError("continuous recording is missing sampling_frequency_hz")
 
         speed = float(params.get("speed", 1.0))
-        if speed not in SPEEDS:
-            raise ServiceError(f"speed must be one of {sorted(SPEEDS)}")
+        if speed not in REPLAY_SPEEDS:
+            raise ServiceError(f"speed must be one of {list(REPLAY_SPEEDS)}")
         interp_steps = params.get("interp_steps")
         if interp_steps is not None:
             interp_steps = int(interp_steps)
@@ -459,6 +467,18 @@ class ReplayOperation(Operation):
                 raise ServiceError(
                     "step_period_s paces stepped playback — set interp_steps "
                     "too (1 = straight to each waypoint)")
+        # Stepped playback is paced by the step period alone: a motor replay
+        # writes the bus every step, a stepped joint replay jumps every step.
+        if traj_type == MOTOR_WAYPOINTS or (
+                traj_type == WAYPOINTS and interp_steps is not None):
+            period = step_period or INTERP_STEP_PERIOD_S
+            if period / speed < MIN_STEP_PERIOD_S:
+                fastest = max(s for s in REPLAY_SPEEDS if period / s >= MIN_STEP_PERIOD_S)
+                raise ServiceError(
+                    f"×{speed:g} would step every {period / speed * 1000:.1f} ms; "
+                    f"stepped playback steps at most every "
+                    f"{MIN_STEP_PERIOD_S * 1000:.0f} ms, so ×{fastest:g} is the "
+                    f"fastest at a {period:g} s step")
         max_settle_ms = params.get("max_settle_ms")
         if max_settle_ms is not None:
             max_settle_ms = int(max_settle_ms)
@@ -500,7 +520,7 @@ class ReplayOperation(Operation):
         record = getattr(ctx.service, "endurance", None) if self.params["loop"] else None
         if record is None:
             return self._play(ctx, None)
-        record.start(self.params["name"],
+        record.start(self.params["name"], speed=self.params["speed"],
                      carried_cycles=self.params.get("carried_cycles", 0),
                      carried_estimated=self.params.get("carried_estimated", 0),
                      continues=self.params.get("continues"),
@@ -537,6 +557,14 @@ class ReplayOperation(Operation):
             frames = data.get("angles") or []
             rate_hz = float(meta["sampling_frequency_hz"])
             holds: list[int] = []
+            # Sped up, skip samples so the stream never runs faster than the
+            # recording did (or WAYPOINT_RATE_HZ, if that is higher).
+            stride = math.ceil(rate_hz * self.params["speed"]
+                               / max(rate_hz, WAYPOINT_RATE_HZ))
+            if stride > 1 and frames:
+                frames = frames[::stride] + (
+                    [frames[-1]] if (len(frames) - 1) % stride else [])
+                rate_hz /= stride
         else:
             waypoints = data.get("waypoints") or []
             # Close the cycle when looping so the wrap-around glides back
@@ -551,7 +579,12 @@ class ReplayOperation(Operation):
                                  or INTERP_STEP_PERIOD_S)
                 holds: list[int] = []
             else:
-                frames, rate_hz, holds = _interpolate(waypoints)
+                # Glides are built at the playback speed, so they stream at
+                # WAYPOINT_RATE_HZ whatever it is; play_frames' rate x speed
+                # then comes back to that rate.
+                frames, rate_hz, holds = _interpolate(
+                    waypoints, speed=self.params["speed"])
+                rate_hz /= self.params["speed"]
                 if self.params["loop"] and len(holds) > 1:
                     # The closing waypoint is the next cycle's opening one,
                     # which is held there; holding it twice doubles the dwell.

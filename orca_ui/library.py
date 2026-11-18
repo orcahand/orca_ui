@@ -23,6 +23,8 @@ WAYPOINTS = "discrete_waypoints"
 # direct motor stepping; only meaningful under the calibration they were
 # recorded/converted with.
 MOTOR_WAYPOINTS = "motor_waypoints"
+# Replay speed multipliers the console accepts (the UI keeps a copy).
+REPLAY_SPEEDS = (0.25, 0.5, 1.0, 2.0, 4.0, 8.0)
 
 
 class LibraryError(ValueError):
