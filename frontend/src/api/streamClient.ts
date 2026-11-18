@@ -14,6 +14,7 @@ import {
 import { api } from './rest'
 import type {
   ControlState,
+  EnduranceState,
   MotorsFaults,
   OperationLogPayload,
   OperationSnapshot,
@@ -125,6 +126,11 @@ async function resyncControlPlanes(): Promise<void> {
     useOperationStore.getState().setOperation((await api.operation()).operation)
   } catch {
     /* keep whatever we have; topic pushes will correct it */
+  }
+  try {
+    useOperationStore.getState().setEndurance(await api.endurance())
+  } catch {
+    /* the next cycle's push brings it */
   }
   try {
     useTeleopStore.getState().setSession((await api.teleopState()).session)
@@ -300,6 +306,11 @@ function dispatch(message: ServerMessage): void {
       useOperationStore
         .getState()
         .setOperation(data as unknown as OperationSnapshot)
+      break
+    case TOPICS.endurance:
+      useOperationStore
+        .getState()
+        .setEndurance(data as unknown as EnduranceState)
       break
     case TOPICS.operationLog:
       useOperationStore

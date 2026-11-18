@@ -82,6 +82,11 @@ class OpContext:
 
     # ----- stop / input ---------------------------------------------------------
 
+    @property
+    def estopped(self) -> bool:
+        """The stop that landed came from the e-stop, not a plain Stop."""
+        return self._manager.stop_reason == "stopped (e-stop)"
+
     def check_stop(self) -> None:
         if self.stop_event.is_set():
             raise OperationStopped()

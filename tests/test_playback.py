@@ -365,6 +365,42 @@ def test_replay_glides_to_the_first_frame(client):
     _wait_op_state(client, "done")
 
 
+def test_looping_replay_keeps_an_endurance_record_the_ui_reads(client):
+    """GET /api/endurance (and the `endurance` topic) carry the shape the
+    Endurance panel reads; the count survives Stop and is downloadable."""
+    joint_ids = _joint_ids(client)
+    flexed = [0.0] * len(joint_ids)
+    flexed[joint_ids.index("index_mcp")] = 30.0
+    _waypoint_trajectory(client, "endure", [flexed, [0.0] * len(joint_ids)])
+    client.post("/api/torque/enable")
+    client.post("/api/operation/replay/start", json={"params": {
+        "name": "endure", "loop": True,
+        "carried_cycles": 100, "carried_estimated": 40,
+        "continues": "replay-earlier"}})
+    current = _wait_for(lambda: (
+        c := client.get("/api/endurance").json()["current"])
+        and c["cycles"] >= 102 and c)
+    assert current["state"] == "running" and current["motion"] == "endure"
+    assert {"run_id", "started_at", "last_cycle_at", "ended_at", "cycles",
+            "carried_cycles", "continues", "fingers", "tactile_hz",
+            "bus_errors", "latched_motors"} <= current.keys()
+    assert all({"peak_n", "health"} == f.keys()
+               for f in current["fingers"].values())
+
+    client.post("/api/operation/stop")
+    _wait_op_state(client, "done")
+    state = client.get("/api/endurance").json()
+    assert state["current"] is None
+    run = state["runs"][0]
+    assert run["state"] == "stopped" and run["cycles"] >= current["cycles"]
+    client.app.state.service.endurance.flush()
+    csv = client.get(f"/api/endurance/{run['run_id']}.csv")
+    assert csv.status_code == 200
+    rows = csv.text.strip().splitlines()
+    assert "60 exact from replay-earlier + 40 estimated" in rows[1]
+    assert len(rows) == 2 + run["cycles"] - 100
+
+
 # ----- demo -----------------------------------------------------------------------
 
 

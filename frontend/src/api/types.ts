@@ -604,6 +604,39 @@ export type OperationState =
   | 'done'
   | 'error'
 
+// ----- endurance (orca_ui/hand/endurance.py): looping replays, per cycle -----
+
+export interface EnduranceRun {
+  run_id: string
+  motion: string
+  state:
+    | 'running'
+    | 'done'
+    | 'stopped'
+    | 'e-stopped'
+    | 'error'
+    | 'interrupted'
+  started_at: number // epoch seconds
+  last_cycle_at: number | null
+  ended_at: number | null
+  cycles: number // carried_cycles included
+  // Cycles taken over from run `continues`, which have no per-cycle data.
+  carried_cycles: number
+  carried_estimated: number // the part of carried_cycles that is an estimate
+  continues: string | null
+  carried_note: string | null // what the CSV's first row says about them
+  // Last completed cycle: peak fingertip force (N) and tactile health.
+  fingers: Record<string, { peak_n: number | null; health: string | null }>
+  tactile_hz: number | null
+  bus_errors: number
+  latched_motors: number
+}
+
+export interface EnduranceState {
+  current: EnduranceRun | null
+  runs: EnduranceRun[]
+}
+
 export interface OperationSnapshot {
   kind: string
   run_id: string
@@ -910,6 +943,7 @@ export const TOPICS = {
   error: 'error',
   operationState: 'operation.state',
   operationLog: 'operation.log',
+  endurance: 'endurance',
   tactileForces: 'tactile.forces',
   tactileTaxels: 'tactile.taxels',
   jointsMeasured: 'joints.measured',

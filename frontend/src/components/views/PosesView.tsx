@@ -8,6 +8,7 @@ import type { DemoEntry, PoseEntry, TrajectoryEntry } from '../../api/types'
 import { useAppStore } from '../../state/appStore'
 import { useControlGate, useOperationStore } from '../../state/operationStore'
 import { DemoList } from '../poses/DemoList'
+import { EndurancePanel } from '../poses/EndurancePanel'
 import { PoseGrid } from '../poses/PoseGrid'
 import { TrajectoryPanel } from '../poses/TrajectoryPanel'
 
@@ -66,6 +67,7 @@ export function PosesView() {
         trajectories={trajectories}
         onChanged={refreshTrajectories}
       />
+      <EndurancePanel />
     </>
   )
 }

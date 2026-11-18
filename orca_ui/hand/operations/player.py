@@ -16,11 +16,13 @@ from __future__ import annotations
 import logging
 import math
 import time
+from typing import Callable
 
 import numpy as np
 
 from orca_ui.hand.operations import hand_ops
 from orca_ui.hand.operations.base import OpContext, Operation
+from orca_ui.hand.operations.events import OperationStopped
 from orca_ui.hand.states import ControlSource
 from orca_ui.library import CONTINUOUS, MOTOR_WAYPOINTS, WAYPOINTS, LibraryError
 
@@ -309,11 +311,28 @@ def _max_cycles(value) -> "int | None":
     return cycles
 
 
+def _carried_cycles(value) -> int:
+    """A count of cycles taken over from earlier runs (0 when absent)."""
+    from orca_ui.hand.service import ServiceError
+
+    try:
+        cycles = -1 if isinstance(value, bool) else int(value or 0)
+        if isinstance(value, float) and value != cycles:
+            cycles = -1
+    except (TypeError, ValueError, OverflowError):
+        cycles = -1
+    if cycles < 0:
+        raise ServiceError("carried_cycles must be a whole number of cycles",
+                           status_code=422)
+    return cycles
+
+
 def play_frames(ctx: OpContext, *, name: str, joint_ids: list[str],
                 frames: list[list[float]], rate_hz: float,
                 speed: float, loop: bool,
                 holds: "list[int] | tuple" = (),
-                max_cycles: "int | None" = DEFAULT_MAX_LOOP_CYCLES) -> dict:
+                max_cycles: "int | None" = DEFAULT_MAX_LOOP_CYCLES,
+                on_cycle: "Callable[[int], None] | None" = None) -> dict:
     """Paced playback with pause/stop; returns {frames, cycles}.
 
     ``duration_s`` counts the commanded motion only — waypoint holds add to
@@ -347,6 +366,8 @@ def play_frames(ctx: OpContext, *, name: str, joint_ids: list[str],
         _stream(ctx, joint_ids, frames, dt, progress=ctx.set_progress,
                 holds=holds)
         cycles += 1
+        if on_cycle is not None:
+            on_cycle(cycles)
         reached_cap = max_cycles is not None and cycles >= max_cycles
         if loop and reached_cap:
             ctx.log(f"requested {max_cycles} cycle(s) complete — "
@@ -457,6 +478,14 @@ class ReplayOperation(Operation):
             "speed": speed,
             "loop": bool(params.get("loop", False)),
             "max_cycles": _max_cycles(params.get("max_cycles")),
+            # An endurance run picking up where another left off: its count
+            # starts at carried_cycles (cycles of `continues`, not replayed).
+            "carried_cycles": _carried_cycles(params.get("carried_cycles")),
+            "carried_estimated": _carried_cycles(params.get("carried_estimated")),
+            "continues": str(params["continues"])[:64]
+            if params.get("continues") else None,
+            "carried_note": str(params["carried_note"])[:200]
+            if params.get("carried_note") else None,
             "type": traj_type,
             "interp_steps": interp_steps,
             # None = the INTERP_STEP_PERIOD_S default; only meaningful in
@@ -467,8 +496,36 @@ class ReplayOperation(Operation):
         }
 
     def run(self, ctx: OpContext) -> dict:
+        # A looping replay is an endurance run: every cycle goes on record.
+        record = getattr(ctx.service, "endurance", None) if self.params["loop"] else None
+        if record is None:
+            return self._play(ctx, None)
+        record.start(self.params["name"],
+                     carried_cycles=self.params.get("carried_cycles", 0),
+                     carried_estimated=self.params.get("carried_estimated", 0),
+                     continues=self.params.get("continues"),
+                     carried_note=self.params.get("carried_note"))
+        def on_cycle(cycles: int) -> None:
+            # The record never stops the motion.
+            try:
+                record.cycle_done(cycles)
+            except Exception:
+                logger.exception("endurance record missed cycle %s", cycles)
+
+        state = "error"
+        try:
+            result = self._play(ctx, on_cycle)
+            state = "done"
+            return result
+        except OperationStopped:
+            state = "stopped"
+            raise
+        finally:
+            record.finish("e-stopped" if ctx.estopped else state)
+
+    def _play(self, ctx: OpContext, on_cycle) -> dict:
         if self.params["type"] == MOTOR_WAYPOINTS:
-            return self._run_motor_waypoints(ctx)
+            return self._run_motor_waypoints(ctx, on_cycle)
         data = ctx.service.library.load_trajectory(self.params["name"])
         meta = data.get("metadata") or {}
         joint_ids = list(meta.get("joint_ids")
@@ -505,9 +562,10 @@ class ReplayOperation(Operation):
             speed=self.params["speed"], loop=self.params["loop"],
             holds=holds,
             max_cycles=self.params.get("max_cycles"),
+            on_cycle=on_cycle,
         )
 
-    def _run_motor_waypoints(self, ctx: OpContext) -> dict:
+    def _run_motor_waypoints(self, ctx: OpContext, on_cycle) -> dict:
         """Raw motor-space stepping: pause the feedback loop's writes (the
         direct-motor fence), glide to the first waypoint, then command each
         (optionally interpolated) motor pose directly."""
@@ -596,6 +654,8 @@ class ReplayOperation(Operation):
                             unsettled += 1
                         ctx.sleep(dt)
                 cycles += 1
+                if on_cycle is not None:
+                    on_cycle(cycles)
                 reached_cap = max_cycles is not None and cycles >= max_cycles
                 if loop and reached_cap:
                     ctx.log(f"requested {max_cycles} cycle(s) complete — "

@@ -6,6 +6,7 @@ import { create } from 'zustand'
 import { recordRunInFinish } from '../components/setup/setupUtils'
 import type {
   ControlSource,
+  EnduranceState,
   OperationLogLine,
   OperationLogPayload,
   OperationSnapshot,
@@ -37,7 +38,9 @@ interface OperationStoreState {
   operation: OperationSnapshot | null
   logRunId: string | null
   logLines: OperationLogLine[]
+  endurance: EnduranceState | null
 
+  setEndurance(state: EnduranceState): void
   // null clears the plane (REST resync after a backend restart found no op).
   setOperation(snapshot: OperationSnapshot | null): void
   mergeLog(payload: OperationLogPayload): void
@@ -47,7 +50,9 @@ export const useOperationStore = create<OperationStoreState>((set, get) => ({
   operation: null,
   logRunId: null,
   logLines: [],
+  endurance: null,
 
+  setEndurance: (endurance) => set({ endurance }),
   setOperation: (snapshot) => {
     const previous = get().operation
     // Before the store updates, so the Run step reads the new date on its next render.

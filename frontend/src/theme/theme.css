@@ -2017,6 +2017,19 @@ header h1 {
   font-weight: 700;
 }
 
+.endurance-fingers,
+.endurance-runs {
+  margin-top: 10px;
+}
+
+.endurance-ok {
+  color: var(--ok);
+}
+
+.endurance-bad {
+  color: var(--err);
+}
+
 .traj-actions {
   display: inline-flex;
   align-items: center;

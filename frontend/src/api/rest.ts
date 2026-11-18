@@ -10,6 +10,7 @@ import type {
   BoardsInfo,
   DemoEntry,
   DirectMotorSnapshot,
+  EnduranceState,
   HandInfo,
   HandStoreInfo,
   ModelMetadata,
@@ -170,6 +171,7 @@ export const api = {
   operation: () =>
     request<{ operation: OperationSnapshot | null }>('/api/operation'),
   operationLog: () => request<OperationLogPayload>('/api/operation/log'),
+  endurance: () => request<EnduranceState>('/api/endurance'),
   operationStart: (kind: string, params: Record<string, unknown> = {}) =>
     post<{ operation: OperationSnapshot }>(`/api/operation/${kind}/start`, {
       params,

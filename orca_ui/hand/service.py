@@ -222,6 +222,7 @@ class HandService:
         self._sweeper = None  # mock-only dev sweeper, for estop
         self._teleop_manager = None  # attached post-construction (server.py)
         self._telemetry = None  # attached in server.py
+        self.endurance = None  # EnduranceRecorder, attached in server.py
         # Gains connect() installed from config.yaml — what "reset" restores.
         # Live gains are read back from the controller, never shadowed here.
         self._config_gains: dict[str, dict] = {}

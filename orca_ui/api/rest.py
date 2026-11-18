@@ -4,6 +4,7 @@ FastAPI's threadpool, never on the event loop."""
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 
 from orca_ui.api import schemas
 from orca_ui import changelog as changelog_doc
@@ -251,6 +252,22 @@ def build_router(service: HandService) -> APIRouter:
     @router.get("/operation/log")
     def operation_log():
         return _manager().log_payload()
+
+    def _endurance():
+        if service.endurance is None:
+            raise HTTPException(status_code=503, detail="endurance record unavailable")
+        return service.endurance
+
+    @router.get("/endurance")
+    def endurance_state():
+        return _endurance().state()
+
+    @router.get("/endurance/{run_id}.csv")
+    def endurance_csv(run_id: str):
+        path = _endurance().csv_path(run_id)
+        if path is None:
+            raise HTTPException(status_code=404, detail=f"no endurance run {run_id!r}")
+        return FileResponse(path, media_type="text/csv", filename=path.name)
 
     @router.post("/operation/{kind}/start")
     def operation_start(kind: str, body: schemas.OperationStartRequest | None = None):

@@ -23,6 +23,7 @@ def create_app(settings: UiSettings) -> FastAPI:
     from orca_ui.api.assets import mount_assets
     from orca_ui.api.rest import build_router as build_rest_router
     from orca_ui.api.ws import build_ws_router
+    from orca_ui.hand.endurance import EnduranceRecorder, endurance_folder
     from orca_ui.hand.service import HandService
     from orca_ui.hand.telemetry import TelemetryService
 
@@ -44,6 +45,9 @@ def create_app(settings: UiSettings) -> FastAPI:
         service.attach_teleop_manager(teleop)
     telemetry = TelemetryService(service, hub, settings)
     service.attach_telemetry(telemetry)
+    service.endurance = EnduranceRecorder(
+        folder=lambda: endurance_folder(settings, service.supervisor.config),
+        latest=hub.latest, publish=hub.publish)
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -58,6 +62,7 @@ def create_app(settings: UiSettings) -> FastAPI:
             if teleop is not None:
                 teleop.shutdown()
             operations.shutdown()
+            service.endurance.flush()
             telemetry.stop()
             service.stop()
 

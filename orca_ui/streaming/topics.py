@@ -14,6 +14,8 @@ ERROR = "error"
 # latest-wins — per-line publishes would drop burst lines.
 OPERATION_STATE = "operation.state"
 OPERATION_LOG = "operation.log"
+# Looping replays' per-cycle record ({current, runs}), kept on disk too.
+ENDURANCE = "endurance"
 
 TACTILE_FORCES = "tactile.forces"
 TACTILE_TAXELS = "tactile.taxels"
@@ -47,7 +49,7 @@ TELEOP_PREVIEW = "teleop.preview"
 
 ALL_TOPICS = [
     STATUS, CONTROL_STATE, ERROR,
-    OPERATION_STATE, OPERATION_LOG,
+    OPERATION_STATE, OPERATION_LOG, ENDURANCE,
     TACTILE_FORCES, TACTILE_TAXELS,
     JOINTS_MEASURED, JOINTS_ESTIMATE, JOINTS_TARGET, JOINTS_CORRECTION,
     MOTORS_TELEMETRY, MOTORS_FAULTS, STATS, SENSORS_HEALTH,

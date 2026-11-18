@@ -353,6 +353,9 @@ class TelemetryService:
                 forces = getattr(reading.forces, "forces", None)
                 if forces:
                     self._hub.publish(T.TACTILE_FORCES, {"forces": forces})
+                    endurance = getattr(self._service, "endurance", None)
+                    if endurance is not None:
+                        endurance.feed_forces(forces)
                 taxels = getattr(reading.taxels, "taxels", None)
                 if taxels:
                     self._hub.publish(T.TACTILE_TAXELS, {"taxels": taxels})
