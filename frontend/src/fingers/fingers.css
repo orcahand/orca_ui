@@ -539,3 +539,111 @@
   white-space: nowrap;
   color: var(--dimmer);
 }
+
+/* --- monitor --- */
+
+.finger-monitor {
+  align-self: start;
+  position: sticky;
+  top: 8px;
+}
+
+.finger-chart-legend {
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.wrist-dials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.wrist-dial {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 11px;
+}
+
+.wrist-dial.incomplete {
+  opacity: 0.5;
+}
+
+.wrist-dial svg circle {
+  fill: none;
+  stroke: var(--panel-border);
+  stroke-width: 1.5;
+}
+
+.wrist-dial svg circle.hub {
+  fill: var(--accent);
+  stroke: none;
+}
+
+.wrist-dial svg line {
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.wrist-dial svg text {
+  fill: var(--dimmer);
+  font-size: 8px;
+  font-family: 'Space Mono', monospace;
+}
+
+.wrist-dial svg text.reading {
+  fill: var(--text);
+  font-size: 10px;
+}
+
+.wrist-dial-name {
+  font-weight: 600;
+}
+
+.wrist-dial-name small {
+  color: var(--dimmer);
+  font-weight: 400;
+}
+
+.finger-slider-load {
+  min-width: 84px;
+  text-align: right;
+  font-size: 10px;
+  color: var(--dimmer);
+}
+
+.finger-slider-load.pinned {
+  color: var(--danger-bright);
+  font-weight: 700;
+}
+
+.finger-slider-short {
+  font-size: 10px;
+  color: var(--danger-bright);
+  white-space: nowrap;
+}
+
+.finger-fault {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--danger-bright);
+  border: 1px solid rgb(var(--danger-rgb) / 0.5);
+  background: rgb(var(--danger-rgb) / 0.08);
+}
+
+.finger-fault .btn {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 2px 8px;
+}
+
+.finger-row.picked {
+  border-color: var(--accent);
+}

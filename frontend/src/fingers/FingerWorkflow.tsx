@@ -8,6 +8,7 @@ import { useOperationStore } from '../state/operationStore'
 import { couplingProblem, couplingsOf } from './coupling'
 import { FingerControl } from './FingerControl'
 import { FingerCoupling } from './FingerCoupling'
+import { FingerMonitor } from './FingerMonitor'
 import { FingerPresets } from './FingerPresets'
 import { FingerRange } from './FingerRange'
 import { FingerTendons } from './FingerTendons'
@@ -56,7 +57,12 @@ export function FingerWorkflow({ connected }: { connected: boolean }) {
       {step === 'tendons' && <FingerTendons connected={connected} locked={engaged} />}
       {step === 'coupling' && <FingerCoupling locked={engaged} />}
       {step === 'range' && <FingerRange connected={connected} locked={engaged} />}
-      {step === 'control' && <FingerControl connected={connected} />}
+      {step === 'control' && (
+        <div className="bench-main fingers-main">
+          <FingerControl connected={connected} />
+          <FingerMonitor />
+        </div>
+      )}
     </>
   )
 }

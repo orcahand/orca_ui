@@ -3,10 +3,14 @@
 // selection. Identify numbers the motors by where they sit: every motor is
 // released, a slot is armed, the operator turns that motor by hand, and the
 // shaft that moved is the motor in that slot. Saving rewrites the bench's
-// motor numbers so slot NN is motor NN; the servos keep their bus ids.
+// motor numbers so slot NN is motor NN; the servos keep their bus ids. In
+// fingers mode the labels carry each motor's tendon, and a picked motor is
+// given its tendon here.
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../../api/rest'
+import { useFingerStore } from '../../fingers/fingerStore'
+import { TowerTendon } from '../../fingers/TowerTendon'
 import { useAppStore } from '../../state/appStore'
 import { useOperationActive } from '../../state/operationStore'
 import { type BenchMotor, useBenchStore } from '../benchStore'
@@ -41,7 +45,7 @@ function storedOpen(): boolean {
   }
 }
 
-function Inspector({ motor, enabled }: { motor: BenchMotor; enabled: boolean }) {
+function Inspector({ motor, enabled, children }: { motor: BenchMotor; enabled: boolean; children?: ReactNode }) {
   const held = useAppStore((s) => s.control?.held_motors?.includes(motor.id) ?? false)
   const setError = useAppStore((s) => s.setError)
   const [step, setStep] = useState(JOG_STEPS_DEG[1])
@@ -101,6 +105,7 @@ function Inspector({ motor, enabled }: { motor: BenchMotor; enabled: boolean }) 
         <dd><span ref={temp}>—</span></dd>
       </dl>
       <div className="tower-fault" ref={fault} />
+      {children}
       <div className="tower-actions">
         <button
           className={`btn ${held ? 'btn-secondary' : 'btn-primary'}`}
@@ -187,6 +192,7 @@ export function TowerPanel({ connected }: { connected: boolean }) {
   const toggleSelected = useBenchStore((s) => s.toggleSelected)
   const mode = useBenchStore((s) => s.mode)
   const scan = useBenchStore((s) => s.scan)
+  const tendons = useFingerStore((s) => s.tendons)
   const bench = useAppStore((s) => s.handInfo?.bench ?? false)
   const control = useAppStore((s) => s.control)
   const torque = useAppStore((s) => s.status?.torque_enabled ?? false)
@@ -387,7 +393,14 @@ export function TowerPanel({ connected }: { connected: boolean }) {
     (Object.keys(identify.draft).length !== Object.keys(benchSlots).length ||
       Object.entries(identify.draft).some(([s, id]) => benchSlots[Number(s)] !== id))
   const heldNow = control?.held_motors?.length ?? 0
-  const narrows = mode === 'fingers' ? '' : ` · ${mode} shows only these`
+  const fingers = mode === 'fingers'
+  const narrows = fingers ? '' : ` · ${mode} shows only these`
+  const tags = useMemo(() => {
+    if (!fingers) return undefined
+    const out: Record<number, string> = {}
+    for (const t of tendons) if (t.motor !== null) out[t.motor] = t.name
+    return out
+  }, [fingers, tendons])
 
   return (
     <section className="panel bench-tower">
@@ -441,6 +454,7 @@ export function TowerPanel({ connected }: { connected: boolean }) {
                 identifying={identify !== null}
                 armed={identify?.armed ?? null}
                 confirmed={identify?.confirmed ?? []}
+                tags={identify ? undefined : tags}
                 onPick={onPick}
               />
             ) : (
@@ -579,14 +593,17 @@ export function TowerPanel({ connected }: { connected: boolean }) {
                 )}
               </div>
             ) : picked.length === 1 ? (
-              <Inspector key={picked[0].id} motor={picked[0]} enabled={canDrive} />
+              <Inspector key={picked[0].id} motor={picked[0]} enabled={canDrive}>
+                {fingers && <TowerTendon motor={picked[0]} />}
+              </Inspector>
             ) : picked.length > 1 ? (
               <SelectionTools picked={picked} enabled={canDrive} />
             ) : (
               <div className="tower-inspector">
                 <p className="tower-note">
-                  Click a motor to select it; shift-click adds more. Cycle and Thermal then show
-                  and run only the selection. A motor glows while its shaft turns.
+                  {fingers
+                    ? 'Click a motor to give it a tendon — hold and jog it to see which tendon it pulls. A motor glows while its shaft turns.'
+                    : 'Click a motor to select it; shift-click adds more. Cycle and Thermal then show and run only the selection. A motor glows while its shaft turns.'}
                 </p>
                 {unplaced.length > 0 && (
                   <p className="tower-note">

@@ -150,6 +150,7 @@ function TendonRow({
   const removeTendon = useFingerStore((s) => s.removeTendon)
   const tendons = useFingerStore((s) => s.tendons)
   const joints = useFingerStore((s) => s.joints)
+  const picked = useBenchStore((s) => tendon.motor !== null && s.selected.includes(tendon.motor))
   const posRef = useRef<HTMLSpanElement>(null)
   useMotorLive((frames) => {
     const pos = tendon.motor === null ? undefined : frames.motors.positions[String(tendon.motor)]
@@ -160,7 +161,7 @@ function TendonRow({
   const movers = joints.filter((j) => j.terms.some((t) => t.tendon === tendon.name)).map((j) => j.name)
 
   return (
-    <div className={`finger-row finger-tendon ${tendon.motor === null ? 'incomplete' : ''}`}>
+    <div className={`finger-row finger-tendon ${tendon.motor === null ? 'incomplete' : ''} ${picked ? 'picked' : ''}`}>
       <div className="finger-row-main">
         <input
           className="finger-name"
@@ -224,8 +225,8 @@ export function FingerTendons({ connected, locked }: { connected: boolean; locke
       <div className="panel-header">
         <h2>Tendons</h2>
         <small className="finger-hint">
-          name each tendon and pick the motor it is wound on — hold a motor and jog it to see which tendon
-          moves; hold all to tension the spools. If the MCP and PIP of a finger come out swapped, flip the
+          name each tendon and pick the motor it is wound on, here or by clicking the motor on the tower —
+          hold a motor and jog it to see which tendon moves; hold all to tension the spools. If the MCP and PIP of a finger come out swapped, flip the
           winding sense of one of its tendons
         </small>
         <HoldAll connected={connected} />

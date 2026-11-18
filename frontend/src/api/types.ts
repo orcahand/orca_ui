@@ -528,6 +528,8 @@ export interface FingerJointReport {
   position_deg: number | null
   fraction: number | null
   current_ma: number | null
+  // Motor id → degrees its shaft is from its goal, once the command has settled.
+  short: Record<string, number>
 }
 
 export interface FingerCycleReport {

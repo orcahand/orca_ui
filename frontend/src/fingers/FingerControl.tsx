@@ -6,7 +6,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api/rest'
-import type { FingerExtra } from '../api/types'
+import type { FingerExtra, HwErrorInfo } from '../api/types'
 import { useBenchStore } from '../bench/benchStore'
 import { useMotorLive } from '../bench/useMotorLive'
 import { useAppStore } from '../state/appStore'
@@ -14,7 +14,21 @@ import { isOperationActive, operationLabel, useOperationStore } from '../state/o
 import { type MotorJoint, couplingsOf, jointAnglesOf } from './coupling'
 import { type FingerPose, fractionOf, groupsOf, readyJoints, resolve, useFingerStore } from './fingerStore'
 
-function JointSlider({ joint, all, engaged }: { joint: MotorJoint; all: MotorJoint[]; engaged: boolean }) {
+function JointSlider({
+  joint,
+  all,
+  engaged,
+  short,
+}: {
+  joint: MotorJoint
+  all: MotorJoint[]
+  engaged: boolean
+  short: Record<string, number>
+}) {
+  const motors = useBenchStore((s) => s.motors)
+  const shortText = Object.entries(short)
+    .map(([id, deg]) => `motor ${motors.find((m) => m.id === Number(id))?.number ?? id} ${deg > 0 ? '+' : ''}${deg.toFixed(0)}°`)
+    .join(', ')
   const target = useFingerStore((s) => s.targets[joint.name] ?? 0)
   const setTarget = useFingerStore((s) => s.setTarget)
   const zeros = useFingerStore((s) => s.zeros)
@@ -24,12 +38,22 @@ function JointSlider({ joint, all, engaged }: { joint: MotorJoint; all: MotorJoi
   )
   const liveRef = useRef<HTMLElement>(null)
   const markRef = useRef<HTMLElement>(null)
+  const loadRef = useRef<HTMLElement>(null)
+  const maxCurrent = useAppStore((s) => s.control?.max_current ?? null)
 
   useMotorLive((frames) => {
     const angle = coupling ? jointAnglesOf([coupling], zeros, frames.motors.positions)[joint.name] : undefined
     const f = angle === undefined ? null : fractionOf(joint, angle)
     if (liveRef.current) liveRef.current.textContent = f === null ? '—' : `${Math.round(f * 100)}%`
     if (markRef.current) markRef.current.style.left = f === null ? '-9999px' : `${(f * 100).toFixed(1)}%`
+    // A motor sitting at the ceiling cannot pull further: the joint stops short.
+    const currents = joint.terms.map((t) => Math.abs(frames.motors.currents[String(t.motor)] ?? 0))
+    const peak = Math.max(0, ...currents)
+    const pinned = maxCurrent !== null && peak >= 0.9 * maxCurrent
+    if (loadRef.current) {
+      loadRef.current.textContent = pinned ? `${Math.round(peak)} mA at limit` : `${Math.round(peak)} mA`
+      loadRef.current.classList.toggle('pinned', pinned)
+    }
   })
 
   return (
@@ -53,6 +77,14 @@ function JointSlider({ joint, all, engaged }: { joint: MotorJoint; all: MotorJoi
         {Math.round(target * 100)}%
         <small ref={liveRef}>—</small>
       </span>
+      <small ref={loadRef} className="finger-slider-load" title="highest motor current of this joint; at the ceiling the motor stalls">
+        —
+      </small>
+      {shortText && (
+        <small className="finger-slider-short" title="the command has settled but these shafts are not at their goal (goal − shaft)">
+          short: {shortText}
+        </small>
+      )}
     </label>
   )
 }
@@ -62,11 +94,13 @@ function GroupSlider({
   joints,
   all,
   engaged,
+  shorts,
 }: {
   group: string
   joints: MotorJoint[]
   all: MotorJoint[]
   engaged: boolean
+  shorts: Record<string, Record<string, number>>
 }) {
   const targets = useFingerStore((s) => s.targets)
   const setTargets = useFingerStore((s) => s.setTargets)
@@ -111,7 +145,7 @@ function GroupSlider({
         </span>
       </div>
       {joints.map((joint) => (
-        <JointSlider key={joint.name} joint={joint} all={all} engaged={engaged} />
+        <JointSlider key={joint.name} joint={joint} all={all} engaged={engaged} short={shorts[joint.name] ?? {}} />
       ))}
     </div>
   )
@@ -272,6 +306,26 @@ export function FingerControl({ connected }: { connected: boolean }) {
   const setError = useAppStore((s) => s.setError)
   const operation = useOperationStore((s) => s.operation)
   const [busy, setBusy] = useState(false)
+  // Latched hardware errors by motor id, from the fault stream; a latched
+  // motor acks torque and never moves, so it must be cleared before Engage.
+  const [faults, setFaults] = useState<Record<number, HwErrorInfo>>({})
+  useMotorLive((frames) => {
+    const next: Record<number, HwErrorInfo> = {}
+    for (const [id, entry] of Object.entries(frames.motors.faults?.motors ?? {})) {
+      if (entry.hw_error) next[Number(id)] = entry.hw_error
+    }
+    setFaults((prev) => {
+      const same =
+        Object.keys(prev).length === Object.keys(next).length &&
+        Object.entries(next).every(([id, e]) => prev[Number(id)]?.headline === e.headline)
+      return same ? prev : next
+    })
+  })
+  const clearFault = (id: number) =>
+    call(async () => {
+      const r = await api.rebootMotor(id)
+      if (!r.cleared) throw new Error(`motor ${motors.find((m) => m.id === id)?.number ?? id} still reports ${r.hw_error_flags?.join(', ')}`)
+    })
 
   const active = isOperationActive(operation)
   const ours = active && operation?.kind === 'finger_control'
@@ -298,6 +352,10 @@ export function FingerControl({ connected }: { connected: boolean }) {
     [ours, extra, resolved, ready],
   )
   const groups = useMemo(() => groupsOf(shown), [shown])
+  const shorts = useMemo(
+    () => Object.fromEntries((extra?.joints ?? []).map((j) => [j.name, j.short ?? {}])),
+    [extra],
+  )
 
   // The run's targets seed the sliders once per run: on engage, and when the
   // page opens mid-run. After that the sliders lead and the run follows.
@@ -318,8 +376,13 @@ export function FingerControl({ connected }: { connected: boolean }) {
     blocked = `control is owned by ${control.control_owner}`
   else if (ready.length === 0) blocked = 'no joint is complete — tendons, coupling and both ends'
   else {
-    const loose = [...new Set(ready.flatMap((j) => j.terms.map((t) => t.motor)))].filter((m) => !held.includes(m))
-    if (loose.length > 0) {
+    const inPlay = [...new Set(ready.flatMap((j) => j.terms.map((t) => t.motor)))]
+    const tripped = inPlay.filter((m) => faults[m])
+    const loose = inPlay.filter((m) => !held.includes(m))
+    if (tripped.length > 0) {
+      const names = tripped.map((id) => motors.find((m) => m.id === id)?.number ?? id)
+      blocked = `motor ${names.join(', ')} tripped — clear the fault first`
+    } else    if (loose.length > 0) {
       const names = loose.map((id) => motors.find((m) => m.id === id)?.number ?? id)
       blocked = loose.length > 3 ? 'hold all the motors first' : `hold motor ${names.join(', ')} first`
     }
@@ -400,12 +463,35 @@ export function FingerControl({ connected }: { connected: boolean }) {
             : blocked ?? `${ready.length} joint(s) ready${skipped ? `, ${skipped} not yet` : ''}`}
         </span>
       </div>
+      {Object.entries(faults).map(([id, fault]) => {
+        const motor = motors.find((m) => m.id === Number(id))
+        const tendon = tendons.find((t) => t.motor === Number(id))
+        return (
+          <div key={id} className="finger-fault" title={fault.advice}>
+            <strong>
+              motor {motor?.number ?? id}
+              {tendon ? ` (${tendon.name})` : ''}
+            </strong>{' '}
+            {fault.headline} — {fault.advice}
+            <button className="btn btn-danger" disabled={busy || ours} onClick={() => clearFault(Number(id))}>
+              clear
+            </button>
+          </div>
+        )
+      })}
       <PosePanel engaged={!!ours} extra={extra} names={shown.map((j) => j.name)} />
       {groups.length === 0 ? (
         <p className="panel-empty">The sliders appear once a joint has its tendons, a solvable coupling and both ends.</p>
       ) : (
         groups.map((g) => (
-          <GroupSlider key={g.group || '\u0000'} group={g.group} joints={g.joints} all={shown} engaged={!!ours || !!extra?.cycle} />
+          <GroupSlider
+            key={g.group || '\u0000'}
+            group={g.group}
+            joints={g.joints}
+            all={shown}
+            engaged={!!ours || !!extra?.cycle}
+            shorts={shorts}
+          />
         ))
       )}
     </section>

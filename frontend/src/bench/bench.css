@@ -923,3 +923,22 @@
   color: var(--text-bright);
   border-width: 2px;
 }
+
+.tower-label i {
+  font-style: normal;
+  color: var(--accent);
+}
+
+.tower-label i.none {
+  color: var(--dimmer);
+}
+
+.tower-tendon {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.tower-tendon input {
+  width: 130px;
+}

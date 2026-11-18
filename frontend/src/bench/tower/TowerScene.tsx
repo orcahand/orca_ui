@@ -31,6 +31,8 @@ export interface TowerSceneProps {
   identifying: boolean
   armed: number | null
   confirmed: number[]
+  // Bus id → a word shown under its label (the tendon it winds).
+  tags?: Record<number, string>
   onPick(slot: number, additive: boolean): void
 }
 
@@ -47,7 +49,7 @@ function Fit({ tower }: { tower: Tower }) {
 }
 
 function Slots(props: TowerSceneProps) {
-  const { tower, slots, selected, identifying, armed, confirmed, onPick } = props
+  const { tower, slots, selected, identifying, armed, confirmed, tags, onPick } = props
   const palette = usePalette()
   const held = useAppStore((s) => s.control?.held_motors)
   const live = useRef<LatestFrames['motors'] | null>(null)
@@ -185,6 +187,9 @@ function Slots(props: TowerSceneProps) {
           >
             <b>{s.slot}</b>
             <span>{slots[s.slot] === undefined ? '—' : `id ${slots[s.slot]}`}</span>
+            {tags && slots[s.slot] !== undefined && (
+              <i className={tags[slots[s.slot]] ? '' : 'none'}>{tags[slots[s.slot]] ?? 'no tendon'}</i>
+            )}
           </div>
         </Html>
       ))}

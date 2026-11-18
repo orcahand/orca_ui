@@ -40,6 +40,7 @@ import numpy as np
 
 from orca_ui.bench import assignments_of
 from orca_ui.hand.operations.base import OpContext, Operation
+from orca_ui.hand.faults import classify_hw_error
 from orca_ui.hand.operations.bench import (MIN_TRAVEL_DEG, _deg, _finite,
                                            check_shaft_range)
 from orca_ui.hand.states import ControlSource
@@ -47,6 +48,17 @@ from orca_ui.hand.states import ControlSource
 STREAM_HZ = 50.0
 SAMPLE_PERIOD_S = 0.1
 PUBLISH_PERIOD_S = 0.1
+# A sync write gets no reply, so a packet the bus drops leaves that motor on
+# its old goal: the goals go out again this often even while nothing moves.
+REWRITE_PERIOD_S = 0.25
+# A motor still this far from its goal this long after the command settled
+# is reported short: the goal never arrived, the load holds it, or it stalls.
+SHORT_AFTER_S = 0.5
+SHORT_DEG = 5.0
+# Far behind with no current: the motor is not driving at all. Its error
+# register is read then, and a latched fault ends the run.
+LIMP_DEG = 20.0
+LIMP_MA = 15.0
 DEFAULT_SPEED_DEG_S = 360.0
 MIN_SPEED_DEG_S, MAX_SPEED_DEG_S = 1.0, 2000.0
 MAX_JOINTS = 32
@@ -438,6 +450,7 @@ class _Joint:
         self.cmd = self.open     # joint degrees last commanded
         self.position: float | None = None   # joint degrees, from the shafts
         self.current: float | None = None    # mA, summed over its motors
+        self.short: dict[int, float] = {}    # motor → degrees behind its goal, once settled
 
     @property
     def span(self) -> float:
@@ -474,7 +487,16 @@ class _Joint:
             "position_deg": None if self.position is None else round(self.position, 2),
             "fraction": None if self.position is None else round(self.fraction_of(self.position), 4),
             "current_ma": None if self.current is None else round(self.current, 1),
+            "short": {str(m): round(v, 1) for m, v in self.short.items()},
         }
+
+
+def _latched_errors(service) -> dict[int, str]:
+    """Motor id → headline of its latched hardware error, from the
+    telemetry's last sweep (a latched motor acks torque but never moves)."""
+    telemetry = getattr(service, "_telemetry", None)
+    info = getattr(telemetry, "_hw_error_info", None) or {}
+    return {int(m): (i or {}).get("headline") or "hardware error latched" for m, i in info.items()}
 
 
 class _Cycle:
@@ -526,6 +548,7 @@ class FingerControlOperation(Operation):
         if not held:
             raise ServiceError("torque is off — hold the motors first", status_code=409)
         known = [int(m) for m in session.hand.config.motor_ids]
+        latched = _latched_errors(service)
         limits = getattr(session.hand, "motor_limits_dict", None) or {}
 
         joints = clean_joints(params.get("joints"))
@@ -543,6 +566,10 @@ class FingerControlOperation(Operation):
                     raise ServiceError(who + f"tendon {term['tendon']!r} is not on a motor")
                 if term["motor"] not in known:
                     raise ServiceError(who + f"unknown motor {term['motor']}")
+                if term["motor"] in latched:
+                    raise ServiceError(
+                        who + f"motor {term['motor']}: {latched[term['motor']]} — "
+                        "clear the fault (reboot) and hold it again", status_code=409)
                 if term["motor"] not in held:
                     raise ServiceError(who + f"motor {term['motor']} is released — "
                                        "hold it first", status_code=409)
@@ -657,7 +684,10 @@ class FingerControlOperation(Operation):
         self._t0 = time.monotonic()
         self._last_publish = 0.0
         self._last_sample = 0.0
-        numbers = assignments_of(self._hand.config)
+        self._last_write = 0.0
+        self._still_since = time.monotonic()
+        self._numbers = assignments_of(self._hand.config)
+        numbers = self._numbers
 
         ctx.log(f"engaging {len(self._joints)} joint(s) at {self._speed:g}°/s:")
         for joint in self._joints:
@@ -665,6 +695,7 @@ class FingerControlOperation(Operation):
             ctx.log(f"  {joint.name}: {motors}, open {joint.open:.1f}° → "
                     f"closed {joint.closed:.1f}°")
         service.set_direct_motor_mode(True, from_operation=True)
+        self._ctx = ctx
         try:
             positions = self._hand.get_motor_pos(as_dict=True)
             for coupling, joints in self._couplings:
@@ -699,7 +730,10 @@ class FingerControlOperation(Operation):
             step = speed * dt
             moved = any([j.tick(step) for j in self._joints])
             if moved:
+                self._still_since = now
+            if moved or now - self._last_write >= REWRITE_PERIOD_S:
                 self._write()
+                self._last_write = now
             if self._cycle is not None:
                 self._advance_cycle(ctx, now, moved)
             if now - self._last_sample >= SAMPLE_PERIOD_S:
@@ -763,13 +797,54 @@ class FingerControlOperation(Operation):
     def _sample(self, now: float) -> None:
         self._last_sample = now
         state = self._hand.get_motor_state()
+        settled = now - self._still_since >= SHORT_AFTER_S
         for coupling, joints in self._couplings:
             rows = [self._index[m] for m in coupling.motors]
-            q = coupling.q_of(np.array([_deg(state.position[i]) for i in rows]))
+            shafts = np.array([_deg(state.position[i]) for i in rows])
+            q = coupling.q_of(shafts)
+            goals = coupling.shaft_of(np.array([j.cmd for j in joints]))
+            behind = {m: float(g - s) for m, g, s in zip(coupling.motors, goals, shafts)}
             for joint, angle in zip(joints, q):
                 joint.position = float(angle)
                 joint.current = sum(abs(float(state.current[self._index[m]]))
                                     for m in joint.motors)
+                short = {m: behind[m] for m in joint.motors
+                         if settled and abs(behind[m]) >= SHORT_DEG}
+                for m, v in short.items():
+                    if abs(v) >= LIMP_DEG and abs(float(state.current[self._index[m]])) < LIMP_MA:
+                        self._check_tripped(m, v)
+                if short and not joint.short:
+                    self._ctx.log(
+                        f"{joint.name} settled {abs(joint.position - joint.cmd):.0f}° short "
+                        f"of its command: " + ", ".join(
+                            f"motor {self._numbers.get(m, m)} is {v:+.0f}° from its goal at "
+                            f"{abs(float(state.current[self._index[m]])):.0f} mA"
+                            for m, v in short.items()))
+                joint.short = short
+
+    def _check_tripped(self, motor: int, behind: float) -> None:
+        """A shaft far from its goal with no current is a motor that is not
+        driving: read its error register and end the run if it has latched,
+        before the other motors of the finger pull against a limp tendon."""
+        from orca_ui.hand.service import ServiceError
+
+        client = getattr(self._hand, "_motor_client", None) or getattr(self._hand, "motor_client", None)
+        read = getattr(client, "read_hardware_error", None)
+        decode = getattr(client, "decode_hardware_error", None)
+        if read is None or decode is None:
+            return
+        try:
+            flags = decode(read(motor))
+        except Exception:
+            return
+        if not flags:
+            return
+        info = classify_hw_error(flags, motor=motor) or {}
+        headline = info.get("headline") or ", ".join(flags)
+        raise ServiceError(
+            f"motor {self._numbers.get(motor, motor)} tripped: {headline} — it sits "
+            f"{abs(behind):.0f}° from its goal with no current; clear the fault "
+            "(reboot), hold it again and engage")
 
     def _detail(self) -> str:
         return " · ".join(f"{j.name} {j.target * 100:.0f}%" for j in self._joints)
