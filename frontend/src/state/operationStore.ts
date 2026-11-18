@@ -28,6 +28,7 @@ const OPERATION_LABELS: Record<string, string> = {
   pair_discovery: 'pair discovery',
   finger_control: 'finger control',
   bus_scan: 'bus scan',
+  motor_reprogram: 're-programming IDs',
 }
 
 export function operationLabel(kind: string): string {

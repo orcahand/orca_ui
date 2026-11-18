@@ -130,6 +130,8 @@ interface BenchState {
   patchMotor(id: number, patch: Partial<MotorSetup>): void
   patchSettings(patch: Partial<CycleSettings>): void
   applyToAll(): void
+  // Servo IDs were re-programmed: the remembered setup follows each motor.
+  remapIds(moved: Record<string, number>): void
 }
 
 export const useBenchStore = create<BenchState>((set, get) => ({
@@ -234,6 +236,22 @@ export const useBenchStore = create<BenchState>((set, get) => ({
     const next = { ...settings, ...patch }
     set({ settings: next })
     if (model) save(model, setup, next, logCsv, logPartMb)
+  },
+
+  remapIds: (moved) => {
+    const { model, setup, settings, logCsv, logPartMb, selected } = get()
+    // The page may have re-adopted the new IDs already: the stored copy
+    // still has the old keys, and an old motor's setup wins over a fresh one.
+    const all: Record<string, Partial<MotorSetup>> = { ...(model ? load(model).motors : {}), ...setup }
+    const next: Record<string, MotorSetup> = {}
+    for (const [id, value] of Object.entries(all)) {
+      if (moved[id] === undefined) next[id] = { ...EMPTY_SETUP, ...settings, ...value }
+    }
+    for (const [id, value] of Object.entries(all)) {
+      if (moved[id] !== undefined) next[String(moved[id])] = { ...EMPTY_SETUP, ...settings, ...value }
+    }
+    set({ setup: next, selected: selected.map((id) => moved[id] ?? id) })
+    if (model) save(model, next, settings, logCsv, logPartMb)
   },
 
   applyToAll: () => {

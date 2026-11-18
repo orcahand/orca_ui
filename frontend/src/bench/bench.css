@@ -905,3 +905,21 @@
 .tower-inspector h3.tower-found {
   color: var(--ok);
 }
+
+.tower-candidates {
+  margin: 4px 0 8px;
+}
+
+.bench-reprogram {
+  white-space: nowrap;
+}
+
+.bench-reprogram input {
+  width: 56px;
+  margin-right: 4px;
+}
+
+.tower-label[data-turning='1'] {
+  color: var(--text-bright);
+  border-width: 2px;
+}

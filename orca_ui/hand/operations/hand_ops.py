@@ -261,6 +261,31 @@ def scan_bus(motor_type: str, port: str, baudrate: int,
     return scan_motors(motor_type, port, baudrate, id_range)
 
 
+def baud_rates(motor_type: str) -> list[int]:
+    from orca_core.maintenance.motor_chain import valid_baudrates
+
+    return list(valid_baudrates(motor_type))
+
+
+def change_motor_id(motor_type: str, port: str, baudrate: int,
+                    current_id: int, new_id: int) -> bool:
+    """Re-program one motor's ID (EEPROM; torque goes off). The caller must
+    hold the bus free."""
+    from orca_core.maintenance.motor_chain import _config_session
+
+    with _config_session(motor_type, [current_id], port, baudrate) as client:
+        return bool(client.change_motor_id(current_id, new_id))
+
+
+def change_motor_baud(motor_type: str, port: str, baudrate: int,
+                      motor_id: int, new_baud: int) -> bool:
+    """Re-program one motor's baud rate; it answers only at ``new_baud`` after."""
+    from orca_core.maintenance.motor_chain import _config_session
+
+    with _config_session(motor_type, [motor_id], port, baudrate) as client:
+        return bool(client.change_motor_baudrate(motor_id, new_baud))
+
+
 def build_chain_plan(config, port: str, motor_type: str):
     """MotorChainPlan from an OrcaHandConfig (the library takes the raw
     config mapping)."""

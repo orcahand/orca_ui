@@ -33,6 +33,7 @@ def build_operation_manager(service, settings, publish_topic) -> OperationManage
             SimulatedCalibrateOperation,
             SimulatedTensionOperation,
         )
+        from orca_ui.hand.operations.reid import SimulatedReprogramIdsOperation
         from orca_ui.hand.operations.scan import SimulatedBusScanOperation
         from orca_ui.hand.operations.wizard import SimulatedWizardOperation
         manager.register(SimulatedCalibrateOperation)
@@ -40,9 +41,11 @@ def build_operation_manager(service, settings, publish_topic) -> OperationManage
         manager.register(SimulatedWizardOperation)
         manager.register(SimulatedConfigureChainOperation)
         manager.register(SimulatedBusScanOperation)
+        manager.register(SimulatedReprogramIdsOperation)
     else:
         from orca_ui.hand.operations.calibrate import CalibrateOperation
         from orca_ui.hand.operations.chain import ConfigureChainOperation
+        from orca_ui.hand.operations.reid import ReprogramIdsOperation
         from orca_ui.hand.operations.scan import BusScanOperation
         from orca_ui.hand.operations.tension import TensionOperation
         from orca_ui.hand.operations.wizard import WizardOperation
@@ -51,6 +54,7 @@ def build_operation_manager(service, settings, publish_topic) -> OperationManage
         manager.register(WizardOperation)
         manager.register(ConfigureChainOperation)
         manager.register(BusScanOperation)
+        manager.register(ReprogramIdsOperation)
     # In-session ops run for real in mock mode too (the mock stack is the
     # production stack over in-memory links).
     from orca_ui.hand.operations.bench import MotorCycleOperation

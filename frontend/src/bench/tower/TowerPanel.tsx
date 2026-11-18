@@ -14,6 +14,8 @@ import { JOG_STEPS_DEG, useJog } from '../useJog'
 import { formatDeg, formatMa, useMotorLive } from '../useMotorLive'
 import {
   assignmentsFor,
+  candidates as candidatesOf,
+  type Movement,
   movements,
   place,
   slotsOf,
@@ -195,6 +197,9 @@ export function TowerPanel({ connected }: { connected: boolean }) {
   const [failed, setFailed] = useState(false)
   const [identify, setIdentify] = useState<Identify | null>(null)
   const [saving, setSaving] = useState(false)
+  // Shafts that moved together, for the operator to say which one was meant.
+  const [candidates, setCandidates] = useState<Movement[]>([])
+  const [manualId, setManualId] = useState('')
 
   useEffect(() => {
     let live = true
@@ -259,29 +264,41 @@ export function TowerPanel({ connected }: { connected: boolean }) {
     const moved = movements(baseline.current, positions)
     if (readout.current) {
       const top = moved.slice(0, 2).filter((m) => m.deg >= 1)
-      const several = moved[1] !== undefined && moved[1].deg >= STILL_DEG
-      readout.current.textContent = several
-        ? `${top.map((m) => `id ${m.id} ${m.deg.toFixed(0)}°`).join(' · ')} — more than one turned: Reset, then turn only this one`
-        : top.length
-          ? top.map((m) => `id ${m.id} ${m.deg.toFixed(0)}°`).join(' · ')
-          : 'nothing turning yet'
+      readout.current.textContent = top.length
+        ? top.map((m) => `id ${m.id} ${m.deg.toFixed(0)}°`).join(' · ')
+        : 'nothing turning yet'
     }
+    const several = candidatesOf(moved).map((m) => ({ id: m.id, deg: Math.round(m.deg) }))
+    setCandidates((now) =>
+      now.length === several.length && now.every((m, i) => m.id === several[i].id && m.deg === several[i].deg)
+        ? now
+        : several,
+    )
     const id = turnedMotor(moved)
-    if (id === null) return
+    if (id !== null) assign(id)
+  })
+
+  // The armed slot holds `id` now: found by turning, picked among several
+  // that turned, or set by hand. Next or Redo follows either way.
+  const assign = (id: number) => {
+    const state = identifyRef.current
+    if (!state || state.armed === null) return
     const slot = state.armed
+    setCandidates([])
     setIdentify({
       ...state,
       draft: place(state.draft, slot, id),
       confirmed: [...state.confirmed.filter((s) => s !== slot), slot],
       found: { slot, id, draft: state.draft, confirmed: state.confirmed },
     })
-  })
+  }
 
   // Forget what has turned so far: the next baseline is taken once every
   // shaft is still again.
   const rebaseline = () => {
     baseline.current = null
     settle.current = { last: null, still: 0 }
+    setCandidates([])
   }
 
   const arm = (slot: number | null) => {
@@ -479,6 +496,48 @@ export function TowerPanel({ connected }: { connected: boolean }) {
                     <p className="tower-live">
                       <span ref={readout}>waiting for the shafts to stop…</span>
                     </p>
+                    {candidates.length > 0 && (
+                      <div className="tower-candidates">
+                        <p className="tower-warn">More than one turned — which is in slot {identify.armed}?</p>
+                        <div className="tower-actions">
+                          {candidates.map((m) => (
+                            <button key={m.id} className="btn btn-info" onClick={() => assign(m.id)}>
+                              id {m.id} · {m.deg}°
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="tower-actions">
+                      <select
+                        value={manualId}
+                        onChange={(e) => setManualId(e.target.value)}
+                        title="pair a bus id with this slot without turning it"
+                      >
+                        <option value="">set id by hand…</option>
+                        {[...motors]
+                          .sort((a, b) => a.id - b.id)
+                          .map((m) => {
+                            const at = Object.entries(identify.draft).find(([, id]) => id === m.id)?.[0]
+                            return (
+                              <option key={m.id} value={m.id}>
+                                id {m.id}
+                                {at === undefined ? ' · not placed' : ` · in slot ${at}`}
+                              </option>
+                            )
+                          })}
+                      </select>
+                      <button
+                        className="btn btn-secondary"
+                        disabled={manualId === ''}
+                        onClick={() => {
+                          assign(Number(manualId))
+                          setManualId('')
+                        }}
+                      >
+                        Pair
+                      </button>
+                    </div>
                     <div className="tower-actions">
                       <button
                         className="btn btn-secondary"

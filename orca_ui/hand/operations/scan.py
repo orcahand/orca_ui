@@ -5,8 +5,9 @@ config that names the wrong IDs connects to nothing. The scan answers the
 question the config is guessing at: it pings IDs 0 to 50 at 1 M baud — the
 hand's rate, and the range any bench motor is programmed into — and reports
 what answered. ``baud_rate`` and ``id_max`` widen that for a motor that was
-left at the factory 57,600 or a stray high ID. The bench page then offers to
-adopt the found set into the bench config.
+left at the factory 57,600 or a stray high ID, and ``deep`` pings every ID
+at every rate the family supports — slow, but nothing on the wire hides from
+it. The bench page then offers to adopt the found set into the bench config.
 
 The scan needs the port to itself, so it runs under the supervisor's
 maintenance lease like chain configuration does: the session (if any) is
@@ -24,6 +25,7 @@ from orca_ui.hand.operations.base import OpContext, Operation
 SCAN_ID_RANGE = (0, 50)
 MAX_ID = 252
 DEFAULT_BAUD = 1_000_000
+FACTORY_BAUD = 57_600
 SCAN_CHUNK = 16
 SIMULATED_MODEL = "XC330-M288-T"
 SIMULATED_PORT = "/dev/orca-mock"
@@ -55,7 +57,19 @@ def _validate(service, params: dict) -> dict:
             raise ServiceError("id_max must be an integer")
         if not SCAN_ID_RANGE[0] <= id_max <= MAX_ID:
             raise ServiceError(f"id_max must be {SCAN_ID_RANGE[0]}..{MAX_ID}")
-    return {"motor_type": motor_type, "baud_rate": baud, "id_max": id_max}
+    deep = bool(params.get("deep", False))
+    if deep:
+        id_max = MAX_ID
+    return {"motor_type": motor_type, "baud_rate": baud, "id_max": id_max, "deep": deep}
+
+
+def _rates(family: str, params: dict) -> list[int]:
+    """The bench rate first, the factory 57,600 next, then the rest."""
+    rate = int(params["baud_rate"] or DEFAULT_BAUD)
+    if not params.get("deep"):
+        return [rate]
+    rest = [r for r in hand_ops.baud_rates(family) if r not in (rate, FACTORY_BAUD)]
+    return [rate, FACTORY_BAUD, *rest]
 
 
 class _Found:
@@ -137,11 +151,13 @@ class BusScanOperation(Operation):
             families = [self.params["motor_type"] or config.motor_type] \
                 if (self.params["motor_type"] or config.motor_type) \
                 else hand_ops.known_motor_types()
-            rate = int(self.params["baud_rate"] or DEFAULT_BAUD)
             lo, hi = id_range
+            steps = [(family, rate) for family in families
+                     for rate in _rates(family, self.params)]
             ctx.log(f"scanning {port} for {' / '.join(families)} motors, "
-                    f"IDs {lo}–{hi} at {rate:,} baud")
-            steps = [(family, rate) for family in families]
+                    f"IDs {lo}–{hi} at "
+                    + ", ".join(f"{rate:,}" for rate in sorted({r for _, r in steps}))
+                    + " baud")
             chunks = list(range(lo, hi + 1, SCAN_CHUNK))
             total = len(steps) * len(chunks)
             done = 0

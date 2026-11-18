@@ -150,6 +150,49 @@ def rewrite_bench_motors(config_path: str,
         yaml.safe_dump(config, f, sort_keys=False)
 
 
+def remap_bench_ids(config_path: str, moved: dict[int, int]) -> None:
+    """Follow re-programmed servo IDs (``{old bus id: new bus id}``) through
+    everything stored beside the bench config: the motor map keeps each
+    motor's number, thermal pairs and finger tendons keep their motor."""
+    moved = {int(k): int(v) for k, v in moved.items()}
+    follow = lambda m: moved.get(int(m), int(m))  # noqa: E731
+    model_dir = os.path.dirname(os.path.abspath(config_path))
+
+    with open(config_path) as f:
+        config = yaml.safe_load(f) or {}
+    numbers = {int(m): number_of_joint(str(j))
+               for j, m in (config.get("joint_to_motor_map") or {}).items()}
+    config.update(_motor_block([(follow(m), n) for m, n in numbers.items() if n is not None]))
+    with open(config_path, "w") as f:
+        yaml.safe_dump(config, f, sort_keys=False)
+
+    def rewrite(name: str, change) -> None:
+        path = os.path.join(model_dir, name)
+        if not os.path.isfile(path):
+            return
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+        change(data)
+        with open(path, "w") as f:
+            yaml.safe_dump(data, f, sort_keys=False)
+
+    def thermal(data: dict) -> None:
+        for pair in data.get("pairs") or []:
+            pair["a"], pair["b"] = follow(pair["a"]), follow(pair["b"])
+        if isinstance(data.get("motors"), dict):
+            data["motors"] = {type(m)(follow(m)): v for m, v in data["motors"].items()}
+
+    def fingers(data: dict) -> None:
+        for tendon in data.get("tendons") or []:
+            if tendon.get("motor") is not None:
+                tendon["motor"] = follow(tendon["motor"])
+        if isinstance(data.get("zeros"), dict):
+            data["zeros"] = {str(follow(m)): v for m, v in data["zeros"].items()}
+
+    rewrite("thermal_setup.yaml", thermal)
+    rewrite("finger_setup.yaml", fingers)
+
+
 def materialize_bench_model(motor_ids: list[int] | None = None, *,
                             root: str | None = None,
                             mock: bool = False) -> str:

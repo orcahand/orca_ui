@@ -14,9 +14,12 @@ import type { LatestFrames } from '../../state/streamStore'
 import { useMotorLive } from '../useMotorLive'
 import type { Tower } from './towerModel'
 
-// A shaft turning faster than this glows, so a motor turned by hand shows
-// where it sits on the tower.
+// A shaft that moved this far between samples, or turns this fast, lights
+// up in shifting colours, so a motor turned by hand shows where it sits on
+// the tower. The colour fades out over about FADE_S once it stops.
+const MOVED_DEG = 0.3
 const TURNING_DEG_S = 8
+const FADE_S = 1.2
 // Pointer travel (px) between down and up beyond which a click was an orbit.
 const CLICK_SLOP_PX = 5
 
@@ -50,8 +53,20 @@ function Slots(props: TowerSceneProps) {
   const live = useRef<LatestFrames['motors'] | null>(null)
   const labels = useRef<(HTMLDivElement | null)[]>([])
   const [hover, setHover] = useState<number | null>(null)
+  // Bus id → seconds (clock time) it last moved.
+  const movedAt = useRef(new Map<string, number>())
+  const lastPos = useRef<Record<string, number>>({})
+  const clock = useThree((s) => s.clock)
   useMotorLive((frames) => {
-    live.current = frames.motors
+    const motors = frames.motors
+    live.current = motors
+    const now = clock.elapsedTime
+    for (const [id, pos] of Object.entries(motors.positions)) {
+      const before = lastPos.current[id]
+      const fast = Math.abs(motors.velocities[id] ?? 0) > TURNING_DEG_S
+      if (fast || (before !== undefined && Math.abs(pos - before) > MOVED_DEG)) movedAt.current.set(id, now)
+    }
+    lastPos.current = { ...motors.positions }
   })
 
   const colors = useMemo(
@@ -62,7 +77,6 @@ function Slots(props: TowerSceneProps) {
       warn: new THREE.Color(palette.warn),
       err: new THREE.Color(palette.err),
       ok: new THREE.Color(palette.ok),
-      glow: new THREE.Color(palette.textBright),
       pick: new THREE.Color(palette.accent),
     }),
     [palette],
@@ -73,7 +87,8 @@ function Slots(props: TowerSceneProps) {
   }, [tower, palette])
 
   const toCamera = useMemo(() => new THREE.Vector3(), [])
-  useFrame(({ camera, clock }) => {
+  const rainbow = useMemo(() => new THREE.Color(), [])
+  useFrame(({ camera }) => {
     const motors = live.current
     const maxTemp = motors?.maxTempC ?? 70
     const pulse = 0.5 + 0.5 * Math.sin(clock.elapsedTime * 6)
@@ -96,11 +111,14 @@ function Slots(props: TowerSceneProps) {
       m.transparent = !present
       m.opacity = present ? 1 : 0.35
 
-      const turning = present && Math.abs(motors?.velocities[key] ?? 0) > TURNING_DEG_S
+      const since = present ? clock.elapsedTime - (movedAt.current.get(key) ?? -Infinity) : Infinity
+      const turning = Math.max(0, 1 - since / FADE_S)
       const picked = identifying ? armed === s.slot : present && selected.includes(id)
-      if (turning) {
-        m.emissive.copy(colors.glow)
-        m.emissiveIntensity = 0.55
+      if (turning > 0) {
+        rainbow.setHSL((clock.elapsedTime * 0.5 + s.slot * 0.13) % 1, 0.95, 0.55)
+        m.color.lerp(rainbow, turning)
+        m.emissive.copy(rainbow)
+        m.emissiveIntensity = 0.8 * turning
       } else if (picked) {
         m.emissive.copy(colors.pick)
         m.emissiveIntensity = identifying ? 0.25 + 0.45 * pulse : 0.45
@@ -115,6 +133,10 @@ function Slots(props: TowerSceneProps) {
         const facing = s.outward.lengthSq() === 0 || s.outward.dot(toCamera) > -0.15
         el.style.opacity = facing || picked ? '1' : '0'
         el.dataset.picked = picked ? '1' : ''
+        el.dataset.turning = turning > 0 ? '1' : ''
+        if (turning > 0) el.style.borderColor = `#${rainbow.getHexString()}`
+        else el.style.borderColor = ''
+        if (turning > 0) el.style.opacity = '1'
       }
     })
   })

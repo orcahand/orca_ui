@@ -3,8 +3,12 @@
 // closed for its duration). What answered is listed with a "use" box and a
 // number per motor — the number is what the bench calls it, the id is the
 // servo's — and Apply rewrites the bench config to that set and reconnects.
+// A deep scan pings every ID at every baud rate, for a motor left at the
+// factory 57,600 or a stray ID. Any found motor can be re-programmed to a new
+// ID on the bench's 1 M baud, and the bench motors can all be moved to
+// 30 + their number, which keeps the low IDs free for new motors.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api/rest'
 import type { BusScanExtra, BusScanResult } from '../api/types'
 import { useAppStore } from '../state/appStore'
@@ -15,12 +19,17 @@ import {
 } from '../state/operationStore'
 import { useBenchStore } from './benchStore'
 
+const BENCH_BAUD = 1_000_000
+const ID_BASE = 30
+
 interface Row {
+  key: string
   id: number
   model: string
   baud: number
   use: boolean
   number: string // text while editing
+  newId: string // re-program target, text while editing
 }
 
 function baud(rate: number): string {
@@ -45,7 +54,15 @@ function buildRows(scan: BusScanResult, numbers: Map<number, number>): Row[] {
         n = free
         taken.add(n)
       }
-      return { id: m.id, model: m.model_name, baud: m.baud_rate, use: true, number: String(n) }
+      return {
+        key: `${m.id}-${m.baud_rate}`,
+        id: m.id,
+        model: m.model_name,
+        baud: m.baud_rate,
+        use: m.baud_rate === BENCH_BAUD,
+        number: String(n),
+        newId: '',
+      }
     })
 }
 
@@ -58,7 +75,9 @@ export function BusPanel({ connected }: { connected: boolean }) {
   const scan = useBenchStore((s) => s.scan)
   const setScan = useBenchStore((s) => s.setScan)
   const motors = useBenchStore((s) => s.motors)
+  const remapIds = useBenchStore((s) => s.remapIds)
   const [busy, setBusy] = useState(false)
+  const remapped = useRef<string | null>(null)
   const [rows, setRows] = useState<Row[]>([])
   // Folded by default; opens itself while scanning and when a scan has
   // something to decide, folds again once the bench matches the bus.
@@ -66,6 +85,7 @@ export function BusPanel({ connected }: { connected: boolean }) {
 
   const active = isOperationActive(operation)
   const scanning = active && operation?.kind === 'bus_scan'
+  const programming = active && operation?.kind === 'motor_reprogram'
   const extra = scanning ? (operation?.extra as BusScanExtra | null) : null
   const numbers = useMemo(() => new Map(motors.map((m) => [m.id, m.number])), [motors])
 
@@ -79,6 +99,16 @@ export function BusPanel({ connected }: { connected: boolean }) {
   useEffect(() => {
     setRows(scan ? buildRows(scan, numbers) : [])
   }, [scan, numbers])
+  // Re-programmed IDs: the page's own per-motor setup follows, once per run,
+  // and the old scan no longer describes the bus.
+  useEffect(() => {
+    if (operation?.kind !== 'motor_reprogram' || operation.state !== 'done') return
+    if (remapped.current === operation.run_id) return
+    remapped.current = operation.run_id
+    const moved = (operation.result?.moved ?? {}) as Record<string, number>
+    if (Object.keys(moved).length) remapIds(moved)
+    setScan(null)
+  }, [operation, remapIds, setScan])
 
   const bench = handInfo?.bench ?? false
   const owned = control !== null && control !== undefined && control.control_source !== 'manual'
@@ -132,8 +162,25 @@ export function BusPanel({ connected }: { connected: boolean }) {
     if (scan === null) return
     setOpen(!settled)
   }, [scan, settled])
-  const patchRow = (id: number, patch: Partial<Row>) =>
-    setRows((current) => current.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+  const patchRow = (key: string, patch: Partial<Row>) =>
+    setRows((current) => current.map((r) => (r.key === key ? { ...r, ...patch } : r)))
+
+  const reprogram = (changes: { id: number; new_id: number; baud_rate: number }[], what: string) => {
+    if (!window.confirm(`${what}\n\nThis writes the servos' EEPROM; the motors are released meanwhile.`)) return
+    void call(() =>
+      api.operationStart('motor_reprogram', {
+        changes: changes.map((c) => ({ ...c, new_baud: BENCH_BAUD })),
+      }),
+    )
+  }
+  // Every bench motor to ID 30 + its number (slot 5 → ID 35).
+  const shift = motors
+    .map((m) => ({ id: m.id, new_id: ID_BASE + m.number, baud_rate: BENCH_BAUD, number: m.number }))
+    .filter((c) => c.new_id !== c.id)
+  let shiftBlocked: string | null = blocked
+  if (!shiftBlocked && !bench) shiftBlocked = 'the config in force is a hand model'
+  else if (!shiftBlocked && shift.length === 0) shiftBlocked = 'every motor already has ID 30 + its number'
+  else if (!shiftBlocked && shift.some((c) => c.new_id > 252)) shiftBlocked = 'a motor number above 222 has no ID 30 + number'
 
   return (
     <section className="panel bench-bus">
@@ -159,6 +206,40 @@ export function BusPanel({ connected }: { connected: boolean }) {
         >
           {scanning ? 'Scanning…' : 'Scan bus'}
         </button>
+        <button
+          className="btn btn-secondary"
+          disabled={busy || blocked !== null}
+          title={
+            blocked ??
+            'every ID 0–252 at every baud rate — finds a factory-new motor (ID 1 @ 57,600) or a stray ID; takes a minute or two'
+          }
+          onClick={() => void call(() => api.operationStart('bus_scan', { deep: true }))}
+        >
+          Deep scan
+        </button>
+        <button
+          className="btn btn-secondary"
+          disabled={busy || shiftBlocked !== null}
+          title={
+            shiftBlocked ??
+            `re-program every bench motor to ID 30 + its number (${shift
+              .slice(0, 4)
+              .map((c) => `${c.id}→${c.new_id}`)
+              .join(', ')}${shift.length > 4 ? ', …' : ''}), so the low IDs stay free for new motors`
+          }
+          onClick={() =>
+            reprogram(
+              shift,
+              `Re-program ${shift.length} motor(s) to ID 30 + number:\n` +
+                shift.map((c) => `motor ${c.number}: ID ${c.id} → ${c.new_id}`).join('\n'),
+            )
+          }
+        >
+          IDs → 30 + number
+        </button>
+        {programming && (
+          <span className="bench-bus-progress">{operation?.detail ?? 're-programming…'}</span>
+        )}
         {scanning && extra && (
           <span className="bench-bus-progress">
             {extra.motor_type} @ {extra.baud_rate ? baud(extra.baud_rate) : '?'} · id{' '}
@@ -200,18 +281,32 @@ export function BusPanel({ connected }: { connected: boolean }) {
                 <th>baud</th>
                 <th title="what the bench calls it">motor number</th>
                 <th>now</th>
+                <th title="write a new ID into the servo (moved onto 1 M baud too)">re-program</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => {
                 const current = numbers.get(row.id)
+                const target = parseInt(row.newId, 10)
+                const taken = rows.some((r) => r.id === target) || motors.some((m) => m.id === target)
+                const programBlocked =
+                  blocked ??
+                  (!bench
+                    ? 'the config in force is a hand model'
+                    : !Number.isFinite(target) || target < 1 || target > 252
+                      ? 'enter an ID of 1–252'
+                      : taken
+                        ? `ID ${target} is already on the bus`
+                        : null)
                 return (
-                  <tr key={row.id} className={row.use ? '' : 'off'}>
+                  <tr key={row.key} className={row.use ? '' : 'off'}>
                     <td>
                       <input
                         type="checkbox"
                         checked={row.use}
-                        onChange={(e) => patchRow(row.id, { use: e.target.checked })}
+                        disabled={row.baud !== BENCH_BAUD}
+                        title={row.baud !== BENCH_BAUD ? 'not at 1 M baud — re-program it first' : undefined}
+                        onChange={(e) => patchRow(row.key, { use: e.target.checked })}
                       />
                     </td>
                     <td>
@@ -227,11 +322,35 @@ export function BusPanel({ connected }: { connected: boolean }) {
                         step={1}
                         value={row.number}
                         disabled={!row.use}
-                        onChange={(e) => patchRow(row.id, { number: e.target.value })}
+                        onChange={(e) => patchRow(row.key, { number: e.target.value })}
                       />
                     </td>
                     <td className="bench-assign-now">
                       {current === undefined ? 'new' : `motor ${current}`}
+                    </td>
+                    <td className="bench-reprogram">
+                      ID{' '}
+                      <input
+                        type="number"
+                        min={1}
+                        max={252}
+                        placeholder={String(row.id)}
+                        value={row.newId}
+                        onChange={(e) => patchRow(row.key, { newId: e.target.value })}
+                      />
+                      <button
+                        className="btn btn-secondary"
+                        disabled={busy || programBlocked !== null}
+                        title={programBlocked ?? `write ID ${target} into this servo, at 1 M baud`}
+                        onClick={() =>
+                          reprogram(
+                            [{ id: row.id, new_id: target, baud_rate: row.baud }],
+                            `Re-program ID ${row.id} (${baud(row.baud)}) → ID ${target} at 1M baud?`,
+                          )
+                        }
+                      >
+                        Write
+                      </button>
                     </td>
                   </tr>
                 )
@@ -245,6 +364,7 @@ export function BusPanel({ connected }: { connected: boolean }) {
                   <td colSpan={2}>not answering</td>
                   <td>motor {m.number}</td>
                   <td className="bench-assign-now">dropped on apply</td>
+                  <td />
                 </tr>
               ))}
             </tbody>

@@ -7,7 +7,7 @@ import type { BenchMotor } from '../benchStore'
 
 // One shaft must have turned this far from where it was when the slot was
 // armed while every other one stayed within STILL_DEG.
-export const TURN_DEG = 10
+export const TURN_DEG = 7
 export const STILL_DEG = 4
 
 export interface Movement {
@@ -34,6 +34,13 @@ export function turnedMotor(moved: Movement[]): number | null {
   const [first, second] = moved
   if (!first || first.deg < TURN_DEG) return null
   return second && second.deg >= STILL_DEG ? null : first.id
+}
+
+/** When more than one shaft moved: every one that did, for the operator to pick from. */
+export function candidates(moved: Movement[]): Movement[] {
+  const [first, second] = moved
+  if (!first || first.deg < TURN_DEG || !second || second.deg < STILL_DEG) return []
+  return moved.filter((m) => m.deg >= STILL_DEG)
 }
 
 /** Slot → bus id, as the bench numbers its motors now. */
