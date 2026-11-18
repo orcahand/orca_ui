@@ -641,6 +641,7 @@ export interface EnduranceRun {
   // Per tip (and "board": no frames at all), times it left the force stream;
   // open_since is set while it is still out. Absent on older records.
   drops?: Record<string, TipDrops>
+  note?: string // interrupted: how much the written count may be missing
 }
 
 export interface TipDrops {
@@ -658,7 +659,7 @@ export interface TipDrops {
 
 export interface EnduranceState {
   current: EnduranceRun | null
-  runs: EnduranceRun[]
+  runs?: EnduranceRun[] // absent on live updates: keep the last list
   server_time?: number // epoch seconds when the state was built
 }
 

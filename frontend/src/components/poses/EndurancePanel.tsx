@@ -175,7 +175,7 @@ export function EndurancePanel() {
               <tr key={run.run_id}>
                 <td>{started(run)}</td>
                 <td className="traj-name">{run.motion}</td>
-                <td>{outcome(run)}</td>
+                <td title={run.note}>{outcome(run)}</td>
                 <td>{duration(endOf(run, now) - run.started_at)}</td>
                 <td>{perHour(run, now)}</td>
                 <td>{run.bus_errors + run.latched_motors}</td>

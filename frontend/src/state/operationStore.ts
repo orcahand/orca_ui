@@ -55,8 +55,13 @@ export const useOperationStore = create<OperationStoreState>((set, get) => ({
   endurance: null,
   enduranceSkew: null,
 
-  setEndurance: (endurance) =>
+  setEndurance: (update) =>
     set((s) => {
+      const current = update.current
+      const runs = (update.runs ?? s.endurance?.runs ?? []).map((r) =>
+        current && r.run_id === current.run_id ? current : r,
+      )
+      const endurance = { ...update, runs }
       if (!endurance.server_time) return { endurance }
       const skew = endurance.server_time - Date.now() / 1000
       return {

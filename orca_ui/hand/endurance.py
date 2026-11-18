@@ -1,10 +1,12 @@
 """Endurance record: what a looping replay did, cycle by cycle, kept on disk.
 
-A looping replay is an endurance run. Every completed cycle appends one CSV row
+A looping replay is an endurance run. Every completed cycle makes one CSV row
 (peak fingertip force and tactile health per finger, bus errors and latched
-motors so far) and rewrites the run's JSON summary, both synced to disk, so a
-crash or power cut keeps every cycle up to the last one and a restarted console
-still lists the run with its count. Files live in the hand's folder, under
+motors so far), kept in memory and written, with the drop rows and the run's
+JSON summary, every ``FLUSH_EVERY_S`` and when the run ends. A crash or power
+cut loses what came after the last write (a failed write is retried with the
+next one); a restarted console lists the run as interrupted at its last
+written count. Files live in the hand's folder, under
 ``endurance/``: ``<run id>.csv`` and ``<run id>.json``.
 
 The motion never waits on the disk: the operation thread only hands each
@@ -59,6 +61,7 @@ DROP_HEADER = ["tip", "start", "end", "duration_s", "cycle", "s_into_cycle",
 BOARD = "board"
 STALE_S = 0.5
 STATS_WINDOW = 500  # drops the per-tip statistics look back over
+FLUSH_EVERY_S = 300.0  # rows reach the disk this often while a run is live
 
 
 def endurance_folder(settings, config) -> Path:
@@ -167,6 +170,9 @@ class EnduranceRecorder:
         self._open: dict[str, dict] = {}
         self._events: dict[str, deque] = {}
         self._closed: dict[str, int] = {}
+        # Rows not yet on disk, per file, and when they last went.
+        self._rows: dict[Path, list[str]] = {}
+        self._flushed_at = 0.0
         self._writes: queue.Queue = queue.Queue()
         threading.Thread(
             target=self._write_loop, name="endurance-writer", daemon=True
@@ -218,7 +224,7 @@ class EnduranceRecorder:
                         self._drop_close(BOARD, mono)
                     changed = True
             if changed:
-                self._publish_locked()
+                self._publish_current_locked()
 
     def _drop_open(self, tip: str, start: float, start_mono: float) -> bool:
         if tip in self._open:
@@ -258,9 +264,19 @@ class EnduranceRecorder:
         row = [tip, _stamp(drop["start"], ms=True), _stamp(drop["start"] + duration, ms=True),
                duration, drop["cycle"], drop["s_into_cycle"], drop["cycle_fraction"],
                drop["joints"], note]
-        self._writes.put(([(self._dir / f"{self._run['run_id']}-drops.csv",
-                            _csv_row(row), True)], None))
+        self._buffer_locked(self._dir / f"{self._run['run_id']}-drops.csv", _csv_row(row))
         return True
+
+    def _buffer_locked(self, path: Path, row: str) -> None:
+        self._rows.setdefault(path, []).append(row)
+
+    def _flush_job_locked(self) -> list:
+        """Every buffered row, then the live run's summary; empties the buffer."""
+        writes = [(path, "".join(rows), True) for path, rows in self._rows.items()]
+        if self._run is not None:
+            writes.append((self._dir / f"{self._run['run_id']}.json", json.dumps(self._run), False))
+        self._rows, self._flushed_at = {}, time.monotonic()
+        return writes
 
     def _set_tip(self, tip: str) -> None:
         # Replaced, never changed in place: published snapshots share it.
@@ -317,6 +333,7 @@ class EnduranceRecorder:
             "latched_motors": 0,
             "drops": {f: _tip_stats([], 0, None, None) for f in [*FINGER_NAMES, BOARD]},
             "tips": [],
+            "flush_every_s": FLUSH_EVERY_S,
         }
         text = ",".join(HEADER) + "\n"
         if carried_cycles:
@@ -357,6 +374,7 @@ class EnduranceRecorder:
             self._bus_last = bus
             self._recent = recent
             self._period, self._open, self._events, self._closed = None, {}, {}, {}
+            self._flushed_at = time.monotonic()
             if self._tips_dir not in (None, folder):  # another hand
                 self._tips = set()
             self._tips_dir = folder
@@ -418,17 +436,8 @@ class EnduranceRecorder:
                 + [fingers[f]["health"] for f in FINGER_NAMES]
                 + [hz, run["bus_errors"], run["latched_motors"], None]
             )
-            folder, run_id = self._dir, run["run_id"]
-            summary = json.dumps(run)
-        self._writes.put(
-            (
-                [
-                    (folder / f"{run_id}.csv", _csv_row(row), True),
-                    (folder / f"{run_id}.json", summary, False),
-                ],
-                None,
-            )
-        )
+            self._buffer_locked(self._dir / f"{run['run_id']}.csv", _csv_row(row))
+            self._publish_current_locked()
 
     def finish(self, state: str) -> None:
         with self._lock:
@@ -439,32 +448,50 @@ class EnduranceRecorder:
             for tip in list(self._open):
                 self._drop_close(tip, mono, note="still out when the run ended")
             run.update(state=state, ended_at=now, tips=sorted(self._tips))
+            self._writes.put((self._flush_job_locked(), run))
             self._run, self._ended = None, run
-            path = self._dir / f"{run['run_id']}.json"
-            summary = json.dumps(run)
-        self._writes.put(([(path, summary, False)], run))
 
     def flush(self, timeout: float = 5.0) -> bool:
-        """Wait until every queued write is on disk (shutdown, tests)."""
+        """Write everything buffered and wait until it is on disk (shutdown, tests)."""
         done = threading.Event()
+        with self._lock:
+            if self._run is not None or self._rows:
+                self._writes.put((self._flush_job_locked(), None))
         self._writes.put(done)
         return done.wait(timeout)
 
     def _write_loop(self) -> None:
         """Jobs are ``(writes, ended_run)``; ``ended_run`` marks a run's final summary."""
         while True:
-            job = self._writes.get()
+            with self._lock:
+                wait = self._flushed_at + FLUSH_EVERY_S - time.monotonic()
+            try:
+                job = self._writes.get(timeout=max(wait, 0.1))
+            except queue.Empty:
+                # The timed flush, whether or not rows keep coming.
+                with self._lock:
+                    if self._run is None and not self._rows:
+                        self._flushed_at = time.monotonic()
+                        continue
+                    job = (self._flush_job_locked(), None)
             if isinstance(job, threading.Event):
                 job.set()
                 continue
             writes, ended = job
-            try:
-                for path, text, append in writes:
+            failed = []
+            for path, text, append in writes:
+                try:
                     _write_synced(path, text, append)
-                written = True
-            except Exception:
-                logger.exception("could not write the endurance record")
-                written = False
+                except Exception:
+                    logger.exception("could not write the endurance record")
+                    failed.append((path, text, append))
+            written = not failed
+            if failed:
+                with self._lock:
+                    # Rows go back in front of the buffer for the next flush.
+                    for path, text, append in failed:
+                        if append:
+                            self._rows[path] = [text, *self._rows.get(path, [])]
             try:
                 recent = self._read_recent() if ended is not None else None
                 with self._lock:
@@ -482,6 +509,10 @@ class EnduranceRecorder:
     def csv_path(self, run_id: str) -> Path | None:
         if not RUN_ID_RE.match(run_id):
             return None
+        with self._lock:
+            live = self._run is not None and run_id.startswith(self._run["run_id"])
+        if live:
+            self.flush()  # the download is as current as the panel
         path = self._folder() / f"{run_id}.csv"
         return path if path.is_file() else None
 
@@ -514,8 +545,12 @@ class EnduranceRecorder:
             if run.get("state") == "running" and not (
                 current and run["run_id"] == current["run_id"]
             ):
-                # Its console went away mid-run; the count is what it reached.
+                # Its console went away mid-run; the count is what it last wrote.
                 run["state"] = "interrupted"
+                if run.get("flush_every_s"):
+                    run["note"] = (f"counted to the last write; cycles from up to "
+                                   f"{run['flush_every_s'] / 60:g} min before the console "
+                                   "went away may be missing")
             runs.append(run)
         # Live runs newer than the last read of the folder go first.
         runs = sorted(live.values(), key=lambda r: r["started_at"], reverse=True) + runs
@@ -525,3 +560,7 @@ class EnduranceRecorder:
     def _publish_locked(self) -> None:
         # Under the lock, so an older snapshot can never land after a newer one.
         self._publish(T.ENDURANCE, self._state_locked())
+
+    def _publish_current_locked(self) -> None:
+        # Live updates carry the run in progress only; the list goes with a write.
+        self._publish(T.ENDURANCE, {"current": dict(self._run), "server_time": time.time()})
