@@ -26,6 +26,22 @@ import {
   windowed,
 } from './fingerStore'
 
+// Leave joints out of the pose cycle, or let them back in; an engaged run
+// hears of it at once, so a running cycle lets go of them or picks them up.
+function useCycleSkip(): [Set<string>, (names: string[], skipped: boolean) => void] {
+  const skipJoints = useFingerStore((s) => s.settings.cycleSkipJoints)
+  const patchSettings = useFingerStore((s) => s.patchSettings)
+  const engaged = useOperationStore((s) => isOperationActive(s.operation) && s.operation?.kind === 'finger_control')
+  const setError = useAppStore((s) => s.setError)
+  const skip = useMemo(() => new Set(skipJoints), [skipJoints])
+  const toggle = (names: string[], skipped: boolean) => {
+    const next = skipped ? [...new Set([...skipJoints, ...names])] : skipJoints.filter((n) => !names.includes(n))
+    patchSettings({ cycleSkipJoints: next })
+    if (engaged) api.fingerCycleSkip(next).catch((error) => setError(String((error as Error).message ?? error)))
+  }
+  return [skip, toggle]
+}
+
 function JointSlider({
   joint,
   all,
@@ -55,6 +71,8 @@ function JointSlider({
   const markRef = useRef<HTMLElement>(null)
   const loadRef = useRef<HTMLElement>(null)
   const maxCurrent = useAppStore((s) => s.control?.max_current ?? null)
+  const [skip, toggleSkip] = useCycleSkip()
+  const skipped = skip.has(joint.name)
 
   useMotorLive((frames) => {
     const angle = coupling ? jointAnglesOf([coupling], zeros, frames.motors.positions)[joint.name] : undefined
@@ -72,11 +90,21 @@ function JointSlider({
   })
 
   return (
-    <label
-      className="finger-slider"
+    <div
+      className={`finger-slider ${skipped ? 'off-cycle' : ''}`}
       title={`${joint.name} = ${joint.terms.map((t) => `${t.gain} · θ(motor ${t.motor})`).join(' + ')}`}
     >
       <span className="finger-slider-name">
+        <input
+          type="checkbox"
+          checked={!skipped}
+          title={
+            skipped
+              ? 'left out of the pose cycle: it holds, and its slider does not end the cycle — tick to cycle it again'
+              : 'part of the pose cycle — untick to keep it where it is while the cycle runs'
+          }
+          onChange={(e) => toggleSkip([joint.name], !e.target.checked)}
+        />
         {joint.name}
         {window !== null && (
           <small
@@ -110,7 +138,7 @@ function JointSlider({
           short: {shortText}
         </small>
       )}
-    </label>
+    </div>
   )
 }
 
@@ -138,11 +166,25 @@ function GroupSlider({
   const mean = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0
   const spread = Math.max(...values) - Math.min(...values) > 0.01
   const curl = (fraction: number) => setTargets(Object.fromEntries(names.map((n) => [n, fraction])))
+  const [skip, toggleSkip] = useCycleSkip()
+  const jointNames = joints.map((j) => j.name)
+  const cycledCount = jointNames.filter((n) => !skip.has(n)).length
 
   return (
     <div className="finger-group-block">
       <div className="finger-group-head">
-        <h3>{group || 'ungrouped'}</h3>
+        <h3>
+          <input
+            type="checkbox"
+            checked={cycledCount > 0}
+            ref={(el) => {
+              if (el) el.indeterminate = cycledCount > 0 && cycledCount < jointNames.length
+            }}
+            title="this finger in the pose cycle — untick to keep all its joints where they are while the cycle runs"
+            onChange={(e) => toggleSkip(jointNames, !e.target.checked)}
+          />
+          {group || 'ungrouped'}
+        </h3>
         {names.length > 1 && (
           <label className="finger-slider master" title="curl this finger: its flexion joints together, abduction untouched">
             <span className="finger-slider-name">curl</span>
@@ -227,7 +269,15 @@ function PosePanel({ engaged, extra, names }: { engaged: boolean; extra: FingerE
         : [...settings.cycleSkip.filter((n) => poses.some((p) => p.name === n)), name],
     })
   const startCycle = () =>
-    call(() => api.fingerCycle(cycled, settings.cycleCount, settings.cycleDwellS, settings.speedDegS))
+    call(() =>
+      api.fingerCycle(
+        cycled,
+        settings.cycleCount,
+        settings.cycleDwellS,
+        settings.speedDegS,
+        settings.cycleSkipJoints.filter((n) => names.includes(n)),
+      ),
+    )
   const stopCycle = () => call(() => api.fingerCycleStop())
   const describe = (pose: FingerPose) =>
     Object.entries(pose.targets)
@@ -297,7 +347,7 @@ function PosePanel({ engaged, extra, names }: { engaged: boolean; extra: FingerE
           {cycle
             ? `${cycle.phase === 'moving' ? 'going to' : 'holding'} ${cycle.pose} (${cycle.index + 1}/${cycle.poses.length}) · round ${cycle.done + 1}${cycle.cycles ? ` of ${cycle.cycles}` : ''}`
             : poses.length
-              ? 'go to a pose, or cycle through the ticked ones in this order — a slider ends the cycle'
+              ? 'go to a pose, or cycle through the ticked ones in this order — moving a ticked joint ends the cycle'
               : 'capture a pose to come back to it'}
         </span>
       </div>
@@ -428,8 +478,12 @@ export function FingerControl({ connected }: { connected: boolean }) {
     if (!extra.joints.length) return
     // While a cycle runs the run leads, and the sliders show where it is going.
     if (seededRun.current === operation.run_id && !extra.cycle) return
+    const fresh = seededRun.current !== operation.run_id
     seededRun.current = operation.run_id
-    seedTargets(Object.fromEntries(extra.joints.map((j) => [j.name, j.target])))
+    // Joints the cycle leaves alone keep their sliders: the hand leads there.
+    const skip = new Set(extra.cycle_skip ?? [])
+    const run = extra.joints.filter((j) => fresh || !skip.has(j.name))
+    seedTargets({ ...useFingerStore.getState().targets, ...Object.fromEntries(run.map((j) => [j.name, j.target])) })
   }, [ours, extra, operation, seedTargets])
 
   let blocked: string | null = null

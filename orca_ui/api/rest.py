@@ -404,7 +404,13 @@ def build_router(service: HandService, telemetry=None) -> APIRouter:
         """Walk the engaged run through poses, dwell_s at each, cycles times
         round (0: until stopped). A slider target ends the cycle."""
         return guard(_finger_run().set_cycle, [p.model_dump() for p in body.poses],
-                     body.cycles, body.dwell_s, body.speed_deg_s)
+                     body.cycles, body.dwell_s, body.speed_deg_s, body.skip)
+
+    @router.put("/fingers/cycle/skip")
+    def finger_cycle_skip(body: schemas.FingerCycleSkipRequest):
+        """Joints the cycle leaves alone: they hold, and a slider on one of
+        them does not end the cycle. A joint let back in joins the pose."""
+        return guard(_finger_run().set_cycle_skip, body.joints)
 
     @router.delete("/fingers/cycle")
     def finger_cycle_stop():

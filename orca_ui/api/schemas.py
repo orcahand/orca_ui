@@ -69,6 +69,14 @@ class FingerCycleRequest(BaseModel):
     cycles: int = 0
     dwell_s: float = 0.5
     speed_deg_s: Optional[float] = None
+    # Joints the cycle leaves where they are; their sliders stay live.
+    skip: Optional[list[str]] = None
+
+
+class FingerCycleSkipRequest(BaseModel):
+    """Joints the cycle leaves alone, replacing the previous set."""
+
+    joints: list[str]
 
 
 class ModelSelectRequest(BaseModel):

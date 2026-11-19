@@ -549,6 +549,8 @@ export interface FingerExtra {
   speed_deg_s: number
   joints: FingerJointReport[]
   cycle: FingerCycleReport | null
+  // Joints the cycle leaves alone.
+  cycle_skip?: string[]
 }
 
 // ----- pair_discovery operation (orca_ui/hand/operations/pairs.py) -----------

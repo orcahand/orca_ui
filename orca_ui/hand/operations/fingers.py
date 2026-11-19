@@ -537,6 +537,8 @@ class FingerControlOperation(Operation):
         self._speed = float(params.get("speed_deg_s", DEFAULT_SPEED_DEG_S))
         self._cycle: _Cycle | None = None
         self._cycle_request: _Cycle | None | bool = False   # False: nothing new
+        self._skip: frozenset[str] = frozenset()   # joints the cycle leaves alone
+        self._skip_changed = False
 
     @classmethod
     def validate(cls, service, params: dict) -> dict:
@@ -624,13 +626,33 @@ class FingerControlOperation(Operation):
             self._pending.update(clean)
             if speed is not None:
                 self._speed = speed
-            if clean:
-                self._cycle_request = None   # a hand on a slider ends the cycle
+            if set(clean) - self._skip:
+                self._cycle_request = None   # a hand on a cycled joint's slider ends the cycle
         return {"targets": clean, "speed_deg_s": speed if speed is not None else self._speed}
 
-    def set_cycle(self, poses, cycles, dwell_s, speed_deg_s=None) -> dict:
-        """Run the poses in turn, each held for ``dwell_s`` once every joint
-        has arrived, ``cycles`` times round (0: until stopped)."""
+    def _clean_skip(self, names) -> frozenset[str]:
+        from orca_ui.hand.service import ServiceError
+
+        if not isinstance(names, (list, tuple, set, frozenset)):
+            raise ServiceError("skip must be a list of joint names")
+        known = {j["name"] for j in self.params["joints"]}
+        unknown = sorted({str(n) for n in names} - known)
+        if unknown:
+            raise ServiceError(f"unknown joint {unknown[0]!r}", status_code=404)
+        return frozenset(str(n) for n in names)
+
+    def set_cycle_skip(self, names) -> dict:
+        """The joints the cycle leaves alone, replacing the previous set."""
+        skip = self._clean_skip(names)
+        with self._lock:
+            self._skip = skip
+            self._skip_changed = True
+        return {"skip": sorted(skip)}
+
+    def set_cycle(self, poses, cycles, dwell_s, speed_deg_s=None, skip=None) -> dict:
+        """Run the poses in turn, each held for ``dwell_s`` once every cycled
+        joint has arrived, ``cycles`` times round (0: until stopped). Joints in
+        ``skip`` are left where they are."""
         from orca_ui.hand.service import ServiceError
 
         clean = clean_poses(poses)
@@ -654,10 +676,14 @@ class FingerControlOperation(Operation):
         if not 0 <= dwell <= MAX_DWELL_S:
             raise ServiceError(f"dwell_s must be 0..{MAX_DWELL_S:g}")
         speed = None if speed_deg_s is None else self.clean_speed(speed_deg_s)
+        skipped = None if skip is None else self._clean_skip(skip)
         cycle = _Cycle(clean, cycles, dwell)
         with self._lock:
             if speed is not None:
                 self._speed = speed
+            if skipped is not None:
+                self._skip = skipped
+                self._skip_changed = True
             self._cycle_request = cycle
         return cycle.report()
 
@@ -725,23 +751,31 @@ class FingerControlOperation(Operation):
                 pending, self._pending = self._pending, {}
                 speed = self._speed
                 request, self._cycle_request = self._cycle_request, False
+                skip_changed, self._skip_changed = self._skip_changed, False
+                skip = self._skip
             for joint in self._joints:
                 if joint.name in pending:
                     joint.target = pending[joint.name]
             if request is not False:
                 self._switch_cycle(ctx, request)
+            elif skip_changed and self._cycle is not None:
+                # Joints let back in head for the pose the cycle is at.
+                self._goto(self._cycle.poses[self._cycle.index])
+                self._cycle.phase = "moving"
             step = speed * dt
-            moved = any([j.tick(step) for j in self._joints])
+            ticks = [j.tick(step) for j in self._joints]
+            moved = any(ticks)
             if moved:
                 self._still_since = now
             if moved or now - self._last_write >= REWRITE_PERIOD_S:
                 self._write()
                 self._last_write = now
             if self._cycle is not None:
-                self._advance_cycle(ctx, now, moved)
+                cycled = any(t for j, t in zip(self._joints, ticks) if j.name not in skip)
+                self._advance_cycle(ctx, now, cycled)
             if now - self._last_sample >= SAMPLE_PERIOD_S:
                 self._sample(now)
-            self._publish(ctx, force=bool(pending))
+            self._publish(ctx, force=bool(pending) or skip_changed)
             next_t += dt
             delay = next_t - time.monotonic()
             if delay > 0:
@@ -762,8 +796,10 @@ class FingerControlOperation(Operation):
         self._publish(ctx, force=True)
 
     def _goto(self, pose: dict) -> None:
+        with self._lock:
+            skip = self._skip
         for joint in self._joints:
-            if joint.name in pose["targets"]:
+            if joint.name in pose["targets"] and joint.name not in skip:
                 joint.target = pose["targets"][joint.name]
 
     def _advance_cycle(self, ctx: OpContext, now: float, moved: bool) -> None:
@@ -864,4 +900,5 @@ class FingerControlOperation(Operation):
             "speed_deg_s": self._speed,
             "joints": [j.report() for j in self._joints],
             "cycle": None if self._cycle is None else self._cycle.report(),
+            "cycle_skip": sorted(self._skip),
         })

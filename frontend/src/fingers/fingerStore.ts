@@ -41,6 +41,8 @@ export interface FingerSettings {
   cycleDwellS: number
   // Poses left out of the cycle, by name; new poses join it.
   cycleSkip: string[]
+  // Joints the cycle leaves where they are; their sliders stay live.
+  cycleSkipJoints: string[]
   // A joint without a captured range is driven ± this many joint degrees
   // around where it is at Engage.
   windowDeg: number
@@ -57,6 +59,7 @@ export const DEFAULT_SETTINGS: FingerSettings = {
   cycleCount: 10,
   cycleDwellS: 0.5,
   cycleSkip: [],
+  cycleSkipJoints: [],
   windowDeg: 30,
   uTendon: 2,
 }

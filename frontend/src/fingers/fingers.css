@@ -816,3 +816,14 @@
 .finger-sign.neg {
   color: var(--err);
 }
+
+/* Pose-cycle ticks on the joints and fingers; a joint left out reads dim. */
+.finger-slider-name input[type='checkbox'],
+.finger-group-head h3 input[type='checkbox'] {
+  margin: 0 5px 0 0;
+  vertical-align: -2px;
+}
+
+.finger-slider.off-cycle .finger-slider-name {
+  opacity: 0.55;
+}
