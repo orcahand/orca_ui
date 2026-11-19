@@ -641,7 +641,18 @@ export interface EnduranceRun {
   // Per tip (and "board": no frames at all), times it left the force stream;
   // open_since is set while it is still out. Absent on older records.
   drops?: Record<string, TipDrops>
-  note?: string // interrupted: how much the written count may be missing
+  note?: string | null // why it ended, or what an interrupted count may miss
+  clears?: AutoClear[] // latched motors cleared, and heat pauses, during the run
+}
+
+export interface AutoClear {
+  at: number // epoch seconds
+  cycle: number
+  motor: number // the hottest one, for a heat pause
+  joint: string | null
+  flags: string[] // the latch's flags, or the temperature that paused the run
+  temp_c: number | null
+  outcome: string
 }
 
 export interface TipDrops {

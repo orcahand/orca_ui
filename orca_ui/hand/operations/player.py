@@ -22,6 +22,7 @@ import numpy as np
 
 from orca_ui.hand.operations import hand_ops
 from orca_ui.hand.operations.base import OpContext, Operation
+from orca_ui.hand.operations.endurance_guard import EnduranceGuard, HardStop
 from orca_ui.hand.operations.events import OperationStopped
 from orca_ui.hand.states import ControlSource
 from orca_ui.library import (
@@ -340,8 +341,11 @@ def play_frames(ctx: OpContext, *, name: str, joint_ids: list[str],
                 speed: float, loop: bool,
                 holds: "list[int] | tuple" = (),
                 max_cycles: "int | None" = DEFAULT_MAX_LOOP_CYCLES,
-                on_cycle: "Callable[[int], None] | None" = None) -> dict:
+                on_cycle: "Callable[[int], bool | None] | None" = None) -> dict:
     """Paced playback with pause/stop; returns {frames, cycles}.
+
+    ``on_cycle`` returning True means the hand was let go of between cycles,
+    so the next one starts with a glide back to the first frame.
 
     ``duration_s`` counts the commanded motion only — waypoint holds add to
     the wall clock on top of it, by however long the hand takes to arrive.
@@ -374,8 +378,12 @@ def play_frames(ctx: OpContext, *, name: str, joint_ids: list[str],
         _stream(ctx, joint_ids, frames, dt, progress=ctx.set_progress,
                 holds=holds)
         cycles += 1
-        if on_cycle is not None:
-            on_cycle(cycles)
+        if on_cycle is not None and on_cycle(cycles):
+            ctx.set_phase("approach", detail=f"{name} · back to the start")
+            _stream(ctx, joint_ids,
+                    _lead_in(ctx.service, joint_ids, frames[0], WAYPOINT_RATE_HZ)
+                    or [frames[0]], 1.0 / WAYPOINT_RATE_HZ)
+            ctx.set_phase("playing")
         reached_cap = max_cycles is not None and cycles >= max_cycles
         if loop and reached_cap:
             ctx.log(f"requested {max_cycles} cycle(s) complete — "
@@ -525,23 +533,42 @@ class ReplayOperation(Operation):
                      carried_estimated=self.params.get("carried_estimated", 0),
                      continues=self.params.get("continues"),
                      carried_note=self.params.get("carried_note"))
-        def on_cycle(cycles: int) -> None:
-            # The record never stops the motion.
+        guard = EnduranceGuard(ctx, record)
+
+        def on_cycle(cycles: int) -> bool:
+            # The record never stops the motion; the guard may.
             try:
                 record.cycle_done(cycles)
             except Exception:
                 logger.exception("endurance record missed cycle %s", cycles)
+            try:
+                return guard.after_cycle(cycles)
+            except (HardStop, OperationStopped):
+                raise
+            except Exception as e:
+                # Whatever goes wrong, the run ends through the torque-off path.
+                logger.exception("endurance guard failed at cycle %s", cycles)
+                raise HardStop(f"endurance guard failed: {e}") from e
 
-        state = "error"
+        state, note = "error", None
         try:
             result = self._play(ctx, on_cycle)
             state = "done"
             return result
+        except HardStop as e:
+            from orca_ui.hand.service import ServiceError
+
+            state, note = "e-stopped", f"hardware error: {e}"
+            try:
+                ctx.service.disable_torque()
+            except Exception:
+                logger.exception("torque off after the endurance run ended")
+            raise ServiceError(f"endurance run ended, torque off: {note}") from e
         except OperationStopped:
             state = "stopped"
             raise
         finally:
-            record.finish("e-stopped" if ctx.estopped else state)
+            record.finish("e-stopped" if ctx.estopped else state, note)
 
     def _play(self, ctx: OpContext, on_cycle) -> dict:
         if self.params["type"] == MOTOR_WAYPOINTS:
@@ -687,8 +714,10 @@ class ReplayOperation(Operation):
                             unsettled += 1
                         ctx.sleep(dt)
                 cycles += 1
-                if on_cycle is not None:
-                    on_cycle(cycles)
+                if on_cycle is not None and on_cycle(cycles):
+                    hand.write_motor_pos(motor_ids, frames[0])
+                    if not _await_arrival(ctx, hand, "start", max_settle_s):
+                        unsettled += 1
                 reached_cap = max_cycles is not None and cycles >= max_cycles
                 if loop and reached_cap:
                     ctx.log(f"requested {max_cycles} cycle(s) complete — "

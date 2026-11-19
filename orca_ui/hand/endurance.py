@@ -172,6 +172,8 @@ class EnduranceRecorder:
         self._closed: dict[str, int] = {}
         # Rows not yet on disk, per file, and when they last went.
         self._rows: dict[Path, list[str]] = {}
+        # Auto-clears since the last cycle row, for its note column.
+        self._clear_note: str | None = None
         self._flushed_at = 0.0
         self._writes: queue.Queue = queue.Queue()
         threading.Thread(
@@ -237,7 +239,7 @@ class EnduranceRecorder:
         if start < since and self._period:
             cycle, since = cycle - 1, since - self._period
         into = max(0.0, start - since)
-        angles = self._payload_of(T.JOINTS_TARGET).get("angles") or {}
+        angles = self.payload(T.JOINTS_TARGET).get("angles") or {}
         self._open[tip] = {
             "start": start,
             "start_mono": start_mono,
@@ -289,7 +291,7 @@ class EnduranceRecorder:
         )
         self._run["drops"] = {**self._run["drops"], tip: stats}
 
-    def _payload_of(self, topic: str) -> dict:
+    def payload(self, topic: str) -> dict:
         entry = self._latest(topic)
         return entry[2] if entry and isinstance(entry[2], dict) else {}
 
@@ -334,6 +336,8 @@ class EnduranceRecorder:
             "drops": {f: _tip_stats([], 0, None, None) for f in [*FINGER_NAMES, BOARD]},
             "tips": [],
             "flush_every_s": FLUSH_EVERY_S,
+            "clears": [],
+            "note": None,
         }
         text = ",".join(HEADER) + "\n"
         if carried_cycles:
@@ -366,7 +370,7 @@ class EnduranceRecorder:
         except Exception:
             logger.exception("could not start the endurance record")
             return
-        bus = self._bus_errors_total(self._payload_of(T.MOTORS_FAULTS))
+        bus = self._bus_errors_total(self.payload(T.MOTORS_FAULTS))
         recent = self._read_recent()
         with self._lock:
             self._run, self._dir = run, folder
@@ -375,6 +379,7 @@ class EnduranceRecorder:
             self._recent = recent
             self._period, self._open, self._events, self._closed = None, {}, {}, {}
             self._flushed_at = time.monotonic()
+            self._clear_note = None
             if self._tips_dir not in (None, folder):  # another hand
                 self._tips = set()
             self._tips_dir = folder
@@ -387,8 +392,8 @@ class EnduranceRecorder:
 
     def cycle_done(self, cycles: int) -> None:
         """``cycles`` completed in this run; returns without touching the disk."""
-        health = self._payload_of(T.SENSORS_HEALTH).get("tactile") or {}
-        faults = self._payload_of(T.MOTORS_FAULTS)
+        health = self.payload(T.SENSORS_HEALTH).get("tactile") or {}
+        faults = self.payload(T.MOTORS_FAULTS)
         now = time.time()
         with self._lock:
             run = self._run
@@ -434,16 +439,31 @@ class EnduranceRecorder:
                 [run["cycles"], _stamp(now), round(now - run["started_at"], 1)]
                 + [fingers[f]["peak_n"] for f in FINGER_NAMES]
                 + [fingers[f]["health"] for f in FINGER_NAMES]
-                + [hz, run["bus_errors"], run["latched_motors"], None]
+                + [hz, run["bus_errors"], run["latched_motors"], self._clear_note]
             )
+            self._clear_note = None
             self._buffer_locked(self._dir / f"{run['run_id']}.csv", _csv_row(row))
             self._publish_current_locked()
 
-    def finish(self, state: str) -> None:
+    def record_clear(self, event: dict) -> None:
+        """An automatic clear of a latched motor, or a pause to cool."""
+        with self._lock:
+            if self._run is None:
+                return
+            self._run["clears"] = [*self._run["clears"], event]
+            self._clear_note = "; ".join(filter(None, [
+                self._clear_note,
+                (f"motor {event['motor']} ({event['joint']}) "
+                 f"{', '.join(event['flags'])}: {event['outcome']}")]))
+            self._publish_current_locked()
+
+    def finish(self, state: str, note: str | None = None) -> None:
         with self._lock:
             run = self._run
             if run is None:
                 return
+            if note:
+                run["note"] = note
             now, mono = time.time(), time.monotonic()
             for tip in list(self._open):
                 self._drop_close(tip, mono, note="still out when the run ended")

@@ -1902,7 +1902,7 @@ class HandService:
             ],
         }
 
-    def reboot_motor(self, motor_id: int) -> dict:
+    def reboot_motor(self, motor_id: int, *, from_operation: bool = False) -> dict:
         """Clear a motor's latched hardware error with a Protocol 2.0 reboot.
 
         The only way back from a latched Hardware Error Status short of
@@ -1916,7 +1916,8 @@ class HandService:
         threshold is not abandoned for the rest of the session.
         """
         session = self._require_motors()
-        self._require_manual_control()
+        if not from_operation:
+            self._require_manual_control()
         hand = session.hand
         # Torque is deliberately not a precondition. The fault policy reboots
         # single motors with the hand energized and restores their torque

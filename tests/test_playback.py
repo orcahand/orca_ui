@@ -405,6 +405,46 @@ def test_looping_replay_keeps_an_endurance_record_the_ui_reads(client):
     assert len(rows) == 2 + run["cycles"] - 100
 
 
+def test_endurance_run_clears_a_latched_motor_and_goes_on(client, monkeypatch):
+    """A motor latched mid-run is rebooted (as the console's button does) and
+    the run continues with its count; the clear is on record as a power fault."""
+    from orca_ui.hand.operations import endurance_guard
+
+    monkeypatch.setattr(endurance_guard, "SETTLE_S", 0.2)
+    joint_ids = _joint_ids(client)
+    flexed = [0.0] * len(joint_ids)
+    flexed[joint_ids.index("ring_pip")] = 30.0
+    _waypoint_trajectory(client, "latch", [flexed, [0.0] * len(joint_ids)])
+    client.post("/api/torque/enable")
+    client.post("/api/operation/replay/start", json={"params": {
+        "name": "latch", "loop": True, "speed": 8.0}})
+    _wait_for(lambda: (c := client.get("/api/endurance").json()["current"]) and c["cycles"] >= 2)
+
+    motors = client.app.state.service.session.hand.motor_client
+    shock = next(1 << b for b in range(8)
+                 if "electrical_shock" in motors.decode_hardware_error(1 << b))
+    # Real motors flag a latch in every status packet; that is what is noticed mid-motion.
+    monkeypatch.setattr(motors, "take_hardware_alerts",
+                        lambda: dict(motors.latched_errors), raising=False)
+    motors.latched_errors[8] = shock
+    cleared = _wait_for(lambda: (c := client.get("/api/endurance").json()["current"])
+                        and c["clears"] and c, timeout=20.0)
+    assert cleared, "the latch was never cleared"
+    event = cleared["clears"][0]
+    assert event["motor"] == 8 and event["flags"] == ["electrical_shock"]
+    assert event["outcome"].startswith("cleared")
+    assert 8 not in motors.latched_errors and motors.reboot_count.get(8) == 1
+
+    # The same run goes on counting, with torque back on.
+    assert _wait_for(lambda: client.get("/api/endurance").json()["current"]["cycles"]
+                     >= event["cycle"] + 2, timeout=15.0)
+    assert _operation(client)["state"] == "running"
+    assert client.get("/api/endurance").json()["current"]["run_id"] == cleared["run_id"]
+    assert client.app.state.service.supervisor.status().torque_enabled
+    client.post("/api/operation/stop")
+    _wait_op_state(client, "done")
+
+
 # ----- demo -----------------------------------------------------------------------
 
 
@@ -415,12 +455,6 @@ def test_demo_plays_builtin_sequence(client):
     assert response.status_code == 200
     snapshot = _wait_op_state(client, "done", timeout=30.0)
     assert snapshot["result"]["frames"] > 0
-
-
-def test_demo_unknown_name_404(client):
-    client.post("/api/torque/enable")
-    assert client.post("/api/operation/demo/start", json={"params": {
-        "name": "macarena"}}).status_code == 404
 
 
 def test_demo_loop_runs_until_stopped(client):

@@ -4,7 +4,7 @@
 // it outlives Stop and a console restart.
 
 import { useEffect, useState } from 'react'
-import type { EnduranceRun, TipDrops } from '../../api/types'
+import type { AutoClear, EnduranceRun, TipDrops } from '../../api/types'
 import { useOperationStore } from '../../state/operationStore'
 import { Panel } from '../common/Panel'
 
@@ -19,6 +19,19 @@ function duration(seconds: number): string {
   const h = Math.floor(s / 3600)
   const m = Math.floor((s % 3600) / 60)
   return h ? `${h}h ${m}m` : `${m}m ${s % 60}s`
+}
+
+function clearCounts(clears: AutoClear[]): string {
+  const counts = new Map<string, number>()
+  for (const c of clears) {
+    const key = `${c.joint ?? `motor ${c.motor}`}${c.flags.some((f) => f.endsWith('°C')) ? ' heat' : ''}`
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return [...counts].map(([key, n]) => `${key} ×${n}`).join(' · ')
+}
+
+function lastClear(c: AutoClear, now: number): string {
+  return `${duration(now - c.at)} ago · cycle ${c.cycle} · ${c.joint ?? `motor ${c.motor}`} ${c.flags.join(', ')} · ${c.outcome}`
 }
 
 function perHour(run: EnduranceRun, now: number): string {
@@ -107,6 +120,15 @@ export function EndurancePanel() {
               label="faults"
               value={`${current.bus_errors} bus · ${current.latched_motors} latched`}
             />
+            {current.clears && current.clears.length > 0 && (
+              <>
+                <Stat label="auto-clears" value={clearCounts(current.clears)} />
+                <Stat
+                  label="last auto-clear"
+                  value={lastClear(current.clears[current.clears.length - 1], now)}
+                />
+              </>
+            )}
           </div>
           <table className="traj-table endurance-fingers">
             <thead>
@@ -175,7 +197,7 @@ export function EndurancePanel() {
               <tr key={run.run_id}>
                 <td>{started(run)}</td>
                 <td className="traj-name">{run.motion}</td>
-                <td title={run.note}>{outcome(run)}</td>
+                <td title={run.note ?? undefined}>{outcome(run)}</td>
                 <td>{duration(endOf(run, now) - run.started_at)}</td>
                 <td>{perHour(run, now)}</td>
                 <td>{run.bus_errors + run.latched_motors}</td>
