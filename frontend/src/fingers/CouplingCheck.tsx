@@ -6,8 +6,12 @@
 // equation is judged on its own — it must read its own bend, positive, and
 // not the others'. A wrong one gets the sign fix that makes it fit, and
 // when one tendon's sign is off in every equation (it is wound the other way
-// round its spool) one button flips it in all of them. The
-// equations themselves, and their confirm boxes, are the lines above.
+// round its spool) one button flips it in all of them. Once every joint has
+// been bent alone from straight to closed, the bends themselves give the
+// equations: how the motors turned for each joint is all the coupling is,
+// and the full bend is called a set angle (90° unless picked), which also
+// becomes the joint's range. The equations themselves, and their confirm
+// boxes, are the lines above.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api/rest'
@@ -15,14 +19,16 @@ import { useAppStore } from '../state/appStore'
 import { useOperationActive } from '../state/operationStore'
 import { useBenchStore } from '../bench/benchStore'
 import { useMotorLive } from '../bench/useMotorLive'
-import { type Coupling, couplingProblem, couplingsOf, shaftDeltaFor } from './coupling'
+import { type Coupling, couplingProblem, couplingsOf, fitFromBends, shaftDeltaFor } from './coupling'
 import { resolve, useFingerStore } from './fingerStore'
 
 // Slider span either side of the held pose, in joint degrees.
 const SLIDER_DEG = 60
 // How often the latest slider position goes to the motors.
 const SEND_MS = 60
-// Shaft degrees per write: caps the speed at about 100°/s, a far jump is walked.
+// Shaft degrees per write: the command walks at about 100°/s from the last
+// one sent, not from the shaft, so a loaded motor falls behind and pulls
+// harder, up to its current limit.
 const MAX_SHAFT_STEP_DEG = 6
 const DEG = Math.PI / 180
 
@@ -32,6 +38,8 @@ const BEND_MIN_DEG = 8
 const READ_MIN_DEG = 4
 // An equation reading more than this share of another joint's bend is crosstalk.
 const CROSS_OK = 0.3
+// What a full bend from straight to closed is called, in joint degrees.
+const FULL_DEG = [120, 105, 90, 75, 60, 45]
 
 const signed = (v: number, digits = 1) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(digits)}`
 
@@ -63,6 +71,10 @@ function CouplingCard({ coupling, connected, locked }: { coupling: Coupling; con
   const tendons = useFingerStore((s) => s.tendons)
   const joints = useFingerStore((s) => s.joints)
   const flipTerms = useFingerStore((s) => s.flipTerms)
+  const zeros = useFingerStore((s) => s.zeros)
+  const setJoints = useFingerStore((s) => s.setJoints)
+  const setZeros = useFingerStore((s) => s.setZeros)
+  const [fullDeg, setFullDeg] = useState<number[]>(() => coupling.joints.map(() => 90))
   const motors = useBenchStore((s) => s.motors)
   const control = useAppStore((s) => s.control)
   const setError = useAppStore((s) => s.setError)
@@ -71,6 +83,7 @@ function CouplingCard({ coupling, connected, locked }: { coupling: Coupling; con
   const [targets, setTargets] = useState<number[]>(() => coupling.joints.map(() => 0))
   const positions = useRef<Record<string, number>>({})
   const base = useRef<Record<string, number> | null>(null)
+  // The last shaft command sent per motor.
   const sent = useRef<Record<string, number>>({})
   const sending = useRef(false)
   const targetsRef = useRef(targets)
@@ -81,6 +94,8 @@ function CouplingCard({ coupling, connected, locked }: { coupling: Coupling; con
   const [testing, setTesting] = useState<number | null>(null)
   const [peaks, setPeaks] = useState<Record<number, number[]>>({})
   const testBase = useRef<Record<string, number> | null>(null)
+  // Where the shafts were (straight) when each recorded bend started.
+  const bendBase = useRef<Record<number, number[]>>({})
   const bendRef = useRef<HTMLElement>(null)
 
   const stored = coupling.joints.map((cj) => joints.findIndex((j) => j.name === cj.name))
@@ -132,8 +147,10 @@ function CouplingCard({ coupling, connected, locked }: { coupling: Coupling; con
     }
     const size = Math.max(...bend.map(Math.abs))
     const prev = peaks[testing]
-    if (size >= BEND_MIN_DEG && (!prev || size > Math.max(...prev.map(Math.abs)) + 0.5))
+    if (size >= BEND_MIN_DEG && (!prev || size > Math.max(...prev.map(Math.abs)) + 0.5)) {
+      bendBase.current[testing] = coupling.motors.map((m) => t[String(m)])
       setPeaks((p) => ({ ...p, [testing]: bend }))
+    }
   })
 
   const startBend = (j: number) => {
@@ -176,20 +193,17 @@ function CouplingCard({ coupling, connected, locked }: { coupling: Coupling; con
       if (sending.current) return
       const want = shaftTargets()
       if (!want) return
-      const moves = coupling.motors.filter((m) => Math.abs(want[m] - (sent.current[m] ?? NaN)) > 0.05 || sent.current[m] === undefined)
+      const moves = coupling.motors.filter((m) => sent.current[m] === undefined || Math.abs(want[m] - sent.current[m]) > 0.05)
       if (moves.length === 0) return
       sending.current = true
       try {
         if (!useAppStore.getState().control?.direct_motor_mode) await api.motorsDirectMode(true)
         for (const m of moves) {
-          const live = positions.current[String(m)]
-          if (live === undefined) continue
-          const step = Math.max(-MAX_SHAFT_STEP_DEG, Math.min(MAX_SHAFT_STEP_DEG, want[m] - live))
-          const target = live + step
+          const from = sent.current[m] ?? positions.current[String(m)]
+          if (from === undefined) continue
+          const target = from + Math.max(-MAX_SHAFT_STEP_DEG, Math.min(MAX_SHAFT_STEP_DEG, want[m] - from))
           await api.motorsDirectPosition(m, target * DEG)
-          // Only call it reached when the whole way was sent; else walk on next tick.
-          if (target === want[m]) sent.current[m] = target
-          else delete sent.current[m]
+          sent.current[m] = target
         }
         setError(null)
       } catch (error) {
@@ -242,6 +256,35 @@ function CouplingCard({ coupling, connected, locked }: { coupling: Coupling; con
           coupling.matrix.every((row, r) => fits(row.map((g, i) => (i === c ? -g : g)), r, peaks)),
         )
       : -1
+  // The equations the bends themselves give, the straight pose as zero.
+  const fit = allRecorded ? fitFromBends(coupling.joints.map((_, j) => peaks[j]), fullDeg) : null
+  const tendonName = (motor: number) => tendonOn(motor).tendon?.name
+  const fitLine = (r: number) =>
+    fit![r]
+      .map((g, c) => `${g < 0 ? '−' : c ? '+' : ''}${Math.abs(g).toFixed(3)}·θ(${tendonName(coupling.motors[c]) ?? motorName(coupling.motors[c])})`)
+      .join(' ')
+  const applyFit = () => {
+    if (!fit || coupling.motors.some((m) => !tendonName(m))) return
+    const round = (v: number) => Math.round(v * 1e4) / 1e4
+    setJoints(
+      joints.map((j, i) => {
+        const r = stored.indexOf(i)
+        if (r < 0) return j
+        // The line's own tendon order first, then any tendon it did not name.
+        const order = [
+          ...j.terms.map((t) => coupling.motors.findIndex((m) => tendonName(m) === t.tendon)),
+          ...coupling.motors.map((_, c) => c),
+        ].filter((c, k, all) => c >= 0 && all.indexOf(c) === k)
+        const terms = order.map((c) => ({ tendon: tendonName(coupling.motors[c])!, gain: round(fit[r][c]) }))
+        return { ...j, terms, open_deg: 0, closed_deg: fullDeg[r], confirmed: undefined }
+      }),
+    )
+    const straight = coupling.motors.map(
+      (_, c) => coupling.joints.reduce((sum, _j, r) => sum + bendBase.current[r][c], 0) / coupling.joints.length,
+    )
+    setZeros({ ...zeros, ...Object.fromEntries(coupling.motors.map((m, c) => [String(m), Math.round(straight[c] * 10) / 10])) })
+  }
+
   // A column of the coupling, as the stored joint's term index.
   const termOf = (r: number, c: number) => {
     const joint = joints[stored[r]]
@@ -286,6 +329,11 @@ function CouplingCard({ coupling, connected, locked }: { coupling: Coupling; con
           zero here
         </button>
       </div>
+      <small className="finger-hint">
+        a slider drives through every equation of the pair: the motors turn so its joint reads the target and the
+        others read 0, so changing one equation changes how every joint is driven. Bend by hand checks each equation
+        on its own.
+      </small>
       {coupling.joints.map((joint, j) => (
         <div key={joint.name} className="coupling-check-slider">
           <span>{joint.name}</span>
@@ -325,7 +373,9 @@ function CouplingCard({ coupling, connected, locked }: { coupling: Coupling; con
         </p>
       )}
       <div className="coupling-check-bend">
-        <span title="release the motors, press a joint, bend only that joint closed by hand">bend by hand:</span>
+        <span title="release the motors, start straight, press a joint, bend only that joint fully closed by hand and back, press it again">
+          bend by hand:
+        </span>
         {coupling.joints.map((joint, j) => (
           <button
             key={joint.name}
@@ -381,6 +431,47 @@ function CouplingCard({ coupling, connected, locked }: { coupling: Coupling; con
             </li>
           )}
         </ul>
+      )}
+      {allRecorded && (
+        <div className="coupling-fit">
+          {fit ? (
+            <>
+              <span>from these bends:</span>
+              {coupling.joints.map((joint, r) => (
+                <div key={joint.name} className="coupling-fit-line">
+                  <code>
+                    {joint.name} = {fitLine(r)}
+                  </code>
+                  <label title="what a full bend from straight to closed is called; it also becomes this joint's range">
+                    full bend
+                    <select
+                      value={fullDeg[r]}
+                      onChange={(e) => setFullDeg((d) => d.map((x, k) => (k === r ? Number(e.target.value) : x)))}
+                    >
+                      {FULL_DEG.map((d) => (
+                        <option key={d} value={d}>
+                          {d}°
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              ))}
+              <button
+                className="btn btn-primary"
+                disabled={locked || coupling.motors.some((m) => !tendonName(m))}
+                title={`write these equations into the lines${anyConfirmed ? ' (unticking their confirm)' : ''}; straight becomes 0° and each joint's range straight → its full bend`}
+                onClick={applyFit}
+              >
+                {anyConfirmed ? 'unconfirm and apply fit' : 'apply fit'}
+              </button>
+            </>
+          ) : (
+            <small className="tower-warn">
+              these bends turned the motors alike — bend each joint alone, all the way closed, and record it again
+            </small>
+          )}
+        </div>
       )}
     </div>
   )

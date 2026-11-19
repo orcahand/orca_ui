@@ -1,6 +1,6 @@
 // The bench tower as drawn: frame parts plus one mesh per motor slot. The
 // GLB comes from scripts/build_bench_tower.py, which keeps the STEP's
-// component names; slot mNN is motor number NN.
+// component names mNN; MOTOR_OF_PART turns those into the motor numbers.
 
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
@@ -28,10 +28,24 @@ export interface Tower {
 // GLTFLoader strips ':' from node names, so "m05:1" arrives as "m051".
 const SLOT_NAME = /^m(\d{2})\d*$/
 
+// The lower tower's four stacks of three, each bottom to top, so each
+// stack's motors are numbered in a row.
+const STACKS = [
+  [1, 5, 10],
+  [7, 3, 9],
+  [4, 8, 12],
+  [2, 6, 11],
+]
+// STEP part mNN → motor number; parts outside the stacks keep NN.
+const MOTOR_OF_PART = new Map(STACKS.flat().map((part, i) => [part, i + 1]))
+
 function slotOf(object: THREE.Object3D): number | null {
   for (let o: THREE.Object3D | null = object; o; o = o.parent) {
     const match = SLOT_NAME.exec(o.name)
-    if (match) return parseInt(match[1], 10)
+    if (match) {
+      const part = parseInt(match[1], 10)
+      return MOTOR_OF_PART.get(part) ?? part
+    }
   }
   return null
 }

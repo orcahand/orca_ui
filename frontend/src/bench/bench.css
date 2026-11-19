@@ -4,6 +4,14 @@
   max-width: 1100px;
 }
 
+/* Header, errors and torque stay in view while the page scrolls. */
+.bench-top {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--bg);
+}
+
 .bench header .brand-sub {
   letter-spacing: 1.5px;
 }

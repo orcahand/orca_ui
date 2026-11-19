@@ -39,6 +39,8 @@ export interface FingerSettings {
   // Cycling through the poses: rounds (0: until stopped) and the hold at each.
   cycleCount: number
   cycleDwellS: number
+  // Poses left out of the cycle, by name; new poses join it.
+  cycleSkip: string[]
   // A joint without a captured range is driven ± this many joint degrees
   // around where it is at Engage.
   windowDeg: number
@@ -54,6 +56,7 @@ export const DEFAULT_SETTINGS: FingerSettings = {
   pipRadiusMm: 16.6,
   cycleCount: 10,
   cycleDwellS: 0.5,
+  cycleSkip: [],
   windowDeg: 30,
   uTendon: 2,
 }

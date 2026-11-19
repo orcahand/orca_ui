@@ -126,3 +126,17 @@ export function differentialGains(spoolRadius: number, radiusMcp: number, radius
   const round = (v: number) => Math.round(v * 10000) / 10000
   return { mcp: round(spoolRadius / radiusMcp), pip: round(spoolRadius / radiusPip) }
 }
+
+/**
+ * The coupling that reads each recorded bend as that joint alone: bends[j]
+ * is how far every motor turned (shaft degrees, the coupling's motor order)
+ * while joint j alone went from straight to `angles[j]`. The rows of
+ * diag(angles) · V⁻¹, V's columns the bends; null when two bends turn the
+ * motors alike.
+ */
+export function fitFromBends(bends: number[][], angles: number[]): number[][] | null {
+  const n = bends.length
+  if (n === 0 || bends.some((b) => b.length !== n)) return null
+  const inverse = invert(Array.from({ length: n }, (_, i) => bends.map((b) => b[i])))
+  return inverse && inverse.map((row, j) => row.map((v) => v * angles[j]))
+}

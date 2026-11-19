@@ -138,82 +138,84 @@ export function BenchApp() {
 
   return (
     <div className="container bench">
-      <header>
-        <h1 className="brand">
-          <span className="brand-mark">◈ ORCA</span>
-          <span className="brand-sub">MOTOR BENCH</span>
-        </h1>
-        <div className="bench-mode-switch" role="tablist" aria-label="bench mode">
-          {MODES.map(({ mode: m, label, title, kind }) => (
-            <button
-              key={m}
-              role="tab"
-              aria-selected={mode === m}
-              className={`bench-mode-tab ${mode === m ? 'on' : ''}`}
-              title={title}
-              onClick={() => setMode(m)}
-            >
-              {label}
-              {runningKind === kind && <i className="bench-mode-live" aria-label="running" />}
-            </button>
-          ))}
-        </div>
-        <UsbIndicator connected={connected} />
-        <span
-          className={`status-indicator ${STATE_CLASS[state] ?? 'busy'}`}
-          title={status?.message ?? ''}
-        >
-          {wsConnected ? STATE_LABEL[state] ?? state : 'Backend offline'}
-        </span>
-        {status?.model && (
-          <span className="capability-badge" title={port ?? 'motor port not resolved'}>
-            {status.model}
-            {port ? ` · ${port}` : ''}
+      <div className="bench-top">
+        <header>
+          <h1 className="brand">
+            <span className="brand-mark">◈ ORCA</span>
+            <span className="brand-sub">MOTOR BENCH</span>
+          </h1>
+          <div className="bench-mode-switch" role="tablist" aria-label="bench mode">
+            {MODES.map(({ mode: m, label, title, kind }) => (
+              <button
+                key={m}
+                role="tab"
+                aria-selected={mode === m}
+                className={`bench-mode-tab ${mode === m ? 'on' : ''}`}
+                title={title}
+                onClick={() => setMode(m)}
+              >
+                {label}
+                {runningKind === kind && <i className="bench-mode-live" aria-label="running" />}
+              </button>
+            ))}
+          </div>
+          <UsbIndicator connected={connected} />
+          <span
+            className={`status-indicator ${STATE_CLASS[state] ?? 'busy'}`}
+            title={status?.message ?? ''}
+          >
+            {wsConnected ? STATE_LABEL[state] ?? state : 'Backend offline'}
           </span>
-        )}
-        <div className="header-spacer" />
-        <a
-          className="btn btn-secondary bench-console-link"
-          href="/console"
-          title="the full hand console, on the same backend"
-        >
-          Full console
-        </a>
-        <ThemeToggle />
-        <button
-          className="btn btn-secondary bench-quit"
-          disabled={!wsConnected || quitting || runningKind !== null}
-          title={
-            runningKind !== null
-              ? 'a run is in progress — stop it first'
-              : 'stop the backend (same as Ctrl+C in the terminal); closing the tab does this too after a few seconds'
+          {status?.model && (
+            <span className="capability-badge" title={port ?? 'motor port not resolved'}>
+              {status.model}
+              {port ? ` · ${port}` : ''}
+            </span>
+          )}
+          <div className="header-spacer" />
+          <a
+            className="btn btn-secondary bench-console-link"
+            href="/console"
+            title="the full hand console, on the same backend"
+          >
+            Full console
+          </a>
+          <ThemeToggle />
+          <button
+            className="btn btn-secondary bench-quit"
+            disabled={!wsConnected || quitting || runningKind !== null}
+            title={
+              runningKind !== null
+                ? 'a run is in progress — stop it first'
+                : 'stop the backend (same as Ctrl+C in the terminal); closing the tab does this too after a few seconds'
+            }
+            onClick={() => {
+              if (!window.confirm('Stop the backend? The motors are released.')) return
+              setQuitting(true)
+              api.quit().catch((error) => {
+                setError(String((error as Error).message ?? error))
+                setQuitting(false)
+              })
+            }}
+          >
+            {quitting ? 'stopping…' : '⏻ Quit'}
+          </button>
+          <EStopButton />
+        </header>
+        <ErrorBanner />
+        <TorqueBar
+          connected={connected}
+          heldHint={
+            mode === 'thermal'
+              ? thermalFree
+                ? 'all held — set the waveform, Start; the motors will turn'
+                : 'all held — clamp the shafts, set the waveform, Start'
+              : mode === 'fingers'
+                ? 'all held — in Control, Engage to drive the joints'
+                : 'all held — jog to tension, Start to cycle'
           }
-          onClick={() => {
-            if (!window.confirm('Stop the backend? The motors are released.')) return
-            setQuitting(true)
-            api.quit().catch((error) => {
-              setError(String((error as Error).message ?? error))
-              setQuitting(false)
-            })
-          }}
-        >
-          {quitting ? 'stopping…' : '⏻ Quit'}
-        </button>
-        <EStopButton />
-      </header>
-      <ErrorBanner />
-      <TorqueBar
-        connected={connected}
-        heldHint={
-          mode === 'thermal'
-            ? thermalFree
-              ? 'all held — set the waveform, Start; the motors will turn'
-              : 'all held — clamp the shafts, set the waveform, Start'
-            : mode === 'fingers'
-              ? 'all held — in Control, Engage to drive the joints'
-              : 'all held — jog to tension, Start to cycle'
-        }
-      />
+        />
+      </div>
       <BusPanel connected={connected} />
       <TowerPanel connected={connected} />
       {mode === 'fingers' ? (

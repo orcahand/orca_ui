@@ -218,8 +218,16 @@ function PosePanel({ engaged, extra, names }: { engaged: boolean; extra: FingerE
   // A stored pose may name joints that are not engaged now: only the engaged ones go.
   const goTo = (pose: FingerPose) =>
     setTargets(Object.fromEntries(Object.entries(pose.targets).filter(([n]) => names.includes(n))))
+  const skip = new Set(settings.cycleSkip)
+  const cycled = poses.filter((p) => !skip.has(p.name))
+  const toggleCycled = (name: string) =>
+    patchSettings({
+      cycleSkip: skip.has(name)
+        ? settings.cycleSkip.filter((n) => n !== name)
+        : [...settings.cycleSkip.filter((n) => poses.some((p) => p.name === n)), name],
+    })
   const startCycle = () =>
-    call(() => api.fingerCycle(poses, settings.cycleCount, settings.cycleDwellS, settings.speedDegS))
+    call(() => api.fingerCycle(cycled, settings.cycleCount, settings.cycleDwellS, settings.speedDegS))
   const stopCycle = () => call(() => api.fingerCycleStop())
   const describe = (pose: FingerPose) =>
     Object.entries(pose.targets)
@@ -246,11 +254,11 @@ function PosePanel({ engaged, extra, names }: { engaged: boolean; extra: FingerE
           ) : (
             <button
               className="btn btn-primary"
-              disabled={busy || !engaged || poses.length < 2}
-              title={poses.length < 2 ? 'a cycle needs at least two poses' : 'walk through the poses in order'}
+              disabled={busy || !engaged || cycled.length < 2}
+              title={cycled.length < 2 ? 'a cycle needs at least two ticked poses' : 'walk through the ticked poses in order'}
               onClick={startCycle}
             >
-              ▶ cycle
+              ▶ cycle {cycled.length < poses.length ? `${cycled.length} of ${poses.length}` : ''}
             </button>
           )}
           <label className="stress-field" title="rounds through the poses; 0 keeps going until stopped">
@@ -289,12 +297,19 @@ function PosePanel({ engaged, extra, names }: { engaged: boolean; extra: FingerE
           {cycle
             ? `${cycle.phase === 'moving' ? 'going to' : 'holding'} ${cycle.pose} (${cycle.index + 1}/${cycle.poses.length}) · round ${cycle.done + 1}${cycle.cycles ? ` of ${cycle.cycles}` : ''}`
             : poses.length
-              ? 'go to a pose, or cycle through them in this order — a slider ends the cycle'
+              ? 'go to a pose, or cycle through the ticked ones in this order — a slider ends the cycle'
               : 'capture a pose to come back to it'}
         </span>
       </div>
       {poses.map((pose, index) => (
         <div key={pose.name} className={`finger-pose ${cycle?.pose === pose.name ? 'on' : ''}`}>
+          <input
+            type="checkbox"
+            checked={!skip.has(pose.name)}
+            disabled={!!cycle}
+            title="part of the cycle"
+            onChange={() => toggleCycled(pose.name)}
+          />
           <button className="btn btn-secondary" disabled={!engaged || !!cycle} title={describe(pose)} onClick={() => goTo(pose)}>
             go
           </button>

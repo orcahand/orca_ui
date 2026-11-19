@@ -1,7 +1,8 @@
 """Convert the bench tower's STEP into the GLB the bench page shows.
 
 The STEP must name each motor slot ``mNN`` (``m01`` … ``m18``); the bench
-maps slot NN to motor number NN. Everything else is drawn as the tower.
+turns those into motor numbers (``MOTOR_OF_PART`` in towerModel.ts).
+Everything else is drawn as the tower.
 
     uv run --with cadquery-ocp python scripts/build_bench_tower.py \
         ~/Downloads/tower_main_gui.step

@@ -758,6 +758,34 @@
   color: var(--ok);
 }
 
+.coupling-fit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: var(--panel-strong);
+}
+
+.coupling-fit-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.coupling-fit-line code {
+  font-size: 11px;
+}
+
+.coupling-fit-line label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+}
+
 .coupling-check-verdicts li.bad {
   border-left-color: var(--err);
   color: var(--err);
