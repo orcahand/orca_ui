@@ -221,6 +221,7 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
         """Open the rig read-only (torque off): the plate angle for the dashboard."""
         from orca_ui.hand.rig_detect import check_model
         _experiment_on_path()
+        from visual_calibration.rig_config import RigConfigError
         from visual_calibration.turntable import Turntable, TurntableError
         with connect_lock:
             if "t" not in table:
@@ -230,7 +231,7 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
                 try:
                     table["t"] = Turntable.open(r.raw["turntable"], mock=mock, port=(found or {}).get("port"),
                                                 torque=False, **turntable_files(r))
-                except (TurntableError, OSError) as e:
+                except (TurntableError, OSError, RigConfigError) as e:
                     presence.update(present=found is not None, connected=False, warnings=[f"turntable: {e}"])
                     return
             t = table["t"]
@@ -307,10 +308,11 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
             raise HTTPException(409, str(e)) from e
 
     def turntable_files(r) -> dict:
-        """Where the turntable reads its motor calibration and saves a new one (the rig's folder)."""
+        """Where the turntable reads its motor calibration and saves a new one: the rig's folder,
+        never the checkout (RigConfigError when the rig has no id)."""
         from visual_calibration.rig_config import TURNTABLE_CALIBRATION_FILE
         return {"calibration_path": r.turntable_calibration_path,
-                "save_path": r.own_file(TURNTABLE_CALIBRATION_FILE) if r.home else None}
+                "save_path": r.own_file(TURNTABLE_CALIBRATION_FILE)}
 
     def turntable():
         if "t" not in table:
@@ -487,6 +489,7 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
     @router.post("/turntable/connect")
     def turntable_connect(body: Connect) -> dict:
         vc()
+        from visual_calibration.rig_config import RigConfigError
         from visual_calibration.turntable import Turntable, TurntableError
         if "t" in table:
             return table["t"].state().as_dict()
@@ -494,7 +497,7 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
             r = rig_config()
             table["t"] = Turntable.open(r.raw["turntable"], mock=mock, port=body.port, motor_id=body.motor_id,
                                         torque=body.torque, **turntable_files(r))
-        except (TurntableError, OSError) as e:
+        except (TurntableError, OSError, RigConfigError) as e:
             raise HTTPException(409, f"turntable: {e}") from e
         note_rig(getattr(table["t"].bus, "usb_serial", None), None)
         return table["t"].state().as_dict()
