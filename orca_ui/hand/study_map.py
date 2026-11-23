@@ -190,7 +190,10 @@ class StudyMap:
         return self.forward(estimate, mode) if mode != "off" else estimate
 
     def forward(self, estimate: dict[str, float], name: str | None = None) -> dict[str, float]:
-        """Where the joints really are, from orca_core's estimate (map `name`, else the selected, else the preferred)."""
+        """Where the joints really are, from orca_core's estimate (map `name`, else the selected, else the preferred);
+        the estimate unchanged without --research-ui."""
+        if not research.enabled():
+            return estimate
         d = self.data(name)
         if d is None:
             return dict(estimate)

@@ -624,8 +624,6 @@ class TelemetryService:
         hand's own stops differ. ``overlays``: every mapping's angles (ghost hands).
         Without --research-ui only orca_core's estimate, and none of the rest is computed."""
         from orca_ui import research
-        from orca_ui.hand import main_stops, overlays
-        from orca_ui.hand.study_map import STUDY_MAP
 
         standard = _clean_angles(raw)
         if not standard:
@@ -634,6 +632,9 @@ class TelemetryService:
         if not research.enabled():
             self._hub.publish(T.JOINTS_ESTIMATE, payload)
             return standard
+        from orca_ui.hand import main_stops, overlays
+        from orca_ui.hand.study_map import STUDY_MAP
+
         mapped = STUDY_MAP.estimate(standard)
         if mapped is not standard:
             payload = {"angles": _clean_angles(mapped), "standard": standard,
