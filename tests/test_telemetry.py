@@ -8,6 +8,8 @@ happen at all.
 
 from types import SimpleNamespace
 
+import pytest
+
 from orca_ui.hand.telemetry import (
     MAX_TELEMETRY_STALENESS_S,
     MOTOR_TELEMETRY_MIN_INTERVAL_S,
@@ -280,6 +282,22 @@ def test_no_estimate_read_once_the_model_follows_commands():
     for _ in range(5):
         telemetry._mid_tick()
     assert session.hand.bus_reads == []
+
+
+def test_without_research_ui_the_estimate_carries_no_ghost_hands(monkeypatch):
+    """The ghost hands (main stops, every study mapping) are research extras:
+    without --research-ui none is computed on the motor read, none is published."""
+    from orca_ui import research
+    from orca_ui.hand import main_stops, overlays
+
+    monkeypatch.setattr(research, "_enabled", False)
+    monkeypatch.setattr(main_stops, "estimate", lambda *a: pytest.fail("main stops computed"))
+    monkeypatch.setattr(overlays, "evaluate", lambda *a: pytest.fail("overlays computed"))
+    telemetry, session = _build()
+    sent = []
+    telemetry._hub.publish = lambda topic, payload: sent.append(payload)
+    telemetry._publish_joint_estimate({"index_mcp": 5.0}, session)
+    assert sent == [{"angles": {"index_mcp": 5.0}}]
 
 
 # ----- command adherence ------------------------------------------------------
