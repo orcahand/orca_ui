@@ -1,9 +1,13 @@
-"""The visual calibration study's research extras: the Study tab, study maps, the ghost-hand
-overlays, the control sandbox and the live hand-pose estimate.
+"""The visual calibration study's research extras, kept in the code but off and hidden unless
+the console is started with ``--research-ui``. Without it:
 
-They stay in the code but are off and hidden unless the console is started with
-``--research-ui``: no study map is ever applied, telemetry computes no overlays,
-their endpoints answer 404 and the browser shows none of them.
+- no study map is applied (its mode reads off; a stored selection is kept, selecting is refused);
+- telemetry computes no ghost hands (main stops, study mappings);
+- these endpoints answer 404: ``/api/visual-calibration/study-map``, ``/lut``, ``/lut/command``,
+  ``/study/*`` (the study server proxy) and ``/api/control/motor_currents``;
+- the browser hides the Study tab, the dashboard's study panel, the ghost hands, and steps 7
+  (live hand-pose estimate) and 11 (control sandbox) of Setup › Visual calibration. The
+  ``/api/visual-calibration/live-fit/*`` endpoints behind step 7 stay open.
 """
 
 from __future__ import annotations
