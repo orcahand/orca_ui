@@ -51,11 +51,12 @@ export interface StatusSnapshot {
   // board to answer". Pinned means the backend never opens another board's
   // ports — the way two consoles on one machine each keep to their own hand.
   board_pinned: string | null
-  // Hardware version in force (2 = v2.0, 21 = v2.1; null = unknown), whether
-  // config.yaml pins it, and what the board reports (null with no board).
-  // Only v2.1 gets guided tensioning and travel-checked calibration.
+  // Hardware version in force (200 = v2.0, 210 = v2.1; null = unknown), the one
+  // chosen in the console for this session only (null = none), and what the
+  // board reports (null with no board). Only v2.1 gets guided tensioning and
+  // travel-checked calibration.
   hardware_version?: number | null
-  hardware_version_pinned?: boolean
+  hardware_version_override?: number | null
   board_hardware_version?: number | null
   // Device classes the config declares that this session did not get, and
   // whether the backend is still probing for them. It gives up after a few
@@ -183,6 +184,17 @@ export interface ControlState {
   pose_source: PoseSource
   // What "auto" resolved to right now; equals pose_source when pinned.
   effective_pose_source: 'estimate' | 'target'
+  // Motors an operation could not confirm off; `confirmed` once a later
+  // connection switched them all off.
+  motors_holding?: MotorsHolding | null
+}
+
+export interface MotorsHolding {
+  // The hand that raised the warning; only a connection to it can confirm the motors off.
+  hand_id: string | null
+  motors: number[]
+  joints: (string | null)[]
+  confirmed: boolean
 }
 
 // Control-table facts for a model a bench knows how to drive. `source` says
@@ -247,11 +259,40 @@ export interface CoreSourceInfo {
   summary: string
 }
 
+// The connected hand's own folder in orca_core's hand store.
+export interface HandStoreInfo {
+  // Serial, else board ID; `noboard-<model>` for a hand that reports neither.
+  id: string
+  // The hand's own folder; null when no hand is connected.
+  folder: string | null
+  nickname: string | null
+  calibration: {
+    calibrated_at: string | null
+    sequence: number | null
+    // The file the calibration in force was read from.
+    path: string | null
+    previous_available: boolean
+    previous_at: string | null
+  }
+  joint_ranges: {
+    source: 'model' | 'measured'
+    measured_at: string | null
+    // Where ranges measured on this hand are read from.
+    path: string | null
+  }
+  // Set when the board holds a newer calibration than this computer.
+  board_calibration_newer: {
+    board: { sequence: number | null; calibrated_at: string | null }
+    computer: { sequence: number | null; calibrated_at: string | null }
+  } | null
+  // Files from before the hand store, found and not used; empty once dismissed.
+  legacy_files: string[]
+}
+
 export interface HandInfo {
   model_name: string
   side: 'left' | 'right'
-  // The connected hand's identity (board serial), null in mock mode or before it is read.
-  hand_id?: string | null
+  hand?: HandStoreInfo | null
   // The model has a tactile skin (drawn black), connected or not.
   tactile_skin?: boolean
   mock: boolean
@@ -269,12 +310,8 @@ export interface HandInfo {
   // False when the installed orca_core predates guided tensioning.
   guided_tension?: boolean
   last_tension?: LastTension | null
-  // Unfinished guided tensioning saved for this hand, per scoring: the best
-  // fraction per joint (ccc page) and the last round's slack scores (kai page).
+  // Unfinished guided tensioning saved for this hand: the best fraction per joint.
   tension_progress?: TensionProgress | null
-  tension_progress_slack?: TensionProgress | null
-  // Present once this hand was calibrated after its last completed tensioning.
-  slack_estimate?: SlackEstimate | null
   // Fingertip model per slot and slots holding another finger's model; absent
   // when the connector-board firmware doesn't report fingertip identities.
   fingertips?: FingertipIdentities
@@ -452,7 +489,6 @@ export interface SweepLevels {
 
 export interface SweepListing {
   recorded_at: string
-  hand_key?: string | null
   motor_type?: string | null
   note?: string | null
   joints: string[]
@@ -481,17 +517,18 @@ export interface TravelBaselineSummary {
 export interface TravelSnapshot {
   recorded_at: string
   source: 'manual' | 'auto' | 'import' | string
-  hand_key?: string | null
   note?: string | null
   // A run that did not calibrate every finger joint: the other values are older.
   partial?: boolean
+  // Kept in the hand's archive only: readable, no longer promotable.
+  archived?: boolean
   joints?: string[] | null
   travel: Record<string, number>
   ratios?: Record<string, number>
   limits?: Record<string, [number, number]>
 }
 
-export interface TravelBaseline extends Omit<TravelSnapshot, 'ratios' | 'limits' | 'hand_key'> {
+export interface TravelBaseline extends Omit<TravelSnapshot, 'ratios' | 'limits'> {
   from_snapshot: string | null
 }
 
@@ -534,16 +571,6 @@ export interface LastTension {
   slack_deg?: Record<string, number | null>
   spread_deg?: Record<string, number>
   expected_deg?: Record<string, number | null>
-}
-
-// Slack per joint from two sweeps of the same hand in the same state: the
-// motor-driven calibration (hardstops plus slack) against the hand sweep of the
-// final tensioning round (hardstops minus slack).
-export interface SlackEstimate {
-  snapshot: string
-  calibrated_at: string
-  tensioned_at: string
-  joints: Record<string, { sweep_deg: number; motor_deg: number; slack_deg: number; travel_deg: number }>
 }
 
 export type TactileMode = 'resultant' | 'taxels' | 'combined'
@@ -1155,6 +1182,8 @@ export interface MotorSpread {
   // Ratchet clicks the joint's slack still needs (rounded down); null while
   // the degrees per click are unknown.
   clicks_left?: number | null
+  // Never swept and nothing kept from earlier: no slack measured, no clicks suggested.
+  not_checked?: boolean
   // Latched error bits while the motor is limp; null when it holds.
   fault?: string[] | null
 }
@@ -1168,8 +1197,18 @@ export interface OperationMotorFault extends HwErrorInfo {
   relatched?: boolean
 }
 
+// Motors that did not acknowledge torque off when a routine let go: they may
+// still hold. Any operation's `extra` may carry it (OpContext.torque_off_failed).
+export interface TorqueOffFailed {
+  motors: number[]
+  joints: (string | null)[]
+}
+
 export interface GuidedTensionExtra {
   step: TensionStep
+  // The live spread sampler died this round: the spreads shown stopped updating.
+  sampler_failed?: { round: number; error: string | null }
+  torque_off_failed?: TorqueOffFailed
   round: number
   motors: MotorSpread[]
   passed?: number

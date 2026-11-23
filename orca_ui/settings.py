@@ -22,8 +22,6 @@ class UiSettings:
     # ``model_version`` is carried along so re-derivation stays on the version
     # the user asked for.
     model_pinned: bool = True
-    # Temporary, see hand_folders: keep each identified hand's files in its own folder.
-    hand_folders: bool = False
     model_version: str | None = None
     # Device path of the board this console is pinned to, or None for "first
     # board to answer". Pinning is what makes two consoles on one machine
@@ -39,7 +37,7 @@ class UiSettings:
     host: str = "127.0.0.1"
     port: int = 5001
     open_browser: bool = True
-    # Pose/trajectory library root; None -> ~/.orca_ui/library. Recordings and
+    # Pose/trajectory library root; None -> ~/.orca/ui/library. Recordings and
     # user poses live under <root>/<model_name>/.
     library_dir: str | None = None
 

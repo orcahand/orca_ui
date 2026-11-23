@@ -1,5 +1,16 @@
 # ORCA assembly guide — handover
 
+## Current state (UI 0.5.0, November 2026)
+
+- The guide and the maintenance walkthrough ship in the console on `main`. Open **Setup → Open assembly guide**, or **Setup → Maintenance** for the index AP tendon replacement (Base right, Dynamixel); both open in their own window.
+- Builders get the Base guide and choose left or right, Dynamixel or Feetech. The Touch and Full builds, the internal edition and the guide editor (a dev tool for reviewing the guide's wording) are switched off in `frontend/src/components/assembly/editions.ts`.
+- Photos, videos, 3D models and PDFs live in the public bucket, listed in `storedMedia.json`; publishing and the rules for new files are in [DEVELOPMENT.md](DEVELOPMENT.md#assembly-guide-media). Nothing is unpacked from archives any more.
+- Browser checks: `scripts/check_upkeep_guide.py` for the maintenance walkthrough; see [the assembly README](frontend/src/components/assembly/README.md) for the guide's own.
+
+The dated sections below are the working log the guide was built from. Branch names, checkout paths and file locations in them are historical; where they disagree with this section, this section is current.
+
+---
+
 Updated: 22 October 2026. Intended for the next Astra/Codex instance and human maintainers.
 
 ## Start here
@@ -9,6 +20,8 @@ The assembly guide is implemented in this checkout. Open **Setup → Open assemb
 The goal is a self-contained guide that makes building the hand straightforward without needing to consult the teaching PDF or ask for missing instructions. The current version is substantial and reviewable, but some mechanical specifications and procedures remain unresolved. Do not describe it as a physically validated, independently complete assembly manual yet.
 
 Read this document first, then [the assembly implementation notes](frontend/src/components/assembly/README.md), [DEVELOPMENT.md](DEVELOPMENT.md) and [CLAUDE.md](CLAUDE.md). The assembly README contains detailed historical development notes; some early statements are superseded. In particular, its opening statement that the guide never starts a hand operation predates the explicitly enabled connected-hand test described below.
+
+**Guide media is never committed.** Photos, videos, 3D models and PDFs are published to the public bucket with `scripts/guide_media.py` and loaded only through `mediaUrl`, `mediaImage` or `downloadMedia`. Before adding a new kind of file, follow the rules in [DEVELOPMENT.md](DEVELOPMENT.md#assembly-guide-media).
 
 ## Index tendon and skin sequence · 22 October
 
@@ -437,7 +450,7 @@ object already present in unpublished history.
 
 ## Persistence and compatibility
 
-`GET/PUT /api/assembly/progress` stores one build at `~/.orca_ui/assembly-progress-v2.json`, with validation and atomic replacement. Browser storage under `orca-ui.assembly.v2.1` provides fallback. Server persistence matters because the desktop shell can discard its browser profile.
+`GET/PUT /api/assembly/progress` stores one build at `~/.orca/ui/assembly-progress-v2.json`, with validation and atomic replacement. Browser storage under `orca-ui.assembly.v2.1` provides fallback. Server persistence matters because the desktop shell can discard its browser profile.
 
 Saved state includes the current step, build configuration, completed steps, checklists, tendon checks and selected views. Writes are serialized across modal mounts. Preserve stable step IDs and migrate incompatible state explicitly. Configuration changes invalidate relevant checks; do not allow completion for one configuration to imply verification of another.
 

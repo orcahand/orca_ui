@@ -1,18 +1,18 @@
-// The hand's hardware revision: a header badge that opens a picker, and a
-// setup prompt for hands that cannot report it. The board reports its version;
-// a hand on a plain Feetech/Dynamixel adapter has no board, so the operator
-// sets it here and it is pinned as `hardware_version:` in the hand's
-// config.yaml. Only v2.1 gets guided tensioning and travel-checked
-// calibration (and, on a left hand, the reversed thumb MCP/DIP motors).
+// The hand's hardware revision: a header menu, and a setup prompt for hands
+// that cannot report it. The board reports its version and that is what runs.
+// A version picked here applies to the connected hand for this session only:
+// nothing is saved, and connecting another hand drops it. Only v2.1 gets
+// guided tensioning and travel-checked calibration (and, on a left hand, the
+// reversed thumb MCP/DIP motors).
 
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
 import { api, ApiError } from '../../api/rest'
 import { useAppStore } from '../../state/appStore'
 import { isOperationActive, useOperationStore } from '../../state/operationStore'
 import { formatHardwareVersion, V20, V21, V211 } from '../../state/tensionFlow'
 
-type Choice = 'auto' | typeof V20 | typeof V21 | typeof V211
+const BOARD = 'board'
+const VERSIONS = [V20, V21, V211]
 
 async function save(version: number | null): Promise<boolean> {
   try {
@@ -33,130 +33,88 @@ async function save(version: number | null): Promise<boolean> {
 
 export function HardwareVersionBadge() {
   const status = useAppStore((s) => s.status)
-  const [open, setOpen] = useState(false)
-  if (!status || status.bare) return null
-
-  const version = status.hardware_version ?? null
-  const pinned = status.hardware_version_pinned ?? false
-  return (
-    <>
-      <button
-        className="model-picker hw-version"
-        onClick={() => setOpen(true)}
-        title="Hardware version — click to change"
-      >
-        <span className="model-select">hw {formatHardwareVersion(version)}</span>
-        <span className={`model-pin${pinned ? ' pinned' : ''}`}>
-          {pinned ? 'PINNED' : status.board_hardware_version != null ? 'BOARD' : 'UNSET'}
-        </span>
-      </button>
-      {open && <HardwareVersionDialog onClose={() => setOpen(false)} />}
-    </>
-  )
-}
-
-function HardwareVersionDialog({ onClose }: { onClose: () => void }) {
-  const status = useAppStore((s) => s.status)
   const side = useAppStore((s) => s.handInfo?.side)
   const busy = useOperationStore((s) => isOperationActive(s.operation))
-  const pinned = status?.hardware_version_pinned ?? false
-  const current: Choice = pinned ? ((status?.hardware_version as Choice) ?? 'auto') : 'auto'
-  const [choice, setChoice] = useState<Choice>(current)
   const [saving, setSaving] = useState(false)
-  const board = status?.board_hardware_version ?? null
+  if (!status || status.bare) return null
 
-  const options: { value: Choice; title: string; note: string }[] = [
-    {
-      value: 'auto',
-      title: 'From the board',
-      note:
-        board != null
-          ? `the controller board reports ${formatHardwareVersion(board)}`
-          : 'no controller board answers, so the version stays unknown (treated like v2.0)',
-    },
-    {
-      value: V20,
-      title: 'v2.0.0',
-      note: 'hold-and-ratchet tensioning, one plain calibration pass',
-    },
-    {
-      value: V21,
-      title: 'v2.1.0',
-      note: `guided tensioning, travel-checked calibration${side === 'left' ? ', thumb MCP/DIP motors reversed' : ''}`,
-    },
-    {
-      value: V211,
-      title: 'v2.1.1',
-      note: 'as v2.1.0, with its own wrist range of motion',
-    },
-  ]
-
-  const apply = async () => {
+  const override = status.hardware_version_override ?? null
+  const board = status.board_hardware_version ?? null
+  // With neither, a version in force is the one config.yaml pins.
+  const pinned = override == null && board == null ? (status.hardware_version ?? null) : null
+  const choose = async (version: number | null) => {
     setSaving(true)
-    const ok = await save(choice === 'auto' ? null : choice)
+    await save(version)
     setSaving(false)
-    if (ok) onClose()
   }
+  const note = (version: number) =>
+    version === V20
+      ? 'hold-and-ratchet tensioning, one plain calibration pass'
+      : `guided tensioning, travel-checked calibration${side === 'left' ? ', thumb MCP/DIP motors reversed' : ''}${version === V211 ? ', its own wrist range' : ''}`
 
-  return createPortal(
-    <div className="gt-overlay" role="dialog" aria-modal="true" aria-label="Hardware version">
-      <div className="gt-dialog hv-dialog">
-        <header className="gt-header">
-          <span className="gt-title">Hardware version</span>
-          <span className="gt-header-spacer" />
-          <button className="btn btn-secondary" onClick={onClose}>
-            Cancel
-          </button>
-        </header>
-        <section className="gt-content">
-          <div className="hv-options">
-            {options.map((option) => (
-              <label key={option.value} className={`hv-option${choice === option.value ? ' active' : ''}`}>
-                <input
-                  type="radio"
-                  name="hardware-version"
-                  checked={choice === option.value}
-                  onChange={() => setChoice(option.value)}
-                />
-                <span>
-                  <div className="gt-step-title">{option.title}</div>
-                  <div className="hv-note">{option.note}</div>
-                </span>
-              </label>
-            ))}
-          </div>
-          <p className="hv-note">
-            Select the hardware version of your hand from this menu. Your selected change will
-            write into the hand's local_config.yaml (next to its config.yaml) and overwrite any
-            automatic detection.
-          </p>
-          {busy && <div className="gt-warning">An operation is running — stop it first.</div>}
-          <div className="gt-actions">
-            <button
-              className="btn btn-primary"
-              disabled={saving || busy || choice === current}
-              onClick={() => void apply()}
-            >
-              Save
-            </button>
-          </div>
-        </section>
-      </div>
-    </div>,
-    document.body,
+  return (
+    <span className="model-picker">
+      <select
+        className="model-select"
+        value={override ?? BOARD}
+        disabled={saving || busy}
+        onChange={(event) =>
+          void choose(event.target.value === BOARD ? null : Number(event.target.value))
+        }
+        title={
+          busy
+            ? 'An operation is running — stop it first.'
+            : 'Set the hardware version you want this ORCA UI session to run with. It is not saved.'
+        }
+        aria-label="Hardware version"
+      >
+        <option value={BOARD}>
+          {board != null
+            ? `hw ${formatHardwareVersion(board)} · board`
+            : pinned != null
+              ? `hw ${formatHardwareVersion(pinned)} · from config`
+              : 'hw ? · no board'}
+        </option>
+        {VERSIONS.map((version) => (
+          <option key={version} value={version} title={note(version)}>
+            {version === override
+              ? `hw ${formatHardwareVersion(version)}, set by you`
+              : `hw ${formatHardwareVersion(version)}`}
+          </option>
+        ))}
+      </select>
+      {override != null && (
+        <span
+          className="model-pin pinned"
+          title="Picked in this console for this session; connecting another hand drops it."
+        >
+          {board != null ? `board says ${formatHardwareVersion(board)}` : 'no board'}
+        </span>
+      )}
+      {override != null && board != null && (
+        <button
+          className="model-pin hv-use-board"
+          disabled={saving || busy}
+          onClick={() => void choose(null)}
+        >
+          use board's
+        </button>
+      )}
+    </span>
   )
 }
 
 // Setup prompt for a hand nothing has told the console the version of: no
-// board to report it and none pinned. Answering pins it in config.yaml.
+// board to report it, none pinned in config.yaml and none picked this session.
 export function HardwareVersionPrompt() {
   const status = useAppStore((s) => s.status)
   const [saving, setSaving] = useState(false)
   if (
     !status ||
     status.bare ||
-    status.hardware_version_pinned ||
-    status.board_hardware_version != null
+    status.hardware_version_override != null ||
+    status.board_hardware_version != null ||
+    status.hardware_version != null
   ) {
     return null
   }
@@ -169,17 +127,19 @@ export function HardwareVersionPrompt() {
     <div className="flow-info hv-prompt">
       <span>
         No controller board reports this hand's hardware version. Which is it? It decides the
-        tensioning and calibration steps.
+        tensioning and calibration steps, and holds until the console closes or another hand
+        connects.
       </span>
-      <button className="btn btn-secondary btn-sm" disabled={saving} onClick={() => void pick(V20)}>
-        v2.0.0
-      </button>
-      <button className="btn btn-secondary btn-sm" disabled={saving} onClick={() => void pick(V21)}>
-        v2.1.0
-      </button>
-      <button className="btn btn-secondary btn-sm" disabled={saving} onClick={() => void pick(V211)}>
-        v2.1.1
-      </button>
+      {VERSIONS.map((version) => (
+        <button
+          key={version}
+          className="btn btn-secondary btn-sm"
+          disabled={saving}
+          onClick={() => void pick(version)}
+        >
+          {formatHardwareVersion(version)}
+        </button>
+      ))}
     </div>
   )
 }

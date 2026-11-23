@@ -146,10 +146,10 @@ export const CAD_ILLUSTRATIONS: Recipe[] = [
   {
     step: 'p136',
     file: 'panel-138-4',
-    caption: 'OH board · seated face down in the rear hull',
+    caption: 'HIVE board · seated face down in the rear hull',
     instruction: 3,
-    parts: ['Rear hull cover', 'OH control board'],
-    labelParts: ['OH control board'],
+    parts: ['Rear hull cover', 'HIVE control board'],
+    labelParts: ['HIVE control board'],
     view: [0.25, 0.15, -1],
   },
   {

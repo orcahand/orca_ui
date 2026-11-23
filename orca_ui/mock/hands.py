@@ -19,6 +19,7 @@ from orca_core import (
 )
 from orca_core.utils.utils import read_yaml
 
+from orca_ui.hand.hand_store import prepare_hand
 from orca_ui.mock.pumps import EncoderPump, TactilePump
 from orca_ui.mock.tactile_responder import TactileMockState, install_tactile_mock
 
@@ -114,20 +115,8 @@ _MOCK_RATIO_RAD_PER_DEG = 0.005
 _MOCK_ANCHOR_COUNT = 8192
 
 
-def _synthetic_calibration(hand) -> None:
-    """Replace the hand's loaded calibration with mock-consistent values.
-
-    A real model's calibration describes real motors (limits at arbitrary
-    shaft positions); pushing the mock motors' 0-rad start through it yields
-    angles far outside every ROM — the hand renders as a contorted claw and
-    nothing converges. Mock simulates the *declared* hand instead.
-    """
-    import dataclasses
-
-    from orca_core.calibration import JointEncoderCal
-    from orca_core.hardware.sensing.constants import JOINT_TO_ENCODER_SLOT
-
-    config = hand.config
+def synthetic_motor_limits(config) -> tuple[dict, dict]:
+    """(motor limits, ratios) by motor id that put the mock motors' 0 rad at 0 deg."""
     motor_limits: dict = {}
     ratios: dict = {}
     for joint, motor_id in config.joint_to_motor_map.items():
@@ -144,6 +133,24 @@ def _synthetic_calibration(hand) -> None:
                       rom_hi * _MOCK_RATIO_RAD_PER_DEG]
         motor_limits[motor_id] = limits
         ratios[motor_id] = _MOCK_RATIO_RAD_PER_DEG
+    return motor_limits, ratios
+
+
+def _synthetic_calibration(hand) -> None:
+    """Replace the hand's loaded calibration with mock-consistent values.
+
+    A real model's calibration describes real motors (limits at arbitrary
+    shaft positions); pushing the mock motors' 0-rad start through it yields
+    angles far outside every ROM — the hand renders as a contorted claw and
+    nothing converges. Mock simulates the *declared* hand instead.
+    """
+    import dataclasses
+
+    from orca_core.calibration import JointEncoderCal
+    from orca_core.hardware.sensing.constants import JOINT_TO_ENCODER_SLOT
+
+    config = hand.config
+    motor_limits, ratios = synthetic_motor_limits(config)
 
     configured = config.joint_encoder_joints or []
     select_all = any(str(j).lower() == "all" for j in configured)
@@ -164,7 +171,8 @@ def _synthetic_calibration(hand) -> None:
     )
 
 
-def build_mock_hand(config_path: str, engage_feedback: bool = True):
+def build_mock_hand(config_path: str, engage_feedback: bool = True,
+                    hardware_version: int | None = None):
     """Construct the instrumented mock hand matching the config's capabilities.
 
     Two isolations from the real world, whatever the config says:
@@ -203,5 +211,7 @@ def build_mock_hand(config_path: str, engage_feedback: bool = True):
 
     feedback = engage_feedback and config.joint_feedback_enabled
     hand = _UI_MOCK_MATRIX[(bool(feedback), tactile)](config=config)
+    # The version picks the map the synthetic calibration is derived from.
+    prepare_hand(hand, hardware_version)
     _synthetic_calibration(hand)
     return hand

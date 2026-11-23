@@ -1,4 +1,4 @@
-// Console header: brand lockup, model picker, status pill, the link controls
+// Console header: brand lockup, model picker, hand menu, hardware version, status pill, the link controls
 // (disconnect / reconnect), the view tabs, what's-new, and the E-stop hard right.
 // Capability badges + Hz meters live in the Motors tab.
 
@@ -7,6 +7,7 @@ import type { ViewName } from '../../state/appStore'
 import { useAppStore } from '../../state/appStore'
 import { BoardPicker } from './BoardPicker'
 import { EStopButton } from './EStopButton'
+import { HandMenu } from './HandMenu'
 import { HardwareVersionBadge } from './HardwareVersion'
 import { LinkControls } from './LinkControls'
 import { ModelPicker } from './ModelPicker'
@@ -82,6 +83,7 @@ export function AppHeader() {
         <span className="brand-sub">HAND CONSOLE</span>
       </h1>
       <ModelPicker />
+      <HandMenu />
       <HardwareVersionBadge />
       <BoardPicker />
       {handInfo?.core?.development && (

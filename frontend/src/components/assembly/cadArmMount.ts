@@ -31,7 +31,7 @@ export function cadArmMount(
     if (stage === 'covers') {
       const cover = covers.includes(piece)
         ? piece
-        : piece.part.label === 'OH control board'
+        : piece.part.label === 'HIVE control board'
           ? covers.find((p) => p.part.label === 'Rear hull cover')
           : piece.part.label === 'Hull magnet'
             ? nearest(covers, piece.center)

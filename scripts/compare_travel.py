@@ -1,13 +1,15 @@
 """Compare a hand's motor-travel tables joint by joint.
 
-Reads travel_baselines.yaml beside the hand's calibration (written by the
-console: one snapshot per calibration run, named baselines such as GT_01) and
-prints, per joint, the active baseline, the newest manual and automatic
-snapshots, the shared v2.1 block, and how far each is from the baseline.
+Reads the travel_baselines section of setup.yaml in the hand's own folder, and
+its archive (written by the console: one snapshot per calibration run, named
+baselines such as GT_01), and prints, per joint, the active baseline, the
+newest manual and automatic snapshots, the shared v2.1 block, and how far each
+is from the baseline.
 
-    uv run python scripts/compare_travel.py                       # autodetect the hand
-    uv run python scripts/compare_travel.py path/to/config.yaml
-    uv run python scripts/compare_travel.py --against GT_00 --manual manual_2026-10-15T17-50-00
+    uv run python scripts/compare_travel.py --dir ~/.orca/hands/0123456789ABCDEF
+    uv run python scripts/compare_travel.py --dir <hand folder> path/to/config.yaml
+    uv run python scripts/compare_travel.py --dir <hand folder> --against GT_00 \
+        --manual manual_2026-10-15T17-50-00
 
 A manual table (joint dragged by hand, torque off) below the automatic one
 (motor-driven) on the same hand means the motor wound slack before the joint
@@ -17,9 +19,14 @@ moved; the automatic one falling short means the joint stalled before its stop.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
+from dataclasses import replace
+
+from orca_core.hand_store import read_hand
 
 from orca_ui.hand import baselines
+from orca_ui.hand.models import available_models
 from orca_ui.hand.supervisor import load_config
 
 
@@ -43,10 +50,13 @@ def _pct(value: float | None, ref: float | None) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
+        "--dir", required=True, help="The hand's folder, with its setup.yaml (~/.orca/hands/<id>)."
+    )
+    parser.add_argument(
         "config_path",
         nargs="?",
         default=None,
-        help="Path to the hand's config.yaml; omit to autodetect the connected hand's model.",
+        help="Path to the hand's config.yaml; omit to use the model the hand's folder names.",
     )
     parser.add_argument(
         "--against",
@@ -61,12 +71,15 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    folder = os.path.abspath(os.path.expanduser(args.dir))
     config_path = args.config_path
     if config_path is None:
-        from orca_ui.hand.supervisor import _resolve_config_path
-
-        config_path = _resolve_config_path(None)
-    config = load_config(config_path)
+        model = read_hand(folder).get("model")
+        config_path = next((m.config_path for m in available_models() if m.name == model), None)
+        if config_path is None:
+            print(f"{folder} names no known model ({model!r}): pass its config.yaml", file=sys.stderr)
+            return 2
+    config = replace(load_config(config_path), hand_dir=folder)
     state = baselines.state(config)
     ref_name = args.against or state["active"]
     ref = state["baselines"].get(ref_name, {}).get("travel") if ref_name else None
@@ -74,7 +87,7 @@ def main() -> int:
     auto_name, auto = _latest(state["snapshots"], "auto", args.auto)
     shared = state["shared"]
 
-    print(f"hand: {config_path}")
+    print(f"hand: {folder} ({config_path})")
     print(
         f"baseline: {ref_name or '(none active)'}   manual: {manual_name or '-'}   auto: {auto_name or '-'}"
     )

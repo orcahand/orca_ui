@@ -5,7 +5,7 @@ is launched as a subprocess in ``--app`` mode with its own profile so the
 window can be deterministically closed when the server stops. Otherwise the
 default browser opens the URL (and stays open).
 
-The profile is kept between runs, one per port, in ``~/.orca_ui/browser/``, so
+The profile is kept between runs, one per port, in ``~/.orca/ui/browser/``, so
 the guide's cached media and any sign-in survive a restart. A browser can hold
 a profile open only once, hence one per port.
 """
@@ -22,6 +22,8 @@ import threading
 from pathlib import Path
 from urllib.parse import urlsplit
 import webbrowser
+
+from orca_ui.home import ui_home
 
 _browser_proc = None
 
@@ -47,7 +49,7 @@ def _find_chromium():
 
 def _profile_dir(url) -> Path:
     """The kept browser profile for the console served at ``url``."""
-    folder = Path.home() / ".orca_ui" / "browser" / f"port-{urlsplit(url).port}"
+    folder = ui_home() / "browser" / f"port-{urlsplit(url).port}"
     folder.mkdir(mode=0o700, parents=True, exist_ok=True)
     return folder
 

@@ -6,7 +6,9 @@ tensioning scores against follows the active name — a wrong baseline makes
 the console certify a slack finger as tensioned.
 """
 
+import os
 import time
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -60,6 +62,8 @@ def test_calibration_leaves_a_snapshot_that_can_become_the_active_baseline(clien
     ((name, snapshot),) = state["snapshots"].items()
     assert name.startswith("auto_")
     assert snapshot["travel"]["index_pip"] > 0
+    # A mock hand files its records in a temporary folder, never in the hand store.
+    assert not (Path(os.environ["ORCA_HOME"]) / "hands").exists()
     assert client.get("/api/hand/info").json()["travel_baseline"] is None
 
     response = client.post(

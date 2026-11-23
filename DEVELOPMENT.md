@@ -50,12 +50,6 @@ needed it goes quiet.
 
 ## Working against an unreleased orca_core
 
-> **On `merge/assembly-calibration-with-main`:** temporarily, a plain clone of this
-> experimental branch installs `orca_core` from GitHub, at the commit in `uv.lock`.
-> `./dev run` and `./dev test` still use your `../orca_core` checkout, and print a
-> warning about the source entry, which is expected on this branch. See
-> [Using this experimental branch](README.md#using-this-experimental-branch).
-
 `pyproject.toml` depends on the published `orca_core`, which is what a plain
 clone installs and what the wheel declares. To run a branch that needs an
 unreleased core, check the matching `orca_core` branch out beside this repo
@@ -120,7 +114,7 @@ one joint at a time.
 
 ## Assembly guide media
 
-The guide's photos, videos and 3D models live in the public bucket
+The guide's photos, videos, 3D models and PDFs live in the public bucket
 `orca-public-a5h6t`, not in git. Each file is stored under its guide path with
 a fingerprint of its contents added, such as
 `guide/clips/p35-329-review-1a2b3c4d5e6f7a8b.mp4`, so a changed file gets a new
@@ -139,6 +133,16 @@ is new and asks before uploading. Commit `storedMedia.json` afterwards.
 Uploading needs upload rights on the bucket and the `gcloud` CLI signed in
 (`gcloud auth login`); Google Cloud Shell has it signed in already. CI runs
 the same command, which only checks when no one is at the terminal.
+
+Rules, for people and agents alike:
+
+- Guide media is published with this script and never committed.
+- Every new file under `frontend/public/assembly/` is a media decision. If it is
+  media and its type is new, add the type to `CONTENT_TYPES` in
+  `scripts/guide_media.py`, to `.gitignore` (both assembly trees) and to the
+  wheel excludes in `pyproject.toml` before publishing.
+- The guide loads media only through `mediaUrl`, `mediaImage` or
+  `downloadMedia` in `frontend/src/components/assembly/media.ts`.
 
 ## Releasing
 

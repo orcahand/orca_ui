@@ -35,10 +35,23 @@ class BoardSelectRequest(BaseModel):
 
 
 class HardwareVersionRequest(BaseModel):
-    """The hand's hardware version to pin in its config.yaml (2 = v2.0,
-    21 = v2.1), or null to put it back on ``auto`` so the board decides."""
+    """The hardware version to run the connected hand as for this session
+    (200 = v2.0, 210 = v2.1, 211 = v2.1.1), or null for the board's."""
 
     version: Optional[int] = Field(default=None, ge=0, le=255)
+
+
+class NicknameRequest(BaseModel):
+    """A display name for the connected hand; null or empty removes it."""
+
+    nickname: Optional[str] = Field(default=None, max_length=64)
+
+
+class BoardCalibrationRequest(BaseModel):
+    """Answer to "the board's calibration is newer": take it, keep this
+    computer's until the next connect, or until either calibration changes."""
+
+    choice: Literal["use_board", "keep_session", "keep_until_change"]
 
 
 class TorqueRequest(BaseModel):

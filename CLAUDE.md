@@ -93,13 +93,6 @@ unreleased `orca_core` — check `./dev` first.
 `./dev release` flips it back; `./dev` says which is live. The flip lives in
 `.venv` — nothing tracked changes. See DEVELOPMENT.md.
 
-**Temporary exception on `merge/assembly-calibration-with-main`:** this branch
-commits a git source for `orca_core` so its users can run a plain `uv run orca-ui`,
-and adds per-hand folders (`orca_ui/hand/hand_folders.py`). Both sit in commits
-whose messages start `Temporary:`. Revert them before the history cleanup, and
-never let them reach `main`. A new `orca_core` commit reaches this branch only
-through `uv lock --upgrade-package orca-core`. Everywhere else, the rule below holds.
-
 **Never add a `[tool.uv.sources]` entry for `orca_core`**, even when asked to
 commit one or when it is the only way a branch currently runs. A relative path
 is a fact about one machine; committed, it makes the project unresolvable
@@ -139,6 +132,19 @@ A pre-commit hook blocks committing frontend sources without a rebuilt bundle.
 Everything static the UI serves must live in `frontend/public/` — the build
 runs with `emptyOutDir`, so a file that exists only in `orca_ui/webui/` is
 deleted by the next build.
+
+### Assembly guide media
+
+The guide's photos, videos, 3D models and PDFs live in a public bucket, never in
+git ([DEVELOPMENT.md](DEVELOPMENT.md#assembly-guide-media)).
+
+- Publish guide media with `scripts/guide_media.py`; never commit it.
+- Every new file under `frontend/public/assembly/` is a media decision. If it is
+  media and its type is new, add the type to `CONTENT_TYPES` in
+  `scripts/guide_media.py`, to `.gitignore` (both assembly trees) and to the wheel
+  excludes in `pyproject.toml` before publishing.
+- Load media only through `mediaUrl`, `mediaImage` or `downloadMedia`
+  (`frontend/src/components/assembly/media.ts`), never by a hardcoded path.
 
 ## Versioning and the changelog
 

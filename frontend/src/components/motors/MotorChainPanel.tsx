@@ -1,6 +1,6 @@
 // Motor-chain configuration (orca_core's configure_motor_chain workflow):
 // guided per-motor ID'ing during assembly, visualized as the daisy chain
-// hanging off the OH board. Factory reset is deliberately behind a two-step
+// hanging off the HIVE board. Factory reset is deliberately behind a two-step
 // confirmation — resetting means redoing the whole ID'ing process.
 //
 // Runs as a maintenance operation, so it works with NO hand connected
@@ -168,7 +168,7 @@ function ChainFlow({ extra }: { extra: MotorChainExtra }) {
   return (
     <div className="chain-flow">
       <div className="chain-node board">
-        <span className="chain-node-id">OH</span>
+        <span className="chain-node-id">HIVE</span>
         <span className="chain-node-model">board</span>
       </div>
       {extra.chain.map((slot) => (

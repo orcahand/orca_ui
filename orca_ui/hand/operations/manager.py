@@ -178,6 +178,12 @@ class OperationManager:
                         expected=operation.control_source)
                 except Exception:
                     logger.exception("release_control failed")
+            if ctx.torque_off_report:
+                # The console keeps warning, and re-checks, after this run is gone.
+                try:
+                    self._service.motors_may_hold(ctx.torque_off_report)
+                except Exception:
+                    logger.exception("motors_may_hold failed")
 
     def _finish(self, state: OpState, result: dict | None = None,
                 detail: str | None = None, error: str | None = None) -> None:

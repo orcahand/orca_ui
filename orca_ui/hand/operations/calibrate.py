@@ -10,7 +10,6 @@ tension + calibrate rounds under one lease.
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import math
 import threading
@@ -55,7 +54,7 @@ def validate_calibrate_params(service, params: dict) -> dict:
     if not params.get("ignore_slack_test"):
         from orca_ui.hand import slack_tests
 
-        block = slack_tests.calibration_block(config, service.supervisor.hand_id)
+        block = slack_tests.calibration_block(config)
         if block:
             raise ServiceError(block, status_code=409)
     return {
@@ -139,12 +138,13 @@ def _travel_line(event: dict, note: str) -> str:
 
 def manual_capture_steps(config, joints: list[str] | None) -> list[dict]:
     """The steps a manual run asks for, in order; one answer records a whole step.
-    The wrist is always included; absent motors are trimmed by ManualCapture."""
-    sequence = (
-        getattr(config, "manual_calibration_sequence", None)
-        or config.calibration_sequence
-    )
-    steps = [dict(step["joints"]) for step in sequence]
+    The wrist is always included; absent motors are trimmed by ManualCapture.
+    Without a manual sequence, orca_core asks for one joint per step of the calibration sequence."""
+    manual = getattr(config, "manual_calibration_sequence", None)
+    if manual:
+        steps = [dict(step["joints"]) for step in manual]
+    else:
+        steps = [{j: d} for step in config.calibration_sequence for j, d in step["joints"].items()]
     if not any("wrist" in step for step in steps) and "wrist" in config.joint_ids:
         steps += [{"wrist": "flex"}, {"wrist": "extend"}]
     wanted = set(joints) if joints is not None else None
@@ -379,6 +379,10 @@ def run_calibrate(
         elif kind == "joint_calibrated":
             progress["joints_calibrated"].append(event["joint"])
             ctx.log(f"joint calibrated: {event['joint']} (ratio {event['ratio']:.4f})")
+        elif kind == "calibration_file":
+            # Which file a run lands in decides what the hand loads next time;
+            # orca_core says it at INFO, which the console does not show.
+            ctx.log(f"calibration written to {event.get('path')}")
         elif kind == "calibration_done":
             ctx.log("calibration complete")
             # What the numbers above mean, so the log reads on its own.
@@ -390,13 +394,18 @@ def run_calibrate(
                 ctx.log("travel: motor-shaft travel between the hardstops in degrees, against the "
                         "hand's joint_motor_travel baseline; mA: the current the joint was driven "
                         "onto its hardstops with")
-            for line in _drive_current_lines(
-                    event.get("drive_current_ma") or {},
-                    event.get("drive_current_previous_ma") or {}):
+            measured = event.get("drive_current_ma") or {}
+            # Only the joints driven this run; the rest of drive_current_ma carries over from earlier runs.
+            if "drive_current_measured_joints" in event:
+                driven = set(event["drive_current_measured_joints"] or ())
+                measured = {j: v for j, v in measured.items() if j in driven}
+            for line in _drive_current_lines(measured, event.get("drive_current_previous_ma") or {}):
                 ctx.log(line)
         elif kind == "calibration_aborted":
             progress["aborted"] = True
             ctx.log("calibration aborted — completed steps are persisted")
+        elif kind == "torque_off_failed":
+            ctx.torque_off_failed(event)
         elif kind == "joints_skipped":
             ctx.log(f"skipping {', '.join(event['joints'])}: {event['reason']}")
         elif kind == "travel_checked":
@@ -452,9 +461,9 @@ def run_calibrate(
 
 def _snapshot_run(ctx: OpContext, config, calibration, manual: bool,
                   joints: list[str] | None = None, partial: bool = False) -> None:
-    """Keep this run's travel table: calibration.yaml alone is overwritten by the
-    next run. A partial run (subset, abort) is kept but marked: the other joints'
-    values are the previous run's."""
+    """Keep this run's travel table: calibration.yaml keeps only this run and the
+    one before. A partial run (subset, abort) is kept but marked: the other
+    joints' values are the previous run's."""
     from orca_ui.hand import baselines
 
     try:
@@ -462,26 +471,14 @@ def _snapshot_run(ctx: OpContext, config, calibration, manual: bool,
             config,
             calibration,
             source="manual" if manual else "auto",
-            hand_key=ctx.service.supervisor.hand_id,
             joints=joints,
             partial=partial,
         )
         ctx.log(
-            f"travel snapshot saved as {name} — promote it to a baseline from the Setup tab"
+            f"travel snapshot saved as {name}"
         )
     except Exception as e:
         ctx.log(f"travel snapshot not saved: {e}")
-    # calibration.yaml is overwritten by whichever run comes next; the last
-    # manual and the last automatic run are also kept each in its own file.
-    try:
-        import shutil
-
-        source = Path(config.calibration_path)
-        kept = source.with_name(f"calibration_{'manual' if manual else 'auto'}.yaml")
-        shutil.copyfile(source, kept)
-        ctx.log(f"calibration also kept as {kept.name}")
-    except Exception as e:
-        ctx.log(f"calibration copy not kept: {e}")
 
 
 class CalibrateOperation(Operation):
@@ -509,6 +506,7 @@ class CalibrateOperation(Operation):
                 supervisor.config,
                 ctx.stop_event,
                 motor_port=lease.presence.motor_port if lease.presence else None,
+                hardware_version=supervisor.hardware_version_override,
             )
             self._hand = hand
             apply_calibration_current(hand, ctx.service.max_current, ctx)

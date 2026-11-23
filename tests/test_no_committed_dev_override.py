@@ -13,8 +13,6 @@ import subprocess
 
 import pytest
 
-pytestmark = pytest.mark.skip(reason="Temporary: this branch commits an orca_core source for in-house assembly")
-
 # Fallback for Python 3.10, which has no TOML parser. This project declares no
 # other source, so the table header appearing at all is the entry.
 SOURCE_TABLE = re.compile(r"^[ \t]*\[tool\.uv\.sources", re.MULTILINE)

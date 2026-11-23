@@ -32,13 +32,51 @@ def test_stages_with_no_present_joint_leave_the_sidebar():
     assert ctx.extra["absent_joints"] == sorted(absent)
 
 
-def test_the_exclusion_list_rides_along_with_every_score():
+def test_the_score_sheet_carries_exclusions_and_suggests_no_clicks_for_unswept_joints():
+    """A run that jumps to the ratchet mid-round leaves joints unswept: their
+    full "slack" is no measurement, so they must not be given clicks. A fully
+    slack tendon leaves its motor still: zero spread from a range check is the
+    slackest result, not a joint nobody checked."""
     ctx = _Ctx()
     presenter = _Presenter(ctx, {})
     excluded = [{"joint": "ring_mcp", "motor": 4, "reason": "motor did not answer at connect"}]
-    presenter.progress({"event": "spread", "round": 1, "motors": [], "passed": 0, "scored": 0,
+    row = {"expected_deg": 100.0, "kept": None, "status": "low"}
+    motors = [{**row, "joint": "index_mcp", "motor": 5, "spread_deg": 84.0, "slack_deg": 16.0},
+              {**row, "joint": "index_pip", "motor": 6, "spread_deg": 0.0, "slack_deg": 100.0}]
+    presenter.progress({"event": "spread", "round": 1, "motors": motors, "passed": 0, "scored": 2,
                         "fraction": 0.0, "excluded": excluded})
     assert ctx.extra["excluded"] == excluded
+    swept, unswept = ctx.extra["motors"]
+    assert swept["clicks_left"] == 2 and not swept.get("not_checked")
+    assert unswept["not_checked"] is True and unswept["clicks_left"] is None
+
+    presenter = _Presenter(ctx, {})
+    stage = {"key": "index", "joints": ["index_mcp"], "pose": "flat"}
+    presenter.progress({"event": "step", "step": "range", "round": 1, "stage": stage,
+                        "stage_index": 0, "stage_count": 1})
+    row = {"expected_deg": 100.0, "kept": None, "status": "low", "spread_deg": 0.0,
+           "slack_deg": 100.0, "motor": 5}
+    presenter.progress({"event": "score", "round": 1, "passed": 0, "scored": 2, "fraction": 0.0,
+                        "motors": [{**row, "joint": "index_mcp"}, {**row, "joint": "middle_mcp"}]})
+    checked, unchecked = ctx.extra["motors"]
+    assert not checked.get("not_checked") and checked["clicks_left"]
+    assert unchecked["not_checked"] is True
+
+    presenter.progress({"event": "step", "step": "pose", "round": 2, "stage": stage,
+                        "stage_index": 0, "stage_count": 1})
+    # Saved progress keeps 0.0 for a joint that was never swept: still no score, so no clicks.
+    presenter.progress({"event": "score", "round": 2, "passed": 0, "scored": 2, "fraction": 0.0,
+                        "motors": [{**row, "joint": "index_mcp", "kept": 0.0},
+                                   {**row, "joint": "middle_mcp", "kept": 0.0}]})
+    assert all(m["not_checked"] and m["clicks_left"] is None for m in ctx.extra["motors"])
+
+    # A joint tested again is unchecked until it is measured again, not a whole travel short.
+    presenter.progress({"event": "step", "step": "range", "round": 2, "stage": stage,
+                        "stage_index": 0, "stage_count": 1})
+    presenter.retested({"index_mcp"})
+    presenter.progress({"event": "spread", "round": 2, "passed": 0, "scored": 1, "fraction": 0.0,
+                        "motors": [{**row, "joint": "index_mcp"}]})
+    assert ctx.extra["motors"][0]["not_checked"] is True
 
 
 def test_a_latched_motor_is_shown_until_its_reboot_clears_it(monkeypatch):
@@ -51,6 +89,7 @@ def test_a_latched_motor_is_shown_until_its_reboot_clears_it(monkeypatch):
     ctx = _Ctx()
     op = GuidedTensionOperation({})
     presenter = op._presenter = _Presenter(ctx, {})
+    presenter.progress({"event": "step", "step": "range", "round": 1})
     presenter.progress({"event": "fault", "motor": 8, "joint": "index_mcp", "flags": ["overload"]})
     fault = ctx.extra["faults"]["8"]
     assert fault["kind"] == "load" and fault["joint"] == "index_mcp" and "reboot" in fault["advice"]
@@ -69,9 +108,46 @@ def test_a_latched_motor_is_shown_until_its_reboot_clears_it(monkeypatch):
     assert ctx.extra["faults"] == {}
     assert any("holding again" in line for line in ctx.lines)
     # A reboot the fault survives stays shown, marked as such.
+    presenter.progress({"event": "fault", "motor": 8, "joint": "index_mcp", "flags": ["overload"]})
     monkeypatch.setattr(hand_ops, "reboot_held_motor", lambda hand, mid: ["overload"])
     op.handle_input("reboot:8")
     assert ctx.extra["faults"]["8"]["relatched"] is True
+
+
+def test_a_reboot_is_refused_unless_that_motor_is_faulted_and_the_motors_hold(monkeypatch):
+    from orca_ui.hand.operations import hand_ops
+    from orca_ui.hand.operations.guided_tension import GuidedTensionOperation
+
+    ctx = _Ctx()
+    op = GuidedTensionOperation({})
+    presenter = op._presenter = _Presenter(ctx, {})
+
+    class _Hand:
+        class config:
+            motor_to_joint_dict = {8: "index_mcp", 1: "wrist"}
+
+    op._hand = _Hand()
+    rebooted = []
+    monkeypatch.setattr(hand_ops, "reboot_held_motor", lambda hand, mid: rebooted.append(mid) or [])
+    presenter.progress({"event": "step", "step": "pose", "round": 1})
+    presenter.progress({"event": "fault", "motor": 8, "joint": "index_mcp", "flags": ["overload"]})
+    op.handle_input("reboot:8")
+    presenter.progress({"event": "step", "step": "range", "round": 1})
+    for motor in ("254", "1", "-1"):
+        op.handle_input(f"reboot:{motor}")
+    assert rebooted == []
+    op.handle_input("reboot:8")
+    assert rebooted == [8]
+
+
+def test_the_slack_tests_clicks_leave_after_the_first_tension_step():
+    ctx = _Ctx()
+    presenter = _Presenter(ctx, {})
+    presenter.seed_ratchet({"index_mcp": 3})
+    presenter.progress({"event": "step", "step": "tension", "round": 1})
+    assert ctx.extra["ratchet"] == {"index_mcp": 3}
+    presenter.progress({"event": "step", "step": "pose", "round": 2})
+    assert "ratchet" not in ctx.extra
 
 
 def test_rounds_count_on_from_the_saved_progress():
@@ -90,3 +166,12 @@ def test_rounds_count_on_from_the_saved_progress():
     fresh = _Ctx()
     _Presenter(fresh, {}).progress({"event": "step", "step": "pose", "round": 1})
     assert fresh.extra["round"] == 1
+
+
+def test_a_dead_sampler_is_shown_and_logged():
+    """Spreads that stopped updating must reach the dialog and the log in plain words."""
+    ctx = _Ctx()
+    presenter = _Presenter(ctx, {})
+    presenter.progress({"event": "sampler_failed", "round": 2, "error": "bus timeout"})
+    assert ctx.extra["sampler_failed"] == {"round": 2, "error": "bus timeout"}
+    assert "no longer update" in ctx.lines[0]

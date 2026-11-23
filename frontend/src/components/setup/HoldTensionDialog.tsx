@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '../../api/rest'
+import { EStopButton } from '../header/EStopButton'
 import type { OperationSnapshot } from '../../api/types'
 import { isOperationActive, useStartGate } from '../../state/operationStore'
 import { DEFAULT_OFFSET_DEG, EXTRA_DEG, PULL_MORE, useTensionFlow } from '../../state/tensionFlow'
@@ -79,7 +80,7 @@ export function HoldTensionDialog({
     if (!primary || (step === 'activate' && !active && gate.blocked)) return
     const onKey = (e: KeyboardEvent) => {
       // A focused button answers Enter itself.
-      if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) {
+      if (e.key === 'Enter' && !e.repeat && !(e.target instanceof HTMLButtonElement)) {
         e.preventDefault()
         primary()
       }
@@ -94,6 +95,7 @@ export function HoldTensionDialog({
         <header className="gt-header">
           <span className="gt-title">Tensioning</span>
           <span className="gt-header-spacer" />
+          <EStopButton />
           {active ? (
             <button
               className="btn btn-secondary"

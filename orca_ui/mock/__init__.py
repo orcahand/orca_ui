@@ -38,6 +38,8 @@ def materialize_mock_model() -> str:
     return os.path.join(run_dir, "config.yaml")
 
 
-def build_mock_hand(config_path: str, engage_feedback: bool = True):
+def build_mock_hand(config_path: str, engage_feedback: bool = True,
+                    hardware_version: int | None = None):
     from orca_ui.mock.hands import build_mock_hand as _build
-    return _build(config_path, engage_feedback=engage_feedback)
+    return _build(config_path, engage_feedback=engage_feedback,
+                  hardware_version=hardware_version)

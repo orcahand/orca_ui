@@ -72,80 +72,130 @@
 
 =========================================================================== -->
 
-## UI 0.3.1 — 2026-11-04
-Core: 0.12.0
+## UI 0.6.0 — 2026-11-16
+Core: 0.14.0
 
 ## Features
 
-### Experimental branch: install and run with `uv run orca-ui`
+### One folder per hand
 
-- This version of the orca_ui is an experimental branch that combines the assembly guide, the new tensioning and calibration, and the fixes from `main`. It is unreleased and only lightly tested, and it will be replaced by a release on `main`, at which point you will need a fresh clone.
+Each hand now keeps its calibration and setup records in its own folder, `~/.orca/hands/<hand id>`, so two hands of the same model no longer share or overwrite their calibrations and records. The console's own library, recordings and assembly progress move once from `~/.orca_ui` to `~/.orca/ui`; a link is created pointing at the old location (macOS and Linux only, no link is created on Windows).
 
-- For this branch you no longer need a separate `orca_core` clone. A plain `uv run orca-ui` installs the matching unreleased `orca_core` by itself. The header shows **DEV CORE · feature/improve-calibration** while you are on this version.
+> After the update every hand reads as uncalibrated once, unless its board holds a calibration. Calibrate it once in *Setup → Calibrate*.
 
-### Experimental branch: each hand keeps its files in its own folder
+### Hand menu
 
-- A plain `uv run orca-ui` now keeps each hand's config and calibration in `~/orca_bench/<serial>/<model>/`, created the first time the hand connects. If you already set a hand up in `~/orca_bench/<serial>/`, its files are copied in and the originals stay where they are.
+Click the hand chip in the header to see which hand is connected: its id, a nickname you can set, when it was calibrated, and where its joint ranges come from. Hover the id to see the hand's folder.
 
-- A hand that reports no serial number uses the shared model folder instead. Starting `uv run orca-ui` with `--config` or `--model` uses exactly what you name, with no hand folder.
+### Restore previous calibration
 
-### Experimental branch: one hand per orca_ui run
+The console keeps the calibration before the current one. *restore previous calibration* in the hand menu swaps back to it; press it again to undo. Switch torque off first.
 
-- Each run stays on the first hand it identifies, so one hand's calibration can't end up in another hand's folder. To use another hand, press Ctrl+C and start the orca_ui again.
+### Hardware version for this session
 
-- Run one orca_ui at a time for each hand. A orca_ui left open in another terminal holds the hand, and the one you are looking at can't connect.
+The version picker in the header now applies to this session only and is never saved. A choice made for one hand stays with that hand; plugging in another hand goes back to what its board reports.
 
-### Assembly guide in the orca_ui
+### Notice for older files
 
-- The assembly guide now ships with the orca_ui, with its images, videos and 3D models.
+Calibration and setup files from before this version are listed once and left untouched; they are no longer used.
 
-### Tensioning pulls, then holds at each motor's ceiling
+### Motors-holding warning
 
-- Motors now pull, settle where they stopped, and then hold at each motor's own ceiling while you ratchet, so a motor no longer turns with the ratchet under a lower hold. The default pull is 15 degrees, and *Pull more* adds another 15.
-
-- The Tensioning current field is gone. Avoid hard pushes on a finger while the motors are holding, as this may loosen the tendon.
-
-### Calibration drives fingers at each motor's ceiling
-
-- Automatic calibration now drives fingers onto their end stops at each motor's own ceiling, because a lower limit can stall a joint short of its stop and record the wrong range. The calibration current sliders are gone.
-
-- Keep your fingers clear and the power switch within reach while it runs.
-
-### Manual calibration with Back
-
-- Manual calibration now asks for one answer per step, and *Back* lets you redo the previous step if you got it wrong.
-
-### Slack test and tension sweep, with currents per motor type
-
-- The Setup tab now has a *Slack test*, where you hold each joint while its motor winds both ways, and a *Tension sweep*, which records each joint's current over its travel after calibration.
-
-- Slack test currents now start from your motor type, 60 mA on Dynamixel and 120 mA on Feetech, and you can still choose another.
-
-- Feetech values are provisional. On Feetech hands a passing slack test can miss small slack, so please also check the tendons by hand, and the sweep can stop short on some joints.
-
-### Reboot one motor with its torque on
-
-- When a motor reports a fault, you can now reboot just that motor with torque on. Its torque is restored afterwards.
+If a routine ends without confirming that every motor switched torque off, for example after a USB drop, a red banner names the motors that may still be holding. Press E-STOP or power-cycle the hand. Once the hand reconnects and every motor confirms torque off, the banner turns green.
 
 ## Bugfixes
 
-### Fingertips that join late are picked up
+### Stop after a USB error
 
-- A fingertip that appears late or is replugged no longer stops the tactile stream. It is picked up without restarting the orca_ui.
+Stop and Disconnect now switch torque off even after a USB error in the middle of a motor command.
 
-### The orca_ui stops retrying a failed sensor link
+### Guided tensioning scores and clicks
 
-- A sensor whose link fails no longer sends the orca_ui into a reconnect loop. The motors stay available, and the orca_ui only tries that sensor again when you press *Rescan*.
+The score screen no longer says every joint passed when nothing was checked in that round. A joint you test again, or one that was never swept, gets the right number of clicks.
 
-### Leaving calibration or tensioning no longer looks like a lost hand
+### Unchecked joints in guided tensioning
 
-- When calibration or tensioning finishes, the orca_ui reconnects to the hand while keeping its views on screen, instead of dropping to the screen you see when no hand is found.
+Joints that were not range-checked show *not checked* and get no clicks. A banner says when live readings stop or when torque could not be confirmed off.
 
-### Stopped manual calibration and stalled sweeps no longer log errors
+### Slack test with every joint skipped
 
-- Stopping manual calibration now ends cleanly, without an error in the log.
+A slack test where you skipped every joint shows as nothing tested, and no longer lifts an earlier block on calibration.
 
-- A tension sweep that stalls before the end of a joint's travel no longer logs an error.
+### Faster first load
+
+The console opens faster: the 3D tower preview in the Setup dialogs loads when you first open it, and tries again if loading fails.
+
+## UI 0.5.0 — 2026-11-11
+Core: 0.13.0
+
+## Features
+
+### Maintenance guide overlay
+
+*Setup → Maintenance* now opens in a separate overlay, like the assembly guide. The close control and E-stop remain within reach, and you can open the assembly guide from the maintenance steps.
+
+### Base-only assembly setup
+
+The assembly guide now uses Base automatically, without a Base/Full selector. You can still choose the side and motor type. Saved Full or Touch choices display the Base guide for now; those choices are retained for when the other versions return.
+
+## Bugfixes
+
+### Assembly guide editing disabled
+
+Guide text and background colors can no longer be edited in the assembly manual. Previously saved text and color overrides no longer change what the guide displays.
+
+### Tendon animation and framing
+
+The maintenance animation has smoother slack transitions and finer tendon paths. The routing camera follows the replacement tendon more closely, the anchor view has less clutter, and the animation background now matches dark mode.
+
+### HIVE board naming
+
+The assembly instructions, board diagrams, parts lists and motor-chain display now call the board HIVE instead of OH.
+
+## UI 0.4.0 — 2026-11-10
+Core: 0.13.0
+
+## Features
+
+### Assembly guide
+
+- *Setup → Open assembly guide* walks you through building a Base or Full hand, left or right, with Dynamixel or Feetech motors, step by step with photos, videos and 3D models.
+
+- Your choices, position and checked steps are saved, so you can close the console and carry on later. Media downloads the first time you open a step and is cached after that. Feetech builds have no 3D model yet.
+
+### Maintenance: replacing the index AP tendon
+
+- *Setup → Maintenance* shows an animated, step-by-step repair of the index AP tendon on a Base right Dynamixel hand.
+
+### Slack test
+
+- You hold one joint at a time while the motor winds each way at low current. The remaining slack is then shown in motor degrees. It also shows how many ratchet clicks are needed to remove the remaining slack.
+
+### Tension sweep
+
+- After calibration, the tension sweep measures how tight each tendon is by feeling how hard each motor has to work to move its joint. If the tension sweep lists no clicks that means your hand is well tensioned.
+
+### Guided and simple tensioning
+
+- On v2.1 hands, guided tensioning alternates ratcheting the marked spools with moving each finger through its range. You can jump back to any finger, redo a joint, and see the current each motor holds.
+
+- v2.0 gets *Simple tensioning*: the motors hold while you ratchet.
+
+### Manual calibration
+
+- A new button in the *Calibrate* step: with torque off, lets you calibrate manually by holding each joint on its stops and records their positions.
+
+### v2.1.1 hands
+
+- Hardware versions now read v2.0.0, v2.1.0 and v2.1.1, and the version picker offers v2.1.1. A v2.1.1 hand uses its own joint ranges.
+
+## Bugfixes
+
+### The console no longer falls out of step with the touch sensors
+
+### The 3D view no longer spills out of its dashboard card
+
+### Forcing simple tensioning no longer reopens the last guided run
 
 ## UI 0.3.0 — 2026-10-21
 Core: 0.10.1

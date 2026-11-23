@@ -40,7 +40,7 @@ const imageNames: Record<string, string> = {
   '106-1': 'Not ready · Bench Helper is unreachable',
   '106-2': 'Ready · Bench Helper is connected',
   '107-1': 'Selected order, Flash button and output controls',
-  '108-1': 'OH board power, USB and programming connections',
+  '108-1': 'HIVE board power, USB and programming connections',
   '108-2': 'Hold the Tag-Connect on the programming pads',
   '108-4': 'Prompt to lift the Tag-Connect off the pads',
   '109-1': 'Success · flashed and linked',

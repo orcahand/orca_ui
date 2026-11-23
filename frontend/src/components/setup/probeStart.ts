@@ -3,9 +3,9 @@
 
 import { api } from '../../api/rest'
 import { isOperationActive, useOperationStore } from '../../state/operationStore'
-import { useSetupVariant } from '../../state/setupVariant'
+import { estopsFired } from '../../state/estop'
 import { DEFAULT_OFFSET_DEG } from '../../state/tensionFlow'
-import { loadPassFractions, loadPassSlack } from './guidedSettings'
+import { loadPassFractions } from './guidedSettings'
 
 export const SLACK_HINT =
   'Slack test: you hold one joint at a time while its motor winds each way at low current. The free rotation is the slack; more than half a turn fails the joint and blocks calibration.'
@@ -32,19 +32,25 @@ export async function startHoldTension(): Promise<void> {
 // Guided tensioning (v2.1 hands) with the page's scoring; the currents come
 // from the hand's family defaults unless the Tension step passed its own.
 export async function startGuidedTension(params: Record<string, unknown> = {}): Promise<void> {
-  const kai = useSetupVariant.getState().variant === 'kai'
   return startWhenConnected('guided_tension', {
     tension_offset_deg: DEFAULT_OFFSET_DEG,
-    ...(kai ? { scoring: 'slack', pass_slack_deg: loadPassSlack() } : { scoring: 'fraction', pass_fractions: loadPassFractions() }),
+    scoring: 'fraction',
+    pass_fractions: loadPassFractions(),
     resume: true,
     ...params,
   })
 }
 
-// Start the next operation once the run `runId` has ended (it was just told to finish).
+// Start the next operation once the run `runId` has finished cleanly (it was just
+// told to finish); a run that ended in an error or an E-STOP starts nothing.
 export async function startAfter(runId: string, start: () => Promise<void>): Promise<void> {
+  const estops = estopsFired()
   for (let i = 0; i < 300; i++) {
+    if (estopsFired() !== estops) throw new Error('E-STOP pressed: the next step was not started')
     const op = useOperationStore.getState().operation
+    if (op && op.run_id === runId && op.state === 'error') {
+      throw new Error('the previous run ended with an error or E-STOP: the next step was not started')
+    }
     if (!op || op.run_id !== runId || !isOperationActive(op)) return start()
     await sleep(100)
   }
@@ -52,8 +58,10 @@ export async function startAfter(runId: string, start: () => Promise<void>): Pro
 }
 
 async function startWhenConnected(kind: string, params: Record<string, unknown>): Promise<void> {
+  const estops = estopsFired()
   let lastError: unknown = null
   for (let i = 0; i < 60; i++) {
+    if (estopsFired() !== estops) throw new Error(`E-STOP pressed: ${kind} was not started`)
     try {
       await api.operationStart(kind, params)
       return

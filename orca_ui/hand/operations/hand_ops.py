@@ -8,6 +8,7 @@ themselves must not import orca_core directly.
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 from typing import Callable
@@ -44,12 +45,16 @@ def build_maintenance_hand(
     stop_event: threading.Event,
     retry_s: float = 2.0,
     motor_port: str | None = None,
+    hardware_version: int | None = None,
 ):
     """Fresh motor-only OrcaHand for a maintenance operation.
 
     Built from the supervisor's config, so the hardware version in force (and
-    the joint map and travel features it selects) carries over. Always the
-    plain class — never the feedback subclass, whose joint loop refuses to
+    the joint map and travel features it selects) carries over, and so does
+    the hand's folder: what the operation records is filed under the hand the
+    session was connected to. ``hardware_version`` is the session's choice,
+    which the hand would otherwise settle afresh at connect. Always the plain
+    class — never the feedback subclass, whose joint loop refuses to
     calibrate. Port-open is retried briefly to absorb the OS serial release
     latency after the supervisor closed the session.
     """
@@ -57,8 +62,11 @@ def build_maintenance_hand(
 
     from orca_core import OrcaHand
 
+    from orca_ui.hand.hand_store import prepare_hand
+
     # A copy, so the port pin below never reaches the supervisor's config.
     hand = OrcaHand(config=copy.copy(config))
+    prepare_hand(hand, hardware_version)
     if motor_port and getattr(hand.config, "port", None) == "auto":
         # The lease already resolved the motor port, scoped to the pinned
         # board when one is pinned; connect() must not look beyond it.
@@ -73,7 +81,7 @@ def build_maintenance_hand(
         if ok:
             return hand
         if stop_event.is_set():
-            raise RuntimeError("stopped while connecting")
+            raise OperationStopped()
         if time.monotonic() >= deadline:
             raise RuntimeError(f"maintenance connect failed: {last_message}")
         time.sleep(0.25)
@@ -185,14 +193,21 @@ def hand_family(hand) -> str | None:
     return family if isinstance(family, str) else None
 
 
-def current_ceiling(config, session) -> float | None:
-    """The hand's own current limit in mA, or None if nothing numeric is known."""
-    value = getattr(config, "max_current", None)
-    if isinstance(value, (int, float)) and value > 0:
-        return float(value)
-    client = getattr(getattr(session, "hand", None), "motor_client", None)
-    family_max = getattr(type(client), "max_current_ma", None) if client is not None else None
-    return float(family_max) if isinstance(family_max, (int, float)) and family_max > 0 else None
+def current_ceiling(config, family: str | None, live_ma: float | None = None) -> float | None:
+    """The hand's current limit in mA: the console's live ceiling, else config.yaml's,
+    else ``family``'s own default for a config left on ``default``; None if none is known."""
+    for value in (live_ma, getattr(config, "max_current", None)):
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0:
+            return float(value)
+    if not family:
+        return None
+    from orca_core.hardware.motor_factory import motor_client_class
+
+    try:
+        default_ma = getattr(motor_client_class(family), "default_max_current_ma", None)
+    except ValueError:
+        return None
+    return float(default_ma) if isinstance(default_ma, (int, float)) and default_ma > 0 else None
 
 
 def slack_test_supported() -> bool:
@@ -286,7 +301,6 @@ def guided_tension(
     scoring: str | None = None,
     pass_fraction=None,
     pass_slack_deg=None,
-    hand_key: str | None = None,
     resume: bool = True,
     any_hardware: bool = False,
     forget=None,
@@ -315,7 +329,7 @@ def guided_tension(
         prompt_callback=prompt_callback,
         progress_callback=progress_callback,
         should_stop=should_stop,
-        hand_key=hand_key,
+        hand_key=_progress_key(hand.config),
         resume=resume,
         any_hardware=any_hardware,
         **settings,
@@ -337,6 +351,11 @@ def record_hold_tension(config) -> None:
     """Mark the hand tensioned after a plain hold-and-ratchet."""
     from orca_core.maintenance.guided_tension import record_hold_tension as record
 
+    from orca_ui.hand.hand_store import has_folder
+
+    if not has_folder(config):
+        logger.warning("hold tension not recorded: no hand folder is known")
+        return
     try:
         record(config)
     except Exception:
@@ -376,15 +395,25 @@ def set_joint_currents(hand, current_for_joint) -> None:
     )
 
 
-def tension_progress(config, hand_key: str | None, scoring: str = "fraction") -> dict | None:
+def _progress_key(config) -> str | None:
+    """orca_core's key for a hand's tension progress: its folder's name, the id
+    the connect filed it under, whatever detection made of the board."""
+    return os.path.basename(config.hand_dir) if getattr(config, "hand_dir", "") else None
+
+
+def tension_progress(config, scoring: str = "fraction") -> dict | None:
     """This hand's unfinished guided tensioning under ``scoring``: the best
     fraction per joint (fraction) or the last round's scores (slack)."""
+    from orca_ui.hand.hand_store import has_folder
+
     try:
         from orca_core.maintenance.guided_tension import read_progress
     except ImportError:
         return None
+    if not has_folder(config):
+        return None
     try:
-        return read_progress(config, hand_key, scoring)
+        return read_progress(config, _progress_key(config), scoring)
     except Exception:
         logger.exception("reading the tension progress failed")
         return None
@@ -392,9 +421,13 @@ def tension_progress(config, hand_key: str | None, scoring: str = "fraction") ->
 
 def last_tension(config) -> dict | None:
     """The last guided tension that reached 100 %, or None (or a core without it)."""
+    from orca_ui.hand.hand_store import has_folder
+
     try:
         from orca_core.maintenance.guided_tension import read_last_tension
     except ImportError:
+        return None
+    if not has_folder(config):
         return None
     try:
         return read_last_tension(config)

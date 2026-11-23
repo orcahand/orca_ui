@@ -18,6 +18,7 @@ import time
 
 from orca_ui.hand.operations import hand_ops
 from orca_ui.hand.operations.base import OpContext, Operation
+from orca_ui.hand.operations.tension_sweep import current_ceiling
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +41,17 @@ def hold_prompt(joint: str) -> str:
     return f"Hold {joint.replace('_', ' ')} still so the joint cannot move, then test"
 
 
-def current_options(family: str) -> dict:
-    """The motor family's winding current and the choices offered around it, in mA."""
-    default_ma = hand_ops.slack_setting_defaults(family)["current_ma"]
+def current_options(family: str, ceiling_ma: float | None = None) -> dict:
+    """The motor family's winding current and the choices offered around it, in
+    mA, none above the console's current limit ``ceiling_ma``."""
+    family_ma = hand_ops.slack_setting_defaults(family)["current_ma"]
+    cap = float("inf") if ceiling_ma is None else ceiling_ma
+    default_ma = round(min(family_ma, cap))
+    choices = {round(family_ma * factor) for factor in CURRENT_CHOICE_FACTORS}
+    # The capped default is always offered, so the picker shows what a start sends.
     return {
-        "default_ma": round(default_ma),
-        "choices_ma": [round(default_ma * factor) for factor in CURRENT_CHOICE_FACTORS],
+        "default_ma": default_ma,
+        "choices_ma": sorted({c for c in choices if c <= cap} | {default_ma}),
     }
 
 
@@ -69,7 +75,10 @@ def validate_slack_params(service, params: dict) -> dict:
         clean["joints"] = list(joints)
     settings = {}
     family_current_ma = type(session.hand.motor_client).slack_test_current_ma
-    bounds = {**SETTING_BOUNDS, "current_ma": (MIN_CURRENT_MA, family_current_ma * MAX_CURRENT_FACTOR)}
+    ceiling = current_ceiling(service, hand_ops.hand_family(session.hand))
+    high_ma = family_current_ma * MAX_CURRENT_FACTOR
+    high_ma = high_ma if ceiling is None else min(high_ma, ceiling)
+    bounds = {**SETTING_BOUNDS, "current_ma": (min(MIN_CURRENT_MA, high_ma), high_ma)}
     for key, (low, high) in bounds.items():
         if params.get(key) is None:
             continue
@@ -80,6 +89,9 @@ def validate_slack_params(service, params: dict) -> dict:
         if not low <= value <= high:
             raise ServiceError(f"{key} must be between {low:g} and {high:g}", status_code=422)
         settings[key] = value
+    # The family's own winding current, when nothing is chosen, stays under the console's limit too.
+    if "current_ma" not in settings and ceiling is not None and family_current_ma > ceiling:
+        settings["current_ma"] = ceiling
     clean["settings"] = settings
     return clean
 
@@ -107,6 +119,15 @@ class _Presenter:
         self._last = now
         self._ctx.set_extra({**self.extra, "results": dict(self.extra["results"])})
 
+    def _ask(self, prompt: str, options: list[str]) -> str:
+        """An answer this prompt offers; anything else, such as a click meant for an
+        earlier prompt, is logged and ignored, so it can never wind a joint."""
+        while True:
+            answer = self._ctx.wait_input(prompt, options)
+            if answer in options:
+                return answer
+            self._ctx.log(f"ignored {answer!r}: this prompt takes {', '.join(options)}")
+
     def hold(self, joint: str) -> bool | str:
         """Park on the hold prompt for ``joint``; False when the operator skips
         it, orca_core's HOLD_BACK to test the previous joint again."""
@@ -118,8 +139,8 @@ class _Presenter:
             self._publish()
         self._ctx.set_phase("hold", detail=f"torque off — hold {joint.replace('_', ' ')}")
         options = [HOLD_TEST, HOLD_SKIP] + ([HOLD_BACK] if can_back else [])
-        answer = self._ctx.wait_input(hold_prompt(joint), options)
-        return {HOLD_SKIP: False, HOLD_BACK: CORE_BACK}.get(answer, True)
+        answer = self._ask(hold_prompt(joint), options)
+        return {HOLD_TEST: True, HOLD_SKIP: False, HOLD_BACK: CORE_BACK}[answer]
 
     def review(self) -> bool | str:
         """Park after the last joint: orca_core's HOLD_BACK tests it again,
@@ -130,7 +151,7 @@ class _Presenter:
             self.extra.update(step="review", joint=None, direction=None, live=None, can_back=True)
             self._publish()
         self._ctx.set_phase("review", detail="torque off — every joint tested")
-        answer = self._ctx.wait_input(REVIEW_PROMPT, [REVIEW_FINISH, HOLD_BACK])
+        answer = self._ask(REVIEW_PROMPT, [REVIEW_FINISH, HOLD_BACK])
         return CORE_BACK if answer == HOLD_BACK else True
 
     def progress(self, event: dict) -> None:
@@ -183,8 +204,14 @@ class _Presenter:
                 self._publish()
             elif kind == "cleanup_failed":
                 self._ctx.log(f"cleanup failed: {event.get('error')}")
+            elif kind == "torque_off_failed":
+                self._ctx.torque_off_failed(event)
+                self._publish()
 
     def finish(self, report: dict, saved: str | None) -> None:
+        skipped = [r["joint"] for r in report["results"] if r["status"] == "skipped"]
+        if skipped:
+            self._ctx.log(f"{len(skipped)} joint(s) skipped, not checked: {', '.join(skipped)}")
         with self._lock:
             for r in report["results"]:
                 self.extra["results"][r["joint"]] = _row(r, self._ctx.service.supervisor.config)
@@ -221,8 +248,7 @@ def _save(ctx: OpContext, config, report: dict, family: str | None) -> str | Non
     from orca_ui.hand.operations.guided_tension import motor_family
 
     try:
-        key = slack_tests.save(config, report, hand_key=ctx.service.supervisor.hand_id,
-                               motor_type=family or motor_family(ctx.service))
+        key = slack_tests.save(config, report, motor_type=family or motor_family(ctx.service))
         ctx.log("slack test saved" + (" — calibration is blocked until a passing test" if report["blocked"] else ""))
         return key
     except Exception as e:
@@ -254,18 +280,24 @@ class SlackTestOperation(Operation):
             hand = hand_ops.build_maintenance_hand(
                 supervisor.config, ctx.stop_event,
                 motor_port=lease.presence.motor_port if lease.presence else None,
+                hardware_version=supervisor.hardware_version_override,
             )
             self._hand = hand
             family = hand_ops.hand_family(hand)
-            report = hand_ops.slack_test(
-                hand,
-                joints=self.params.get("joints"),
-                settings=self.params.get("settings") or {},
-                hold_callback=presenter.hold,
-                review_callback=presenter.review,
-                progress_callback=presenter.progress,
-                should_stop=ctx.stop_event.is_set,
-            )
+            try:
+                report = hand_ops.slack_test(
+                    hand,
+                    joints=self.params.get("joints"),
+                    settings=self.params.get("settings") or {},
+                    hold_callback=presenter.hold,
+                    review_callback=presenter.review,
+                    progress_callback=presenter.progress,
+                    should_stop=ctx.stop_event.is_set,
+                )
+            except InterruptedError:
+                # orca_core's answer to should_stop: a stop, not a failure.
+                ctx.check_stop()
+                raise
             ctx.check_stop()
             saved = _save(ctx, supervisor.config, report, family)
             presenter.finish(report, saved)

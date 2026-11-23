@@ -966,6 +966,16 @@ header h1 {
   font-size: 11px;
 }
 
+/* The motors-holding banner once a reconnect confirmed every motor off. */
+.error-panel.holding-confirmed {
+  background: rgb(var(--ok-rgb) / 0.1);
+  border-color: rgb(var(--ok-rgb) / 0.3);
+}
+
+.error-panel.holding-confirmed .error-message {
+  color: var(--ok);
+}
+
 /* --- Motor fault popup --- */
 
 .fault-popup {
@@ -3256,44 +3266,128 @@ header h1 {
   height: min(420px, 100%);
 }
 
-.gt-dialog.hv-dialog {
-  width: min(520px, 100%);
-  height: auto;
-}
-
-.hw-version {
-  padding: 0;
+.hv-use-board {
   font-family: var(--font);
+  background: transparent;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  color: var(--accent);
   cursor: pointer;
 }
 
-.hv-options {
+.hv-use-board:hover {
+  background: rgb(var(--accent-rgb) / 0.12);
+}
+
+.hand-menu {
+  position: relative;
+}
+
+.hand-menu-button {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hand-menu-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  width: 380px;
+  max-width: calc(100vw - 48px);
+  padding: 10px 12px;
+  border: 1px solid var(--panel-border-strong);
+  background: var(--pop-bg);
+  box-shadow: 0 8px 24px var(--pop-shadow-color);
+}
+
+.hand-details {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  margin-top: 8px;
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--text);
 }
 
-.hv-option {
+.hand-menu-panel .hand-details {
+  margin-top: 0;
+}
+
+.hand-line {
   display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 8px;
-  color: var(--muted);
-  border: 1px solid var(--panel-border);
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.hand-key {
+  min-width: 78px;
+  color: var(--dimmer);
+  text-transform: uppercase;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+}
+
+.hand-line code {
+  color: var(--text-bright);
+  font-family: var(--font);
+}
+
+.hand-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 10px;
+  color: var(--dim);
+  text-decoration: underline;
   cursor: pointer;
 }
 
-.hv-option.active {
-  color: var(--text-bright);
-  background: rgb(var(--accent-rgb) / 0.1);
-  border-color: rgb(var(--accent-rgb) / 0.5);
+.hand-link:hover:not(:disabled) {
+  color: var(--accent);
 }
 
-.hv-note {
-  margin: 0;
+.hand-link:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.hand-confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--warn);
+}
+
+.hand-nickname-input {
+  width: 160px;
+  padding: 1px 4px;
+  font-family: var(--font);
   font-size: 10px;
-  line-height: 1.6;
-  color: var(--dim);
+  color: var(--text-bright);
+  background: var(--panel);
+  border: 1px solid rgb(var(--accent-rgb) / 0.5);
+  border-radius: 0;
+  outline: none;
+}
+
+.hand-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--text);
+  border: 1px solid rgb(var(--warn-rgb) / 0.35);
+  background: rgb(var(--warn-rgb) / 0.08);
 }
 
 .hv-prompt {
@@ -3613,7 +3707,7 @@ header h1 {
   color: var(--danger, #e05252);
 }
 
-/* Plain measurement (ccc page): joint · slack · flex · extend, no verdicts. */
+/* Plain measurement: joint · slack · flex · extend, no verdicts. */
 .probe-head.plain,
 .probe-row.plain {
   grid-template-columns: 120px 80px 1fr 1fr;
@@ -3673,33 +3767,6 @@ header h1 {
 
 .travel-grid.four {
   grid-template-columns: 100px repeat(3, minmax(64px, auto));
-}
-
-/* ----- setup page variants: ccc (the committed page) and kai (the newer tooling) ----- */
-
-.setup-variants {
-  display: flex;
-  gap: 4px;
-  margin: 0 0 10px;
-}
-
-.setup-variant {
-  font-family: var(--font);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  padding: 4px 14px;
-  border: 1px solid var(--panel-border);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.setup-variant.active {
-  color: var(--text-bright);
-  border-color: var(--panel-border-strong);
-  background: rgb(var(--accent-rgb) / 0.08);
 }
 
 /* Fraction scoring: passing on a kept score rather than this check's movement. */

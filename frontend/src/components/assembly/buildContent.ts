@@ -100,18 +100,18 @@ export const KITS: Record<string, string[]> = {
     '180 mm 3-pin cable',
   ],
   p99: ['M2 nut per spool', '3 screws · M2×4 per spool', 'Bottom spools', 'Ratchets'],
-  p101: ['OH board', '12 V power supply', 'USB-C data cable'],
-  p105: ['OH board', '12 V supply', 'USB-C data cable', 'J-Link', 'Tag-Connect probe'],
-  p150: ['OH board', '12 V supply', 'USB-C data cable', 'J-Link', 'Tag-Connect probe'],
+  p101: ['HIVE board', '12 V power supply', 'USB-C data cable'],
+  p105: ['HIVE board', '12 V supply', 'USB-C data cable', 'J-Link', 'Tag-Connect probe'],
+  p150: ['HIVE board', '12 V supply', 'USB-C data cable', 'J-Link', 'Tag-Connect probe'],
   p110: [
-    'OH board, 12 V supply and USB-C data cable',
+    'HIVE board, 12 V supply and USB-C data cable',
     'Connector board',
     '4-wire board cable',
     'J-Link',
     'Tag-Connect probe',
   ],
   p154: [
-    'OH board, 12 V supply and USB-C data cable',
+    'HIVE board, 12 V supply and USB-C data cable',
     'Connector board',
     '4-wire board cable',
     'J-Link',
@@ -257,7 +257,7 @@ export function kit(step: AssemblyStep, build: Build): string[] {
         ? ['Tower', 'FeeTech direct motor cables']
         : ['Tower', '12 Dynamixel motor connector PCBs'],
     p112: [
-      'OH board',
+      'HIVE board',
       '12 V supply',
       'USB-C data cable',
       build.motor === 'feetech'
@@ -298,7 +298,7 @@ export function kit(step: AssemblyStep, build: Build): string[] {
           ]
         : ['Dynamixel tower', '12 Dynamixel motor connector PCBs']
     extra.p112 = [
-      'OH board with firmware installed',
+      'HIVE board with firmware installed',
       '12 V supply',
       'USB-C data cable',
       build.motor === 'feetech'
@@ -428,8 +428,8 @@ const CAPTIONS: Record<number, string> = {
   96: 'Tower cable routing',
   98: 'Dynamixel connector PCB placement',
   100: 'Fit the M2 nut before the ratchet',
-  101: 'OH board connector locations',
-  103: 'Powered OH board and USB-C cable',
+  101: 'HIVE board connector locations',
+  103: 'Powered HIVE board and USB-C cable',
   104: 'J-Link connection',
   105: 'Select the order in Bench Helper',
   106: 'Bench Helper readiness',
@@ -453,8 +453,8 @@ const CAPTIONS: Record<number, string> = {
   135: 'Fan side plates',
   138: 'Board and cable placement',
   140: 'Completed hand',
-  151: 'OH board flash output',
-  152: 'OH board power and USB',
+  151: 'HIVE board flash output',
+  152: 'HIVE board power and USB',
   156: 'Connector-board probe and power',
 }
 export function figures(step: AssemblyStep, build: Build): Figure[] {
@@ -675,8 +675,8 @@ function sourceFigures(step: AssemblyStep, build: Build): Figure[] {
       ['106-1', 2, 'Bench Helper not connected'],
       ['106-2', 2, 'Bench Helper ready'],
       ['107-1', 3, 'Start the flash'],
-      ['108-1', 3, 'OH board power, USB and programming connections'],
-      ['108-2', 3, 'OH board programming probe'],
+      ['108-1', 3, 'HIVE board power, USB and programming connections'],
+      ['108-2', 3, 'HIVE board programming probe'],
       ['108-4', 4, 'Remove the probe when prompted'],
       ['109-1', 5, 'Flashed and linked'],
     ].map(([id, instruction, caption]) => ({
@@ -869,14 +869,14 @@ export function instructions(step: AssemblyStep, build: Build): string[] {
     if (step.id === 'p98' && build.motor === 'feetech')
       return [
         'Use the FeeTech tower, wrist structure and wrist adapter supplied for this build. FeeTech motors connect directly by cable; there are no Dynamixel connector PCBs between them. Leave the motors disconnected until the configuration tool asks for each one.',
-        'Sort the three cable types: short cables join neighboring finger motors; long cables link the column bottoms; thin-to-thick adapter cables connect the OH board to the first finger motor and the last finger motor to the wrist motor.',
+        'Sort the three cable types: short cables join neighboring finger motors; long cables link the column bottoms; thin-to-thick adapter cables connect the HIVE board to the first finger motor and the last finger motor to the wrist motor.',
         'Check connector orientation against the photos. Align the small hole in the motor connector with the matching plug; it should slide in easily and seat completely. A reversed connector can permanently damage the motor.',
         'Keep the board OFF for every cable connection or removal. During configuration, follow the power-off, connection and power-on prompts for each motor. Never hot-plug a FeeTech motor.',
       ]
     if (step.id === 'p112')
       return [
-        `Disconnect the hand in ORCA UI and close other programs using its serial port. With the OH board OFF and the motors disconnected, attach the lead to the board’s ${build.motor === 'feetech' ? 'FeeTech output using the thin-to-thick adapter' : 'Dynamixel output using the 3-pin cable'}. Connect the 12 V supply and a USB-C data cable to the computer, then switch the board ON. The board must already have its firmware installed.`,
-        `Open a terminal in your orca_core checkout with uv installed and run the command below for this Base ${build.side} hand and ${build.motor === 'feetech' ? 'FeeTech' : 'Dynamixel'} motors. Select the OH board’s serial port if prompted. The script assigns IDs and the communication baud rate; the guide’s selectors do not change a connected hand.`,
+        `Disconnect the hand in ORCA UI and close other programs using its serial port. With the HIVE board OFF and the motors disconnected, attach the lead to the board’s ${build.motor === 'feetech' ? 'FeeTech output using the thin-to-thick adapter' : 'Dynamixel output using the 3-pin cable'}. Connect the 12 V supply and a USB-C data cable to the computer, then switch the board ON. The board must already have its firmware installed.`,
+        `Open a terminal in your orca_core checkout with uv installed and run the command below for this Base ${build.side} hand and ${build.motor === 'feetech' ? 'FeeTech' : 'Dynamixel'} motors. Select the HIVE board’s serial port if prompted. The script assigns IDs and the communication baud rate; the guide’s selectors do not change a connected hand.`,
         build.motor === 'feetech'
           ? 'When the tool asks for motor 17, turn the board OFF and wait for the connection prompt. Connect only the first finger motor, checking plug orientation. Press Enter when prompted, then restore power when the tool asks. Repeat this power cycle for every new motor.'
           : 'Wait for “Scanning for default … motor”, then connect only the first finger motor to the board lead. This becomes ID 17, at the top-right position when looking at the palm side of the tower.',
@@ -1111,7 +1111,7 @@ export function instructions(step: AssemblyStep, build: Build): string[] {
           ]
         : [
             'Use the connector PCBs to join neighboring Dynamixel motors, then link the column bottoms with the short 3-pin cables.',
-            'Use the Dynamixel output on the OH board. The FeeTech output is a different connector.',
+            'Use the Dynamixel output on the HIVE board. The FeeTech output is a different connector.',
             'The connector PCBs should already be seated in the tower. Next, prepare the spools and assign IDs one motor at a time.',
           ]
     case 'p98':
@@ -1145,7 +1145,7 @@ export function instructions(step: AssemblyStep, build: Build): string[] {
       return [
         'Open ORCA Console → Flashing. Select the correct order and confirm its hand side, version and motor type.',
         'Check Bench Helper. If it is not connected, open Bench setup and start the helper, then wait for the ready state.',
-        'Press Flash. Hold the Tag-Connect firmly on the OH board pads when the tool asks for the bootloader connection.',
+        'Press Flash. Hold the Tag-Connect firmly on the HIVE board pads when the tool asks for the bootloader connection.',
         'When prompted, lift the Tag-Connect OFF the pads. Keep power and USB connected while firmware and identity are written.',
         'Wait for the flashed-and-linked success message. Use Show output if the process fails; check the connections before retrying.',
       ]
@@ -1160,7 +1160,7 @@ export function instructions(step: AssemblyStep, build: Build): string[] {
     case 'p110':
       return [
         'In ORCA Console → Flashing, select the order for this hand and confirm Bench Helper is connected. Use the connector-board check/flash action for the selected hand side.',
-        'Power the connector board through the OH board’s 4-wire cable; the OH board’s green LEDs must be on. Keep the board loose on the bench for access to its programming pads.',
+        'Power the connector board through the HIVE board’s 4-wire cable; the HIVE board’s green LEDs must be on. Keep the board loose on the bench for access to its programming pads.',
         build.version === 'touch'
           ? 'Place the Tag-Connect on the six programming pads on the BACK of the Touch connector board, opposite its component side. Keep the probe seated for the entire connector-board flash.'
           : 'Place the Tag-Connect on the six programming pads of the Full connector board and hold it for the entire flash.',
@@ -1169,7 +1169,7 @@ export function instructions(step: AssemblyStep, build: Build): string[] {
     case 'p154':
       return [
         build.version === 'touch'
-          ? 'Keep the Touch board loose on the bench. Power it through the OH board’s 4-wire cable; hold the Tag-Connect on the six pads on the BACK of the connector board. Keep it seated for the entire flash.'
+          ? 'Keep the Touch board loose on the bench. Power it through the HIVE board’s 4-wire cable; hold the Tag-Connect on the six pads on the BACK of the connector board. Keep it seated for the entire flash.'
           : step.instructions[0],
         step.instructions[1],
         step.instructions[2],
@@ -1177,7 +1177,7 @@ export function instructions(step: AssemblyStep, build: Build): string[] {
     case 'p112':
       return [
         'From a terminal in your installed orca_core checkout, run the command below. It selects the model matching this build; the assembly selector does not change the configuration of a connected hand.',
-        `Power the OH board with 12 V and connect to its ${build.motor === 'feetech' ? 'FeeTech' : 'Dynamixel'} motor output.`,
+        `Power the HIVE board with 12 V and connect to its ${build.motor === 'feetech' ? 'FeeTech' : 'Dynamixel'} motor output.`,
         'Wait for “Scanning for motor …” before introducing the top-right palm-side motor, ID 17.',
         ...(build.motor === 'feetech'
           ? [

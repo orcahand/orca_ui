@@ -20,7 +20,7 @@ export const BASE_REVIEW_STEPS: AssemblyStep[] = [
     title: 'Fit cable covers A and B',
     pages: [121],
     instructions: [
-      'Switch the OH board OFF after all 17 motors have been configured. Identify two CableHolder-A covers and two CableHolder-B covers in the parts shown below.',
+      'Switch the HIVE board OFF after all 17 motors have been configured. Identify two CableHolder-A covers and two CableHolder-B covers in the parts shown below.',
       'Lay the motor-link cables into their tower recesses. Fit the matching A/B covers at the two top and two bottom positions shown in the assembly photo. Match each cover’s profile to its recess; keep the cables below the cover edges.',
       'Check that all four covers are seated and that no motor lead is trapped or pulled tight. Keep the wrist motor lead free for joining the wrist and tower.',
     ],

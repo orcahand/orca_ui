@@ -1,5 +1,89 @@
 # Assembly workspace
 
+## Current state (UI 0.5.0, November 2026)
+
+- Builders get the Base guide and choose left or right, Dynamixel or Feetech. The maintenance walkthrough covers
+  the index AP tendon on Base right Dynamixel.
+- All media loads through `media.ts` from the public bucket; see
+  [Model distribution](#model-distribution) and
+  [DEVELOPMENT.md](../../../../DEVELOPMENT.md#assembly-guide-media).
+- The dated sections below are the development log. Branch names, archives and
+  paths in them are historical; where they disagree with this section, this
+  section is current.
+
+## Maintenance
+
+Setup has a **Maintenance** button beside **Open assembly guide**. It opens a
+window like the assembly guide's, with E-STOP and Close. The assembly reference
+opens the assembly guide on top, pauses playback underneath, and closes back to
+maintenance. The introductory paragraph gives the general
+six/eight-end rule. A single animation teaches index AP replacement (Base right,
+Dynamixel); nine numbered chapter buttons replace the duplicate image grid.
+Selecting a chapter shows its representative pose. Play starts that chapter;
+Play from start runs the complete repair. Instructions and knot cues sit below
+the scene. Inside it, text identifies parts only.
+
+`createRepairScene` is a repair-specific full-hand scene using the assembly CAD,
+not a reversed assembly explosion. Pins/bearings move rigidly with their finger
+sections and top spools. Removed holder hardware and lifted top spools have room
+between them. The scene shows motor identification, screw removal, opposite spool
+rotation, release of both affected spool ends, finger removal, broken-cord
+removal/replacement, tying, routing, re-spooling and final reassembly.
+
+Channel paths reuse `fingerApChannelRoutes`, `fingerCarpalRoutes` and
+`handTendonPath`. Measured channel polylines are preserved. Only exposed cord
+spans use tangent-matched curves: during withdrawal the tail retreats through the
+fixed route while loose cord collects outside the openings, then hangs free.
+The break uses a fixed distance from the AP anchor. Other cords are muted;
+replacement cord is teal, the broken cord red. The AP close-up fades context
+cords and hides distant spool coils. Free spans illustrate handling rather than
+simulate the physics of the full cord length.
+
+`spoolPaths` supplies the actual rim, anchor channels and opposite winding
+directions. Its source geometry is mirrored in z for this tower face (checked
+against CAD). Motor 4's pair unwinds and leaves its channels before the finger
+opens. Motors 2/3 keep their anchors. The shown top/bottom pairing is illustrative;
+operators preserve recorded assignments and winding directions.
+
+The Ashley portion reuses all eleven `KnotLesson` photographs/cues.
+`KnotReinforcement` provides the single-knot lesson, with action text below the
+scene in maintenance and its original captions retained in assembly. These are
+existing visual lessons, not a new knot-tying simulation.
+
+Playback supports pause, scrub, replay and ½×/1×/2× speed. It pauses offscreen,
+when hidden, and under the assembly reference. Reduced-motion users start paused.
+Model/WebGL/chunk failures retain the PDF link. Browsing/playback send no hardware
+commands. Actual tensioning and calibration remain in Setup. The last chapter
+calls for power off again before final mechanical tightening and holder refit.
+Only the selected chapter is saved to `orca-ui.upkeep.v3`; existing saved checks
+are preserved but no longer displayed in the simplified walkthrough.
+
+`renderUpkeepFigure.ts` exports preview images and two print frames per chapter
+from the same geometry/timing. `scripts/render_upkeep_figure.py` builds the
+11-page landscape PDF, including the original knot reference, without a hardware
+backend. The PDF and the generated PNG previews are published through
+`scripts/guide_media.py` and `storedMedia.json`, like the other guide media; only
+the provenance JSON, which records the CAD source hash, is in git. The PDF links use
+`downloadMedia`, the preview and knot photos use `mediaImage`, and the model uses the
+existing `loadBundle` bucket loader.
+Regenerate with Vite on port 5183:
+
+```sh
+uv run --no-project --with playwright python scripts/render_upkeep_figure.py --url http://127.0.0.1:5183
+```
+
+Browser review uses mocked APIs/WebSockets and covers inline navigation, PDF
+download, chapter selection, playback, knot text placement, responsive layout,
+storage failure, model/WebGL recovery and the assembly reference. Run against a
+served production build:
+
+```sh
+python3 -m http.server 5192 --bind 127.0.0.1 --directory orca_ui/webui
+uv run --no-project --with playwright python scripts/check_upkeep_guide.py
+```
+
+Software/CAD/visual checks do not replace a physical repair trial.
+
 ## Base motor setup · 30 October 2026
 
 Base steps `p98`, `p112` and `p115` include cable preparation, OH board and
@@ -15,7 +99,7 @@ both motor families and hand sides; no physical motor configuration was run.
 
 ## Model distribution
 
-The guide's photos, videos and 3D models, including the four complete Base/Touch
+The guide's photos, videos, 3D models and PDFs, including the four complete Base/Touch
 assembly GLBs, live in a public bucket, not in git. `storedMedia.json` maps each
 path under `frontend/public/assembly/` to its stored name. Every place that shows
 or loads media goes through `media.ts`: a published file comes from the bucket, and
@@ -24,6 +108,15 @@ locally before it is published. Images carry their guide path in `data-media`,
 which stylesheets match on instead of `src`. Generator scripts still write into
 `frontend/public/assembly/`, which Git ignores for media. Publishing is described
 in [DEVELOPMENT.md](../../../../DEVELOPMENT.md#assembly-guide-media).
+
+Rules for anyone adding to the guide, people and agents alike:
+
+- Guide media is published with `scripts/guide_media.py` and never committed.
+- Every new file under `frontend/public/assembly/` is a media decision. If it is
+  media and its type is new, add the type to `CONTENT_TYPES` in
+  `scripts/guide_media.py`, to `.gitignore` (both assembly trees) and to the wheel
+  excludes in `pyproject.toml` before publishing.
+- Load media only through `mediaUrl`, `mediaImage` or `downloadMedia` in `media.ts`.
 
 ## Workspace
 
@@ -55,11 +148,11 @@ and populated PCBs as units. It removes coincident repeated motor subassemblies
 before counting fasteners and spools. Finer tessellation and exported vertex normals
 support the high-DPI viewer. Touch uses black structural parts and skins.
 
-`scripts/refine_assembly_boards.py` restores the OH board's individual component
+`scripts/refine_assembly_boards.py` restores the HIVE board's individual component
 colors from each current STEP while keeping its single inventory identity and
 assembly placement. The PCB is black; the modeled connectors retain their light
 plastic finish. `board-components.json` records the source hash and 26 component
-meshes. The supplied OH model omits the USB-C port, power switch/input and fan
+meshes. The supplied HIVE model omits the USB-C port, power switch/input and fan
 connectors, so it cannot replace the connector-identification and wiring photos.
 Those photos remain the connection reference. The rear-hull instructions specify
 the upper motor/connector-board exit and lower fan exit, viewed from inside the hull.
@@ -88,7 +181,7 @@ merges these into the existing hardware rows, and the Tower kit includes them;
 the model's node counts remain unchanged. Cable harnesses without specified individual lengths are explicitly
 listed as a matching set. The exports have asymmetric hardware/board content and
 are not independently verified procurement BOMs. Both updated Touch exports contain
-the OH board and separate front and rear hull covers. Optional arm mounting parts are marked.
+the HIVE board and separate front and rear hull covers. Optional arm mounting parts are marked.
 
 Regenerate models in a separate environment with CadQuery, trimesh, NumPy and Pillow:
 
@@ -200,7 +293,7 @@ cp -R /tmp/orca-assembly-build/. orca_ui/webui/
 
 ## Persistence
 
-`/api/assembly/progress` stores one build in `~/.orca_ui/assembly-progress-v2.json`,
+`/api/assembly/progress` stores one build in `~/.orca/ui/assembly-progress-v2.json`,
 using validation and atomic replacement. It never reads or writes hand config.
 The browser also keeps `orca-ui.assembly.v2.1` as a fallback. Server storage is
 necessary because the desktop launcher discards its browser profile on exit.

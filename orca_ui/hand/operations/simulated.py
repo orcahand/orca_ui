@@ -166,16 +166,19 @@ def simulate_manual_calibration(
 
 
 def _snapshot_mock(ctx: OpContext, config, manual: bool, partial: bool = False) -> None:
-    """The mock writes no calibration, so snapshot the model's shipped one — the
-    console exercises the same promote/activate path as on hardware."""
-    from orca_ui.hand import baselines
+    """The mock writes no calibration, so snapshot the limits the mock hand runs
+    on: the Calibrate step then shows a run's travel as it does on hardware."""
+    from types import SimpleNamespace
 
+    from orca_ui.hand import baselines
+    from orca_ui.mock.hands import synthetic_motor_limits
+
+    limits, ratios = synthetic_motor_limits(config)
     try:
-        name = baselines.snapshot_from_file(
+        name = baselines.snapshot_calibration(
             config,
-            config.calibration_path,
+            SimpleNamespace(motor_limits_dict=limits, joint_to_motor_ratios_dict=ratios),
             source="manual" if manual else "auto",
-            hand_key=ctx.service.supervisor.hand_id,
             partial=partial,
         )
         ctx.log(f"travel snapshot saved as {name}")

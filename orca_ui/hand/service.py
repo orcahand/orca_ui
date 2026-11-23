@@ -15,7 +15,7 @@ from typing import Callable, TYPE_CHECKING
 
 import numpy as np
 
-from orca_core import JointGains, OrcaHandTouchConfig
+from orca_core import JointGains, OrcaHandTouchConfig, calibration_store
 from orca_core.hardware.motor_client import MotionTimeoutError
 
 if TYPE_CHECKING:
@@ -24,7 +24,8 @@ if TYPE_CHECKING:
 from pathlib import Path
 
 from orca_ui.core_source import resolve_cached as resolve_core_source
-from orca_ui.hand import zeroing
+from orca_ui.hand import hand_store, zeroing
+from orca_ui.home import ui_home
 from orca_ui.hand.commands import CommandWorker
 from orca_ui.hand.presets import BUILTIN_POSES, BUILTIN_SEQUENCES
 from orca_ui.hand.faults import classify_hw_error
@@ -229,6 +230,15 @@ class HandService:
         # Gains connect() installed from config.yaml — what "reset" restores.
         # Live gains are read back from the controller, never shadowed here.
         self._config_gains: dict[str, dict] = {}
+        # The operator chose not to take the board's calibration until another
+        # hand connects or a Disconnect.
+        self._kept_over_board = False
+        # The hand the hand block describes: the connected one, else the last to
+        # connect, until a Disconnect.
+        self._last_hand_id: str | None = None
+        # Motors an operation could not confirm off: warned about until a working
+        # connection confirms them off or the operator dismisses it.
+        self._motors_holding: dict | None = None
 
         self.supervisor = HandSupervisor(
             settings,
@@ -236,6 +246,7 @@ class HandService:
             on_session_ready=self._session_ready,
             on_error=self._publish_error,
             on_model_changed=self._model_changed,
+            on_connection_lost=self._publish_connection_lost,
         )
         self.worker = CommandWorker(
             get_session=lambda: self.supervisor.session,
@@ -279,7 +290,7 @@ class HandService:
         self._library_root = (
             Path(settings.library_dir)
             if settings.library_dir
-            else Path.home() / ".orca_ui" / "library"
+            else ui_home() / "library"
         )
         self.library = Library(self._library_root, self.supervisor.model_name)
 
@@ -299,6 +310,11 @@ class HandService:
     @property
     def session(self) -> HandSession | None:
         return self.supervisor.session
+
+    @property
+    def session_ready(self) -> bool:
+        """The session exists and has finished starting (tactile stream and all)."""
+        return self.supervisor.session_ready
 
     def status(self) -> dict:
         return self.supervisor.status().as_dict()
@@ -334,38 +350,27 @@ class HandService:
             "joints": len(entry.get("travel") or {}),
         }
 
-    def _slack_estimate(self, config) -> dict | None:
-        from orca_ui.hand import baselines
-        from orca_ui.hand.operations import hand_ops
-
-        try:
-            return baselines.slack_estimate(
-                config, self.supervisor.hand_id, hand_ops.last_tension(config)
-            )
-        except Exception:
-            logger.exception("estimating slack from the calibration failed")
-            return None
-
     def _slack_current(self) -> dict | None:
         """The winding current and choices for the connected motor family."""
         from orca_ui.hand.operations.guided_tension import motor_family
         from orca_ui.hand.operations.slack_test import current_options
+        from orca_ui.hand.operations.tension_sweep import current_ceiling
 
         family = motor_family(self)
-        return current_options(family) if family else None
+        return current_options(family, current_ceiling(self, family)) if family else None
 
     def _slack_test(self, config) -> dict | None:
         """The hand's newest slack test, and whether it blocks calibration."""
         from orca_ui.hand import slack_tests
 
         try:
-            found = slack_tests.summary(config, self.supervisor.hand_id)
+            found = slack_tests.summary(config)
         except Exception:
             logger.exception("reading slack tests failed")
             return None
         if found is None:
             return None
-        found["block"] = slack_tests.calibration_block(config, self.supervisor.hand_id)
+        found["block"] = slack_tests.calibration_block(config)
         return found
 
     def _tension_sweep(self, config) -> dict | None:
@@ -376,7 +381,7 @@ class HandService:
             from orca_ui.hand.operations.guided_tension import motor_family
 
             ref = sweeps.reference(config, motor_family(self))
-            mine = sweeps.for_hand(config, self.supervisor.hand_id)
+            mine = sweeps.recent(config)
         except Exception:
             logger.exception("reading tension sweeps failed")
             return None
@@ -399,7 +404,7 @@ class HandService:
             )
 
             return SimulatedGuidedTensionOperation.progress_for(scoring) or None
-        return hand_ops.tension_progress(config, self.supervisor.hand_id, scoring)
+        return hand_ops.tension_progress(config, scoring)
 
     def hand_info(self) -> dict:
         from orca_ui.hand.operations import hand_ops
@@ -484,11 +489,9 @@ class HandService:
             "guided_tension": hand_ops.guided_tension_supported(),
             "last_tension": hand_ops.last_tension(config),
             "tension_progress": self._tension_progress(config),
-            "tension_progress_slack": self._tension_progress(config, "slack"),
-            "hand_id": self.supervisor.hand_id,
+            "hand": self._hand_store_state_or_none(),
             "guided_tension_defaults": self._guided_tension_defaults(),
             "travel_baseline": self._travel_baseline(config),
-            "slack_estimate": self._slack_estimate(config),
             "slack_test": self._slack_test(config),
             "slack_current": self._slack_current(),
             "tension_sweep": self._tension_sweep(config),
@@ -629,8 +632,8 @@ class HandService:
         return self.boards()
 
     def set_hardware_version(self, version: int | None) -> dict:
-        """Pin the hardware version in config.yaml (``None`` = auto) and
-        reconnect if that changes the version in force."""
+        """Run the connected hand as ``version`` for this session (``None`` =
+        the board's), reconnecting if that changes the version in force."""
         if self.settings.bare:
             raise ServiceError(
                 "bare motor mode has no hand to version", status_code=409
@@ -646,9 +649,97 @@ class HandService:
             self.supervisor.set_hardware_version(version)
         except HandBusyError as e:
             raise ServiceError(str(e), status_code=409)
-        except OSError as e:
-            raise ServiceError(f"could not write config.yaml: {e}", status_code=500)
         return self.supervisor.status().as_dict()
+
+    # ----- the hand's own files (orca_core's hand store) ---------------------
+
+    def _store_hand(self, action: str):
+        """The connected hand, for an action on its files."""
+        if self.settings.bare:
+            raise ServiceError(f"bare motor mode has no hand files to {action}", status_code=409)
+        session = self.session
+        if session is None or not session.caps.motors:
+            raise ServiceError(f"no hand is connected to {action}", status_code=409)
+        return session.hand
+
+    def _store_call(self, fn, *args):
+        try:
+            return fn(*args)
+        except RuntimeError as e:
+            # StoreRefused, and orca_core's refusals (a calibration a newer orca_core wrote).
+            raise ServiceError(str(e), status_code=409)
+        except (OSError, ValueError) as e:
+            raise ServiceError(str(e), status_code=500)
+
+    def _replace_calibration(self, action: str, fn) -> dict:
+        """Swap the calibration on file and reconnect so the hand runs on it.
+
+        Refused while anything drives the hand: a new calibration remaps every
+        joint to its motor, and a held target would then mean another position.
+        """
+        manager = self._operation_manager
+        if manager is not None and manager.active():
+            raise ServiceError(f"an operation is running — stop it before you {action}",
+                               status_code=409)
+        if self.supervisor.status().torque_enabled:
+            raise ServiceError(f"turn torque off before you {action}", status_code=409)
+        hand = self._store_hand(action)
+        try:
+            written = self._store_call(fn, hand)
+        finally:
+            # Even a failed swap may have changed the hand's calibration in memory.
+            self.supervisor.request_reconnect()
+        logger.warning("%s: %s", action, written)
+        return {"written": written}
+
+    def hand_store_state(self) -> dict | None:
+        """The hand block of ``hand_info``, plus the notices it raises; None
+        when no hand has connected since the console started or the last Disconnect."""
+        if self._last_hand_id is None:
+            return None
+        session = self.session
+        hand = session.hand if session is not None and session.caps.motors else None
+        state = hand_store.details(hand, self._last_hand_id)
+        newer = hand_store.board_calibration_newer(hand) if hand is not None else None
+        state["board_calibration_newer"] = None if self._kept_over_board else newer
+        state["legacy_files"] = hand_store.legacy_files(hand)
+        return state
+
+    def _hand_store_state_or_none(self) -> dict | None:
+        try:
+            return self.hand_store_state()
+        except Exception:
+            logger.exception("reading the hand's own files failed")
+            return None
+
+    def set_nickname(self, nickname: str | None) -> dict:
+        self._store_call(hand_store.set_nickname, self._store_hand("name"), nickname or None)
+        return self.hand_store_state()
+
+    def restore_previous_calibration(self) -> dict:
+        return self._replace_calibration(
+            "restore the previous calibration", hand_store.restore_previous_calibration)
+
+    def board_calibration_choice(self, choice: str) -> dict:
+        """Answer the "board's calibration is newer" banner.
+
+        ``use_board`` takes the board's calibration; ``keep_session`` hides the
+        banner until a Disconnect or another hand connects; ``keep_until_change`` has orca_core
+        remember the choice until either side's calibration changes.
+        """
+        if choice == "use_board":
+            return self._replace_calibration(
+                "take the board's calibration", hand_store.adopt_board_calibration)
+        hand = self._store_hand("keep this computer's calibration")
+        if choice == "keep_until_change":
+            self._store_call(hand_store.keep_computer_calibration, hand)
+            return {"written": None}
+        self._kept_over_board = True
+        return {"written": None}
+
+    def dismiss_legacy_notice(self) -> dict:
+        self._store_call(hand_store.dismiss_legacy_files, self._store_hand("dismiss the notice"))
+        return self.hand_store_state()
 
     def disconnect(self) -> dict:
         """Close the session and hold the ports free until Reconnect."""
@@ -662,6 +753,7 @@ class HandService:
             self.supervisor.disconnect()
         except HandBusyError as e:
             raise ServiceError(str(e), status_code=409)
+        self._last_hand_id = None
         self.worker.reset()
         return self.status()
 
@@ -780,6 +872,7 @@ class HandService:
                 "direct_motor_mode": self._direct_motor_mode,
                 "pose_source": self._pose_source,
                 "effective_pose_source": effective_source,
+                "motors_holding": dict(self._motors_holding) if self._motors_holding else None,
             }
 
     def stats(self) -> dict:
@@ -815,6 +908,12 @@ class HandService:
 
     # ----- session bootstrap ---------------------------------------------------
 
+    def _publish_connection_lost(self, message: str) -> None:
+        """An error that ends with the connection: marked so the console clears it on reconnect."""
+        from orca_ui.streaming import topics as T
+
+        self._publish_topic(T.ERROR, {"message": message, "connection": True})
+
     def _model_changed(self, config) -> None:
         """The supervisor swapped in the model the hardware reports (a hand
         that was off at startup, or a different one plugged in since). Repoint
@@ -841,8 +940,15 @@ class HandService:
                     self._max_current = _current_or_none(hand_config.max_current)
             self._config_gains = config_gains
         self._publish_control_state()
+        hand_id = getattr(session.hand, "hand_id", None)
+        if hand_id != self._last_hand_id:
+            # Another hand, or the first since a Disconnect: the board banner asks again.
+            self._kept_over_board = False
+        self._last_hand_id = hand_id
         if session.caps.motors:
             self._apply_default_profile(session)
+        if session.caps.motors:
+            self._recheck_motors_holding(session)
         if session.caps.tactile:
             try:
                 zeroing.apply_saved_offsets(session)
@@ -1030,7 +1136,9 @@ class HandService:
         try:
             session = self.session
             if session is not None and session.caps.motors:
-                session.hand.disable_torque()
+                not_acked = session.hand.disable_torque()
+                self._settle_motors_holding(not_acked, checked=session.hand.config.motor_ids,
+                                            session=session)
                 self.supervisor.set_torque_flag(False)
                 self.worker.reset()
                 self._publish_control_state()
@@ -1052,6 +1160,69 @@ class HandService:
         return report
 
     # ----- motor control ---------------------------------------------------------
+
+    # ----- motors left holding ---------------------------------------------------------
+
+    def motors_may_hold(self, report: dict) -> None:
+        """An operation could not confirm torque off on ``report["motors"]``: warn,
+        then switch them off again over the console's own connection."""
+        joint_of = dict(zip(report.get("motors") or [], report.get("joints") or []))
+        # The hand the operation ran on: only a session of that hand can confirm these motors.
+        hand_id = self._last_hand_id
+        with self._state_lock:
+            held = self._motors_holding
+            if held and not held["confirmed"]:
+                if held["hand_id"] == hand_id:
+                    joint_of = {**dict(zip(held["motors"], held["joints"])), **joint_of}
+                else:
+                    logger.warning("hand %s may still have motors %s holding; the warning "
+                                   "now shows hand %s", held["hand_id"], held["motors"], hand_id)
+            motors = sorted(joint_of)
+            self._motors_holding = {"hand_id": hand_id, "motors": motors,
+                                    "joints": [joint_of[m] for m in motors], "confirmed": False}
+        self._publish_control_state()
+        self._recheck_motors_holding()
+
+    def _recheck_motors_holding(self, session: HandSession | None = None) -> None:
+        """Torque off again on the flagged motors once no operation holds the hand
+        and it is the hand that raised the warning; only disables, never enables."""
+        with self._state_lock:
+            held = self._motors_holding
+        manager = self._operation_manager
+        session = session or self.session
+        if not held or held["confirmed"] or (manager is not None and manager.active()) \
+                or session is None or not session.caps.motors \
+                or getattr(session.hand, "hand_id", None) != held["hand_id"]:
+            return
+        try:
+            not_acked = session.hand.disable_torque(list(held["motors"]))
+        except Exception as e:
+            logger.warning("torque off re-check failed: %s", e)
+            return
+        self._settle_motors_holding(not_acked, checked=held["motors"], session=session)
+
+    def _settle_motors_holding(self, not_acked, *, checked, session: HandSession) -> None:
+        """Clear the ``checked`` motors that acknowledged torque off; when none is
+        left, the warning becomes a confirmation."""
+        # A motor that did not answer at connect is never written to, so its silence is no ack.
+        absent = getattr(session.hand, "absent_motor_ids", None) or []
+        not_acked, checked = set(not_acked or []) | set(absent), set(checked)
+        with self._state_lock:
+            held = self._motors_holding
+            # Another hand's motors are not the ones just switched off.
+            if not held or held["confirmed"] \
+                    or held["hand_id"] != getattr(session.hand, "hand_id", None):
+                return
+            keep = [(m, j) for m, j in zip(held["motors"], held["joints"])
+                    if m in not_acked or m not in checked]
+            self._motors_holding = {**held, "motors": [m for m, _ in keep],
+                                    "joints": [j for _, j in keep], "confirmed": not keep}
+        self._publish_control_state()
+
+    def dismiss_motors_holding(self) -> None:
+        with self._state_lock:
+            self._motors_holding = None
+        self._publish_control_state()
 
     def _publish_control_state(self) -> None:
         from orca_ui.streaming import topics as T
@@ -2744,8 +2915,14 @@ class HandService:
 
     def zero_tactile(self, num_samples: int = 100) -> None:
         session = self._require_tactile()
-        zeroing.capture_and_persist(session, num_samples=num_samples)
+        try:
+            zeroing.capture_and_persist(session, num_samples=num_samples)
+        except calibration_store.NewerCalibrationError as e:
+            raise ServiceError(str(e), status_code=409) from e
 
     def clear_tactile_zero(self) -> None:
         session = self._require_tactile()
-        zeroing.clear_offsets(session)
+        try:
+            zeroing.clear_offsets(session)
+        except calibration_store.NewerCalibrationError as e:
+            raise ServiceError(str(e), status_code=409) from e

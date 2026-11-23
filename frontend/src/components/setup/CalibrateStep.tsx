@@ -17,10 +17,10 @@ import {
 } from '../../state/operationStore'
 import { FlowProgress, FlowRowTitle, FlowRunning, FlowStep, type StepState } from './FlowStep'
 import { failToBanner } from './setupUtils'
-import { BaselinePicker, CalibrationRecords, SnapshotPromoter, TravelCheck, SlackEstimate } from './TravelBaselines'
+import { CalibrationRecords } from './TravelBaselines'
 import { SWEEP_HINT, startTensionSweep } from './probeStart'
-import type { SetupVariant } from '../../state/setupVariant'
 import { useTensionFlow } from '../../state/tensionFlow'
+import { HandDetails } from '../hand/HandDetails'
 import { shortDate } from './setupUtils'
 
 const GROUP_ORDER = ['wrist', 'thumb', 'index', 'middle', 'ring', 'pinky']
@@ -36,9 +36,7 @@ function jointMark(joint: JointInfo): 'ok' | 'bad' | 'na' {
   return joint.encoder_calibrated === true ? 'ok' : 'na'
 }
 
-export function CalibrateStep({ state, variant }: { state: StepState; variant: SetupVariant }) {
-  // The kai page adds the travel snapshots and the slack estimate.
-  const kai = variant === 'kai'
+export function CalibrateStep({ state }: { state: StepState }) {
   const gate = useStartGate('motors')
   const handInfo = useAppStore((s) => s.handInfo)
   const operation = useOperationStore((s) => s.operation)
@@ -153,14 +151,6 @@ export function CalibrateStep({ state, variant }: { state: StepState; variant: S
         )}
       </div>
       <CalibrationRecords />
-      {kai && (
-        <>
-          <BaselinePicker />
-          <SnapshotPromoter />
-          <TravelCheck />
-          <SlackEstimate />
-        </>
-      )}
     </>
   )
 
@@ -237,6 +227,7 @@ export function CalibrateStep({ state, variant }: { state: StepState; variant: S
           </div>
         </div>
       )}
+      {handInfo?.hand && <HandDetails hand={handInfo.hand} />}
       {joints.length > 0 && (
         <div className="flow-dots">
           {joints.map((joint) => (

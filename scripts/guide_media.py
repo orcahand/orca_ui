@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish the assembly guide's photos, videos and 3D models, and check what is published.
+"""Publish the assembly guide's photos, videos, 3D models and PDFs, and check what is published.
 
     python3 scripts/guide_media.py
 
@@ -21,6 +21,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 import gzip
 import hashlib
+import http.client
 import json
 from pathlib import Path
 import shutil
@@ -47,6 +48,7 @@ CONTENT_TYPES = {
     ".jpeg": "image/jpeg",
     ".glb": "model/gltf-binary",
     ".stl": "model/stl",
+    ".pdf": "application/pdf",
 }
 # Stored gzip-compressed: 3D models shrink to about 40 %, while photos and videos are already compressed.
 GZIP_SUFFIXES = {".glb", ".stl"}
@@ -116,7 +118,11 @@ def head(url: str) -> tuple[int, dict]:
 
 def stored_problem(bucket: str, entry: dict) -> str | None:
     """Why the bucket's copy of ``entry`` is missing or wrong, or None when it matches."""
-    status, headers = head(public_url(bucket, entry["object"]))
+    try:
+        status, headers = head(public_url(bucket, entry["object"]))
+    except (OSError, http.client.HTTPException) as error:
+        # No answer (offline, DNS, timeout): the file can't be confirmed, which is a problem, not a crash.
+        return f"bucket not reachable ({getattr(error, 'reason', None) or error})"
     if status != 200:
         return "not stored" if status == 404 else f"HTTP {status}"
     encoding = entry.get("encoding", "identity")
@@ -237,7 +243,7 @@ def check(catalog: dict) -> tuple[list[str], dict[str, str]]:
     print(f"  Asking the bucket for the {count(stored_files, 'file')} the catalog lists (this can take half a minute)...")
     problems = problems_in_bucket(catalog.get("bucket", BUCKET), catalog["files"])
     if problems:
-        print(f"  Missing from the bucket or stored wrongly: {count(len(problems), 'file')} the catalog lists.")
+        print(f"  Missing from the bucket, stored wrongly or not reachable: {count(len(problems), 'file')} the catalog lists.")
         report_bucket_problems(catalog, problems)
     else:
         print("  OK: every file the catalog lists is in the bucket.")
@@ -267,7 +273,7 @@ def publish(catalog: dict) -> tuple[int, bool]:
     print("  Reading the media files and their fingerprints (about a minute for 1 GB)...")
     found = scan(media_dir)
     if not found:
-        print(f"  No photos, videos or 3D models in {media_dir}. Nothing to publish; nothing changed.")
+        print(f"  No photos, videos, 3D models or PDFs in {media_dir}. Nothing to publish; nothing changed.")
         return 0, False
     print("  Asking the bucket which of them it already has...")
     changed = {path: entry for path, entry in found.items() if catalog["files"].get(path) != entry}
@@ -345,7 +351,7 @@ def main() -> int:
 
 def run() -> int:
     print("Assembly guide media: checks what is published, then lets you publish new or changed")
-    print("photos, videos and 3D models. Nothing is uploaded without your confirmation.")
+    print("photos, videos, 3D models and PDFs. Nothing is uploaded without your confirmation.")
     catalog = load_catalog()
     tracked, problems = check(catalog)
     if not sys.stdin.isatty():

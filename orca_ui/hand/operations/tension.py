@@ -71,6 +71,8 @@ def run_tension(hand, ctx: OpContext, move_motors: bool, offset_deg: float | Non
         elif kind == "pulled":
             ctx.set_extra({"pulled_deg": event["total_deg"]})
             ctx.log(f"finger motors turned {event['total_deg']:g}° counterclockwise")
+        elif kind == "torque_off_failed":
+            ctx.torque_off_failed(event)
         elif kind == "winding_progress":
             ctx.set_detail(
                 f"winding pass {event['stage']}/{event['stages']}")
@@ -108,7 +110,8 @@ class TensionOperation(Operation):
             ctx.set_phase("connecting", detail="opening motor-only connection")
             hand = hand_ops.build_maintenance_hand(
                 supervisor.config, ctx.stop_event,
-                motor_port=lease.presence.motor_port if lease.presence else None)
+                motor_port=lease.presence.motor_port if lease.presence else None,
+                hardware_version=supervisor.hardware_version_override)
             self._hand = hand
             run_tension(hand, ctx, move_motors=self.params["move_motors"],
                         offset_deg=self.params.get("offset_deg"),

@@ -1,7 +1,7 @@
 // Step 3, "Run": loop the collision-free full-range sequence for a few minutes
 // so the freshly tensioned tendons settle. Needs a calibrated hand.
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { api } from '../../api/rest'
 import { useAppStore } from '../../state/appStore'
 import {
@@ -10,7 +10,7 @@ import {
   useStartGate,
 } from '../../state/operationStore'
 import { FlowProgress, FlowRunning, FlowStep, type StepState } from './FlowStep'
-import { failToBanner, readRunInDone, runInCompleted, shortDate, writeRunInDone } from './setupUtils'
+import { failToBanner, readRunInDone, shortDate } from './setupUtils'
 
 const MINUTES = [1, 2, 5, 10, 15]
 // Mirrors RUN_IN_SPEEDS in orca_ui/hand/operations/player.py.
@@ -23,7 +23,7 @@ export function RunInStep({
   calibrated: boolean
 }) {
   const gate = useStartGate('motors')
-  const model = useAppStore((s) => s.handInfo?.model_name)
+  const handId = useAppStore((s) => s.handInfo?.hand?.id ?? null)
   const torque = useAppStore((s) => s.status?.torque_enabled ?? false)
   const liveMaxCurrent = useAppStore((s) => s.control?.max_current ?? null)
   const operation = useOperationStore((s) => s.operation)
@@ -33,16 +33,8 @@ export function RunInStep({
   const [speed, setSpeed] = useState(3)
   // Current cap for the run, in mA; empty = leave the hand's ceiling alone.
   const [capDraft, setCapDraft] = useState('')
-  const [doneAt, setDoneAt] = useState<string | null>(null)
-  useEffect(() => setDoneAt(readRunInDone(model)), [model])
-
-  const finishedId = runInCompleted(operation) ? operation!.run_id : null
-  useEffect(() => {
-    if (!finishedId || !model) return
-    const now = new Date().toISOString()
-    writeRunInDone(model, now)
-    setDoneAt(now)
-  }, [finishedId, model])
+  // Written by the operation store when this hand's run finishes.
+  const doneAt = readRunInDone(handId)
 
   const cap = capDraft.trim() === '' ? null : parseInt(capDraft, 10)
   const capValid =

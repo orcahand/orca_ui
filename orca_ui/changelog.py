@@ -5,10 +5,10 @@ Two lines per release are structural — the ``## UI <version> — <date>`` head
 and the ``Core:`` line naming the orca_core release to run with it. Everything
 else is prose the reviewer writes.
 
-"Don't show this again" is one indicator file in ``STATE_DIR``, named after the
-release it dismisses. The directory is untracked, created on demand, and holds
-nothing else: writing an indicator clears it first, so a release whose name no
-longer matches leaves no residue and the folder never accumulates.
+"Don't show this again" is one indicator file in ``~/.orca/ui/changelog/``,
+named after the release it dismisses. The directory is created on demand and
+holds nothing else: writing an indicator clears it first, so a release whose
+name no longer matches leaves no residue and the folder never accumulates.
 """
 
 from __future__ import annotations
@@ -17,11 +17,9 @@ import re
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
-CHANGELOG_PATH = Path(__file__).with_name("changelog.md")
+from orca_ui.home import ui_home
 
-# Beside the package, so a checkout keeps it out of git and an install keeps it
-# out of the wheel. Only ever holds one indicator file.
-STATE_DIR = Path(__file__).resolve().parent.parent / ".changelog"
+CHANGELOG_PATH = Path(__file__).with_name("changelog.md")
 
 _INDICATOR = re.compile(r"^ui-(\d+(?:\.\d+)*)\.seen$")
 
@@ -75,10 +73,14 @@ def latest_version(markdown: str | None = None) -> str | None:
     return str(found[0]["version"]) if found else None
 
 
+def _state_dir() -> Path:
+    return ui_home() / "changelog"
+
+
 def seen_version() -> str | None:
     """The release whose notes were ticked away, read off the indicator file."""
     try:
-        names = [entry.name for entry in STATE_DIR.iterdir() if entry.is_file()]
+        names = [entry.name for entry in _state_dir().iterdir() if entry.is_file()]
     except OSError:
         return None
     found = [m.group(1) for m in map(_INDICATOR.match, names) if m]
@@ -88,7 +90,7 @@ def seen_version() -> str | None:
 
 def _clear_state_dir() -> None:
     try:
-        entries = list(STATE_DIR.iterdir())
+        entries = list(_state_dir().iterdir())
     except OSError:
         return
     for entry in entries:
@@ -107,9 +109,10 @@ def set_seen(version: str | None) -> str | None:
     _clear_state_dir()
     if version is None:
         return None
+    folder = _state_dir()
     try:
-        STATE_DIR.mkdir(parents=True, exist_ok=True)
-        (STATE_DIR / f"ui-{version}.seen").write_text(
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / f"ui-{version}.seen").write_text(
             f"The console's {version} release notes have been dismissed.\n"
             "Delete this file to have them open again.\n",
             encoding="utf-8",

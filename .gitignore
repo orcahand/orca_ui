@@ -38,6 +38,7 @@ node_modules/
 /frontend/public/assembly/**/*.jpeg
 /frontend/public/assembly/**/*.glb
 /frontend/public/assembly/**/*.stl
+/frontend/public/assembly/**/*.pdf
 /orca_ui/webui/assembly/**/*.mp4
 /orca_ui/webui/assembly/**/*.png
 /orca_ui/webui/assembly/**/*.webp
@@ -45,6 +46,7 @@ node_modules/
 /orca_ui/webui/assembly/**/*.jpeg
 /orca_ui/webui/assembly/**/*.glb
 /orca_ui/webui/assembly/**/*.stl
+/orca_ui/webui/assembly/**/*.pdf
 
 # Personal Claude Code instructions, never committed
 CLAUDE.local.md

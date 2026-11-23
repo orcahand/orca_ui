@@ -24,9 +24,10 @@ from orca_core.hand_config import OrcaHandTouchConfig
 from orca_core.hardware.hand_serial_link import HandSerialLink
 from orca_core.hardware.joint_encoder_client import JointEncoderClient
 from orca_core.hardware.sensing.types import LinkHealth
-from orca_core import JointFeedbackConnectError, OrcaHand, OrcaHandJointFeedback
+from orca_core import JointFeedbackConnectError, OrcaHand, OrcaHandJointFeedback, OrcaHandTouch
 
 from orca_ui.hand.detection import HardwarePresence, probe_hardware
+from orca_ui.hand.hand_store import prepare_hand
 from orca_ui.hand.states import Capabilities
 from orca_ui.settings import UiSettings
 
@@ -72,7 +73,6 @@ class HandSession:
     # supervisor must not treat finding the port as "it appeared".
     refused: tuple[str, ...] = ()
     _fingertips: dict | None = None
-    _fingertips_read: bool = False
 
     # ----- tactile ---------------------------------------------------------
 
@@ -99,17 +99,21 @@ class HandSession:
         tc = self.tactile_client
         return tc.get_stats() if tc else None
 
+    def read_fingertip_identities(self) -> None:
+        """Read which fingertip model sits in each slot, once, before the
+        session is published: nothing else talks to the board yet, and request
+        handlers only ever see the stored result."""
+        if self.tactile_client is None:
+            return
+        from orca_ui.hand.operations import hand_ops
+        try:
+            self._fingertips = hand_ops.fingertip_identities(self.tactile_client)
+        except Exception:
+            logger.warning("could not read fingertip identities", exc_info=True)
+
     def fingertip_identities(self) -> dict | None:
-        """Which fingertip model sits in each slot, and the mismatches; read
-        once per session; a failed read is retried on the next call (None when
-        the board firmware doesn't report it)."""
-        if not self._fingertips_read and self.tactile_client is not None:
-            from orca_ui.hand.operations import hand_ops
-            try:
-                self._fingertips = hand_ops.fingertip_identities(self.tactile_client)
-                self._fingertips_read = True
-            except Exception:
-                logger.warning("could not read fingertip identities", exc_info=True)
+        """Which fingertip model sits in each slot, and the mismatches, as read
+        at connect; None when unread or the board firmware doesn't report it."""
         return self._fingertips
 
     # ----- joints ----------------------------------------------------------
@@ -267,18 +271,20 @@ class HandSession:
 
 
 def connect_session(settings: UiSettings, config,
-                    presence: HardwarePresence | None = None) -> HandSession:
+                    presence: HardwarePresence | None = None,
+                    hardware_version: int | None = None) -> HandSession:
     """Connect at the best achievable tier.
 
     ``presence`` may be supplied by a caller that has already probed (the
     supervisor does, because the same probe decides which model ``config``
-    is); left out, this probes for itself.
+    is); left out, this probes for itself. ``hardware_version`` is the
+    session's choice, carried into the hand before it connects.
     """
     declared = declared_capabilities(config, settings.engage_feedback,
                                      motors_enabled=settings.motors_enabled)
 
     if settings.mock:
-        return _connect_mock(settings, config, declared)
+        return _connect_mock(settings, config, declared, hardware_version)
 
     if presence is None:
         presence = probe_hardware(config)
@@ -286,7 +292,7 @@ def connect_session(settings: UiSettings, config,
 
     if settings.motors_enabled and presence.motor_port:
         try:
-            return _connect_with_motors(settings, config, declared, presence)
+            return _connect_with_motors(settings, config, declared, presence, hardware_version)
         except SessionConnectError as motor_error:
             # A motor port that answers but won't connect (unpowered motors,
             # broken motor stack) must not block sensor viewing.
@@ -339,13 +345,15 @@ def _caps_from_hand(hand, declared: dict) -> Capabilities:
     )
 
 
-def _connect_mock(settings: UiSettings, config, declared: dict) -> HandSession:
+def _connect_mock(settings: UiSettings, config, declared: dict,
+                  hardware_version: int | None = None) -> HandSession:
     from orca_ui.mock import build_mock_hand
 
     # The config in force, not settings.config_path: the model can be changed
     # from the browser, and the mock has to simulate the hand now selected.
     hand = build_mock_hand(config.config_path,
-                           engage_feedback=settings.engage_feedback)
+                           engage_feedback=settings.engage_feedback,
+                           hardware_version=hardware_version)
     try:
         ok, msg = hand.connect(interactive=False)
     except (JointFeedbackConnectError, RuntimeError) as e:
@@ -374,12 +382,14 @@ def _build_hand(settings: UiSettings, config, feedback: bool, tactile: bool):
         return OrcaHandJointFeedback(config=config)
     if not feedback and not tactile and isinstance(config, OrcaHandTouchConfig):
         return OrcaHand(config=config)
+    # The version is the hand's to settle at connect, from its own board: one
+    # handed in here would pass for the board's on a hand that has none.
     return load_hand(config_path=config.config_path,
-                     engage_feedback=feedback,
-                     detected_hardware_version=config.hardware_version)
+                     engage_feedback=feedback)
 
 
-def _connect_with_motors(settings, config, declared, presence: HardwarePresence):
+def _connect_with_motors(settings, config, declared, presence: HardwarePresence,
+                         hardware_version: int | None = None):
     want_feedback = declared["feedback_loop"] and bool(presence.sensing.encoder)
     want_tactile = declared["tactile"] and bool(presence.sensing.tactile)
 
@@ -422,6 +432,7 @@ def _connect_with_motors(settings, config, declared, presence: HardwarePresence)
             if hand.config is config:
                 hand.config = copy.copy(config)
             object.__setattr__(hand.config, "sensor_port", presence.sensing.tactile)
+        prepare_hand(hand, hardware_version)
         try:
             ok, msg = hand.connect(interactive=False)
         except (JointFeedbackConnectError, RuntimeError) as e:
@@ -490,9 +501,13 @@ def _tier_name(feedback: bool, tactile: bool) -> str:
 
 
 def _connect_sensors_only(settings, config, declared, presence: HardwarePresence):
-    """Motors unpowered: tactile viewing and/or encoder viewing only."""
-    hand = load_hand(config_path=config.config_path, engage_feedback=False,
-                     detected_hardware_version=config.hardware_version)
+    """Motors unpowered: tactile viewing and/or encoder viewing only.
+
+    Built on the config in force, so the hand keeps the folder (and the
+    calibration in it) its last motor connect settled: with no motor bus it
+    never asks its board which hand it is."""
+    hand_cls = OrcaHandTouch if isinstance(config, OrcaHandTouchConfig) else OrcaHand
+    hand = hand_cls(config=config)
     ports = {"motor": None, "tactile": None, "encoder": None}
     messages: list[str] = []
     owned_links: list[HandSerialLink] = []
