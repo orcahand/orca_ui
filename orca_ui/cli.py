@@ -252,6 +252,8 @@ def main(argv=None) -> None:
     mode = "MOCK — no hardware" if settings.mock else "hardware"
     if settings.mock is False and not settings.motors_enabled:
         mode += ", sensors only (--no-motors)"
+    if settings.research_ui:
+        mode += ", research extras ON"
     # Which orca_core is driving the hardware is invisible otherwise: a dev
     # checkout and the release it was cut from carry the same version string.
     core = resolve_core_source()
