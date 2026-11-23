@@ -188,7 +188,7 @@ def test_write_to_board_releases_the_port_writes_and_reads_back(client, monkeypa
                                     {"measured_at": "2026-11-23T20:00:00", "joint_roms": {"index_mcp": [-12.0, 95.5]}})
     monkeypatch.setattr(board_push, "board_contents", lambda port: held)
     op = write()
-    assert op["result"]["written"] and op["result"]["confirmed"]
+    assert op["result"]["written"] and op["result"]["confirmed"] and op["result"]["hand"] == hand.hand_id
     assert op["result"]["board"]["ranges"] == ["index_mcp"] and op["result"]["board"]["sequence"] == 4
     assert _wait_for(lambda: client.get("/api/status").json()["state"] == "connected")
 
@@ -272,3 +272,10 @@ def test_results_name_their_run(client):
     joints = r["results"]["joints"]
     assert joints["index_mcp"]["measured"] and not joints["wrist"]["measured"] and r["results"]["gone"] == ["ring_mcp"]
 
+
+def test_no_board_write_with_an_orca_core_that_cannot_keep_the_ranges(client, monkeypatch, tmp_path):
+    from orca_core import board_push
+    monkeypatch.setattr(board_push, "firmware_tool", lambda: tmp_path / "cal_store.py")
+    monkeypatch.delattr(board_push, "board_contents")
+    writer = client.get(f"{VC}/board-write").json()
+    assert writer["available"] is False and "can't keep the measured ranges on the board" in writer["reason"]

@@ -13,12 +13,20 @@ from orca_ui.hand.operations.base import OpContext, Operation
 
 
 def board_writer() -> dict:
-    """Whether this computer can write a hand's board, and why not."""
+    """Whether this computer can write a hand's board, and why not: the installed orca_core must
+    pack the measured ranges (store section 16) and read a board back, and find an orca_firmware
+    checkout."""
+    import inspect
     try:
-        from orca_core import board_push
+        from orca_core import board_push, board_store
     except ImportError:
         return {"available": False, "tool": None,
                 "reason": "the installed orca_core cannot write a hand's board"}
+    if not (hasattr(board_push, "board_contents") and hasattr(board_store, "SEC_JOINT_RANGES")
+            and "joint_ranges" in inspect.signature(board_store.pack).parameters):
+        return {"available": False, "tool": None,
+                "reason": "this orca_core can't keep the measured ranges on the board (it predates store "
+                          "section 16): update orca_core"}
     tool = board_push.firmware_tool()
     if tool is None:
         return {"available": False, "tool": None,
@@ -68,7 +76,7 @@ class BoardWriteOperation(Operation):
         finally:
             supervisor.exit_maintenance()
         ranges = (hand_store.read_joint_ranges(hand.hand_dir, hand.config.joint_ids) if hand.hand_dir else {})
-        out = {"written": result.written, "reason": result.reason or None, "sequence": result.sequence,
+        out = {"hand": hand.hand_id, "written": result.written, "reason": result.reason or None, "sequence": result.sequence,
                "size": result.size, "port": port,
                "file_ranges": sorted((ranges.get("joint_roms") or {})), "board": None, "confirmed": False}
         if held is not None:
