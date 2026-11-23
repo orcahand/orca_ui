@@ -5,11 +5,15 @@ The code is orca_core's self-contained experiment
 ``experiments/visual_calibration/`` (its README), not the orca_core package: it
 is put on sys.path from $ORCA_VISUAL_CALIBRATION, else ``../orca_core/experiments/visual_calibration``.
 
-Photos are sent as the raw image bytes (PNG/JPEG body), the stop as a query
-parameter. Sessions live in ``~/.orca_ui/visual_calibration/<id>/``
+The backend owns the rig's cameras (visual_calibration.rig_cameras: every enabled
+camera opened once, told apart by serial, its controls locked): a sweep's photos are
+its own stills from every camera (``/sessions/{id}/capture``), the page only shows a
+preview (``/cameras/{cam}/preview.jpg``), and the hand run takes its stills from
+``/cameras/{cam}/still``. Nothing is captured before ``/cameras/preflight`` passed.
+Sessions live in ``~/.orca_ui/visual_calibration/<id>/``
 (visual_calibration.session). The plate is turned by the rig's Dynamixel
 (visual_calibration.turntable; the mock one under --mock); the page drives the
-sweep: move, then grab a frame and post it.
+sweep: move, then ask for the photos.
 CPU-bound handlers are plain ``def`` so FastAPI runs them off the event loop.
 """
 from __future__ import annotations
@@ -24,7 +28,7 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 
@@ -46,6 +50,11 @@ class Move(BaseModel):
 
 class Home(BaseModel):
     hold: bool = False
+
+
+class Preflight(BaseModel):
+    tiles: bool = True                             # the tower is on the plate: each camera's height from its tiles too
+    write: bool = True                             # False: check the controls, never set them
 
 
 class StudyMapSwitch(BaseModel):
@@ -111,7 +120,8 @@ class StudyNote(BaseModel):
     who: str = "agent"
 
 
-def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
+def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> APIRouter:
+    """cameras: the rig's camera service (default: a RigCameras of the rig config, made on first use)."""
     base = base or Path.home() / ".orca_ui" / "visual_calibration"
     router = APIRouter(prefix="/api/visual-calibration", tags=["visual-calibration"])
     lock = threading.Lock()                        # one solve / photo write at a time
@@ -331,6 +341,7 @@ def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
                 "mountings": config_mountings(obj), "coverage_warnings": cover["warnings"],
                 "tiles": sorted(preview_detector().obj.tiles),
                 "reference_tile": obj.get("reference_tile"), "camera_mount": r.raw["camera"].get("mount"),
+                "cameras": r.active_cameras,
                 "letters": obj.get("letters") or {},
                 "swap_angle": float(r.raw["turntable"].get("swap_angle", 180.0)),
                 "rig_board": rig_board(r),
@@ -348,18 +359,46 @@ def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
             devices = sorted(p.device for p in serial.tools.list_ports.comports() if p.serial_number == serial_no)
         return {"usb_serial": serial_no, "devices": devices}
 
-    def uvc_state(write: bool) -> dict:
-        """The camera's UVC controls against config.yaml camera.uvc (visual_calibration.uvc)."""
+    camera_service = {"cameras": cameras}
+
+    def rig_cameras():
+        """The rig's cameras, made on first use and kept for the app's life (opened on first use too)."""
         _experiment_on_path()
-        from visual_calibration.uvc import CameraSettingsError, Uvcc, ensure
-        cfg = rig_config().raw["camera"].get("uvc")
-        if not cfg:
-            return {"ok": True, "configured": False}
+        if camera_service["cameras"] is None:
+            from visual_calibration.rig_cameras import RigCameras
+            camera_service["cameras"] = RigCameras(rig_config(), mock=mock)
+        return camera_service["cameras"]
+
+    def close_cameras() -> None:
+        if camera_service["cameras"] is not None:
+            camera_service["cameras"].close()
+
+    router.close_cameras = close_cameras
+
+    def camera_call(fn):
+        """fn(the camera service); a camera missing, unidentified or not checked: 409."""
+        cams = rig_cameras()
+        from visual_calibration.uvc import CameraSettingsError
         try:
-            r = ensure(Uvcc.from_config(cfg), cfg, write=write)
-        except (CameraSettingsError, OSError) as e:
+            return fn(cams)
+        except KeyError as e:
+            raise HTTPException(404, f"no camera {e}") from e
+        except (CameraSettingsError, RuntimeError, OSError) as e:      # CameraIdentityError is a RuntimeError
             raise HTTPException(409, str(e)) from e
-        return {"ok": True, "configured": True, "set": r["set"], "controls": r["after"]}
+
+    def image_response(img, fmt: str, quality: int) -> Response:
+        from visual_calibration.rig_cameras import encode
+        return Response(encode(img, fmt, quality), media_type="image/png" if fmt == "png" else "image/jpeg",
+                        headers={"Cache-Control": "no-store"})
+
+    def uvc_state(write: bool) -> dict:
+        """Every camera's UVC controls against config.yaml cameras.<c>.uvc (visual_calibration.uvc)."""
+        r = camera_call(lambda c: c.lock_controls(write))
+        if not r:
+            return {"ok": True, "configured": False}
+        a = r.get("a") or next(iter(r.values()))
+        return {"ok": True, "configured": True, "set": a["set"], "controls": a["after"],
+                "cameras": {c: {"set": v["set"], "controls": v["after"]} for c, v in r.items()}}
 
     @router.get("/camera/uvc")
     def camera_uvc() -> dict:
@@ -370,6 +409,28 @@ def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
     def camera_uvc_set() -> dict:
         """Set the controls that differ, read them back; 409 if they still differ (before a sweep)."""
         return {"ok": True} if mock else uvc_state(write=True)
+
+    @router.get("/cameras")
+    def cameras_state() -> dict:
+        """The enabled cameras, their indices and whether a preflight passed (opens nothing)."""
+        return _plain(rig_cameras().status())
+
+    @router.post("/cameras/preflight")
+    def cameras_preflight(body: Preflight | None = None) -> dict:
+        """Open every camera, lock its controls and prove which stream is which (409 if not)."""
+        body = body or Preflight()
+        detector = preview_detector() if body.tiles else None
+        return _plain(camera_call(lambda c: c.preflight(detector, write=body.write)))
+
+    @router.get("/cameras/{cam}/preview.jpg")
+    def camera_preview(cam: str, max_side: int = Query(1600, ge=160, le=3840)) -> Response:
+        """The newest frame, scaled down: the page's live view (no preflight needed)."""
+        return image_response(camera_call(lambda c: c.preview(cam, max_side)), "jpg", 80)
+
+    @router.get("/cameras/{cam}/still")
+    def camera_still(cam: str, format: Literal["png", "jpg"] = "png", quality: int = Query(95, ge=50, le=100)) -> Response:
+        """A full-resolution frame captured after this request (409 before a preflight)."""
+        return image_response(camera_call(lambda c: c.still(cam, after=time.monotonic())), format, quality)
 
     @router.get("/turntable")
     def turntable_state() -> dict:
@@ -460,15 +521,19 @@ def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
         return turntable_state()
 
     @router.get("/overlay")
-    def model_overlay(angle: float | None = Query(None, ge=-360, le=360), rotation: float = Query(270.0)) -> dict:
-        """What the rig model expects to see at a plate angle (default: the turntable's),
+    def model_overlay(angle: float | None = Query(None, ge=-360, le=360), rotation: float = Query(270.0),
+                      camera: str = Query("a")) -> dict:
+        """What the rig model expects `camera` to see at a plate angle (default: the turntable's),
         tiles projected into the raw image + the transforms for drawing the hand."""
         vc()
         from visual_calibration.overlay import overlay
+        r = rig_config()
+        if camera not in r.cameras:
+            raise HTTPException(404, f"no camera {camera}")
         if angle is None:
             t = table.get("t")
             angle = t.angle() if t is not None and t.zero is not None else 0.0
-        return overlay(rig_config(), float(angle), rotation)
+        return overlay(r, float(angle), rotation, camera)
 
     @router.get("/status")
     def status() -> dict:
@@ -559,30 +624,57 @@ def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
     def get(sid: str) -> dict:
         return open_session(sid).summary()
 
-    @router.post("/sessions/{sid}/photos")
-    async def add_photo(sid: str, request: Request, stop: float = Query(..., ge=-360, le=360),
-                        plate: float | None = Query(None, ge=-360, le=360)) -> dict:
-        """`plate`: the plate's angle when the photo was taken; by default the turntable's
-        read-back (the solves use it instead of the nominal stop)."""
-        data = await request.body()
-        if not data:
-            raise HTTPException(400, "send the image as the request body")
-        s = open_session(sid)
+    def plate_at(s, stop: float, plate: float | None) -> float | None:
+        """The plate's angle for a photo: given, else the turntable's read-back; 409 off the stop."""
         t = table.get("t")
         if plate is None and t is not None and t.zero is not None and not s.meta.get("hand_turned"):
             plate = t.peek_angle()
         if plate is not None and abs(plate - stop) > 2.0:
             raise HTTPException(409, f"the plate is at {plate:.1f}°, not at the stop {stop:g}°")
+        return plate
+
+    @router.post("/sessions/{sid}/photos")
+    async def add_photo(sid: str, request: Request, stop: float = Query(..., ge=-360, le=360),
+                        plate: float | None = Query(None, ge=-360, le=360), camera: str = Query("a")) -> dict:
+        """A photo taken elsewhere (an import; a sweep uses /capture). `plate`: the plate's angle when
+        the photo was taken; by default the turntable's read-back (the solves use it instead of the
+        nominal stop)."""
+        data = await request.body()
+        if not data:
+            raise HTTPException(400, "send the image as the request body")
+        s = open_session(sid)
+        if camera not in s.rig.cameras:
+            raise HTTPException(404, f"no camera {camera}")
+        plate = plate_at(s, stop, plate)
 
         def work():
             with lock:
-                return s.add_photo(data, stop, "jpg" if data[:2] == b"\xff\xd8" else "png", plate_deg=plate)
+                return s.add_photo(data, stop, "jpg" if data[:2] == b"\xff\xd8" else "png", plate_deg=plate, camera=camera)
         try:
             entry, dets = await asyncio.to_thread(work)
         except ValueError as e:
             raise HTTPException(400, str(e)) from e
         return {"photo": entry, "size": s.meta["image_size"], "detections": _detections(dets),
                 "orientation": _orientation(s.object, dets)}
+
+    @router.post("/sessions/{sid}/capture")
+    def capture(sid: str, stop: float = Query(..., ge=-360, le=360),
+                plate: float | None = Query(None, ge=-360, le=360)) -> dict:
+        """A photo from every camera at this stop: the backend's own full-resolution stills (PNG),
+        each stored tagged by its camera. 409 before a camera preflight passed."""
+        s = open_session(sid)
+        plate = plate_at(s, stop, plate)
+        from visual_calibration.rig_cameras import encode
+        frames = camera_call(lambda c: c.stills())
+        out = {}
+        with lock:
+            for cam, img in frames.items():
+                try:
+                    entry, dets = s.add_photo(encode(img, "png"), stop, "png", plate_deg=plate, camera=cam)
+                except ValueError as e:
+                    raise HTTPException(400, f"camera {cam}: {e}") from e
+                out[cam] = {"photo": entry, "detections": _detections(dets), "orientation": _orientation(s.object, dets)}
+        return {"stop": stop, "size": s.meta["image_size"], "cameras": out}
 
     fit_lock = threading.Lock()
 
