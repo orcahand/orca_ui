@@ -123,13 +123,16 @@ export function HandDetails({ hand }: { hand: HandStoreInfo }) {
         <span className="hand-key">joint ranges</span>
         <span
           title={
-            ranges.path
-              ? `Joint ranges on this hand are read from ${ranges.path}`
-              : undefined
+            ranges.stored_on === 'board'
+              ? `Read from the hand's board: this computer has no ${ranges.path ?? 'joint_ranges.yaml'}`
+              : ranges.path
+                ? `Joint ranges on this hand are read from ${ranges.path}`
+                : undefined
           }
         >
           {ranges.source === 'measured'
-            ? `measured on this hand${ranges.measured_at ? ` (${shortDate(ranges.measured_at)})` : ''}`
+            ? `measured on this hand${ranges.measured_at ? ` (${shortDate(ranges.measured_at)})` : ''}` +
+              `, ${ranges.joints.length} joints · ${ranges.stored_on === 'board' ? 'from its board' : 'on this computer'}`
             : 'model defaults'}
         </span>
       </div>

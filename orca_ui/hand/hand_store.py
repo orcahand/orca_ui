@@ -118,10 +118,17 @@ def calibration_record(hand) -> dict:
 
 def joint_ranges(hand) -> dict:
     """``source`` is ``model`` (the model's defaults) or ``measured`` (on this
-    hand, at ``measured_at``); ``path`` is where measured ranges are read from."""
+    hand, at ``measured_at``, for ``joints``). ``stored_on`` says where measured
+    ranges are kept: ``file`` (this computer's ``joint_ranges.yaml``) or ``board``
+    (the hand's board store, in force while there is no such file); None for the
+    model's. ``path`` is the hand's ``joint_ranges.yaml``, where measured ranges
+    are read from first."""
     info = hand.joint_ranges_info if hand is not None else {}
     folder = getattr(hand, "hand_dir", None) if hand is not None else None
+    measured = info.get("source") == "measured"
     return {"source": info.get("source", "model"), "measured_at": info.get("measured_at"),
+            "stored_on": info.get("stored_on", "file") if measured else None,
+            "joints": list(info.get("joints") or []),
             "path": os.path.join(folder, core_store.JOINT_RANGES_FILE) if folder else None}
 
 
