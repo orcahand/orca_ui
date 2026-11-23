@@ -362,11 +362,11 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
     camera_service = {"cameras": cameras}
 
     def rig_cameras():
-        """The rig's cameras, made on first use and kept for the app's life (opened on first use too)."""
+        """The rig's cameras, made on first use and kept for the app's life; each preflight rereads the config."""
         _experiment_on_path()
         if camera_service["cameras"] is None:
             from visual_calibration.rig_cameras import RigCameras
-            camera_service["cameras"] = RigCameras(rig_config(), mock=mock)
+            camera_service["cameras"] = RigCameras(rig_config, mock=mock)
         return camera_service["cameras"]
 
     def close_cameras() -> None:
@@ -376,14 +376,19 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
     router.close_cameras = close_cameras
 
     def camera_call(fn):
-        """fn(the camera service); a camera missing, unidentified or not checked: 409."""
+        """fn(the camera service). An unknown camera: 404; a camera missing, unidentified or not
+        checked, uvcc or the device listing failing: 409; a key missing in config.yaml: 409 saying so."""
+        import subprocess
         cams = rig_cameras()
+        from visual_calibration.rig_cameras import UnknownCamera
         from visual_calibration.uvc import CameraSettingsError
         try:
             return fn(cams)
-        except KeyError as e:
+        except UnknownCamera as e:
             raise HTTPException(404, f"no camera {e}") from e
-        except (CameraSettingsError, RuntimeError, OSError) as e:      # CameraIdentityError is a RuntimeError
+        except KeyError as e:
+            raise HTTPException(409, f"rig config.yaml: missing {e} in a camera's block") from e
+        except (CameraSettingsError, RuntimeError, OSError, subprocess.SubprocessError, ValueError) as e:
             raise HTTPException(409, str(e)) from e
 
     def image_response(img, fmt: str, quality: int) -> Response:
@@ -426,6 +431,16 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
     def camera_preview(cam: str, max_side: int = Query(1600, ge=160, le=3840)) -> Response:
         """The newest frame, scaled down: the page's live view (no preflight needed)."""
         return image_response(camera_call(lambda c: c.preview(cam, max_side)), "jpg", 80)
+
+    @router.get("/cameras/stills")
+    def camera_stills(format: Literal["png", "jpg"] = "jpg", quality: int = Query(95, ge=50, le=100)) -> dict:
+        """Every camera's full-resolution frame, all captured after this request: {camera: base64}
+        (409 before a preflight). The hand run's photos of a stop."""
+        import base64
+        from visual_calibration.rig_cameras import encode
+        frames = camera_call(lambda c: c.stills(after=time.monotonic()))
+        return {"format": format, "cameras": {c: base64.b64encode(encode(img, format, quality)).decode()
+                                              for c, img in frames.items()}}
 
     @router.get("/cameras/{cam}/still")
     def camera_still(cam: str, format: Literal["png", "jpg"] = "png", quality: int = Query(95, ge=50, le=100)) -> Response:
@@ -664,13 +679,12 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
         each stored tagged by its camera. 409 before a camera preflight passed."""
         s = open_session(sid)
         plate = plate_at(s, stop, plate)
-        from visual_calibration.rig_cameras import encode
         frames = camera_call(lambda c: c.stills())
         out = {}
         with lock:
             for cam, img in frames.items():
                 try:
-                    entry, dets = s.add_photo(encode(img, "png"), stop, "png", plate_deg=plate, camera=cam)
+                    entry, dets = s.add_photo(img, stop, plate_deg=plate, camera=cam)
                 except ValueError as e:
                     raise HTTPException(400, f"camera {cam}: {e}") from e
                 out[cam] = {"photo": entry, "detections": _detections(dets), "orientation": _orientation(s.object, dets)}
