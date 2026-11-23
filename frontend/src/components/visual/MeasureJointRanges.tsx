@@ -45,6 +45,14 @@ export function useHandRun(on: boolean): [HandRun | null, () => void] {
 const minutes = (s: number | null | undefined) =>
   s === null || s === undefined ? "" : s < 90 ? `${Math.round(s)} s` : `${Math.round(s / 60)} min`;
 
+/** The console's run as this hand sees it: `mine` (this hand's run, or idle), `other` (another
+ * hand's run, still measuring on the rig). A run of another hand that ended is not shown. */
+export function runsFor(run: HandRun | null, handId: string | null): { mine: HandRun | null; other: HandRun | null } {
+  if (!run || run.state === "idle") return { mine: run, other: null };
+  if (run.hand === handId) return { mine: run, other: null };
+  return { mine: null, other: run.state === "running" ? run : null };
+}
+
 export function runNote(run: HandRun | null): string {
   if (!run || run.state === "idle") return "~65 min";
   if (run.state === "running") {
@@ -72,13 +80,21 @@ export function HandCalibrate() {
   );
 }
 
-export function MeasureRun({ run, refresh }: { run: HandRun | null; refresh: () => void }) {
+export function MeasureRun({
+  run,
+  other,
+  refresh,
+}: {
+  run: HandRun | null;
+  other: HandRun | null;
+  refresh: () => void;
+}) {
   const [note, setNote] = useState<{ text: string; bad: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const handInfo = useAppStore((s) => s.handInfo);
   const handState = useAppStore((s) => s.status?.state ?? null);
   const operation = useOperationStore((s) => s.operation);
-  const running = run?.state === "running";
+  const running = run?.state === "running" || !!other;
   const p = run?.progress ?? null;
   const blocks = p?.steps.filter((s) => s.poses) ?? [];
   const total = blocks.reduce((n, s) => n + (s.poses ?? 0), 0);
@@ -133,6 +149,16 @@ export function MeasureRun({ run, refresh }: { run: HandRun | null; refresh: () 
         {blocked && !running && <span className="visual-cal-hint">{blocked}</span>}
       </div>
       {note && <p className={`visual-cal-note${note.bad ? " warn" : ""}`}>{note.text}</p>}
+      {other && (
+        <p className="visual-cal-note warn">
+          The rig is measuring hand {other.hand}: stop that run before measuring this hand.
+        </p>
+      )}
+      {!!run?.dead_workers?.length && (
+        <p className="visual-cal-note warn">
+          A solve worker died: the poses are not being solved. See {run.dead_workers.join(", ")}.
+        </p>
+      )}
       {run && run.state !== "idle" && (
         <>
           <p className={`visual-cal-note${["failed", "stopped"].includes(run.state) ? " warn" : ""}`}>
@@ -144,7 +170,7 @@ export function MeasureRun({ run, refresh }: { run: HandRun | null; refresh: () 
                   ? `stopped (${run.stopped}): hand and plate torque off`
                   : run.state === "ended"
                     ? "dry run: the steps below were planned, nothing moved"
-                    : `failed${p?.error ? `: ${p.error}` : ""}`}
+                    : `failed: ${run.reason ?? "see the log"}`}
           </p>
           {total > 0 && (
             <div className="setup-progress" title={`${taken} of ${total} poses`}>
@@ -193,36 +219,67 @@ export function MeasureRun({ run, refresh }: { run: HandRun | null; refresh: () 
 const range = (r: [number, number]) => `${r[0].toFixed(1)} … ${r[1].toFixed(1)}`;
 const err = (e: ErrorStats | null | undefined) => (e ? `${e.rms.toFixed(1)} / ${e.max.toFixed(1)}` : "–");
 
+const runName = (path: string | null | undefined) => (path ?? "").split("/").pop() || "?";
+
+/** The connected hand's results: of this run once it is done; nothing from a run that failed or
+ * was stopped; with no run here, the hand's newest measured run, named as an earlier one. */
 export function MeasureResults({ run }: { run: HandRun | null }) {
-  const [res, setRes] = useState<HandRunResults | null>(null);
+  const [got, setGot] = useState<{ latest: string | null; results: HandRunResults | null } | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const handInfo = useAppStore((s) => s.handInfo);
+  const connected = useAppStore((s) => s.status?.state === "connected");
+  const handId = handInfo?.hand?.id ?? null;
   const ended = run?.ended ?? null;
   useEffect(() => {
+    if (!connected) return; // and again once the hand is back after a run (its new ranges in force)
     visualApi.handRunResults().then(
       (r) => {
-        setRes(r.results);
+        setGot(r);
         setNote(r.results ? null : `no measured run of ${r.hand} on this rig yet`);
       },
       (e: Error) => setNote(e.message),
     );
-  }, [ended]);
+  }, [ended, connected, handId]);
+  if (run?.state === "running")
+    return <p className="visual-cal-note">Measuring: the results come when this run is done.</p>;
+  if (run && ["failed", "stopped"].includes(run.state))
+    return (
+      <p className="visual-cal-note warn">
+        This run ({runName(run.run)}) {run.state === "stopped" ? `was stopped (${run.stopped})` : `failed: ${run.reason}`}:
+        no results from it. Measure again.
+      </p>
+    );
+  const res = got?.results ?? null;
   if (!res) return <p className="visual-cal-note">{note ?? "loading…"}</p>;
+  const thisRun = run?.state === "done" && run.run === res.run;
   const acc = res.accuracy;
   const measured = Object.values(res.joints).filter((j) => j.measured).length;
   return (
     <div style={{ display: "grid", gap: 8 }}>
-      <p className="visual-cal-note">
-        Run of {res.started ? shortDate(res.started) : "?"} on rig {res.rig}: {measured} of{" "}
-        {Object.keys(res.joints).length} joints measured from {res.poses} poses.{" "}
+      <p className={`visual-cal-note${thisRun ? "" : " warn"}`}>
+        {thisRun ? "This run" : "An earlier run"}, {runName(res.run)} ({res.started ? shortDate(res.started) : "?"}, rig{" "}
+        {res.rig}): {measured} of {Object.keys(res.joints).length} joints measured from {res.poses} poses.{" "}
         {res.joint_ranges ? `Recorded in ${res.joint_ranges}.` : "No joint measured: nothing recorded."}
-        {res.gone.length ? ` No longer in it (back to the model’s range): ${res.gone.join(", ")}.` : ""}
+        {!thisRun && got?.latest && got.latest !== res.run
+          ? ` The hand’s newest run, ${runName(got.latest)}, recorded no ranges.`
+          : ""}
       </p>
+      {res.joint_ranges && (
+        <p className="visual-cal-hint">
+          The hand’s joint_ranges.yaml was replaced whole: a joint not measured in this run has no measured range
+          on this computer, it uses the model’s range here. For a hand whose ranges came from its board, those
+          joints fall back to the model’s range here too, and the next Write to board would drop them from the
+          board.
+          {res.gone.length
+            ? ` Had a measured range before this run, now the model’s: ${res.gone.join(", ")}.`
+            : ""}
+        </p>
+      )}
       {/* TODO(quality gate): which joints get a measured range is not decided; for now every joint
           the fit's coverage check passes (the motor covered min_span of its range). */}
       <p className="visual-cal-hint">
         Measured: the motor covered at least {Math.round((res.min_span ?? 0) * 100)}% of the joint’s range in the
-        short block (the fit’s coverage check). Not measured: the range in force stays. No quality gate yet.
+        short block (the fit’s coverage check), and its fit is a range. No quality gate yet.
       </p>
       <table className="visual-cal-joints">
         <thead>
@@ -272,9 +329,11 @@ export function BoardWrite() {
   useEffect(() => {
     visualApi.boardWriter().then(setWriter, (e: Error) => setError(e.message));
   }, []);
+  const handId = handInfo?.hand?.id ?? null;
   const mine = operation?.kind === "board_write" ? operation : null;
   const active = isOperationActive(mine);
-  const result = mine?.state === "done" ? (mine.result as BoardWriteResult | null) : null;
+  const done = mine?.state === "done" ? (mine.result as BoardWriteResult | null) : null;
+  const result = done && done.hand === handId ? done : null; // another hand's write is not this hand's
   if (!writer) return <p className="visual-cal-note">{error ?? "loading…"}</p>;
   if (!writer.available)
     return (
@@ -296,7 +355,7 @@ export function BoardWrite() {
           disabled={active || isOperationActive(operation)}
           title={`The hand lets go of its port, the board is written with ${writer.tool}, read back, and the hand reconnects`}
         >
-          {active ? "writing…" : "Write to board"}
+          {active ? "writing…" : `Write hand ${handId ?? "?"} to its board`}
         </button>
         {active && <span className="visual-cal-hint">{mine?.detail ?? mine?.phase}</span>}
       </div>
@@ -304,6 +363,7 @@ export function BoardWrite() {
       {mine?.state === "error" && <p className="visual-cal-note warn">{mine.error}</p>}
       {result && (
         <p className={`visual-cal-note${result.written && result.confirmed ? "" : " warn"}`}>
+          {`Hand ${result.hand}: `}
           {!result.written
             ? `Not written: ${result.reason}`
             : result.confirmed && result.board
@@ -317,6 +377,7 @@ export function BoardWrite() {
 }
 
 interface BoardWriteResult {
+  hand: string;
   written: boolean;
   reason: string | null;
   sequence: number | null;

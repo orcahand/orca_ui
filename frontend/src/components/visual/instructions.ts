@@ -154,7 +154,7 @@ export const STEPS: StepDef[] = [
     items: () => [
       'The hand on the rig, cables free for the plate’s full turn, the tower off.',
       'Measure: both cameras are checked first (focus, exposure, which is which); the run starts only if they pass.',
-      'Keep orca-ui running: quitting it ends the run (closing this page does not). Stop ends it now; it can’t be resumed here, Measure starts a new one.',
+      'Keep orca-ui running: if it quits or crashes the run ends too (the next start cleans up anything left and turns the torque off); closing this page does not end it. Stop ends it now; it can’t be resumed here, Measure starts a new one.',
     ],
   },
   {

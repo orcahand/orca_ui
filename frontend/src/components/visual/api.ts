@@ -375,6 +375,8 @@ export interface HandRun {
   ended?: number | null;
   returncode?: number | null;
   stopped?: string | null; // "stopped", "e-stop", "the console shut down"
+  reason?: string | null; // why a run failed
+  dead_workers?: string[]; // the logs of solve workers that died
   run?: string | null; // its folder under the rig
   log?: string; // the run's output, in the console's state
   log_tail?: string[];
@@ -385,6 +387,8 @@ export interface HandRun {
     steps: HandRunStep[];
     eta_s: number | null;
     photos: Record<string, string>; // camera -> its newest photo, in the run folder
+    cut_short: string | null; // the step the night's deadline came before
+    recorded: boolean; // this run's fit recorded the ranges
   } | null;
 }
 
@@ -525,7 +529,7 @@ export const visualApi = {
   handRunStart: (dry = false) => call<HandRun>("/hand-run/start", json({ dry })),
   handRunStop: () => call<HandRun>("/hand-run/stop", { method: "POST" }),
   handRunResults: () =>
-    call<{ hand: string; results: HandRunResults | null }>("/hand-run/results"),
+    call<{ hand: string; latest: string | null; results: HandRunResults | null }>("/hand-run/results"),
   boardWriter: () => call<BoardWriter>("/board-write"),
   twinState: (angle?: number) =>
     call<TwinState>(

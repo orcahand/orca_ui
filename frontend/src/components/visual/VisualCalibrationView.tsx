@@ -49,6 +49,7 @@ import { HandBoard } from "./HandBoard";
 import {
   BoardWrite,
   calibratedToday,
+  runsFor,
   HandCalibrate,
   MeasureResults,
   MeasureRun,
@@ -777,6 +778,11 @@ export function VisualCalibrationView() {
   const [sandboxMount, setSandboxMount] = useState<number[][] | null>(null);
   const [handNote, setHandNote] = useState<string | null>(null);
   const handInfo = useAppStore((s) => s.handInfo);
+  // Hand-phase ticks are the connected hand's own: another hand starts with none.
+  const handId = handInfo?.hand?.id ?? null;
+  const handKey = handId ? `${CONFIRMED_KEY}.${handId}` : null;
+  const [handConfirmed, setHandConfirmed] = useState<StepId[]>([]);
+  useEffect(() => setHandConfirmed(handKey ? stored<StepId[]>(handKey, []) : []), [handKey]);
   const handState = useAppStore((s) => s.status?.state ?? null);
   const [fit, setFit] = useState<LiveFit | null>(null);
   const [fitRate, setFitRate] = useState<number | null>(null);
@@ -806,7 +812,8 @@ export function VisualCalibrationView() {
   // The stream stops while the tab is hidden (no decoding for nobody).
   const pageVisible = usePageVisible();
   // The rig's hand run (Measure joint ranges), followed on the hand steps.
-  const [handRun, refreshHandRun] = useHandRun(step.phase === "hand" && pageVisible);
+  const [handRun, refreshHandRun] = useHandRun(pageVisible);
+  const { mine: myRun, other: otherRun } = runsFor(handRun, handId);
 
   // The live view is the backend's preview of the shown camera (it owns the cameras).
   const cameras = rig?.cameras ?? [];
@@ -1070,8 +1077,18 @@ export function VisualCalibrationView() {
 
   const setSession = (k: SessionKind, s: Session | null) =>
     setByKind((b) => ({ ...b, [k]: s }));
+  const isHandStep = (id: StepId) => STEPS.find((d) => d.id === id)?.phase === "hand";
+  const ticked = (id: StepId) => (isHandStep(id) ? handConfirmed : confirmed).includes(id);
   const confirm = (id: StepId) =>
-    setConfirmed((c) => {
+    isHandStep(id)
+      ? handKey &&
+        setHandConfirmed((c) => {
+          if (c.includes(id)) return c;
+          const next = [...c, id];
+          store(handKey, next);
+          return next;
+        })
+      : setConfirmed((c) => {
       if (c.includes(id)) return c;
       const next = [...c, id];
       store(CONFIRMED_KEY, next);
@@ -1400,7 +1417,7 @@ export function VisualCalibrationView() {
   const begun = count("camera") > 0 || count("rotation") > 0;
   const cameraSolved = sessions.some((s) => s.step === "camera" && s.solved);
   const status = (s: StepDef): { state: StepState; note: string } => {
-    const seen = confirmed.includes(s.id);
+    const seen = ticked(s.id);
     switch (s.id) {
       case "mount":
         return {
@@ -1459,12 +1476,12 @@ export function VisualCalibrationView() {
       case "hand-measure":
         return {
           state:
-            handRun?.state === "done"
+            myRun?.state === "done"
               ? "done"
-              : handRun?.state === "failed" || handRun?.state === "stopped"
+              : myRun?.state === "failed" || myRun?.state === "stopped"
                 ? "warn"
                 : "todo",
-          note: runNote(handRun),
+          note: otherRun ? `rig busy: ${otherRun.hand}` : runNote(myRun),
         };
       case "hand-results":
         return {
@@ -1520,7 +1537,7 @@ export function VisualCalibrationView() {
       label: "Park for the swap",
       title: `Turn the plate to ${rig?.swap_angle ?? 180}° and release the torque`,
       onClick: parkForSwap,
-      primary: !confirmed.includes("swap"),
+      primary: !ticked("swap"),
       disabled: !rig || byHand,
     });
   } else if (step.id === "hand-pose") {
@@ -1929,6 +1946,14 @@ export function VisualCalibrationView() {
               <p className="visual-cal-hint">{hint}</p>
             )}
 
+            {handRun?.state === "running" && step.id !== "hand-measure" && (
+              <div className="gt-warning visual-cal-issue">
+                <b>
+                  The hand run is measuring hand {handRun.hand} on the rig: photos, solves, the plate’s
+                  calibration and park wait until it ends or is stopped (Measure joint ranges).
+                </b>
+              </div>
+            )}
             {issue && (
               <div className="gt-warning visual-cal-issue">
                 <b>{issue.text}</b>
@@ -2059,9 +2084,9 @@ export function VisualCalibrationView() {
               <div style={{ display: "grid", gap: 8, alignContent: "start", width: "100%", maxWidth: 820 }}>
                 {step.id === "hand-calibrate" && <HandCalibrate />}
                 {step.id === "hand-measure" && (
-                  <MeasureRun run={handRun} refresh={refreshHandRun} />
+                  <MeasureRun run={myRun} other={otherRun} refresh={refreshHandRun} />
                 )}
-                {step.id === "hand-results" && <MeasureResults run={handRun} />}
+                {step.id === "hand-results" && <MeasureResults run={myRun} />}
                 {step.id === "hand-write" && <BoardWrite />}
               </div>
             )}
