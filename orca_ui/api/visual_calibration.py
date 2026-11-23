@@ -9,7 +9,10 @@ The backend owns the rig's cameras (visual_calibration.rig_cameras: every enable
 camera opened once, told apart by serial, its controls locked): a sweep's photos are
 its own stills from every camera (``/sessions/{id}/capture``), the page only shows a
 preview (``/cameras/{cam}/preview.jpg``), and the hand run takes its stills from
-``/cameras/stills``. Nothing is captured before ``/cameras/preflight`` passed.
+``/cameras/stills``. Nothing is captured before ``/cameras/preflight`` passed. The assemblers'
+"Measure joint ranges" starts that run for the connected hand as a child process
+(``/hand-run``, orca_ui.hand.hand_run); ``/board-write`` says whether this computer can then
+write the hand's board (the ``board_write`` operation).
 Sessions live in the rig's folder, ``<ORCA_HOME>/rigs/<rig id>/sessions/<id>/``,
 beside its calibrations (visual_calibration.session, visual_calibration.rig_home); the rig id
 comes from the board the watcher found, else from the USB serial turntable.yaml pins. The
@@ -20,6 +23,7 @@ CPU-bound handlers are plain ``def`` so FastAPI runs them off the event loop.
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import sys
 import threading
@@ -60,6 +64,11 @@ class Preflight(BaseModel):
     write: bool = True                             # False: check the controls, never set them
 
 
+class MeasureStart(BaseModel):
+    dry: bool = False                              # build the hand run and list its steps; nothing moves
+    limit: int | None = None                       # poses per block: a short trial
+
+
 class StudyMapSwitch(BaseModel):
     enabled: bool | None = None
     mode: str | None = None                        # "off" or a map of the connected hand
@@ -70,6 +79,7 @@ class LutCommand(BaseModel):
     use_lut: bool = True                           # False: send them as they are (orca_core's linear map)
 
 
+logger = logging.getLogger(__name__)
 RESEARCH = [Depends(research.require)]     # the study's research extras: 404 without --research-ui
 HOLD_LEASE_S = 20.0    # a held plate (a sweep between stops) drops the torque this long after its last move
 RIG_POLL_S = 3.0       # the rig watcher's period (lists ports; probes a new board once)
@@ -164,7 +174,7 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
     router.release_turntable = release_turntable
 
     # The rig on the dashboard (docs/rig-dashboard.md): found by the watcher, never the hand's board.
-    hand = {"ports": lambda: set(), "blocker": lambda: None}
+    hand = {"ports": lambda: set(), "blocker": lambda: None, "service": None}
     presence: dict = {"present": False, "connected": False, "port": None, "usb_serial": None, "reason": "",
                       "model": None, "identity_claim": None, "warnings": [], "autodetect": False}
     probed: set = set()                            # (device, usb serial) whose identity was asked: once per plug-in
@@ -968,5 +978,127 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
         with path.open("a") as f:
             f.write(_json.dumps(row) + "\n")
         return row
+
+    # ---- Measure joint ranges (the assemblers' hand steps): hand_study.run_hand as the console's
+    # child process (orca_ui.hand.hand_run), followed from its run folder (run_hand.progress, .results).
+    measure: dict = {"run": None}
+
+    def attach_service(service, ui_url: str) -> None:
+        """The hand service (the hand to measure, its torque) and the URL the run drives the console at."""
+        from orca_ui.hand.hand_run import HandRun
+        from orca_ui.home import ui_home
+        hand["service"] = service
+        measure["run"] = router.hand_run = HandRun(EXPERIMENT, ui_url, lambda: ui_home() / "visual_calibration" / "hand_runs",
+                                                   safe_off=run_safe_off, on_end=run_ended)
+
+    def stop_hand_run(why: str = "stopped", release: bool = True) -> bool:
+        return measure["run"] is not None and measure["run"].stop(why, release)
+
+    router.attach_service = attach_service
+    router.stop_hand_run = stop_hand_run
+    router.hand_run_active = lambda: measure["run"] is not None and measure["run"].alive()
+
+    def run_safe_off() -> None:
+        """Hand and plate torque off after a run (night.py does it too; a killed run cannot)."""
+        try:
+            hand["service"].disable_torque()
+        except Exception as e:                     # no hand session: nothing holds
+            logger.warning("hand run: hand torque off: %s", e)
+        release_turntable()
+
+    def runner():
+        if measure["run"] is None:
+            raise HTTPException(409, "this console has no hand to measure")
+        return measure["run"]
+
+    def run_hand_module():
+        _experiment_on_path()
+        from hand_study import run_hand
+        return run_hand
+
+    def run_view(status: dict) -> dict:
+        """The process, the run's progress from its files and, once it ended, how: done (the night
+        finished), failed, stopped or ended (a dry run lists its steps only)."""
+        progress = run_hand_module().progress(Path(status["run"])) if status.get("run") else None
+        night = (progress or {}).get("state")
+        state = status["state"]
+        if state == "ended":
+            state = "done" if night == "done" else "failed" if status.get("returncode") or night == "aborted" else "ended"
+        return {**status, "state": state, "progress": progress}
+
+    def run_ended(status: dict) -> None:
+        """A finished run recorded the hand's ranges: the hand reconnects, so they are in force now."""
+        if not status.get("dry") and run_view(status)["state"] == "done":
+            hand["service"].reconnect()
+
+    def hand_to_measure() -> str:
+        service = hand["service"]
+        if service is None:
+            raise HTTPException(409, "this console has no hand to measure")
+        session = service.session
+        hand_id = getattr(session.hand, "hand_id", None) if session is not None and session.caps.motors else None
+        if service.supervisor.status().state.value != "connected" or not hand_id:
+            raise HTTPException(409, "connect the hand first")
+        return hand_id
+
+    @router.get("/hand-run")
+    def hand_run_state() -> dict:
+        return run_view(runner().status())
+
+    @router.post("/hand-run/start")
+    def hand_run_start(body: MeasureStart | None = None) -> dict:
+        """Measure the connected hand (~65 min): both cameras proven first, the plate connected, no
+        operation running. The run turns the plate and moves the hand, never both at once."""
+        body = body or MeasureStart()
+        run = runner()
+        hand_id = hand_to_measure()
+        manager = hand["service"].operation_manager
+        if manager is not None and manager.active():
+            raise HTTPException(409, "an operation is running: wait for it or stop it")
+        if run.alive():
+            raise HTTPException(409, "a hand run is already running")
+        if "t" not in table:
+            raise HTTPException(409, "the rig's plate is not connected")
+        camera_call(lambda c: c.preflight(None, write=True))
+        try:
+            return run_view(run.start(hand_id, dry=body.dry, limit=body.limit))
+        except (RuntimeError, OSError) as e:
+            raise HTTPException(409, str(e)) from e
+
+    @router.post("/hand-run/stop")
+    def hand_run_stop() -> dict:
+        """End the run now (its processes killed), hand and plate torque off."""
+        runner().stop("stopped")
+        return hand_run_state()
+
+    @router.get("/hand-run/photo/{cam}.jpg")
+    def hand_run_photo(cam: str) -> FileResponse:
+        """The run's newest photo from camera `cam`, as taken."""
+        status = runner().status()
+        run = Path(status["run"]) if status.get("run") else None
+        rh = run_hand_module()
+        rel = rh.last_photos(run, rh.night_files(run)[0]).get(cam) if run else None
+        if not rel:
+            raise HTTPException(404, f"no photo from camera {cam} yet")
+        return FileResponse(run / rel, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
+    @router.get("/hand-run/results")
+    def hand_run_results() -> dict:
+        """The connected hand's newest measured run on this rig: per joint the range in force before
+        and the measured one, which joints were measured, the accuracy before and after."""
+        from visual_calibration.rig_config import RigConfigError
+        hand_id = hand_to_measure()
+        rh = run_hand_module()
+        try:
+            run = rh.latest_run(hand_id, with_results=True)
+        except RigConfigError as e:
+            raise HTTPException(409, str(e)) from e
+        return {"hand": hand_id, "results": _plain(rh.results(run)) if run else None}
+
+    @router.get("/board-write")
+    def board_write_state() -> dict:
+        """Whether this computer can write a hand's board (an orca_firmware checkout), and why not."""
+        from orca_ui.hand.operations.board_write import board_writer
+        return board_writer()
 
     return router

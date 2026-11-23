@@ -52,6 +52,7 @@ def test_hand_info_and_geometry(client):
             "board_calibration_newer", "legacy_files"} <= set(hand)
     assert {"calibrated_at", "path", "previous_available", "previous_at"} <= set(hand["calibration"])
     assert hand["joint_ranges"]["source"] in ("model", "measured")
+    assert hand["joint_ranges"]["stored_on"] in (None, "file", "board")
     # The menu's tooltips name the hand's folder and its joint ranges file.
     if hand["folder"]:
         assert hand["joint_ranges"]["path"] == os.path.join(hand["folder"], "joint_ranges.yaml")

@@ -1,10 +1,12 @@
 // Visual calibration (orca_core VISUAL_CALIBRATION.md): two fixed cameras owned by
 // the backend (the page shows its preview; every photo is its stills from both), the
-// plate turning in front of them on the rig's motor. A subroutine of seven steps
+// plate turning in front of them on the rig's motor. A subroutine of steps
 // in two phases, freely switchable: rig (the calibration object instead of the
 // hand: set up, then 1a the camera and 1b the rotation, each a motor sweep
-// through every stop and a solve) and hand (the hand on the same connector, a
-// sweep with no solve yet). Each step shows what to do as a line drawing of the
+// through every stop and a solve) and hand (the assemblers' Measure joint ranges:
+// connect, calibrate the motor stops, mount the hand on the same connector, the
+// rig's hand run, its results, write to board; MeasureJointRanges.tsx). Each step
+// shows what to do as a line drawing of the
 // rig, the plate's stops from above, and the live camera with the tiles it
 // finds, where those matter. A step's state comes from its session where the
 // session can tell (photos, solve), else from the operator having moved past it.
@@ -44,6 +46,15 @@ import {
   type StepId,
 } from "./instructions";
 import { HandBoard } from "./HandBoard";
+import {
+  BoardWrite,
+  calibratedToday,
+  HandCalibrate,
+  MeasureResults,
+  MeasureRun,
+  runNote,
+  useHandRun,
+} from "./MeasureJointRanges";
 import { Results } from "./Results";
 import { fitOf, solvedWell } from "./solve";
 import type { HandOverlay } from "./handOverlay";
@@ -794,11 +805,13 @@ export function VisualCalibrationView() {
 
   // The stream stops while the tab is hidden (no decoding for nobody).
   const pageVisible = usePageVisible();
+  // The rig's hand run (Measure joint ranges), followed on the hand steps.
+  const [handRun, refreshHandRun] = useHandRun(step.phase === "hand" && pageVisible);
 
   // The live view is the backend's preview of the shown camera (it owns the cameras).
   const cameras = rig?.cameras ?? [];
-  const shown = cameras.includes(cameraId) ? cameraId : (cameras[0] ?? null);
-  const backend = useBackendCamera(shown, pageVisible);
+  const viewed = cameras.includes(cameraId) ? cameraId : (cameras[0] ?? null);
+  const backend = useBackendCamera(viewed, pageVisible);
   const stream = backend.stream;
   const error = backend.error;
   const size = backend.size && `${backend.size[0]}×${backend.size[1]} preview`;
@@ -960,7 +973,7 @@ export function VisualCalibrationView() {
   useEffect(() => {
     if (!overlayShown || !playing) return;
     let alive = true;
-    visualApi.overlay(plateAngle, rotation, shown ?? "a").then(
+    visualApi.overlay(plateAngle, rotation, viewed ?? "a").then(
       (m) => {
         if (!alive) return;
         setModel(m);
@@ -971,7 +984,7 @@ export function VisualCalibrationView() {
     return () => {
       alive = false;
     };
-  }, [overlayShown, playing, plateAngle, rotation, shown]);
+  }, [overlayShown, playing, plateAngle, rotation, viewed]);
 
   // The hand model loads once, the first time it is wanted, and stays for the page's life.
   const joints = handInfo?.joints;
@@ -1128,7 +1141,7 @@ export function VisualCalibrationView() {
     let n = 0;
     const t0 = performance.now();
     try {
-      if (shown !== "a") throw new Error("the live fit uses camera A: show camera A");
+      if (viewed !== "a") throw new Error("the live fit uses camera A: show camera A");
       while (solvingRef.current) {
         const v = video.current;
         if (!v?.videoWidth) throw new Error("no camera image");
@@ -1205,7 +1218,7 @@ export function VisualCalibrationView() {
   ): Promise<Session> => {
     const target = s ?? (await visualApi.createSession(k, byHand));
     const r = await captureAll(target.id, stop);
-    const mine = (shown && r.cameras[shown]) || Object.values(r.cameras)[0];
+    const mine = (viewed && r.cameras[viewed]) || Object.values(r.cameras)[0];
     if (mine)
       setOverlay({
         size: r.size,
@@ -1434,7 +1447,34 @@ export function VisualCalibrationView() {
       case "hand-board":
         return {
           state: seen || handState === "connected" ? "done" : "todo",
-          note: handState ?? "the hand's board",
+          note:
+            handState === "connected" && handInfo?.hand
+              ? handInfo.hand.id
+              : (handState ?? "the hand's board"),
+        };
+      case "hand-calibrate": {
+        const today = calibratedToday(handInfo?.hand?.calibration.calibrated_at);
+        return { state: today ? "done" : "todo", note: today ? "calibrated today" : "needed" };
+      }
+      case "hand-measure":
+        return {
+          state:
+            handRun?.state === "done"
+              ? "done"
+              : handRun?.state === "failed" || handRun?.state === "stopped"
+                ? "warn"
+                : "todo",
+          note: runNote(handRun),
+        };
+      case "hand-results":
+        return {
+          state: seen ? "done" : "todo",
+          note: handInfo?.hand?.joint_ranges.source === "measured" ? "ranges measured" : "per joint",
+        };
+      case "hand-write":
+        return {
+          state: seen ? "done" : "todo",
+          note: "calibration + ranges",
         };
       case "hand-pose":
         return {
@@ -1923,7 +1963,7 @@ export function VisualCalibrationView() {
             {step.id === "camera" && (
               <div className="visual-cal-toolbar">
                 <select
-                  value={shown ?? ""}
+                  value={viewed ?? ""}
                   onChange={(e) => choose(e.target.value)}
                   disabled={!cameras.length}
                   title="The camera shown; every photo is taken by all of them"
@@ -2015,6 +2055,16 @@ export function VisualCalibrationView() {
           </div>
           <div className="visual-cal-main">
             {camera && <div className="visual-cal-live">{camera}</div>}
+            {["hand-calibrate", "hand-measure", "hand-results", "hand-write"].includes(step.id) && (
+              <div style={{ display: "grid", gap: 8, alignContent: "start", width: "100%", maxWidth: 820 }}>
+                {step.id === "hand-calibrate" && <HandCalibrate />}
+                {step.id === "hand-measure" && (
+                  <MeasureRun run={handRun} refresh={refreshHandRun} />
+                )}
+                {step.id === "hand-results" && <MeasureResults run={handRun} />}
+                {step.id === "hand-write" && <BoardWrite />}
+              </div>
+            )}
             {showResults && session && (
               <Results session={session} cad={rig?.camera_mount ?? null} />
             )}

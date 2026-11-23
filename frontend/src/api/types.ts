@@ -281,7 +281,12 @@ export interface HandStoreInfo {
   joint_ranges: {
     source: 'model' | 'measured'
     measured_at: string | null
-    // Where ranges measured on this hand are read from.
+    // Where the measured ranges in force are kept: this computer's joint_ranges.yaml, or the
+    // hand's board (while there is no such file); null for the model's.
+    stored_on: 'file' | 'board' | null
+    // The joints with a measured range.
+    joints: string[]
+    // The hand's joint_ranges.yaml, where measured ranges are read from first.
     path: string | null
   }
   // Set when the board holds a newer calibration than this computer.
