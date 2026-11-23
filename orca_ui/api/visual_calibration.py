@@ -9,11 +9,12 @@ The backend owns the rig's cameras (visual_calibration.rig_cameras: every enable
 camera opened once, told apart by serial, its controls locked): a sweep's photos are
 its own stills from every camera (``/sessions/{id}/capture``), the page only shows a
 preview (``/cameras/{cam}/preview.jpg``), and the hand run takes its stills from
-``/cameras/{cam}/still``. Nothing is captured before ``/cameras/preflight`` passed.
-Sessions live in ``~/.orca_ui/visual_calibration/<id>/``
-(visual_calibration.session). The plate is turned by the rig's Dynamixel
-(visual_calibration.turntable; the mock one under --mock); the page drives the
-sweep: move, then ask for the photos.
+``/cameras/stills``. Nothing is captured before ``/cameras/preflight`` passed.
+Sessions live in the rig's folder, ``<ORCA_HOME>/rigs/<rig id>/sessions/<id>/``,
+beside its calibrations (visual_calibration.session, visual_calibration.rig_home); the rig id
+comes from the board the watcher found, else from the USB serial turntable.yaml pins. The
+plate is turned by the rig's Dynamixel (visual_calibration.turntable; the mock one under
+--mock); the page drives the sweep: move, then ask for the photos.
 CPU-bound handlers are plain ``def`` so FastAPI runs them off the event loop.
 """
 from __future__ import annotations
@@ -124,8 +125,8 @@ class StudyNote(BaseModel):
 
 
 def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> APIRouter:
-    """cameras: the rig's camera service (default: a RigCameras of the rig config, made on first use)."""
-    base = base or Path.home() / ".orca_ui" / "visual_calibration"
+    """`base`: the sessions folder (tests); by default the rig's own. `cameras`: the rig's
+    camera service (default: a RigCameras of the rig config, made on first use)."""
     router = APIRouter(prefix="/api/visual-calibration", tags=["visual-calibration"])
     lock = threading.Lock()                        # one solve / photo write at a time
     table: dict = {}                               # "t": the open Turntable, "hold_until": the hold's lease
@@ -223,10 +224,12 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
         from visual_calibration.turntable import Turntable, TurntableError
         with connect_lock:
             if "t" not in table:
+                if found:
+                    note_rig(found.get("usb_serial"), found.get("identity_claim"))
                 r = rig_config()
                 try:
                     table["t"] = Turntable.open(r.raw["turntable"], mock=mock, port=(found or {}).get("port"),
-                                                calibration_path=r.turntable_calibration_path, torque=False)
+                                                torque=False, **turntable_files(r))
                 except (TurntableError, OSError) as e:
                     presence.update(present=found is not None, connected=False, warnings=[f"turntable: {e}"])
                     return
@@ -279,10 +282,35 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
     router.start_rig_watcher = start_rig_watcher
     router.stop_rig_watcher = lambda: table.__setitem__("stop_watcher", True)
 
+    def note_rig(usb_serial: str | None, identity: str | None) -> None:
+        """The connected rig's id (visual_calibration.rig_home): its files are that rig's."""
+        from visual_calibration import rig_home
+        try:
+            table["rig_id"] = rig_home.remember(usb_serial, identity) if usb_serial else None
+        except rig_home.RigIdError:
+            table["rig_id"] = None
+
     def rig_config():
+        """The rig's config, its own files those of the rig connected (else of the board turntable.yaml pins)."""
         _experiment_on_path()
         from visual_calibration.rig_config import RigConfig
-        return RigConfig.load()
+        return RigConfig.load(rig_id=table.get("rig_id"))
+
+    def sessions_dir() -> Path:
+        if base is not None:
+            return base
+        _experiment_on_path()
+        from visual_calibration.rig_config import RigConfigError
+        try:
+            return Path(rig_config().own_file("sessions"))
+        except RigConfigError as e:
+            raise HTTPException(409, str(e)) from e
+
+    def turntable_files(r) -> dict:
+        """Where the turntable reads its motor calibration and saves a new one (the rig's folder)."""
+        from visual_calibration.rig_config import TURNTABLE_CALIBRATION_FILE
+        return {"calibration_path": r.turntable_calibration_path,
+                "save_path": r.own_file(TURNTABLE_CALIBRATION_FILE) if r.home else None}
 
     def turntable():
         if "t" not in table:
@@ -325,7 +353,7 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
 
     def open_session(sid: str):
         session, _ = vc()
-        root = base / sid
+        root = sessions_dir() / sid
         if "/" in sid or ".." in sid or not (root / "session.yaml").is_file():
             raise HTTPException(404, f"no session {sid}")
         return session.Session(root)
@@ -334,8 +362,7 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
     def rig() -> dict:
         vc()
         from visual_calibration.mounting import config_mountings, coverage
-        from visual_calibration.rig_config import RigConfig
-        r = RigConfig.load()
+        r = rig_config()
         obj = r.raw["calibration_object"]
         found = r.load_calibration().get("mounting")
         cover = coverage(preview_detector().obj, r.stops.angles, config_mountings(obj))
@@ -466,9 +493,10 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
         try:
             r = rig_config()
             table["t"] = Turntable.open(r.raw["turntable"], mock=mock, port=body.port, motor_id=body.motor_id,
-                                        calibration_path=r.turntable_calibration_path, torque=body.torque)
+                                        torque=body.torque, **turntable_files(r))
         except (TurntableError, OSError) as e:
             raise HTTPException(409, f"turntable: {e}") from e
+        note_rig(getattr(table["t"].bus, "usb_serial", None), None)
         return table["t"].state().as_dict()
 
     def lease(hold: bool) -> None:
@@ -558,7 +586,7 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
         """Per step (motor calibration, 1a, 1b, 2): status, time, key numbers, structured warnings."""
         vc()
         from visual_calibration.status import calibration_status
-        return {**calibration_status(rig_config(), base), "turntable": turntable_state()}
+        return {**calibration_status(rig_config(), sessions_dir()), "turntable": turntable_state()}
 
     @router.get("/twin")
     def twin() -> dict:
@@ -631,12 +659,12 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
     def sessions() -> list[dict]:
         session, _ = vc()
         return [{"id": s.id, "step": s.meta["step"], "created": s.meta["created"], "photos": len(s.meta["photos"]),
-                 "solved": s.result() is not None} for s in session.Session.list(base)]
+                 "solved": s.result() is not None} for s in session.Session.list(sessions_dir())]
 
     @router.post("/sessions")
     def create(body: NewSession) -> dict:
         session, _ = vc()
-        return session.Session.create(base, body.step, hand_turned=body.hand_turned).summary()
+        return session.Session.create(sessions_dir(), body.step, hand_turned=body.hand_turned).summary()
 
     @router.get("/sessions/{sid}")
     def get(sid: str) -> dict:
@@ -774,7 +802,7 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
         f = table.get("fit")
         if f is None or not getattr(f, "frame", None):
             raise HTTPException(409, "no fit yet")
-        out = base / "live_fit" / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        out = sessions_dir() / "live_fit" / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         out.mkdir(parents=True, exist_ok=True)
         (out / ("frame.jpg" if f.frame[:2] == b"\xff\xd8" else "frame.png")).write_bytes(f.frame)
         keep = {k: v for k, v in f.last.items() if k not in ("outlines", "segmentation")}
@@ -909,7 +937,8 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
             raise HTTPException(400, "bad tag")
         return _study(f"/api/protocol/{tag}")
 
-    NOTES = Path.home() / ".orca_ui" / "visual_calibration" / "hand_study" / "protocol"
+    from orca_ui.hand.study_map import study_dir
+    NOTES = study_dir() / "protocol"
 
     def _notes_path(tag: str) -> Path:
         if "/" in tag or ".." in tag:
