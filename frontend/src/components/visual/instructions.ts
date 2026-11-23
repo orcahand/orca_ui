@@ -2,7 +2,9 @@
 // in the order they are done. Phase rig: the calibration object instead of the
 // hand; the motor turns the plate through every stop twice, 1a for the camera
 // (lens, tile poses), 1b for the rotation (camera pose, axis, stop angles).
-// Phase hand: the hand on the same connector.
+// Phase hand: the hand on the same connector. For the assemblers (Measure joint ranges):
+// connect the hand, calibrate its motor stops, mount it, measure (the rig's hand run),
+// the results, write them to the hand's board. The study's hand steps are research extras.
 
 import type { RigInfo, SessionKind } from './api'
 
@@ -15,6 +17,10 @@ export type StepId =
   | 'rotation'
   | 'swap'
   | 'hand-board'
+  | 'hand-calibrate'
+  | 'hand-measure'
+  | 'hand-results'
+  | 'hand-write'
   | 'hand-capture'
   | 'hand-check'
   | 'hand-pose'
@@ -89,9 +95,27 @@ export const STEPS: StepDef[] = [
     solve: true,
   },
   {
+    id: 'hand-board',
+    phase: 'hand',
+    title: 'Connect the hand',
+    copy: () => 'The hand to measure, connected to this console (the hand stays off the rig for now). The turntable’s board answers as a hand too; the console must take the hand’s board, never the turntable’s.',
+    items: () => [
+      'Plug in the hand’s board (USB and power).',
+      'Pick it below. The turntable’s board is marked and cannot be picked.',
+      'Wait until it shows connected, then go on.',
+    ],
+  },
+  {
+    id: 'hand-calibrate',
+    phase: 'hand',
+    title: 'Calibrate the motor stops',
+    copy: () =>
+      'orca_core’s normal calibration (Setup › Calibrate), unless the hand already has one from today: the motors drive every joint to its stops. Keep clear while it runs.',
+  },
+  {
     id: 'swap',
     phase: 'hand',
-    title: 'Swap in the hand',
+    title: 'Mount the hand',
     copy: () => 'The rig is calibrated; from here on the camera stays exactly where it is.',
     items: (rig) => [
       'Close Logi Tune (it rewrites the camera’s focus and exposure). Don’t touch the camera.',
@@ -122,20 +146,36 @@ export const STEPS: StepDef[] = [
     overlay: true,
   },
   {
-    id: 'hand-board',
+    id: 'hand-measure',
     phase: 'hand',
-    title: 'Connect the hand (optional)',
-    copy: () => 'The turntable’s board answers as a hand too; the console must take the hand’s board, never the turntable’s.',
+    title: 'Measure joint ranges',
+    copy: () =>
+      'About 65 minutes: the hand takes 72 poses (the short block) and 25 more (the check), and at each pose the plate turns through its stops while both cameras photograph the hand. The hand and the plate never move together. Keep clear of the rig; E-STOP ends the run.',
     items: () => [
-      'Plug in the hand’s board (USB and power).',
-      'Pick it below. The turntable’s board is marked and cannot be picked.',
-      'Wait until it shows connected, then go on.',
+      'The hand on the rig, cables free for the plate’s full turn, the tower off.',
+      'Measure: both cameras are checked first (focus, exposure, which is which); the run starts only if they pass.',
+      'Keep orca-ui running: quitting it ends the run (closing this page does not). Stop ends it now; it can’t be resumed here, Measure starts a new one.',
     ],
+  },
+  {
+    id: 'hand-results',
+    phase: 'hand',
+    title: 'Results',
+    copy: () =>
+      'Per joint the range in force before and the measured one, and the hand’s accuracy on the 25-pose check before and after. The measured ranges are recorded in the hand’s joint_ranges.yaml on this computer and are in force here.',
+  },
+  {
+    id: 'hand-write',
+    phase: 'hand',
+    title: 'Write to board',
+    copy: () =>
+      'The hand’s calibration and its measured ranges onto its own board, so they go with the hand. Read back to confirm.',
   },
   {
     id: 'hand-capture',
     phase: 'hand',
     title: 'Capture the hand',
+    research: true,
     copy: () => 'One photo per stop, the same stops and the same approach (from the hard-stop side) as the rig calibration.',
     items: () => [
       'Put the hand at zero (every joint at 0°) and leave it there for the whole sweep.',
@@ -150,6 +190,7 @@ export const STEPS: StepDef[] = [
     id: 'hand-check',
     phase: 'hand',
     title: 'Check the overlay',
+    research: true,
     copy: () => 'The hand’s CAD drawn where the calibrated rig puts it, posed by the hand’s joint angles. The automatic hand fit (its mount and joints from the photos) is not built yet: this is a check by eye.',
     items: () => [
       'Step through the stops with “Next stop”.',

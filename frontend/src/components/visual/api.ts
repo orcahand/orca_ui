@@ -356,6 +356,81 @@ export interface LutCommand {
   reached: Record<string, number> | null; // what the hand really reaches with it (the table)
 }
 
+/** One step of the hand run (hand_study.run_hand.progress). */
+export interface HandRunStep {
+  name: string;
+  label: string;
+  state: "done" | "running" | "todo";
+  poses?: number; // a block's poses (its limit in a trial)
+  taken?: number;
+}
+
+/** The rig's hand run, as the console's child process and from its run folder. */
+export interface HandRun {
+  // ended: it stopped without the night finishing (a dry run only lists its steps)
+  state: "idle" | "running" | "done" | "failed" | "stopped" | "ended";
+  hand?: string;
+  dry?: boolean;
+  started?: number;
+  ended?: number | null;
+  returncode?: number | null;
+  stopped?: string | null; // "stopped", "e-stop", "the console shut down"
+  run?: string | null; // its folder under the rig
+  log?: string; // the run's output, in the console's state
+  log_tail?: string[];
+  progress: {
+    state: string; // the night's: starting, planned, running, done, aborted
+    error: string | null;
+    step: string | null;
+    steps: HandRunStep[];
+    eta_s: number | null;
+    photos: Record<string, string>; // camera -> its newest photo, in the run folder
+  } | null;
+}
+
+/** RMS and max |true - predicted| (deg); null where the check saw no pose of the joint. */
+export interface ErrorStats {
+  rms: number;
+  max: number;
+  mean?: number;
+  p50?: number;
+  p95?: number;
+  n?: number;
+}
+
+export interface HandRunResults {
+  run: string;
+  hand: string | null;
+  rig: string | null;
+  started: string | null;
+  poses: number;
+  min_span: number | null; // share of a joint's range the motor must have covered to be measured
+  joint_ranges: string | null; // the joint_ranges.yaml written, or null when no joint was measured
+  joints: Record<
+    string,
+    {
+      old: [number, number]; // in force before the run
+      new: [number, number]; // the measured one (the old one when not measured)
+      measured: boolean;
+      n: number;
+      rms: number;
+      t_span: [number, number] | null;
+    }
+  >;
+  accuracy: {
+    n: number;
+    n_all: number;
+    before: Record<string, ErrorStats | null>; // per joint, and "all"
+    after: Record<string, ErrorStats | null>;
+  } | null;
+}
+
+export interface BoardWriter {
+  available: boolean;
+  tool: string | null;
+  reason: string | null;
+}
+
 const BASE = "/api/visual-calibration";
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
@@ -443,6 +518,12 @@ export const visualApi = {
   rigPresence: () => call<RigPresence>("/rig/presence"),
   rigScan: () => call<RigPresence>("/rig/scan", { method: "POST" }),
   park: () => call<Turntable>("/turntable/park", { method: "POST" }),
+  handRun: () => call<HandRun>("/hand-run"),
+  handRunStart: (dry = false) => call<HandRun>("/hand-run/start", json({ dry })),
+  handRunStop: () => call<HandRun>("/hand-run/stop", { method: "POST" }),
+  handRunResults: () =>
+    call<{ hand: string; results: HandRunResults | null }>("/hand-run/results"),
+  boardWriter: () => call<BoardWriter>("/board-write"),
   twinState: (angle?: number) =>
     call<TwinState>(
       `/twin/state${angle === undefined ? "" : `?angle=${angle}`}`,
@@ -452,6 +533,10 @@ export const visualApi = {
 /** A camera's live view from the backend, a JPEG scaled to maxSide (the page never opens a camera). */
 export const cameraPreviewUrl = (camera: string, maxSide: number) =>
   `${BASE}/cameras/${encodeURIComponent(camera)}/preview.jpg?max_side=${maxSide}`;
+
+/** The hand run's newest photo from `camera`, scaled down; `key` changes with the photo. */
+export const handRunPhotoUrl = (camera: string, key: string) =>
+  `${BASE}/hand-run/photo/${encodeURIComponent(camera)}.jpg?max_side=900&k=${encodeURIComponent(key)}`;
 
 export const twinTileUrl = (name: string) =>
   `${BASE}/twin/tiles/${encodeURIComponent(name)}.png`;
