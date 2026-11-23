@@ -797,8 +797,8 @@ export function VisualCalibrationView() {
 
   // The live view is the backend's preview of the shown camera (it owns the cameras).
   const cameras = rig?.cameras ?? [];
-  const shown = cameras.includes(cameraId) ? cameraId : (cameras[0] ?? null);
-  const backend = useBackendCamera(shown, pageVisible);
+  const viewed = cameras.includes(cameraId) ? cameraId : (cameras[0] ?? null);
+  const backend = useBackendCamera(viewed, pageVisible);
   const stream = backend.stream;
   const error = backend.error;
   const size = backend.size && `${backend.size[0]}×${backend.size[1]} preview`;
@@ -960,7 +960,7 @@ export function VisualCalibrationView() {
   useEffect(() => {
     if (!overlayShown || !playing) return;
     let alive = true;
-    visualApi.overlay(plateAngle, rotation, shown ?? "a").then(
+    visualApi.overlay(plateAngle, rotation, viewed ?? "a").then(
       (m) => {
         if (!alive) return;
         setModel(m);
@@ -971,7 +971,7 @@ export function VisualCalibrationView() {
     return () => {
       alive = false;
     };
-  }, [overlayShown, playing, plateAngle, rotation, shown]);
+  }, [overlayShown, playing, plateAngle, rotation, viewed]);
 
   // The hand model loads once, the first time it is wanted, and stays for the page's life.
   const joints = handInfo?.joints;
@@ -1128,7 +1128,7 @@ export function VisualCalibrationView() {
     let n = 0;
     const t0 = performance.now();
     try {
-      if (shown !== "a") throw new Error("the live fit uses camera A: show camera A");
+      if (viewed !== "a") throw new Error("the live fit uses camera A: show camera A");
       while (solvingRef.current) {
         const v = video.current;
         if (!v?.videoWidth) throw new Error("no camera image");
@@ -1205,7 +1205,7 @@ export function VisualCalibrationView() {
   ): Promise<Session> => {
     const target = s ?? (await visualApi.createSession(k, byHand));
     const r = await captureAll(target.id, stop);
-    const mine = (shown && r.cameras[shown]) || Object.values(r.cameras)[0];
+    const mine = (viewed && r.cameras[viewed]) || Object.values(r.cameras)[0];
     if (mine)
       setOverlay({
         size: r.size,
@@ -1923,7 +1923,7 @@ export function VisualCalibrationView() {
             {step.id === "camera" && (
               <div className="visual-cal-toolbar">
                 <select
-                  value={shown ?? ""}
+                  value={viewed ?? ""}
                   onChange={(e) => choose(e.target.value)}
                   disabled={!cameras.length}
                   title="The camera shown; every photo is taken by all of them"
