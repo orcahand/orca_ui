@@ -154,9 +154,10 @@ def test_the_research_ui_flag_reaches_the_status_and_the_endpoints(flag, tmp_pat
     from orca_ui.hand import study_map
     from orca_ui.server import create_app
 
-    for attr, path in (("path", tmp_path / "joint_map.json"), ("root", tmp_path / "maps"),
-                       ("selection", tmp_path / "selected.json")):
+    for attr, path in (("_path", tmp_path / "joint_map.json"), ("_root", tmp_path / "maps"),
+                       ("_selection", tmp_path / "selected.json")):
         monkeypatch.setattr(study_map.STUDY_MAP, attr, path)
+    monkeypatch.setattr(study_map.STUDY_MAP, "_modes", None)
     settings = build_settings(["--mock", "--no-browser"] + (["--research-ui"] if flag else []))
     assert settings.research_ui is flag
     with TestClient(create_app(settings)) as c:
