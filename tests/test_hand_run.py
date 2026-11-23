@@ -5,6 +5,7 @@ import os
 import socket
 import sys
 import time
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -78,6 +79,12 @@ def test_measure_builds_the_run_for_the_connected_hand(client):
     assert all(s["state"] == "todo" for s in run["progress"]["steps"]) and run["progress"]["eta_s"] > 0
     assert f"/runs/{hand_id}/" in run["run"] and run["run"].startswith(os.environ["ORCA_HOME"])
     assert client.get(f"{VC}/hand-run/results").json() == {"hand": hand_id, "results": None}
+    assert client.get(f"{VC}/hand-run/photo/b.jpg").status_code == 404
+    pose = next(Path(run["run"]).glob("sessions/*-N00-baseline")) / "configs" / "zero"
+    pose.mkdir(parents=True)
+    (pose / "v180_b.jpg").write_bytes(b"\xff\xd8 a photo")
+    assert client.get(f"{VC}/hand-run").json()["progress"]["photos"] == {"b": str((pose / "v180_b.jpg").relative_to(run["run"]))}
+    assert client.get(f"{VC}/hand-run/photo/b.jpg").content == b"\xff\xd8 a photo"
 
     writer = client.get(f"{VC}/board-write").json()
     assert writer["available"] is False and "orca_firmware" in writer["reason"]

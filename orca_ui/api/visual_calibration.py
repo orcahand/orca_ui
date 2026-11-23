@@ -1069,22 +1069,15 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
         return hand_run_state()
 
     @router.get("/hand-run/photo/{cam}.jpg")
-    def hand_run_photo(cam: str, max_side: int = Query(900, ge=160, le=3840)) -> Response:
-        """The run's newest photo from camera `cam`, scaled down."""
-        import cv2
+    def hand_run_photo(cam: str) -> FileResponse:
+        """The run's newest photo from camera `cam`, as taken."""
         status = runner().status()
-        if not status.get("run"):
-            raise HTTPException(404, "no photo yet")
-        run = Path(status["run"])
+        run = Path(status["run"]) if status.get("run") else None
         rh = run_hand_module()
-        rel = rh.last_photos(run, rh.night_files(run)[0]).get(cam)
-        img = cv2.imread(str(run / rel)) if rel else None
-        if img is None:
+        rel = rh.last_photos(run, rh.night_files(run)[0]).get(cam) if run else None
+        if not rel:
             raise HTTPException(404, f"no photo from camera {cam} yet")
-        scale = max_side / max(img.shape[:2])
-        if scale < 1:
-            img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
-        return image_response(img, "jpg", 80)
+        return FileResponse(run / rel, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
     @router.get("/hand-run/results")
     def hand_run_results() -> dict:

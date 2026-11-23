@@ -534,9 +534,9 @@ export const visualApi = {
 export const cameraPreviewUrl = (camera: string, maxSide: number) =>
   `${BASE}/cameras/${encodeURIComponent(camera)}/preview.jpg?max_side=${maxSide}`;
 
-/** The hand run's newest photo from `camera`, scaled down; `key` changes with the photo. */
+/** The hand run's newest photo from `camera`; `key` changes with the photo. */
 export const handRunPhotoUrl = (camera: string, key: string) =>
-  `${BASE}/hand-run/photo/${encodeURIComponent(camera)}.jpg?max_side=900&k=${encodeURIComponent(key)}`;
+  `${BASE}/hand-run/photo/${encodeURIComponent(camera)}.jpg?k=${encodeURIComponent(key)}`;
 
 export const twinTileUrl = (name: string) =>
   `${BASE}/twin/tiles/${encodeURIComponent(name)}.png`;
