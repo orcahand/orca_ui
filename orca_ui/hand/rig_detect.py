@@ -2,10 +2,10 @@
 
 The rig's controller board answers ORCA_ID? like a hand's (today's even claims
 hand ser-3526), so the identity alone cannot tell. In order: a known rig USB
-serial, a rig flag in the board identity (config code RIG, serial rig-...),
-or a bus with exactly one motor of a rig model. Ports of the hand (pinned board,
-live session, same USB device) are never rig candidates, and a rig board is
-never offered or taken as a hand. docs/rig-dashboard.md.
+serial, or a rig flag in the board identity (config code RIG, serial rig-...).
+Its motors never tell: the rig's motor models are hand motors too. Ports of the
+hand (pinned board, live session, same USB device) are never rig candidates, and
+a rig board is never offered or taken as a hand. docs/rig-dashboard.md.
 """
 from __future__ import annotations
 
@@ -43,9 +43,8 @@ def identity_flags_rig(info) -> bool:
     return (config in RIG_CONFIG_CODES) or str(serial).lower().startswith("rig")
 
 
-def classify(usb_serial: str | None, info=None, motors: list[dict] | None = None,
-             serials: Iterable[str] = KNOWN_RIG_SERIALS) -> RigVerdict:
-    """Rig or not, from what is known about one board (motors: a bus scan, if one was made)."""
+def classify(usb_serial: str | None, info=None, serials: Iterable[str] = KNOWN_RIG_SERIALS) -> RigVerdict:
+    """Rig or not, from one board's USB serial and its ORCA identity."""
     claim = getattr(info, "serial", None) if info is not None else None
     if usb_serial and usb_serial in set(serials):
         w = [f"the rig board's ID claims hand {claim}: write a rig ID to it (config RIG, serial rig-<n>)"] \
@@ -53,14 +52,6 @@ def classify(usb_serial: str | None, info=None, motors: list[dict] | None = None
         return RigVerdict(True, "known rig USB serial", w)
     if identity_flags_rig(info):
         return RigVerdict(True, "rig flag in the board ID")
-    if motors is not None:
-        if len(motors) == 1:
-            model = motors[0].get("model_name")
-            if model in RIG_MODELS:
-                w = [f"one {model} on a board that claims hand {claim}"] if claim else []
-                return RigVerdict(True, f"one {model} on its bus", w)
-            return RigVerdict(False, f"one motor of model {model}, not a rig model")
-        return RigVerdict(False, f"{len(motors)} motors on its bus" if motors else "no motor on its bus")
     return RigVerdict(False, "")
 
 

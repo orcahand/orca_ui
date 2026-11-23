@@ -10,12 +10,12 @@ Backend `orca_ui/hand/rig_detect.py`, watcher thread in `api/visual_calibration.
 A board is the **rig** when any of these holds (in order):
 1. its USB serial is a known rig serial: `turntable.yaml` `board.usb_serial`,
    `turntable_calibration.yaml` `board.usb_serial`, built-in `FC9578875154393741202020FF012940…`;
-2. its ORCA identity carries a rig flag: config code `RIG`, or serial `rig-…`;
-3. a bus scan (only on a free, non-hand board) finds exactly one motor of a known
-   rig model (XC430-T240BB-T, XC430-W240-T, XC330-T288-T, read from the control table).
+2. its ORCA identity carries a rig flag: config code `RIG`, or serial `rig-…`
+   (asked once per plug-in, only of a free, non-hand board).
 
-A board with 2+ motors, the pinned hand board, any port of the hand session, and any
-port sharing the hand board's USB serial is **never** a rig candidate. A rig board is
+Its motors are never scanned and never decide: the rig's motor models are hand
+motors too. The pinned hand board, any port of the hand session, and any port
+sharing the hand board's USB serial is **never** a rig candidate. A rig board is
 **never** a hand: `select_board` refuses it (409), the board menu labels it `rig`, and
 unpinned hand detection drops a detection that landed on a rig port.
 
@@ -25,7 +25,7 @@ Proposal (not done): write a rig identity to the board (config code `RIG`, seria
 `rig-<n>`) with the board provisioning tool, after which rule 2 covers new rigs
 without a serial list.
 
-Motor: the model read at the scan is reported; a config `motor.model` that differs
+Motor: the model read when the rig is opened is reported; a config `motor.model` that differs
 (not `auto`) is a warning, not an error. XC330-T288-T: same operating mode 4, PWM
 cap, `gear_ratio: 1.0` (+1) in its `turntable.yaml`.
 

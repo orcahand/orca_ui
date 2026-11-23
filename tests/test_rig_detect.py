@@ -1,4 +1,4 @@
-"""The calibration rig: found by serial / identity / one rig motor, never the hand's board;
+"""The calibration rig: found by USB serial or board identity only, never the hand's board;
 the dashboard's rig API under --mock; the hand and the plate never move together."""
 from types import SimpleNamespace
 
@@ -22,11 +22,7 @@ def test_classify():
     assert v.rig and "serial" in v.reason and "ser-3526" in v.warnings[0]     # today's board claims a hand
     assert classify("other", info("rig-1")).rig and classify("other", info("x", "RIG")).rig
     assert classify("other", info("ser-4485")).rig is False
-    assert classify("other", None, [{"id": 1, "model_name": "XC330-T288-T"}]).rig
-    assert classify("other", None, [{"id": 1, "model_name": "XC430-T240BB-T"}]).rig
-    assert not classify("other", None, [{"id": 1, "model_name": "XL330-M288-T"}]).rig
-    assert not classify("other", None, [{"id": i, "model_name": "XC330-T288-T"} for i in range(17)]).rig
-    assert not classify(None, None, []).rig
+    assert not classify("other", None).rig and not classify(None, None).rig
     assert "pinned" in rig_serials({"board": {"usb_serial": "pinned"}}, None)
 
 

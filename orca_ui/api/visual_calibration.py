@@ -153,7 +153,7 @@ def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
     hand = {"ports": lambda: set(), "blocker": lambda: None}
     presence: dict = {"present": False, "connected": False, "port": None, "usb_serial": None, "reason": "",
                       "model": None, "identity_claim": None, "warnings": [], "autodetect": False}
-    probed: set = set()                            # (device, usb serial) already bus-scanned: once per plug-in
+    probed: set = set()                            # (device, usb serial) whose identity was asked: once per plug-in
     connect_lock = threading.Lock()
 
     def attach_hand(ports, blocker) -> None:
@@ -167,9 +167,9 @@ def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
     router.attach_hand = attach_hand
     router.plate_motion_guard = plate_motion_guard
 
-    def find_rig(scan_unknown: bool) -> dict | None:
-        """The rig's board: a known serial first; with scan_unknown, a free non-hand board whose
-        bus has exactly one motor of a rig model (each board once per plug-in)."""
+    def find_rig() -> dict | None:
+        """The rig's board: a known USB serial first, else a free non-hand board whose identity
+        carries the rig flag (each board asked once per plug-in). Its motors are never scanned."""
         import serial.tools.list_ports
         from orca_core.constants import KNOWN_VIDS
         from orca_core.hardware.sensing.serial_discovery import port_in_use, probe_orca_info
@@ -187,27 +187,17 @@ def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
             return {"port": motor_cdc[0] if len(motor_cdc) == 1 else (rig[0].device if len(rig) == 1 else None),
                     "usb_serial": rig[0].serial_number, "reason": v.reason,
                     "identity_claim": getattr(info, "serial", None), "warnings": v.warnings}
-        if not scan_unknown:
-            return None
-        _experiment_on_path()
-        from visual_calibration.turntable import TurntableError, find_rig_bus
         mine_serials = {p.serial_number for p in serial.tools.list_ports.comports() if p.device in mine}
         for p in ports:
             key = (p.device, p.serial_number)
-            if key in probed or p.serial_number in mine_serials or port_in_use(p.device):
-                continue
-            if p.vid not in KNOWN_VIDS["oh_board"] and p.vid not in KNOWN_VIDS.get("dynamixel", []):
+            if key in probed or p.serial_number in mine_serials or p.vid not in KNOWN_VIDS["oh_board"] \
+                    or port_in_use(p.device):
                 continue
             probed.add(key)
-            info = probe_orca_info(p.device) if p.vid in KNOWN_VIDS["oh_board"] else None
-            if p.vid in KNOWN_VIDS["oh_board"] and (info is None or info.role != "motor"):
+            info = probe_orca_info(p.device)
+            if info is None or info.role != "motor":
                 continue
-            try:
-                bus = find_rig_bus({**rig_yaml()[0], "board": {**(rig_yaml()[0].get("board") or {}), "usb_serial": None}},
-                                   port=p.device)
-            except (TurntableError, OSError):
-                continue
-            v = classify(p.serial_number, info, [{"id": bus.motor_id, "model_name": bus.model}], known)
+            v = classify(p.serial_number, info, serials=known)
             if v.rig:
                 return {"port": p.device, "usb_serial": p.serial_number, "reason": v.reason,
                         "identity_claim": getattr(info, "serial", None), "warnings": v.warnings}
@@ -236,7 +226,7 @@ def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
                             identity_claim=(found or {}).get("identity_claim"),
                             warnings=[*(found or {}).get("warnings", []), *([] if mock else check_model(model, configured))])
 
-    def rig_tick(scan_unknown: bool) -> None:
+    def rig_tick() -> None:
         if "t" in table:
             port = getattr(table["t"].client, "port_name", None)
             if not mock and port and not os.path.exists(port) and not table["t"].lock.locked():
@@ -251,7 +241,7 @@ def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
         if mock:
             connect_rig(None)
             return
-        found = find_rig(scan_unknown)
+        found = find_rig()
         presence.update(present=found is not None)
         if found is not None:
             connect_rig(found)
@@ -259,7 +249,7 @@ def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
     def rig_watcher() -> None:
         while not table.get("stop_watcher"):
             try:
-                rig_tick(scan_unknown=True)
+                rig_tick()
             except Exception as e:                 # never dies: a flaky port must not end the watch
                 presence["warnings"] = [f"rig watcher: {e}"]
             time.sleep(RIG_POLL_S)
@@ -455,10 +445,10 @@ def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
 
     @router.post("/rig/scan")
     def rig_scan() -> dict:
-        """Look for the rig now, a new board's bus included (never the hand's ports)."""
+        """Look for the rig now, asking every free board's identity again (never the hand's ports)."""
         probed.clear()
         table["rig_pause_until"] = 0.0
-        rig_tick(scan_unknown=True)
+        rig_tick()
         return rig_presence()
 
     @router.post("/turntable/release")
