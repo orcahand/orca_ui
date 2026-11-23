@@ -48,8 +48,7 @@ const minutes = (s: number | null | undefined) =>
 /** The console's run as this hand sees it: `mine` (this hand's run, or idle), `other` (another
  * hand's run, still measuring on the rig). A run of another hand that ended is not shown. */
 export function runsFor(run: HandRun | null, handId: string | null): { mine: HandRun | null; other: HandRun | null } {
-  if (!run || run.state === "idle") return { mine: run, other: null };
-  if (run.hand === handId) return { mine: run, other: null };
+  if (!run || run.state === "idle" || !handId || run.hand === handId) return { mine: run, other: null };
   return { mine: null, other: run.state === "running" ? run : null };
 }
 
@@ -171,6 +170,7 @@ export function MeasureRun({
                   : run.state === "ended"
                     ? "dry run: the steps below were planned, nothing moved"
                     : `failed: ${run.reason ?? "see the log"}`}
+            {partly(run) && " The joint ranges were recorded before that (see Results)."}
           </p>
           {total > 0 && (
             <div className="setup-progress" title={`${taken} of ${total} poses`}>
@@ -221,16 +221,24 @@ const err = (e: ErrorStats | null | undefined) => (e ? `${e.rms.toFixed(1)} / ${
 
 const runName = (path: string | null | undefined) => (path ?? "").split("/").pop() || "?";
 
+/** A run that failed or was stopped after its fit had recorded the ranges (the accuracy check left). */
+const partly = (run: HandRun | null) =>
+  !!run && ["failed", "stopped"].includes(run.state) && !!run.progress?.recorded;
+const why = (run: HandRun) => (run.state === "stopped" ? `it was stopped (${run.stopped})` : run.reason);
+
 /** The connected hand's results: of this run once it is done; nothing from a run that failed or
  * was stopped; with no run here, the hand's newest measured run, named as an earlier one. */
 export function MeasureResults({ run }: { run: HandRun | null }) {
-  const [got, setGot] = useState<{ latest: string | null; results: HandRunResults | null } | null>(null);
+  const [got, setGot] = useState<{ hand: string; latest: string | null; results: HandRunResults | null } | null>(
+    null,
+  );
   const [note, setNote] = useState<string | null>(null);
   const handInfo = useAppStore((s) => s.handInfo);
   const connected = useAppStore((s) => s.status?.state === "connected");
   const handId = handInfo?.hand?.id ?? null;
   const ended = run?.ended ?? null;
   useEffect(() => {
+    setGot(null);
     if (!connected) return; // and again once the hand is back after a run (its new ranges in force)
     visualApi.handRunResults().then(
       (r) => {
@@ -242,20 +250,31 @@ export function MeasureResults({ run }: { run: HandRun | null }) {
   }, [ended, connected, handId]);
   if (run?.state === "running")
     return <p className="visual-cal-note">Measuring: the results come when this run is done.</p>;
-  if (run && ["failed", "stopped"].includes(run.state))
+  if (run && ["failed", "stopped"].includes(run.state) && !partly(run))
     return (
       <p className="visual-cal-note warn">
         This run ({runName(run.run)}) {run.state === "stopped" ? `was stopped (${run.stopped})` : `failed: ${run.reason}`}:
         no results from it. Measure again.
       </p>
     );
-  const res = got?.results ?? null;
+  const res = got && got.hand === handId ? got.results : null; // another hand's never shows
   if (!res) return <p className="visual-cal-note">{note ?? "loading…"}</p>;
-  const thisRun = run?.state === "done" && run.run === res.run;
+  if (partly(run) && res.run !== run!.run)
+    return <p className="visual-cal-note">loading this run’s results…</p>;
+  const thisRun = (run?.state === "done" || partly(run)) && run!.run === res.run;
   const acc = res.accuracy;
   const measured = Object.values(res.joints).filter((j) => j.measured).length;
   return (
     <div style={{ display: "grid", gap: 8 }}>
+      {partly(run) && (
+        <p className="visual-cal-note warn">
+          Ranges recorded on this computer (in force once the hand reconnects); the accuracy check didn’t
+          finish: {why(run!)}.{" "}
+          <button className="btn btn-secondary btn-sm" onClick={() => void api.reconnect().catch(() => undefined)}>
+            Reconnect the hand
+          </button>
+        </p>
+      )}
       <p className={`visual-cal-note${thisRun ? "" : " warn"}`}>
         {thisRun ? "This run" : "An earlier run"}, {runName(res.run)} ({res.started ? shortDate(res.started) : "?"}, rig{" "}
         {res.rig}): {measured} of {Object.keys(res.joints).length} joints measured from {res.poses} poses.{" "}
