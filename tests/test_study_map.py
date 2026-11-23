@@ -20,7 +20,17 @@ def _map(tmp_path):
         "index_abd": {"applied": True, "cmd_knots": [-30, 0, 30], "cmd_true": [-22, 1, 21]},
         "thumb_dip": {"applied": False, "cmd_knots": [0, 90], "cmd_true": [5, 80]},
     }}))
-    return StudyMap(p)
+    m = StudyMap(p)
+    m.hand_source = lambda: "ser-4485"                 # the first study's map is this hand's only
+    return m
+
+
+def test_the_first_study_map_is_not_offered_to_other_hands(tmp_path):
+    m = _map(tmp_path)
+    m.hand_source = lambda: None
+    assert "joint_map" not in m.files() and not m.state()["available"]
+    m.hand_source = lambda: "ser-7577"
+    assert "joint_map" not in m.files()
 
 
 def test_off_by_default_is_identity(tmp_path):
@@ -144,9 +154,10 @@ def test_the_research_ui_flag_reaches_the_status_and_the_endpoints(flag, tmp_pat
     from orca_ui.hand import study_map
     from orca_ui.server import create_app
 
-    for attr, path in (("path", tmp_path / "joint_map.json"), ("root", tmp_path / "maps"),
-                       ("selection", tmp_path / "selected.json")):
+    for attr, path in (("_path", tmp_path / "joint_map.json"), ("_root", tmp_path / "maps"),
+                       ("_selection", tmp_path / "selected.json")):
         monkeypatch.setattr(study_map.STUDY_MAP, attr, path)
+    monkeypatch.setattr(study_map.STUDY_MAP, "_modes", None)
     settings = build_settings(["--mock", "--no-browser"] + (["--research-ui"] if flag else []))
     assert settings.research_ui is flag
     with TestClient(create_app(settings)) as c:
