@@ -36,8 +36,8 @@ import {
 import { usePageVisible } from "../common/usePageVisible";
 import { drawTiles } from "./drawTiles";
 import {
-  STEPS as ALL_STEPS,
-  stepsFor,
+  ASSEMBLER_STEPS,
+  STEPS,
   type StepDef,
   type StepId,
 } from "./instructions";
@@ -747,6 +747,17 @@ function TurntableBar({
   );
 }
 
+// The index in `steps` of the step `id`, or of the nearest one on offer when it is not.
+function nearestStep(steps: StepDef[], id: StepId): number {
+  const at = STEPS.findIndex((s) => s.id === id);
+  let best = 0;
+  steps.forEach((s, i) => {
+    const d = Math.abs(STEPS.indexOf(s) - at);
+    if (d < Math.abs(STEPS.indexOf(steps[best]) - at)) best = i;
+  });
+  return best;
+}
+
 export function VisualCalibrationView() {
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [cameraId, setCameraId] = useState("");
@@ -764,10 +775,10 @@ export function VisualCalibrationView() {
   const manualRef = useRef(manualRotation);
   manualRef.current = manualRotation;
   // The live hand-pose estimate and the control sandbox are research extras (--research-ui).
-  const STEPS = stepsFor(useResearchUi());
+  const shown = useResearchUi() ? STEPS : ASSEMBLER_STEPS;
   const [stepId, setStepId] = useState<StepId>(() => {
     const s = stored<StepId>(STEP_KEY, "mount");
-    return ALL_STEPS.some((d) => d.id === s) ? s : "mount";
+    return STEPS.some((d) => d.id === s) ? s : "mount";
   });
   const [confirmed, setConfirmed] = useState<StepId[]>(() =>
     stored<StepId[]>(CONFIRMED_KEY, []),
@@ -825,9 +836,10 @@ export function VisualCalibrationView() {
   const busyRef = useRef(false);
   busyRef.current = busy !== null || sweep !== null;
 
-  // A step that is not on offer (a research extra) opens the first one.
-  const index = Math.max(0, STEPS.findIndex((s) => s.id === stepId));
-  const step = STEPS[index];
+  // A step that is not on offer (a research extra) shows the nearest one; nothing is saved until
+  // the operator moves, so the stored step comes back once the extras are on.
+  const index = nearestStep(shown, stepId);
+  const step = shown[index];
   const kind = step.sweep ?? null;
   const session = kind ? byKind[kind] : null;
   const stops = rig?.stops ?? [];
@@ -1430,7 +1442,7 @@ export function VisualCalibrationView() {
     });
 
   const go = (i: number) => {
-    const next = STEPS[Math.max(0, Math.min(STEPS.length - 1, i))];
+    const next = shown[Math.max(0, Math.min(shown.length - 1, i))];
     store(STEP_KEY, next.id);
     setStepId(next.id);
     say(null);
@@ -1541,7 +1553,7 @@ export function VisualCalibrationView() {
       }
     }
   };
-  const states = STEPS.map(status);
+  const states = shown.map(status);
 
   // ---- the step's controls: one primary at a time
   const taken = new Map(session?.photos.map((p) => [p.stop_deg, p]));
@@ -1673,11 +1685,11 @@ export function VisualCalibrationView() {
         primary: step.id === "rotation",
       });
   }
-  const last = index === STEPS.length - 1;
+  const last = index === shown.length - 1;
   const nextPrimary = !actions.some((a) => a.primary);
 
   // Space captures by hand or retakes, ← → move between steps (when no control has focus).
-  const steps = STEPS.length;
+  const steps = shown.length;
   const keys = useRef({ capture, go, forward, index, actions, steps });
   keys.current = { capture, go, forward, index, actions, steps };
   useEffect(() => {
@@ -1810,9 +1822,9 @@ export function VisualCalibrationView() {
           muted
         />
         <nav className="gt-steps visual-cal-nav">
-          {STEPS.map((s, i) => (
+          {shown.map((s, i) => (
             <div key={s.id} className="visual-cal-nav-item">
-              {(i === 0 || STEPS[i - 1].phase !== s.phase) && (
+              {(i === 0 || shown[i - 1].phase !== s.phase) && (
                 <div className="visual-cal-phase">{s.phase}</div>
               )}
               <button
@@ -1864,7 +1876,7 @@ export function VisualCalibrationView() {
           <div className="visual-cal-side">
             <div className="visual-cal-head">
               <span className="visual-cal-count">
-                {index + 1} / {STEPS.length} · {step.phase}
+                {index + 1} / {shown.length} · {step.phase}
                 {step.tag ? ` · ${step.tag}` : ""}
               </span>
               <h3 className="gt-heading">{step.title}</h3>
@@ -1976,7 +1988,7 @@ export function VisualCalibrationView() {
                 {issue.fix === "camera-step" && (
                   <button
                     className="btn btn-secondary btn-sm"
-                    onClick={() => go(STEPS.findIndex((s) => s.id === "lens"))}
+                    onClick={() => go(shown.findIndex((s) => s.id === "lens"))}
                   >
                     ← Calibrate the camera
                   </button>

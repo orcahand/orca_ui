@@ -177,7 +177,5 @@ export const STEPS: StepDef[] = [
   },
 ]
 
-/** The steps on offer: the research extras only with --research-ui. */
-export function stepsFor(research: boolean): StepDef[] {
-  return research ? STEPS : STEPS.filter((s) => !s.research)
-}
+/** The steps without the research extras: what is on offer unless the console runs with --research-ui. */
+export const ASSEMBLER_STEPS: StepDef[] = STEPS.filter((s) => !s.research)
