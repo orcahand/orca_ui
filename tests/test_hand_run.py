@@ -37,8 +37,9 @@ def _free_port() -> int:
 
 
 @pytest.fixture()
-def client(monkeypatch):
+def client(monkeypatch, tmp_path):
     monkeypatch.setenv("ORCA_RIG_AUTODETECT", "0")
+    monkeypatch.setenv("ORCA_FIRMWARE_REPO", str(tmp_path / "no-firmware"))
     settings = UiSettings(config_path=materialize_mock_model(), mock=True, open_browser=False, port=_free_port())
     with TestClient(create_app(settings)) as c:
         assert _wait_for(lambda: c.get("/api/status").json()["state"] == "connected")
@@ -57,7 +58,8 @@ def _hand_on_file(client) -> str:
 
 def test_measure_builds_the_run_for_the_connected_hand(client):
     """run_hand --dry through the console: the plate must be connected and both cameras proven first;
-    the run is planned over the hand's ranges and lists its steps, nothing moves."""
+    the run is planned over the hand's ranges and lists its steps, nothing moves. No firmware
+    checkout: no board write offered or accepted."""
     _experiment_on_path()
     from visual_calibration.hand_model import description_root
     if description_root() is None:
@@ -76,6 +78,10 @@ def test_measure_builds_the_run_for_the_connected_hand(client):
     assert all(s["state"] == "todo" for s in run["progress"]["steps"]) and run["progress"]["eta_s"] > 0
     assert f"/runs/{hand_id}/" in run["run"] and run["run"].startswith(os.environ["ORCA_HOME"])
     assert client.get(f"{VC}/hand-run/results").json() == {"hand": hand_id, "results": None}
+
+    writer = client.get(f"{VC}/board-write").json()
+    assert writer["available"] is False and "orca_firmware" in writer["reason"]
+    assert client.post("/api/operation/board_write/start", json={"params": {}}).status_code == 409
 
 
 def test_estop_kills_the_whole_hand_run_and_operations_wait_for_it(client, tmp_path):
@@ -106,3 +112,39 @@ def test_estop_kills_the_whole_hand_run_and_operations_wait_for_it(client, tmp_p
         return False
     assert _wait_for(lambda: gone(grandchild), timeout=5)
 
+
+def test_write_to_board_releases_the_port_writes_and_reads_back(client, monkeypatch, tmp_path):
+    """With a firmware checkout: the hand lets go of its port, orca_core packs and writes, the board is
+    read back, the hand reconnects. A refused push comes back with orca_core's reason."""
+    from orca_core import board_push, hand_store
+    from orca_core.board_store import BoardIdentity
+    hand = client.app.state.service.session.hand
+    monkeypatch.setattr(type(hand), "board_hand_id", property(lambda self: "ser-0001"))
+    monkeypatch.setattr(board_push, "firmware_tool", lambda: tmp_path / "cal_store.py")
+    hand_store.write_joint_ranges(hand.hand_dir, {"index_mcp": [-12.0, 95.5]}, source="camera rig")
+    states = []
+
+    def push(h):
+        states.append(client.get("/api/status").json()["state"])
+        return board_push.PushResult(False, "the joint ranges on the board were measured later")
+    monkeypatch.setattr(board_push, "push_for_hand", push)
+
+    def write() -> dict:
+        assert client.post("/api/operation/board_write/start", json={"params": {}}).status_code == 200
+        assert _wait_for(lambda: client.get("/api/operation").json()["operation"]["state"] in ("done", "error"))
+        return client.get("/api/operation").json()["operation"]
+
+    assert client.get(f"{VC}/board-write").json()["available"] is True
+    op = write()
+    assert op["result"]["written"] is False and "measured later" in op["result"]["reason"]
+    assert states == ["maintenance"]
+    assert _wait_for(lambda: client.get("/api/status").json()["state"] == "connected")
+
+    monkeypatch.setattr(board_push, "push_for_hand", lambda h: board_push.PushResult(True, sequence=4, size=300))
+    held = board_push.BoardContents(BoardIdentity(side="right", hw_version=2, config=1, serial="ser-0001"), 4,
+                                    {"measured_at": "2026-11-23T20:00:00", "joint_roms": {"index_mcp": [-12.0, 95.5]}})
+    monkeypatch.setattr(board_push, "board_contents", lambda port: held)
+    op = write()
+    assert op["result"]["written"] and op["result"]["confirmed"]
+    assert op["result"]["board"]["ranges"] == ["index_mcp"] and op["result"]["board"]["sequence"] == 4
+    assert _wait_for(lambda: client.get("/api/status").json()["state"] == "connected")

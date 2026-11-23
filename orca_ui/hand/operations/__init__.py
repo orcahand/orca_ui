@@ -70,8 +70,11 @@ def build_operation_manager(service, settings, publish_topic) -> OperationManage
     )
     from orca_ui.hand.operations.record import RecordOperation
     from orca_ui.hand.operations.fingertips import NumberFingertipOperation
+    from orca_ui.hand.operations.board_write import BoardWriteOperation
     # Mock mode runs it against orca_core's simulated connector board.
     manager.register(NumberFingertipOperation)
+    # Refused unless an orca_firmware checkout is found (internal: the rig flow's Write to board).
+    manager.register(BoardWriteOperation)
     manager.register(ReplayOperation)
     manager.register(DemoOperation)
     manager.register(RunInOperation)

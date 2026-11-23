@@ -11,7 +11,8 @@ its own stills from every camera (``/sessions/{id}/capture``), the page only sho
 preview (``/cameras/{cam}/preview.jpg``), and the hand run takes its stills from
 ``/cameras/stills``. Nothing is captured before ``/cameras/preflight`` passed. The assemblers'
 "Measure joint ranges" starts that run for the connected hand as a child process
-(``/hand-run``, orca_ui.hand.hand_run).
+(``/hand-run``, orca_ui.hand.hand_run); ``/board-write`` says whether this computer can then
+write the hand's board (the ``board_write`` operation).
 Sessions live in the rig's folder, ``<ORCA_HOME>/rigs/<rig id>/sessions/<id>/``,
 beside its calibrations (visual_calibration.session, visual_calibration.rig_home); the rig id
 comes from the board the watcher found, else from the USB serial turntable.yaml pins. The
@@ -1097,5 +1098,11 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
         except RigConfigError as e:
             raise HTTPException(409, str(e)) from e
         return {"hand": hand_id, "results": _plain(rh.results(run)) if run else None}
+
+    @router.get("/board-write")
+    def board_write_state() -> dict:
+        """Whether this computer can write a hand's board (an orca_firmware checkout), and why not."""
+        from orca_ui.hand.operations.board_write import board_writer
+        return board_writer()
 
     return router
