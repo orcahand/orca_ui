@@ -21,7 +21,7 @@ import { SetupTabs } from './components/setup/SetupTabs'
 import { VisualCalibrationView } from './components/visual/VisualCalibrationView'
 import { TeleopView } from './components/views/TeleopView'
 import { StudyView } from './components/views/StudyView'
-import { useAppStore } from './state/appStore'
+import { useAppStore, useResearchUi } from './state/appStore'
 import { hasUnseenChangelog, useChangelogStore } from './state/changelogStore'
 import { useOperationActive } from './state/operationStore'
 
@@ -58,6 +58,7 @@ export default function App() {
   const view = useAppStore((s) => s.view)
   const wsConnected = useAppStore((s) => s.wsConnected)
   const handState = useAppStore((s) => s.status?.state ?? null)
+  const research = useResearchUi()
 
   useEffect(() => {
     startStreamClient()
@@ -87,7 +88,7 @@ export default function App() {
       {view === 'visual-calibration' ? (
         // The camera needs no hand: reachable while booting too.
         <VisualCalibrationView />
-      ) : view === 'study' ? (
+      ) : view === 'study' && research ? (
         // The study runs on its own server: reachable without a hand session.
         <StudyView />
       ) : booting && view === 'setup' ? (

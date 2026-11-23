@@ -71,6 +71,10 @@ export interface StatusSnapshot {
   // behind them. Joints are one-to-one stand-ins for motors, so anything that
   // poses a hand or commands a joint is hidden.
   bare?: boolean
+  // The visual calibration study's research extras (--research-ui): the Study
+  // tab, study maps, ghost hands, the control sandbox and the live hand-pose
+  // estimate. Hidden unless set.
+  research?: boolean
 }
 
 export interface ModelEntry {

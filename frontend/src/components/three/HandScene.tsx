@@ -240,7 +240,9 @@ function HandRig({
       }
 
       // Mapping overlays: each row of the study panel the user shows, in its own colour + opacity.
-      const rows = study.state?.overlays ?? []
+      // A research extra: none without --research-ui.
+      const research = useAppStore.getState().status?.research ?? false
+      const rows = research ? (study.state?.overlays ?? []) : []
       const seen = new Set<string>()
       for (const row of rows) {
         const set = overlaySetting(row.id, study.overlaySettings)

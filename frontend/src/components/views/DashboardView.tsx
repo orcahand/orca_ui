@@ -5,7 +5,7 @@
 // each device answered. The scene holds its place with no session at all
 // (maintenance, released hardware) so the page never goes blank.
 
-import { useAppStore } from '../../state/appStore'
+import { useAppStore, useResearchUi } from '../../state/appStore'
 import { LinkActions } from '../common/LinkActions'
 import { EncoderPanel } from '../encoders/EncoderPanel'
 import { HealthSummary } from '../monitor/HealthSummary'
@@ -27,6 +27,7 @@ export function DashboardView() {
   // for a motor lying on the bench, and the pseudo-joints match none of its
   // links. The motors are the page.
   const bare = status?.bare ?? false
+  const research = useResearchUi()
   // The calibration rig, when orca-ui found it: drawn around the hand, its controls beside.
   useRigPolling()
 
@@ -78,7 +79,7 @@ export function DashboardView() {
           </div>
           {/* CameraPreview self-hides unless a camera teleop session is live. */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {caps?.motors && <StudyCalibrationPanel />}
+            {caps?.motors && research && <StudyCalibrationPanel />}
             <RigPanel />
             {caps?.motors && <MotorPanel />}
             <CameraPreview />

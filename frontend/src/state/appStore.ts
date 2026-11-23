@@ -135,3 +135,8 @@ export const useAppStore = create<AppState>((set) => ({
       control: state.control ? { ...state.control, tactile_mode: mode } : null,
     })),
 }))
+
+/** Whether the console runs with --research-ui: the study's research extras are hidden otherwise. */
+export function useResearchUi(): boolean {
+  return useAppStore((s) => s.status?.research ?? false)
+}

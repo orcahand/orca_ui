@@ -20,7 +20,7 @@ import {
 } from "react";
 import { SetupTabs } from "../setup/SetupTabs";
 import { api } from "../../api/rest";
-import { useAppStore } from "../../state/appStore";
+import { useAppStore, useResearchUi } from "../../state/appStore";
 import {
   grabFrame,
   visualApi,
@@ -35,7 +35,12 @@ import {
 } from "./api";
 import { usePageVisible } from "../common/usePageVisible";
 import { drawTiles } from "./drawTiles";
-import { STEPS, type StepDef, type StepId } from "./instructions";
+import {
+  STEPS as ALL_STEPS,
+  stepsFor,
+  type StepDef,
+  type StepId,
+} from "./instructions";
 import { HandBoard } from "./HandBoard";
 import { Results } from "./Results";
 import { fitOf, solvedWell } from "./solve";
@@ -758,9 +763,11 @@ export function VisualCalibrationView() {
   );
   const manualRef = useRef(manualRotation);
   manualRef.current = manualRotation;
+  // The live hand-pose estimate and the control sandbox are research extras (--research-ui).
+  const STEPS = stepsFor(useResearchUi());
   const [stepId, setStepId] = useState<StepId>(() => {
     const s = stored<StepId>(STEP_KEY, "mount");
-    return STEPS.some((d) => d.id === s) ? s : "mount";
+    return ALL_STEPS.some((d) => d.id === s) ? s : "mount";
   });
   const [confirmed, setConfirmed] = useState<StepId[]>(() =>
     stored<StepId[]>(CONFIRMED_KEY, []),
@@ -818,7 +825,8 @@ export function VisualCalibrationView() {
   const busyRef = useRef(false);
   busyRef.current = busy !== null || sweep !== null;
 
-  const index = STEPS.findIndex((s) => s.id === stepId);
+  // A step that is not on offer (a research extra) opens the first one.
+  const index = Math.max(0, STEPS.findIndex((s) => s.id === stepId));
   const step = STEPS[index];
   const kind = step.sweep ?? null;
   const session = kind ? byKind[kind] : null;
@@ -1669,8 +1677,9 @@ export function VisualCalibrationView() {
   const nextPrimary = !actions.some((a) => a.primary);
 
   // Space captures by hand or retakes, ← → move between steps (when no control has focus).
-  const keys = useRef({ capture, go, forward, index, actions });
-  keys.current = { capture, go, forward, index, actions };
+  const steps = STEPS.length;
+  const keys = useRef({ capture, go, forward, index, actions, steps });
+  keys.current = { capture, go, forward, index, actions, steps };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (
@@ -1683,7 +1692,7 @@ export function VisualCalibrationView() {
       if (e.code === "Space" && k.actions.some((a) => a.key)) {
         e.preventDefault();
         void k.capture();
-      } else if (e.code === "ArrowRight" && k.index < STEPS.length - 1) {
+      } else if (e.code === "ArrowRight" && k.index < k.steps - 1) {
         k.forward();
       } else if (e.code === "ArrowLeft") {
         k.go(k.index - 1);
