@@ -62,6 +62,7 @@ const SEARCH_EVERY = 5; // solves between the per-finger grid searches
 const ROTATIONS = [0, 90, 180, 270] as const;
 type Rotation = (typeof ROTATIONS)[number];
 const LIVE_MS = 700;
+const CONTROLS = /controls differ|uvcc|after the blink/; // a camera control would not hold: Logi Tune?
 const WEAK = 32;
 const KINDS: SessionKind[] = ["camera", "rotation", "hand"];
 
@@ -1163,14 +1164,15 @@ export function VisualCalibrationView() {
     setByHand(on);
   };
 
-  // The backend's stills from every camera at this stop; the cameras checked first if they are not.
+  // The backend's stills from every camera at this stop; the cameras checked again first if the
+  // backend asks (a camera was reopened). Mid-sweep the tower is turned anywhere: no tile check.
   const captureAll = async (id: string, stop: number) => {
     try {
       return await visualApi.capture(id, stop);
     } catch (e) {
       if (!/preflight/.test((e as Error).message)) throw e;
       setNote("checking the cameras…");
-      await visualApi.cameraPreflight(step.phase === "rig");
+      await visualApi.cameraPreflight(false);
       return visualApi.capture(id, stop);
     }
   };
@@ -1210,7 +1212,7 @@ export function VisualCalibrationView() {
     try {
       setNote("checking the cameras…");
       await visualApi.cameraPreflight(step.phase === "rig").catch((e: Error) => {
-        throw new Error(`camera check: ${e.message} (close Logi Tune)`);
+        throw new Error(`camera check: ${e.message}${CONTROLS.test(e.message) ? " (close Logi Tune)" : ""}`);
       });
       if (!tt?.connected) setTt(await visualApi.connect());
       let s = await visualApi.createSession(kind, false);
@@ -1263,7 +1265,9 @@ export function VisualCalibrationView() {
       setPicked(false);
       say(
         controls
-          ? `camera controls differ: ${controls} — close Logi Tune; a sweep sets them`
+          ? CONTROLS.test(controls)
+            ? `camera controls differ: ${controls} — close Logi Tune; a sweep sets them`
+            : `camera check: ${controls}`
           : shot.length
             ? `${stop}°: ${shot.map((p) => `camera ${p.camera ?? "a"} ${p.tiles} tiles, ${p.corners} corners`).join("; ")}`
             : null,
