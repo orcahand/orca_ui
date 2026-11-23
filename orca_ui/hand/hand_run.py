@@ -45,6 +45,7 @@ class HandRun:
         self._lock = threading.Lock()
         self._proc: subprocess.Popen | None = None
         self._starting = False
+        self._stops = 0                            # Stop / E-STOP calls: one between a start's checks and its spawn cancels it
         self._info: dict = {}
 
     def alive(self) -> bool:
@@ -52,14 +53,22 @@ class HandRun:
         proc = self._proc
         return self._starting or (proc is not None and proc.poll() is None)
 
+    def stops(self) -> int:
+        """How many times Stop or E-STOP was asked: a start passes the count it saw before its checks."""
+        return self._stops
+
     def start(self, hand_id: str, dry: bool = False, limit: int | None = None, rig_id: str | None = None,
-              guard: Callable[[], None] | None = None, command: list[str] | None = None) -> dict:
+              guard: Callable[[], None] | None = None, command: list[str] | None = None,
+              stops: int | None = None) -> dict:
         """Start a run for `hand_id` on the rig `rig_id`. `guard()` raises to refuse; it runs under the
         same lock as the start, while alive() already says True (`command`: another program, for tests).
-        RuntimeError if a run is running."""
+        `stops`: stops() before the caller's checks; a Stop or E-STOP since cancels the start.
+        RuntimeError if a run is running or the start was cancelled."""
         with self._lock:
             if self.alive():
                 raise RuntimeError("a hand run is already running: stop it first")
+            if stops is not None and stops != self._stops:
+                raise RuntimeError("Stop or E-STOP came while the run was being started: it was not started")
             self._starting = True
             try:
                 if guard is not None:
@@ -92,15 +101,17 @@ class HandRun:
         env.pop(RIG_ENV, None)
         if rig_id:
             env[RIG_ENV] = rig_id
+        started = time.time()
         with log.open("ab") as out:
             proc = subprocess.Popen(cmd, cwd=self.experiment, env=env, stdout=out, stderr=subprocess.STDOUT,
                                     stdin=subprocess.DEVNULL, start_new_session=True)
         self._proc = proc
-        self._info = {"hand": hand_id, "dry": dry, "pid": proc.pid, "started": time.time(), "log": str(log),
+        self._info = {"hand": hand_id, "dry": dry, "pid": proc.pid, "started": started, "log": str(log),
                       "run": None, "ended": None, "returncode": None, "stopped": None}
         try:
             (folder / ACTIVE_FILE).write_text(json.dumps({"pgid": proc.pid, "hand": hand_id, "log": str(log),
-                                                          "console": os.getpid(), "started": time.time()}))
+                                                          "console": os.getpid(), "command": cmd,
+                                                          "started": started}))
         except OSError:
             logger.exception("hand run: could not record its process group")
 
@@ -127,7 +138,8 @@ class HandRun:
 
     def stop(self, why: str = "stopped", release: bool = True) -> bool:
         """Kill the run's whole process group at once (True if one was running); `release`: hand and
-        plate torque off after. Never raises: E-STOP calls it."""
+        plate torque off after. Never raises: E-STOP calls it. A start not yet spawned is cancelled."""
+        self._stops += 1
         with self._lock:
             proc = self._proc
             if proc is None or proc.poll() is not None:
@@ -148,34 +160,36 @@ class HandRun:
         return True
 
     def reap_leftover(self) -> dict | None:
-        """At console start: kill a run an earlier console left (its group in active.json, if it still
-        has a hand_study process). Returns what was recorded, None when there was nothing."""
+        """At console start: kill a run an earlier console left behind (recorded in active.json), when
+        that console is gone and the group's leader is still that run: its command and start time.
+        Returns the record (`killed`), None when there is none or it is not ours to end. Never raises."""
         path = self.log_dir() / ACTIVE_FILE
         try:
             left = json.loads(path.read_text())
-        except (OSError, ValueError):
+            pgid, started = int(left["pgid"]), float(left["started"])
+            console = int(left.get("console") or 0)
+        except FileNotFoundError:
             return None
-        pgid = int(left.get("pgid") or 0)
-        if pgid > 1 and pgid != os.getpgrp() and self._group_runs_hand_study(pgid):
+        except Exception as e:                     # malformed or foreign: not a record of ours
+            logger.warning("hand run record %s unreadable (%s): left as it is", path, e)
+            return None
+        if console and console != os.getpid() and _alive(console):
+            logger.warning("the hand run in %s belongs to a console still running (pid %s): left alone",
+                           path, console)
+            return None
+        left["killed"] = False
+        if pgid > 1 and pgid != os.getpgrp() and _is_run(pgid, left.get("command"), started):
             try:
                 os.killpg(pgid, signal.SIGKILL)
                 left["killed"] = True
             except (ProcessLookupError, PermissionError):
                 pass
-        path.unlink(missing_ok=True)
+        try:
+            path.unlink(missing_ok=True)
+        except OSError as e:
+            logger.warning("hand run record %s: %s", path, e)
         logger.warning("hand run left by an earlier console: %s", left)
         return left
-
-    @staticmethod
-    def _group_runs_hand_study(pgid: int) -> bool:
-        """Whether process group `pgid` still holds a hand_study process (not a reused id)."""
-        try:
-            out = subprocess.run(["ps", "-ax", "-o", "pgid=,command="], capture_output=True, text=True,
-                                 timeout=10).stdout
-        except (OSError, subprocess.SubprocessError):
-            return False
-        return any(line.split(None, 1)[0] == str(pgid) and "hand_study" in line
-                   for line in out.splitlines() if line.strip())
 
     def status(self) -> dict:
         """The process as the console knows it, the run folder it announced, the log's last lines."""
@@ -209,3 +223,27 @@ class HandRun:
                 return next((line[4:].strip() for line in f if line.startswith("run /")), None)
         except OSError:
             return None
+
+
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)                            # signal 0: only asks whether it exists
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _is_run(pgid: int, command: list[str] | None, started: float, tolerance_s: float = 5.0) -> bool:
+    """Whether process `pgid` (the group's leader) is the recorded run: its command line is the run's
+    (``-m hand_study.run_hand``, or the recorded command) and it started when the record says."""
+    try:
+        out = subprocess.run(["ps", "-ww", "-p", str(pgid), "-o", "lstart=,command="], capture_output=True, text=True,
+                             timeout=10, env={**os.environ, "LC_ALL": "C"}).stdout.strip()
+        t = time.mktime(time.strptime(out[:24], "%a %b %d %H:%M:%S %Y"))
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return False
+    argv = out[24:].strip()
+    ours = "-m hand_study.run_hand" in argv or (bool(command) and argv == " ".join(command))
+    return ours and abs(t - started) <= tolerance_s

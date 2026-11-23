@@ -206,10 +206,18 @@ def test_a_run_is_done_only_when_it_recorded_the_ranges(client, tmp_path, monkey
         assert _wait_for(lambda: not hand_run.alive())
         return client.get(f"{VC}/hand-run").json()
 
-    record = {"stops": {}, "joint_ranges": {"path": None, "recorded": [], "rejected": {}, "gone": []}}
+    record = {"stops": {}, "joint_ranges": {"path": "/h/joint_ranges.yaml", "recorded": ["wrist"], "rejected": {},
+                                            "gone": []}}
     done = ended(_fake_run(tmp_path, "done", {"state": "done", "done": {}}, record))
     assert (done["state"], done["reason"]) == ("done", None)
     assert _wait_for(lambda: reconnects == [1])
+    nothing = {"stops": {}, "joint_ranges": {"path": None, "recorded": [], "rejected": {}, "gone": []}}
+    none_measured = ended(_fake_run(tmp_path, "none", {"state": "done", "done": {}}, nothing, 1))
+    assert none_measured["state"] == "failed" and "without recording" in none_measured["reason"]
+    # The ranges recorded, then the accuracy check died: failed, and it says the ranges are on file.
+    late = ended(_fake_run(tmp_path, "late", {"state": "aborted", "done": {}, "error": "Abort('a solve worker died')"},
+                           record, 1))
+    assert late["state"] == "failed" and late["progress"]["recorded"] and "worker died" in late["reason"]
     cut = ended(_fake_run(tmp_path, "cut", {"state": "done", "done": {}, "cut_short": "N07-short"}, None, 1))
     assert cut["state"] == "failed" and cut["reason"] == "the run reached its deadline before N07-short"
     unrecorded = ended(_fake_run(tmp_path, "unrecorded", {"state": "done", "done": {}}, {"stops": {}}, 1))
@@ -245,9 +253,58 @@ def test_the_console_ends_its_run_when_it_shuts_down_and_kills_one_left_behind(m
     assert _wait_for(lambda: _gone(pid)) and not record.exists()
 
     left = subprocess.Popen(SLEEPER, start_new_session=True)
-    record.write_text(json.dumps({"pgid": left.pid, "hand": "ser-0001"}))
+    entry = {"pgid": left.pid, "hand": "ser-0001", "command": SLEEPER, "started": time.time(), "console": pid}
+    record.write_text(json.dumps(entry))
     with _console():
         assert left.wait(timeout=5) == -9 and not record.exists()
+
+
+def test_a_starting_console_leaves_a_run_alone_that_is_not_its_to_end(monkeypatch):
+    """A second console on the same ORCA_HOME while the first still measures; a record whose group is
+    now another program (its command or start time differ); a malformed record: nothing is killed and
+    the console starts."""
+    import json
+    import subprocess
+    from orca_ui.home import ui_home
+    monkeypatch.setenv("ORCA_RIG_AUTODETECT", "0")
+    record = ui_home() / "visual_calibration" / "hand_runs" / "active.json"
+    record.parent.mkdir(parents=True, exist_ok=True)
+    console = subprocess.Popen(SLEEPER)                           # the first console, still running
+    run = subprocess.Popen(SLEEPER, start_new_session=True)
+    try:
+        record.write_text(json.dumps({"pgid": run.pid, "command": SLEEPER, "started": time.time(),
+                                      "console": console.pid}))
+        with _console():
+            assert run.poll() is None and record.exists()
+        console.kill()
+        console.wait()
+        for entry in ({"pgid": run.pid, "command": SLEEPER, "started": time.time() - 3600},   # started earlier
+                      {"pgid": run.pid, "command": ["python", "-m", "other"], "started": time.time()}):
+            record.write_text(json.dumps(entry))
+            with _console():
+                assert run.poll() is None and not record.exists()
+        record.write_text("{not json")
+        with _console() as c:
+            assert c.get(f"{VC}/hand-run").json()["state"] == "idle" and run.poll() is None
+    finally:
+        for p in (console, run):
+            p.kill()
+            p.wait()
+
+
+def test_a_stop_during_the_camera_check_cancels_the_start(client, monkeypatch):
+    _experiment_on_path()
+    from visual_calibration.rig_cameras import RigCameras
+    _hand_on_file(client)
+    assert client.post(f"{VC}/turntable/connect", json={}).status_code == 200
+
+    def preflight(cams, detector=None, write=True):
+        client.app.state.service.estop()                          # E-STOP pressed while the cameras are checked
+        return {"indices": {"a": 0, "b": 1}}
+    monkeypatch.setattr(RigCameras, "preflight", preflight)
+    r = client.post(f"{VC}/hand-run/start", json={"dry": True})
+    assert r.status_code == 409 and "was not started" in r.json()["detail"]
+    assert client.get(f"{VC}/hand-run").json()["state"] == "idle"
 
 
 def test_results_name_their_run(client):

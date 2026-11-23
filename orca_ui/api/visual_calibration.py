@@ -992,25 +992,17 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
     # child process (orca_ui.hand.hand_run), followed from its run folder (run_hand.progress, .results).
     def attach_service(service, ui_url: str) -> None:
         """The hand service (the hand to measure, its torque) and the URL the run drives the console at.
-        A run an earlier console left running is killed now, and the hand's torque goes off once it is
-        connected again."""
+        A run an earlier console left running (that console gone) is killed now; the hand's and the
+        plate's torque go off when they connect again."""
         from orca_ui.hand.hand_run import HandRun
         from orca_ui.home import ui_home
         hand["service"] = service
         measure["run"] = router.hand_run = HandRun(EXPERIMENT, ui_url, lambda: ui_home() / "visual_calibration" / "hand_runs",
                                                    safe_off=run_safe_off, on_end=run_ended)
-        if measure["run"].reap_leftover() is not None:
-            threading.Thread(target=torque_off_when_connected, daemon=True, name="hand-run-leftover").start()
-
-    def torque_off_when_connected(wait_s: float = 120.0) -> None:
-        """After a run an earlier console left: hand and plate torque off as soon as they are there."""
-        t0 = time.monotonic()
-        while time.monotonic() - t0 < wait_s:
-            session = hand["service"].session
-            if session is not None and session.caps.motors:
-                break
-            time.sleep(1.0)
-        run_safe_off()
+        try:
+            measure["run"].reap_leftover()
+        except Exception:                          # never in the way of the console starting
+            logger.exception("hand run: looking for a run left behind")
 
     def stop_hand_run(why: str = "stopped", release: bool = True) -> bool:
         return measure["run"] is not None and measure["run"].stop(why, release)
@@ -1087,6 +1079,7 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
             raise HTTPException(409, "a hand run is already running")
         if "t" not in table:
             raise HTTPException(409, "the rig's plate is not connected")
+        stops = run.stops()                        # a Stop or E-STOP from here on cancels this start
         camera_call(lambda c: c.preflight(None, write=True))
 
         def no_operation() -> None:                # under the run's start lock: an operation starting
@@ -1095,7 +1088,7 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
                 raise HTTPException(409, "an operation is running: wait for it or stop it")
         try:
             return run_view(run.start(hand_id, dry=body.dry, limit=body.limit, rig_id=table.get("rig_id"),
-                                      guard=no_operation))
+                                      guard=no_operation, stops=stops))
         except (RuntimeError, OSError) as e:
             raise HTTPException(409, str(e)) from e
 
