@@ -224,6 +224,8 @@ class HandService:
         # the plate asks hand_motion_blocker(), joint targets ask plate_motion_guard.
         self._motion_until = 0.0
         self.plate_motion_guard: Callable[[], str | None] | None = None
+        # The rig's hand run (orca_ui.hand.hand_run) drives the hand over REST: no operation meanwhile.
+        self.hand_run_active: Callable[[], bool] | None = None
         self._sweeper = None  # mock-only dev sweeper, for estop
         self._teleop_manager = None  # attached post-construction (server.py)
         self._telemetry = None  # attached in server.py

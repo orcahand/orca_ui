@@ -61,6 +61,7 @@ def create_app(settings: UiSettings) -> FastAPI:
             # Teleop first: no targets may race into a dying stack.
             if teleop is not None:
                 teleop.shutdown()
+            visual.stop_hand_run("the console shut down")
             operations.shutdown()
             telemetry.stop()
             service.stop()
@@ -80,14 +81,20 @@ def create_app(settings: UiSettings) -> FastAPI:
     app.include_router(build_assembly_router())
     visual = build_visual_calibration_router(mock=settings.mock)
     app.include_router(visual)
-    # E-STOP also drops the visual-calibration turntable's torque.
+    app.state.visual = visual
+    # E-STOP also kills the rig's hand run (first: it must not send another command) and drops the
+    # visual-calibration turntable's torque.
     hand_estop = service.estop
 
     def estop() -> dict:
+        run_stopped = visual.stop_hand_run("e-stop", release=False)
         report = hand_estop()
+        report["hand_run_stopped"] = run_stopped
         report["turntable_released"] = visual.release_turntable()
         return report
     service.estop = estop
+    visual.attach_service(service, f"http://127.0.0.1:{settings.port}")
+    service.hand_run_active = visual.hand_run_active
 
     def hand_ports() -> set[str]:
         """The hand's ports and pinned board: never probed or opened as the rig."""
