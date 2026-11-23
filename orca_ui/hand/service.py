@@ -1358,9 +1358,11 @@ class HandService:
     def _glide_op(self, session: HandSession, pose: dict[str, float], num_steps: int, fallback):
         """A one-shot interpolated move to a true pose: `fallback` (orca_core's own
         move) when no study map is selected, else the mapped pose."""
-        sent = self._study_command(pose)
-        if sent is pose:
+        from orca_ui.hand.study_map import STUDY_MAP
+
+        if not STUDY_MAP.enabled:
             return fallback
+        sent = self._study_command(pose)
 
         def op():
             session.hand.set_joint_positions(sent, num_steps=num_steps, step_size=_MOVE_STEP_S)
