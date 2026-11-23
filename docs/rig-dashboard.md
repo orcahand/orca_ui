@@ -55,11 +55,13 @@ while the plate turns.
 
 ## 3. Camera on the dashboard
 
-Tick "camera": the live camera (getUserMedia, the visual-calibration page's device
-choice, rotation 270). Tick "overlay": the hand (live pose, study-corrected when the
-study map is on) and the tower tiles from `/overlay`, using `HandOverlay` and the tile
-drawing of the visual-calibration page. Both off by default. Placed under the 3D view,
-click to enlarge, Esc to close. Do not tick it while a runner holds the camera.
+Tick "camera": the backend's preview of the camera chosen on the visual-calibration
+page (`/cameras/{cam}/preview.jpg`; the backend owns both cameras, the page opens
+none; rotation 270). Tick "overlay": the hand (live pose, study-corrected when the
+study map is on) and the tower tiles from `/overlay` for that camera, using
+`HandOverlay` and the tile drawing of the visual-calibration page. Both off by
+default. Placed under the 3D view, click to enlarge, Esc to close. A runner takes its
+stills from the same backend, so the preview can stay on.
 
 ## 4. Going live
 

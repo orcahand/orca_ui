@@ -1,5 +1,6 @@
-// Visual calibration (orca_core VISUAL_CALIBRATION.md): one fixed camera, the
-// plate turning in front of it on the rig's motor. A subroutine of seven steps
+// Visual calibration (orca_core VISUAL_CALIBRATION.md): two fixed cameras owned by
+// the backend (the page shows its preview; every photo is its stills from both), the
+// plate turning in front of them on the rig's motor. A subroutine of seven steps
 // in two phases, freely switchable: rig (the calibration object instead of the
 // hand: set up, then 1a the camera and 1b the rotation, each a motor sweep
 // through every stop and a solve) and hand (the hand on the same connector, a
@@ -34,6 +35,7 @@ import {
   type Turntable,
 } from "./api";
 import { usePageVisible } from "../common/usePageVisible";
+import { useBackendCamera } from "./backendCamera";
 import { drawTiles } from "./drawTiles";
 import {
   ASSEMBLER_STEPS,
@@ -64,8 +66,8 @@ const SOLVE_JOINTS_KEY = "orca-ui.visual-calibration.solve-joints";
 const SEARCH_EVERY = 5; // solves between the per-finger grid searches
 const ROTATIONS = [0, 90, 180, 270] as const;
 type Rotation = (typeof ROTATIONS)[number];
-const PREFERRED = /brio/i;
 const LIVE_MS = 700;
+const CONTROLS = /controls differ|uvcc|after the blink/; // a camera control would not hold: Logi Tune?
 const WEAK = 32;
 const KINDS: SessionKind[] = ["camera", "rotation", "hand"];
 
@@ -618,58 +620,6 @@ function sourceText(m: ModelOverlay): string {
   return "CAD (not calibrated)";
 }
 
-function pickDefault(cameras: MediaDeviceInfo[]): string {
-  const saved = stored<string>(CAMERA_KEY, "");
-  if (saved && cameras.some((c) => c.deviceId === saved)) return saved;
-  return (
-    (cameras.find((c) => PREFERRED.test(c.label)) ?? cameras[0])?.deviceId ?? ""
-  );
-}
-
-// Focus, exposure and white balance fixed at their current values, where the
-// browser and camera allow it (Chrome over UVC does for the BRIO).
-async function lockCamera(
-  stream: MediaStream,
-): Promise<{ locked: boolean; text: string }> {
-  const track = stream.getVideoTracks()[0];
-  const caps = (track.getCapabilities?.() ?? {}) as Record<string, unknown>;
-  const now = track.getSettings() as Record<string, unknown>;
-  const locks: Record<string, unknown> = {};
-  const can = (key: string) =>
-    Array.isArray(caps[key]) && (caps[key] as string[]).includes("manual");
-  if (can("focusMode"))
-    Object.assign(locks, {
-      focusMode: "manual",
-      ...(now.focusDistance !== undefined && {
-        focusDistance: now.focusDistance,
-      }),
-    });
-  if (can("exposureMode"))
-    Object.assign(locks, {
-      exposureMode: "manual",
-      ...(now.exposureTime !== undefined && { exposureTime: now.exposureTime }),
-    });
-  if (can("whiteBalanceMode"))
-    Object.assign(locks, {
-      whiteBalanceMode: "manual",
-      ...(now.colorTemperature !== undefined && {
-        colorTemperature: now.colorTemperature,
-      }),
-    });
-  const names = Object.keys(locks)
-    .filter((k) => k.endsWith("Mode"))
-    .map((k) => k.replace("Mode", ""));
-  if (!names.length)
-    return {
-      locked: false,
-      text: "this browser can’t lock this camera: lock it in Logi Tune",
-    };
-  await track.applyConstraints({
-    advanced: [locks as MediaTrackConstraintSet],
-  });
-  return { locked: true, text: `locked: ${names.join(", ")}` };
-}
-
 function TurntableBar({
   tt,
   byHand,
@@ -759,12 +709,9 @@ function nearestStep(steps: StepDef[], id: StepId): number {
 }
 
 export function VisualCalibrationView() {
-  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
-  const [cameraId, setCameraId] = useState("");
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  // The camera shown ("a", "b"); every photo is taken by all of them.
+  const [cameraId, setCameraId] = useState(() => stored<string>(CAMERA_KEY, "a"));
   const [playing, setPlaying] = useState(false);
-  const [size, setSize] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [rotation, setRotation] = useState<Rotation>(() =>
     stored<Rotation>(ROTATION_KEY, 270),
   );
@@ -848,76 +795,13 @@ export function VisualCalibrationView() {
   // The stream stops while the tab is hidden (no decoding for nobody).
   const pageVisible = usePageVisible();
 
-  // Labels are only readable once camera access is granted.
-  useEffect(() => {
-    let alive = true;
-    const list = async () => {
-      const all = (await navigator.mediaDevices.enumerateDevices()).filter(
-        (d) => d.kind === "videoinput",
-      );
-      if (!alive) return;
-      setCameras(all);
-      setCameraId((id) =>
-        id && all.some((c) => c.deviceId === id) ? id : pickDefault(all),
-      );
-    };
-    // The access probe opens the camera at its default mode, which switches the device for
-    // every client (the study's 4K capture too): only probe while labels are still hidden.
-    navigator.mediaDevices
-      .enumerateDevices()
-      .then((all) =>
-        all.some((d) => d.kind === "videoinput" && d.label)
-          ? list()
-          : navigator.mediaDevices.getUserMedia({ video: true }).then((probe) => {
-              probe.getTracks().forEach((t) => t.stop());
-              return list();
-            }),
-      )
-      .catch((e: Error) => alive && setError(`No camera access: ${e.message}`));
-    navigator.mediaDevices.addEventListener("devicechange", list);
-    return () => {
-      alive = false;
-      navigator.mediaDevices.removeEventListener("devicechange", list);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!cameraId || !pageVisible) return;
-    let opened: MediaStream | null = null;
-    let alive = true;
-    setSize(null);
-    navigator.mediaDevices
-      .getUserMedia({
-        video: {
-          deviceId: { exact: cameraId },
-          width: { ideal: 3840 },
-          height: { ideal: 2160 },
-        },
-      })
-      .then((s) => {
-        if (!alive) {
-          s.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        opened = s;
-        setStream(s);
-        setError(null);
-        const st = s.getVideoTracks()[0]?.getSettings();
-        if (st?.width)
-          setSize(
-            `${st.width}×${st.height}${st.frameRate ? ` · ${Math.round(st.frameRate)} fps` : ""}`,
-          );
-      })
-      .catch(
-        (e: Error) =>
-          alive && setError(`Could not open the camera: ${e.message}`),
-      );
-    return () => {
-      alive = false;
-      opened?.getTracks().forEach((t) => t.stop());
-      setStream(null);
-    };
-  }, [cameraId, pageVisible]);
+  // The live view is the backend's preview of the shown camera (it owns the cameras).
+  const cameras = rig?.cameras ?? [];
+  const shown = cameras.includes(cameraId) ? cameraId : (cameras[0] ?? null);
+  const backend = useBackendCamera(shown, pageVisible);
+  const stream = backend.stream;
+  const error = backend.error;
+  const size = backend.size && `${backend.size[0]}×${backend.size[1]} preview`;
 
   // One <video> for the whole page: every step captures from it.
   useEffect(() => {
@@ -1076,7 +960,7 @@ export function VisualCalibrationView() {
   useEffect(() => {
     if (!overlayShown || !playing) return;
     let alive = true;
-    visualApi.overlay(plateAngle, rotation).then(
+    visualApi.overlay(plateAngle, rotation, shown ?? "a").then(
       (m) => {
         if (!alive) return;
         setModel(m);
@@ -1087,7 +971,7 @@ export function VisualCalibrationView() {
     return () => {
       alive = false;
     };
-  }, [overlayShown, playing, plateAngle, rotation]);
+  }, [overlayShown, playing, plateAngle, rotation, shown]);
 
   // The hand model loads once, the first time it is wanted, and stays for the page's life.
   const joints = handInfo?.joints;
@@ -1244,6 +1128,7 @@ export function VisualCalibrationView() {
     let n = 0;
     const t0 = performance.now();
     try {
+      if (shown !== "a") throw new Error("the live fit uses camera A: show camera A");
       while (solvingRef.current) {
         const v = video.current;
         if (!v?.videoWidth) throw new Error("no camera image");
@@ -1299,24 +1184,37 @@ export function VisualCalibrationView() {
     setByHand(on);
   };
 
-  // One photo at the selected stop into the step's session (made if there is none).
+  // The backend's stills from every camera at this stop; the cameras checked again first if the
+  // backend asks (a camera was reopened). Mid-sweep the tower is turned anywhere: no tile check.
+  const captureAll = async (id: string, stop: number) => {
+    try {
+      return await visualApi.capture(id, stop);
+    } catch (e) {
+      if (!/preflight/.test((e as Error).message)) throw e;
+      setNote("checking the cameras…");
+      await visualApi.cameraPreflight(false);
+      return visualApi.capture(id, stop);
+    }
+  };
+
+  // One photo per camera at the selected stop into the step's session (made if there is none).
   const shoot = async (
     k: SessionKind,
     stop: number,
     s: Session | null,
   ): Promise<Session> => {
-    const v = video.current;
-    if (!v?.videoWidth) throw new Error("no camera image");
     const target = s ?? (await visualApi.createSession(k, byHand));
-    const r = await visualApi.addPhoto(
-      target.id,
-      stop,
-      await grabFrame(v, "image/png"),
-    );
-    setOverlay(r);
+    const r = await captureAll(target.id, stop);
+    const mine = (shown && r.cameras[shown]) || Object.values(r.cameras)[0];
+    if (mine)
+      setOverlay({
+        size: r.size,
+        detections: mine.detections,
+        orientation: mine.orientation,
+      });
     const photos = [
       ...target.photos.filter((p) => p.stop_deg !== stop),
-      r.photo,
+      ...Object.values(r.cameras).map((c) => c.photo),
     ].sort((a, b) => a.stop_deg - b.stop_deg);
     const next = { ...target, photos };
     setSession(k, next);
@@ -1332,9 +1230,9 @@ export function VisualCalibrationView() {
     setPicked(false);
     setSweep({ i: 0, n: rig.stops.length });
     try {
-      setNote("camera controls…");
-      await visualApi.cameraSet().catch((e: Error) => {
-        throw new Error(`camera check: ${e.message} (close Logi Tune)`);
+      setNote("checking the cameras…");
+      await visualApi.cameraPreflight(step.phase === "rig").catch((e: Error) => {
+        throw new Error(`camera check: ${e.message}${CONTROLS.test(e.message) ? " (close Logi Tune)" : ""}`);
       });
       if (!tt?.connected) setTt(await visualApi.connect());
       let s = await visualApi.createSession(kind, false);
@@ -1380,16 +1278,18 @@ export function VisualCalibrationView() {
       const s = await shoot(kind, stop, session).finally(
         () => held && visualApi.torqueOff().then(setTt, () => undefined),
       );
-      const p = s.photos.find((x) => x.stop_deg === stop);
+      const shot = s.photos.filter((x) => x.stop_deg === stop);
       const taken = new Set(s.photos.map((x) => x.stop_deg));
       const next = rig.stops.findIndex((x, i) => i > stopIdx && !taken.has(x));
       if (byHand && next >= 0) setStopIdx(next);
       setPicked(false);
       say(
         controls
-          ? `camera controls differ: ${controls} — close Logi Tune; a sweep sets them`
-          : p
-            ? `${stop}°: ${p.tiles} tiles, ${p.corners} corners`
+          ? CONTROLS.test(controls)
+            ? `camera controls differ: ${controls} — close Logi Tune; a sweep sets them`
+            : `camera check: ${controls}`
+          : shot.length
+            ? `${stop}°: ${shot.map((p) => `camera ${p.camera ?? "a"} ${p.tiles} tiles, ${p.corners} corners`).join("; ")}`
             : null,
         !!controls,
       );
@@ -1433,12 +1333,18 @@ export function VisualCalibrationView() {
       say(`saved to ${r.path}`);
     });
 
-  const lock = () =>
-    run("locking…", async () => {
-      if (!stream) return;
-      const r = await lockCamera(stream);
-      if (r.locked) confirm("camera");
-      say(r.text, !r.locked);
+  // Every camera's controls locked and each one proven to be the camera it should be (the tower on the plate).
+  const checkCameras = () =>
+    run("checking the cameras…", async () => {
+      const r = await visualApi.cameraPreflight(true);
+      confirm("camera");
+      const heights = Object.entries(r.tiles ?? {})
+        .map(([c, t]) => `${c} ${t.height_mm.toFixed(0)} mm (mount ${t.expected_mm.toFixed(0)})`)
+        .join(", ");
+      say(
+        `cameras ${Object.keys(r.indices).join(", ")} identified by ${r.identified_by}, controls locked` +
+          (heights ? `; above the plate: ${heights}` : ""),
+      );
     });
 
   const go = (i: number) => {
@@ -1624,11 +1530,12 @@ export function VisualCalibrationView() {
     });
   } else if (step.id === "camera") {
     actions.push({
-      label: "Lock focus & exposure",
-      title: "Fix focus, exposure and white balance at their current values",
-      onClick: lock,
+      label: "Check cameras",
+      title:
+        "Lock every camera's focus, exposure and white balance to the rig config and prove which camera is which (the tower on the plate)",
+      onClick: checkCameras,
       primary: !confirmed.includes("camera"),
-      disabled: !stream,
+      disabled: !rig,
     });
   } else if (kind) {
     if (byHand)
@@ -2016,14 +1923,14 @@ export function VisualCalibrationView() {
             {step.id === "camera" && (
               <div className="visual-cal-toolbar">
                 <select
-                  value={cameraId}
+                  value={shown ?? ""}
                   onChange={(e) => choose(e.target.value)}
                   disabled={!cameras.length}
-                  title="Camera"
+                  title="The camera shown; every photo is taken by all of them"
                 >
-                  {cameras.map((c, i) => (
-                    <option key={c.deviceId} value={c.deviceId}>
-                      {c.label || `camera ${i + 1}`}
+                  {cameras.map((c) => (
+                    <option key={c} value={c}>
+                      camera {c.toUpperCase()}
                     </option>
                   ))}
                 </select>
