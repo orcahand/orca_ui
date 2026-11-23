@@ -51,9 +51,9 @@ export const STEPS: StepDef[] = [
   {
     id: 'camera',
     phase: 'rig',
-    title: 'Set up the camera',
+    title: 'Set up the cameras',
     copy: () =>
-      'The BRIO on its side in its mount, 65° field of view (Logi Tune). Once the tiles are sharp, lock focus and exposure. From here on, don’t touch the camera.',
+      'Both BRIOs on their sides: camera A above at the back, camera B on the side rail 45° down. The console owns them: the view here is its preview, every photo is taken by both. With the tower on the plate, Check cameras locks focus and exposure to the rig config and proves which camera is which (it refuses swapped or missing cameras). From here on, don’t touch the cameras.',
     art: 'camera',
     live: true,
   },
@@ -137,7 +137,7 @@ export const STEPS: StepDef[] = [
     copy: () => 'One photo per stop, the same stops and the same approach (from the hard-stop side) as the rig calibration.',
     items: () => [
       'Put the hand at zero (every joint at 0°) and leave it there for the whole sweep.',
-      'Run sweep: the camera’s focus and exposure are set and checked first (the sweep stops if they can’t be), then the motor homes and turns through every stop.',
+      'Run sweep: the cameras are checked first (focus and exposure set, which camera is which; the sweep stops if they can’t be), then the motor homes and turns through every stop, a photo from each camera at each.',
       'The photos stay in a hand session.',
     ],
     live: true,

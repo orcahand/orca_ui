@@ -179,6 +179,7 @@ export interface RigInfo {
   swap_angle: number; // where the plate parks to swap the object for the hand
   rig_board: { usb_serial: string | null; devices: string[] }; // the turntable's board: never the hand's
   mock_turntable: boolean;
+  cameras: string[]; // the enabled cameras ("a" above, "b" on the side rail): every photo is from all of them
 }
 
 /** The camera's UVC controls against the rig config (409 = they differ, or could not be set). */
@@ -218,6 +219,23 @@ export interface CameraControls {
   configured?: boolean;
   set?: Record<string, number | number[]>;
   controls?: Record<string, number | number[]>;
+  cameras?: Record<string, { set: Record<string, number | number[]>; controls: Record<string, number | number[]> }>;
+}
+
+/** The backend's camera preflight (visual_calibration/rig_cameras.py): which stream is which camera. */
+export interface CameraPreflight {
+  indices: Record<string, number>;
+  identified_by: "serial" | "index" | "mock";
+  reordered?: Record<string, string>;
+  tiles?: Record<string, { height_mm: number; expected_mm: number; tiles: number; corners: number }>;
+  at: string;
+}
+
+/** One stop's photos, one per camera, stored by the backend from its own stills. */
+export interface Captured {
+  stop: number;
+  size: [number, number];
+  cameras: Record<string, Omit<Detected, "size"> & { photo: PhotoEntry }>;
 }
 
 type UV = [number, number];
@@ -272,6 +290,7 @@ export type SessionKind = "camera" | "rotation" | "hand";
 
 export interface PhotoEntry {
   name: string;
+  camera?: string; // missing: camera "a"
   stop_deg: number;
   tiles: number;
   corners: number;
@@ -368,11 +387,10 @@ export const visualApi = {
   session: (id: string) => call<Session>(`/sessions/${id}`),
   createSession: (step: SessionKind, handTurned = false) =>
     call<Session>("/sessions", json({ step, hand_turned: handTurned })),
-  addPhoto: (id: string, stop: number, image: Blob) =>
-    call<Detected & { photo: PhotoEntry }>(
-      `/sessions/${id}/photos?stop=${stop}`,
-      { method: "POST", body: image },
-    ),
+  capture: (id: string, stop: number) =>
+    call<Captured>(`/sessions/${id}/capture?stop=${stop}`, { method: "POST" }),
+  cameraPreflight: (tiles: boolean) =>
+    call<CameraPreflight>("/cameras/preflight", json({ tiles })),
   detect: (image: Blob) =>
     call<Detected>("/detect", { method: "POST", body: image }),
   solve: (id: string) =>
@@ -394,8 +412,10 @@ export const visualApi = {
       { method: "POST" },
     ),
   release: () => call<Turntable>("/turntable/release", { method: "POST" }),
-  overlay: (angle: number, rotation: number) =>
-    call<ModelOverlay>(`/overlay?angle=${angle}&rotation=${rotation}`),
+  overlay: (angle: number, rotation: number, camera = "a") =>
+    call<ModelOverlay>(
+      `/overlay?angle=${angle}&rotation=${rotation}&camera=${encodeURIComponent(camera)}`,
+    ),
   status: () => call<CalStatus>("/status"),
   cameraCheck: () => call<CameraControls>("/camera/uvc"),
   liveFit: (
@@ -428,6 +448,10 @@ export const visualApi = {
       `/twin/state${angle === undefined ? "" : `?angle=${angle}`}`,
     ),
 };
+
+/** A camera's live view from the backend, a JPEG scaled to maxSide (the page never opens a camera). */
+export const cameraPreviewUrl = (camera: string, maxSide: number) =>
+  `${BASE}/cameras/${encodeURIComponent(camera)}/preview.jpg?max_side=${maxSide}`;
 
 export const twinTileUrl = (name: string) =>
   `${BASE}/twin/tiles/${encodeURIComponent(name)}.png`;

@@ -1,5 +1,5 @@
-// The rig camera on the dashboard (docs/rig-dashboard.md): the live stream turned like the
-// visual-calibration page (270° by default, its camera choice), and on request the model
+// The rig camera on the dashboard (docs/rig-dashboard.md): the backend's preview (it owns the
+// cameras) turned like the visual-calibration page (270° by default, its camera choice), and on request the model
 // overlay: the hand at its live pose (study-corrected when the study map is on) and the
 // tower's tiles at the plate angle. Off by default; click to enlarge, Esc to close.
 
@@ -11,6 +11,7 @@ import { useRig } from '../../state/rigStore'
 import { visualApi, type ModelOverlay } from '../visual/api'
 import { drawTiles } from '../visual/drawTiles'
 import { usePageVisible } from '../common/usePageVisible'
+import { useBackendCamera } from '../visual/backendCamera'
 import type { HandOverlay } from '../visual/handOverlay'
 
 const CAMERA_KEY = 'orca-ui.visual-calibration.camera'
@@ -36,7 +37,6 @@ export function RigCamera() {
   const joints = useAppStore((s) => s.handInfo?.joints)
   const video = useRef<HTMLVideoElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
-  const [error, setError] = useState<string | null>(null)
   const [zoomed, setZoomed] = useState(false)
   const [model, setModel] = useState<ModelOverlay | null>(null)
   const hand = useRef<HandOverlay | null>(null)
@@ -50,42 +50,26 @@ export function RigCamera() {
   }, [zoomed])
 
   const pageVisible = usePageVisible()
-  // The rig camera's own mode (4K): a smaller request switches the device for every client and
-  // starves the study's 4K capture; the element scales it down.
+  const saved = stored<string>(CAMERA_KEY, 'a')
+  const shown = (info?.cameras ?? ['a']).includes(saved) ? saved : 'a'
+  const { stream, error } = useBackendCamera(camera ? shown : null, pageVisible)
   useEffect(() => {
-    if (!camera || !pageVisible) return
-    let alive = true
-    let stream: MediaStream | null = null
-    const id = stored<string>(CAMERA_KEY, '')
-    navigator.mediaDevices
-      .getUserMedia({ video: { ...(id ? { deviceId: { exact: id } } : {}), width: { ideal: 3840 }, height: { ideal: 2160 } } })
-      .then((s) => {
-        if (!alive) return s.getTracks().forEach((t) => t.stop())
-        stream = s
-        if (video.current) {
-          video.current.srcObject = s
-          void video.current.play()
-        }
-        setError(null)
-      })
-      .catch((e: Error) => alive && setError(`no camera: ${e.message}`))
-    return () => {
-      alive = false
-      stream?.getTracks().forEach((t) => t.stop())
-      if (video.current) video.current.srcObject = null
-    }
-  }, [camera, pageVisible])
+    const v = video.current
+    if (!v) return
+    v.srcObject = stream
+    if (stream) void v.play().catch(() => undefined)
+  }, [stream])
 
   // The overlay's model (lens, camera_from_plate, tiles) at the plate angle, refetched as it turns.
   const key = angle === null ? null : Math.round(angle * 2) / 2
   useEffect(() => {
     if (!camera || !overlay) return
     let alive = true
-    visualApi.overlay(key ?? 0, rotation).then((m) => alive && setModel(m)).catch(() => undefined)
+    visualApi.overlay(key ?? 0, rotation, shown).then((m) => alive && setModel(m)).catch(() => undefined)
     return () => {
       alive = false
     }
-  }, [camera, overlay, key, rotation])
+  }, [camera, overlay, key, rotation, shown])
 
   useEffect(() => {
     if (!camera || !overlay || !joints) return
