@@ -9,7 +9,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { ErrorBoundary } from '../common/ErrorBoundary'
 import { api } from '../../api/rest'
-import { useAppStore } from '../../state/appStore'
+import { useAppStore, useResearchUi } from '../../state/appStore'
 import { Panel } from '../common/Panel'
 import { useStudyMap } from '../../state/studyMapStore'
 import { rigConnected, useRig } from '../../state/rigStore'
@@ -62,12 +62,16 @@ export function HandScenePanel({ height, withRig = false }: { height: string | n
   }, [side])
 
   const caps = status?.capabilities
+  const research = useResearchUi()
   const study = useStudyMap((s) => s.state)
   const view = useStudyMap((s) => s.view)
   const viewed = view ? study?.overlays?.find((r) => r.id === view)?.label : undefined
-  const poseLabel = viewed
-    ? ` · pose: ${viewed} (view only)`
-    : study?.available ? (study.enabled ? ' · pose: study-corrected' : ' · pose: standard') : ''
+  // The study's pose labels are research extras (--research-ui).
+  const poseLabel = !research
+    ? ''
+    : viewed
+      ? ` · pose: ${viewed} (view only)`
+      : study?.available ? (study.enabled ? ' · pose: study-corrected' : ' · pose: standard') : ''
 
   if (assetError) {
     return (

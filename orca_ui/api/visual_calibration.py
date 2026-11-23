@@ -23,9 +23,11 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+
+from orca_ui import research
 
 
 class NewSession(BaseModel):
@@ -58,6 +60,7 @@ class LutCommand(BaseModel):
     use_lut: bool = True                           # False: send them as they are (orca_core's linear map)
 
 
+RESEARCH = [Depends(research.require)]     # the study's research extras: 404 without --research-ui
 HOLD_LEASE_S = 20.0    # a held plate (a sweep between stops) drops the torque this long after its last move
 RIG_POLL_S = 3.0       # the rig watcher's period (lists ports; probes a new board once)
 RIG_PAUSE_S = 8.0      # after an explicit release the watcher leaves the board alone this long
@@ -708,7 +711,7 @@ def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
             table["lut"], table["lut_mtime"] = L.Lut.load(path), path.stat().st_mtime
         return table["lut"]
 
-    @router.get("/study-map")
+    @router.get("/study-map", dependencies=RESEARCH)
     def study_map_state() -> dict:
         """The study's per-joint map (command -> true, orca_core estimate -> true) and whether
         manual joint commands go through it."""
@@ -716,7 +719,7 @@ def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
         from orca_ui.hand.study_map import STUDY_MAP
         return {**STUDY_MAP.state(), "overlays": overlays.catalog()}
 
-    @router.post("/study-map")
+    @router.post("/study-map", dependencies=RESEARCH)
     def study_map_switch(body: StudyMapSwitch) -> dict:
         """On: the next manual commands go through the map. Nothing is sent now."""
         from orca_ui.hand.study_map import STUDY_MAP
@@ -730,7 +733,7 @@ def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
         from orca_ui.hand import overlays
         return {**STUDY_MAP.state(), "overlays": overlays.catalog()}
 
-    @router.get("/lut")
+    @router.get("/lut", dependencies=RESEARCH)
     def lut_state() -> dict:
         """Whether the study's lookup table exists, its held-out accuracy, and the touch poses."""
         import json as _json
@@ -753,7 +756,7 @@ def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
                 "tips": report and report.get("tips"),
                 "touch": {f: t["q"] for f, t in _json.loads(touch.read_text()).items()} if touch.exists() else {}}
 
-    @router.post("/lut/command")
+    @router.post("/lut/command", dependencies=RESEARCH)
     def lut_command(body: LutCommand) -> dict:
         """The joint command for the wanted true angles (the table's inverse), and the angles the
         hand will really reach with that command (its forward map). Nothing is sent to the hand."""
@@ -788,12 +791,12 @@ def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
         except (urllib.error.URLError, OSError, ValueError) as e:
             raise HTTPException(503, f"study server not reachable at {STUDY_URL} ({e})") from e
 
-    @router.get("/study/protocols")
+    @router.get("/study/protocols", dependencies=RESEARCH)
     def study_protocols() -> list:
         """The study's protocol nights (hand_study/server.py on :5010)."""
         return _study("/api/protocols")
 
-    @router.get("/study/protocol/{tag}")
+    @router.get("/study/protocol/{tag}", dependencies=RESEARCH)
     def study_protocol(tag: str) -> dict:
         """One night's phases, steps, ETAs, faults and results, as the study server reports them."""
         if "/" in tag or ".." in tag:
@@ -807,7 +810,7 @@ def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
             raise HTTPException(400, "bad tag")
         return NOTES / tag / "notes.jsonl"
 
-    @router.get("/study/notes/{tag}")
+    @router.get("/study/notes/{tag}", dependencies=RESEARCH)
     def study_notes(tag: str, limit: int = 20) -> list:
         """The status feed of a protocol night, newest first."""
         import json as _json
@@ -817,7 +820,7 @@ def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
         rows = [_json.loads(x) for x in path.read_text().splitlines() if x.strip()]
         return rows[::-1][:limit]
 
-    @router.post("/study/notes/{tag}")
+    @router.post("/study/notes/{tag}", dependencies=RESEARCH)
     def study_note_add(tag: str, body: StudyNote) -> dict:
         """Post a status line to the night's feed (agents: curl -d '{"text": ...}')."""
         import json as _json

@@ -33,6 +33,7 @@ export interface StepDef {
   overlay?: boolean // the model overlay starts on (it can be switched on wherever the camera shows)
   sweep?: SessionKind // the motor turns the plate through the stops into a session of this kind
   solve?: boolean
+  research?: boolean // a research extra of the hand study: shown only with --research-ui
 }
 
 const side0 = (rig: RigInfo | null) => `${rig?.side0_stop ?? 180}°`
@@ -107,6 +108,7 @@ export const STEPS: StepDef[] = [
     id: 'hand-pose',
     phase: 'hand',
     title: 'Estimate the hand pose (camera only)',
+    research: true,
     copy: () =>
       'The hand’s mount and joint angles from the camera image alone: nothing needs to be connected, and the motor does not move. Drawn over the camera: the CAD hand (URDF) at the estimate, following the plate; the View panel adds the CAD hand at zero to compare.',
     items: (rig) => [
@@ -163,6 +165,7 @@ export const STEPS: StepDef[] = [
     id: 'hand-control',
     phase: 'hand',
     title: 'Accurate control (sandbox)',
+    research: true,
     copy: () => 'Move the hand to the joint angles you want, through the hand study’s lookup table or straight through orca_core’s linear map, and see on the camera whether it really gets there. The CAD hand is drawn at the angles you ask for.',
     items: () => [
       'Torque on. The hand ramps slowly to every new target; leaving this step turns the torque off.',
@@ -173,3 +176,6 @@ export const STEPS: StepDef[] = [
     overlay: true,
   },
 ]
+
+/** The steps without the research extras: what is on offer unless the console runs with --research-ui. */
+export const ASSEMBLER_STEPS: StepDef[] = STEPS.filter((s) => !s.research)

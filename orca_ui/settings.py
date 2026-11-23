@@ -59,3 +59,7 @@ class UiSettings:
     teleop_ramp_s: float = 2.0             # engage ramp-in duration
     teleop_hold_after_ms: int = 250        # target silence -> tracking lost
     teleop_disengage_after_s: float = 10.0  # lost this long -> auto-disengage (0 = never)
+
+    # The visual calibration study's research extras (orca_ui.research): off
+    # and hidden unless started with --research-ui.
+    research_ui: bool = False

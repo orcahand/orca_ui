@@ -4,7 +4,7 @@
 
 import type { HandState } from '../../api/types'
 import type { ViewName } from '../../state/appStore'
-import { useAppStore } from '../../state/appStore'
+import { useAppStore, useResearchUi } from '../../state/appStore'
 import { BoardPicker } from './BoardPicker'
 import { EStopButton } from './EStopButton'
 import { HandMenu } from './HandMenu'
@@ -54,16 +54,18 @@ export function AppHeader() {
   const wsConnected = useAppStore((s) => s.wsConnected)
   const view = useAppStore((s) => s.view)
   const setView = useAppStore((s) => s.setView)
+  const research = useResearchUi()
 
   // Every tab is offered for every hand: the dashboard's own sections are
   // capability-gated one level down, so a motors-only hand gets a shorter
   // page rather than no page. Bare motor mode is the exception — there is no
   // hand to pose, no pose library worth keeping and nothing to calibrate, so
-  // only the two tabs that act on motors are offered.
+  // only the two tabs that act on motors are offered. The Study tab is a
+  // research extra, offered only with --research-ui.
   const bare = status?.bare ?? false
   const tabs = bare
     ? TABS.filter((tab) => tab.id === 'dashboard' || tab.id === 'motors')
-    : TABS
+    : TABS.filter((tab) => tab.id !== 'study' || research)
 
   const state: HandState = !wsConnected
     ? 'disconnected'
