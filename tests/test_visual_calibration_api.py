@@ -159,6 +159,9 @@ def test_the_turntable_torque_is_off_whenever_it_stops(tmp_path, monkeypatch):
 def test_lookup_table_command(tmp_path, monkeypatch):
     import json
     import sys
+
+    from orca_ui import research
+    monkeypatch.setattr(research, "_enabled", True)
     sys.path.insert(0, str(EXPERIMENT))
     from hand_study import lut as L
     from hand_study.configs import JOINTS, ROM
