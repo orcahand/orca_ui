@@ -234,7 +234,7 @@ export function MeasureResults({ run }: { run: HandRun | null }) {
         </thead>
         <tbody>
           {Object.entries(res.joints).map(([j, s]) => (
-            <tr key={j} className={s.measured ? "" : "poor"}>
+            <tr key={j} style={{ opacity: s.measured ? 1 : 0.6 }}>
               <td>{j}</td>
               <td>{range(s.old)}</td>
               <td title={s.measured ? `${s.n} poses, fit rms ${s.rms}°` : "not measured: coverage too small"}>
