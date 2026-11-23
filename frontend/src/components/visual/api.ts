@@ -406,12 +406,15 @@ export interface HandRunResults {
   poses: number;
   min_span: number | null; // share of a joint's range the motor must have covered to be measured
   joint_ranges: string | null; // the joint_ranges.yaml written, or null when no joint was measured
+  gone: string[]; // joints the hand's joint_ranges.yaml held before and no longer does (model range again)
   joints: Record<
     string,
     {
       old: [number, number]; // in force before the run
       new: [number, number]; // the measured one (the old one when not measured)
-      measured: boolean;
+      measured: boolean; // fitted with enough coverage and recorded
+      rejected: string | null; // why a fitted joint was left out (its fit is not a range)
+      uncalibrated: boolean; // the joint had no calibration to fit under
       n: number;
       rms: number;
       t_span: [number, number] | null;

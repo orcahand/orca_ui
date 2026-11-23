@@ -216,6 +216,7 @@ export function MeasureResults({ run }: { run: HandRun | null }) {
         Run of {res.started ? shortDate(res.started) : "?"} on rig {res.rig}: {measured} of{" "}
         {Object.keys(res.joints).length} joints measured from {res.poses} poses.{" "}
         {res.joint_ranges ? `Recorded in ${res.joint_ranges}.` : "No joint measured: nothing recorded."}
+        {res.gone.length ? ` No longer in it (back to the model’s range): ${res.gone.join(", ")}.` : ""}
       </p>
       {/* TODO(quality gate): which joints get a measured range is not decided; for now every joint
           the fit's coverage check passes (the motor covered min_span of its range). */}
@@ -237,8 +238,14 @@ export function MeasureResults({ run }: { run: HandRun | null }) {
             <tr key={j} style={{ opacity: s.measured ? 1 : 0.6 }}>
               <td>{j}</td>
               <td>{range(s.old)}</td>
-              <td title={s.measured ? `${s.n} poses, fit rms ${s.rms}°` : "not measured: coverage too small"}>
-                {s.measured ? range(s.new) : "not measured"}
+              <td
+                title={
+                  s.measured
+                    ? `${s.n} poses, fit rms ${s.rms}°`
+                    : (s.rejected ?? (s.uncalibrated ? "no calibration for this joint" : "coverage too small"))
+                }
+              >
+                {s.measured ? range(s.new) : s.rejected ? "left out" : "not measured"}
               </td>
               <td>
                 {acc ? `${err(acc.before[j])} → ${err(acc.after[j])}` : "–"}
