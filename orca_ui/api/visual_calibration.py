@@ -800,7 +800,8 @@ def build_router(base: Path | None = None, mock: bool = False) -> APIRouter:
             raise HTTPException(400, "bad tag")
         return _study(f"/api/protocol/{tag}")
 
-    NOTES = Path.home() / ".orca_ui" / "visual_calibration" / "hand_study" / "protocol"
+    from orca_ui.hand.study_map import study_dir
+    NOTES = study_dir() / "protocol"
 
     def _notes_path(tag: str) -> Path:
         if "/" in tag or ".." in tag:

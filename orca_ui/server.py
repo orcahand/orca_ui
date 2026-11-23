@@ -92,13 +92,9 @@ def create_app(settings: UiSettings) -> FastAPI:
         return {p for p in (*status.ports.values(), status.board_pinned) if p}
     visual.attach_hand(hand_ports, service.hand_motion_blocker)
 
-    def study_hand() -> str | None:
-        """The connected hand's id for the study maps: its folder in ~/orca_bench."""
-        from pathlib import Path as _P
-        parts = _P(getattr(service.supervisor.config, "config_path", "") or "").parts
-        return parts[parts.index("orca_bench") + 1] if "orca_bench" in parts[:-2] else None
     from orca_ui.hand.study_map import STUDY_MAP
-    STUDY_MAP.hand_source = study_hand
+    # The study maps are kept per hand under orca_core's hand id (its folder in <ORCA_HOME>/hands).
+    STUDY_MAP.hand_source = lambda: service.supervisor.hand_id
     from orca_ui.hand import overlays
     overlays.config_source = lambda: getattr(service.supervisor.config, "config_path", None)
     service.plate_motion_guard = visual.plate_motion_guard

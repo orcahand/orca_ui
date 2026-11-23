@@ -6,7 +6,9 @@ command -> true angle (monotone, piecewise linear) and orca_core's estimate -> t
 Maps are per hand: ``maps/<hand>/<name>.json`` (``stops``: hard stops refitted, linear;
 ``curve``: one curve per joint; ``lut``: the curve plus terms over the finger's other joints and
 the wrist; ``advanced``: the physical model of hand_study/advanced.py, a smooth curve, tendon
-coupling, compliance and backlash), and the first study's ``joint_map.json`` for ser-4485. When a map is
+coupling, compliance and backlash), and the first study's ``joint_map.json`` for ser-4485 only. The
+folder is the hand study's, ``<ui home>/visual_calibration/hand_study`` (orca_core
+experiments/visual_calibration/hand_study/paths.py), and a hand is named by orca_core's hand id. When a map is
 selected it is the hand's joint mapping for all of orca-ui: every joint target (any source: sliders,
 REST/ws, poses, sequences, teleop, neutral/zero) is the true angle wanted and turned into the command
 that reaches it (``command``), clamped to the reachable range; every joint estimate read from
@@ -25,8 +27,8 @@ from typing import Callable
 
 import numpy as np
 
-STUDY = Path.home() / ".orca_ui" / "visual_calibration" / "hand_study"
-PATH = STUDY / "joint_map.json"
+from orca_ui.home import ui_home
+
 LEGACY_HAND = "ser-4485"
 LABELS = {"stops": "Hard stops (refit)", "curve": "Per-joint curve", "lut": "Coupled table (LUT)",
           "advanced": "Advanced", "joint_map": "Joint map (first study)"}
@@ -50,15 +52,31 @@ def _hat(x: float, knots: np.ndarray) -> np.ndarray:
     return b
 
 
+def study_dir() -> Path:
+    """The hand study's data folder (read when used: ui_home() is settled at startup)."""
+    return ui_home() / "visual_calibration" / "hand_study"
+
+
 class StudyMap:
-    def __init__(self, path: Path = PATH, root: Path = STUDY / "maps", selection: Path | None = None):
-        self.path, self.root = path, root
-        self.selection = selection or path.parent / "study_map_selected.json"
+    def __init__(self, path: Path | None = None, root: Path | None = None, selection: Path | None = None):
+        self._path, self._root, self._selection = path, root, selection
         self._modes: dict[str, str] | None = None
         self.hand_source: Callable[[], str | None] = lambda: None
         self._lock = threading.Lock()
         self._cache: dict[Path, tuple[float, dict]] = {}
         self._dir: dict[str, float] = {}
+
+    @property
+    def path(self) -> Path:
+        return self._path or study_dir() / "joint_map.json"
+
+    @property
+    def root(self) -> Path:
+        return self._root or study_dir() / "maps"
+
+    @property
+    def selection(self) -> Path:
+        return self._selection or self.path.parent / "study_map_selected.json"
 
     def _selected(self) -> dict[str, str]:
         if self._modes is None:
@@ -107,7 +125,7 @@ class StudyMap:
             for name in NAMES:
                 if (self.root / hand / f"{name}.json").exists():
                     out[name] = self.root / hand / f"{name}.json"
-        if (hand in (None, LEGACY_HAND)) and self.path.exists():
+        if hand == LEGACY_HAND and self.path.exists():           # never offered to another or an unknown hand
             out["joint_map"] = self.path
         return out
 
