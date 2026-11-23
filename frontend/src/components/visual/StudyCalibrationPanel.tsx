@@ -25,7 +25,12 @@ const optionText = (o: StudyMapOption) =>
 const KIND = { basic: 'orca_core', main: 'main', fitted: 'fitted', 'other-hand': 'other hand' } as const
 
 function OverlayList({ rows, active }: { rows: OverlayRow[]; active: string | null }) {
-  const { overlaySettings, setOverlay, setAllOverlays, setMode } = useStudyMap()
+  const { overlaySettings, setOverlay, setAllOverlays, setMode, view, setView } = useStudyMap()
+  const pick = (r: OverlayRow) => {
+    if (r.mode == null) return setView(r.id)
+    setView(null)
+    if (r.mode !== active) void setMode(r.mode)
+  }
   return (
     <div className="study-ov">
       <div className="study-ov-head">
@@ -39,15 +44,15 @@ function OverlayList({ rows, active }: { rows: OverlayRow[]; active: string | nu
         const o = overlaySetting(r.id, overlaySettings)
         const color = o.color ?? autoColor(rows, r.id)
         const drives = active != null && r.mode === active
+        const shown = view ? view === r.id : drives
         return (
           <div key={r.id} className={'study-ov-row' + (o.visible ? ' study-ov-on' : '') + (drives ? ' study-ov-drives' : '')}>
             <input
               type="radio"
               name="study-drive"
-              checked={drives}
-              disabled={r.mode == null}
-              title={r.mode == null ? 'overlay only: cannot drive the hand' : 'use this mapping for the hand and the solid render'}
-              onChange={() => r.mode != null && void setMode(r.mode)}
+              checked={shown}
+              title={r.mode == null ? 'show this mapping on the solid hand (view only: cannot drive the hand)' : 'use this mapping for the hand and the solid render'}
+              onChange={() => pick(r)}
             />
             <input
               type="checkbox"

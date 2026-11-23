@@ -128,6 +128,9 @@ interface Store {
   /** Per overlay id; rows never touched fall back to defaultSetting. */
   overlaySettings: Record<string, Partial<OverlaySetting>>
   error: string | null
+  /** Overlay row the solid hand shows instead of the live pose; null = the live pose. View only. */
+  view: string | null
+  setView(id: string | null): void
   load(): Promise<void>
   setEnabled(on: boolean): Promise<void>
   setMode(mode: string): Promise<void>
@@ -151,6 +154,10 @@ export const useStudyMap = create<Store>((set, get) => ({
   state: null,
   overlaySettings: storedSettings(),
   error: null,
+  view: null,
+  setView(id) {
+    set({ view: id })
+  },
   async load() {
     try {
       const r = await fetch(BASE)

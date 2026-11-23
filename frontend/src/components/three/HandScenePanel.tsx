@@ -63,7 +63,11 @@ export function HandScenePanel({ height, withRig = false }: { height: string | n
 
   const caps = status?.capabilities
   const study = useStudyMap((s) => s.state)
-  const poseLabel = study?.available ? (study.enabled ? ' · pose: study-corrected' : ' · pose: standard') : ''
+  const view = useStudyMap((s) => s.view)
+  const viewed = view ? study?.overlays?.find((r) => r.id === view)?.label : undefined
+  const poseLabel = viewed
+    ? ` · pose: ${viewed} (view only)`
+    : study?.available ? (study.enabled ? ' · pose: study-corrected' : ' · pose: standard') : ''
 
   if (assetError) {
     return (

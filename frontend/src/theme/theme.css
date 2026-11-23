@@ -5755,7 +5755,7 @@ header h1 {
 .study-ov { display: grid; gap: 2px; }
 .study-ov-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 2px; }
 .study-ov-head span { display: flex; gap: 4px; }
-.study-ov-row { display: grid; grid-template-columns: auto 22px minmax(0, 1fr) 64px 30px; align-items: center; gap: 6px; padding: 3px 4px; border: 1px solid transparent; }
+.study-ov-row { display: grid; grid-template-columns: auto auto 22px minmax(0, 1fr) 64px 30px; align-items: center; gap: 6px; padding: 3px 4px; border: 1px solid transparent; }
 .study-ov-row:not(.study-ov-on) .study-ov-text { opacity: 0.6; }
 .study-ov-drives { border-color: var(--ok); background: rgb(var(--ok-rgb) / 0.08); }
 .study-ov-row input[type=color] { width: 22px; height: 18px; padding: 0; border: 1px solid var(--panel-border-strong); background: none; cursor: pointer; }

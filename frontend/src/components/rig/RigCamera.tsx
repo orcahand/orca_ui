@@ -4,6 +4,7 @@
 // tower's tiles at the plate angle. Off by default; click to enlarge, Esc to close.
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { api } from '../../api/rest'
 import { useAppStore } from '../../state/appStore'
 import { useRig } from '../../state/rigStore'
@@ -151,16 +152,22 @@ export function RigCamera() {
   }, [camera, overlay, rotation])
 
   if (!camera) return null
-  return (
+  const frame = (
     <div
       className={zoomed ? 'visual-cal-zoom' : 'visual-cal-frame rig-camera-frame'}
       onClick={() => setZoomed((z) => !z)}
       title={zoomed ? 'Click or Esc to close' : 'Click to enlarge'}
     >
-      <video ref={video} muted playsInline style={{ display: 'none' }} />
       <canvas ref={canvas} className="visual-cal-video" />
       {error && <span className="visual-cal-seg-note">{error}</span>}
       {zoomed && angle !== null && <span className="visual-cal-zoom-caption">plate {angle.toFixed(1)}°</span>}
     </div>
+  )
+  // Enlarged, it portals to <body>: the dashboard's sticky column would trap its z-index.
+  return (
+    <>
+      <video ref={video} muted playsInline style={{ display: 'none' }} />
+      {zoomed ? createPortal(frame, document.body) : frame}
+    </>
   )
 }

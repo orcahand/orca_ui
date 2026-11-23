@@ -215,7 +215,8 @@ function HandRig({
       // own under `standard`), and commanded targets are true angles, so both layer on unchanged.
       const study = useStudyMap.getState()
       const studyOn = caps.motors && Object.keys(frames.joints.standard).length > 0
-      rig.adapter.apply({ ...frames.joints.estimate, ...overlay })
+      const viewed = study.view ? frames.joints.overlays[study.view] : undefined
+      rig.adapter.apply(viewed && Object.keys(viewed).length ? viewed : { ...frames.joints.estimate, ...overlay })
 
       if (rig.ghost) {
         // Without encoders the main hand already shows the motor estimate,
