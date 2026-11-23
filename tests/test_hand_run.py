@@ -37,14 +37,44 @@ def _free_port() -> int:
         return s.getsockname()[1]
 
 
+def _console() -> TestClient:
+    settings = UiSettings(config_path=materialize_mock_model(), mock=True, open_browser=False, port=_free_port())
+    return TestClient(create_app(settings))
+
+
 @pytest.fixture()
 def client(monkeypatch, tmp_path):
     monkeypatch.setenv("ORCA_RIG_AUTODETECT", "0")
     monkeypatch.setenv("ORCA_FIRMWARE_REPO", str(tmp_path / "no-firmware"))
-    settings = UiSettings(config_path=materialize_mock_model(), mock=True, open_browser=False, port=_free_port())
-    with TestClient(create_app(settings)) as c:
+    with _console() as c:
         assert _wait_for(lambda: c.get("/api/status").json()["state"] == "connected")
         yield c
+
+
+def _gone(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    return False
+
+
+SLEEPER = [sys.executable, "-c", "import time; time.sleep(60)", "hand_study"]   # a run that never ends
+
+
+def _fake_run(tmp_path, name: str, state: dict | None, fit: dict | None, exit_code: int = 0, say: str = "") -> list:
+    """A command standing in for run_hand: announces a run folder holding `state` and `fit`, then exits."""
+    import json
+    run = tmp_path / name
+    (run / "night").mkdir(parents=True)
+    (run / "night" / "t.json").write_text(json.dumps({"tag": "t", "steps": [
+        {"name": "preflight", "kind": "preflight", "minutes": 1}, {"name": "N07-short", "kind": "ranges", "minutes": 1}]}))
+    if state is not None:
+        (run / "night" / "t.state.json").write_text(json.dumps(state))
+    if fit is not None:
+        (run / "proposed").mkdir()
+        (run / "proposed" / "hardstops.json").write_text(json.dumps(fit))
+    return [sys.executable, "-c", f"import sys; print('run {run}'); print({say!r}); sys.exit({exit_code})"]
 
 
 def _hand_on_file(client) -> str:
@@ -78,7 +108,7 @@ def test_measure_builds_the_run_for_the_connected_hand(client):
     assert steps[:2] == ["preflight", "snapshot"] and steps[-3:] == ["N08-V", "ranges", "accuracy"]
     assert all(s["state"] == "todo" for s in run["progress"]["steps"]) and run["progress"]["eta_s"] > 0
     assert f"/runs/{hand_id}/" in run["run"] and run["run"].startswith(os.environ["ORCA_HOME"])
-    assert client.get(f"{VC}/hand-run/results").json() == {"hand": hand_id, "results": None}
+    assert client.get(f"{VC}/hand-run/results").json() == {"hand": hand_id, "latest": run["run"], "results": None}
     assert client.get(f"{VC}/hand-run/photo/b.jpg").status_code == 404
     pose = next(Path(run["run"]).glob("sessions/*-N00-baseline")) / "configs" / "zero"
     pose.mkdir(parents=True)
@@ -161,3 +191,84 @@ def test_write_to_board_releases_the_port_writes_and_reads_back(client, monkeypa
     assert op["result"]["written"] and op["result"]["confirmed"]
     assert op["result"]["board"]["ranges"] == ["index_mcp"] and op["result"]["board"]["sequence"] == 4
     assert _wait_for(lambda: client.get("/api/status").json()["state"] == "connected")
+
+
+def test_a_run_is_done_only_when_it_recorded_the_ranges(client, tmp_path, monkeypatch):
+    """Done: the night finished and this run's fit recorded the ranges; then the hand reconnects so
+    they are in force. Anything else is failed, with why, and the hand stays as it is."""
+    hand_run = client.app.state.visual.hand_run
+    reconnects = []
+    monkeypatch.setattr(client.app.state.service, "reconnect", lambda: reconnects.append(1))
+
+    def ended(command) -> dict:
+        hand_run.start("ser-0001", command=command)
+        assert _wait_for(lambda: client.get(f"{VC}/hand-run").json()["state"] != "running")
+        assert _wait_for(lambda: not hand_run.alive())
+        return client.get(f"{VC}/hand-run").json()
+
+    record = {"stops": {}, "joint_ranges": {"path": None, "recorded": [], "rejected": {}, "gone": []}}
+    done = ended(_fake_run(tmp_path, "done", {"state": "done", "done": {}}, record))
+    assert (done["state"], done["reason"]) == ("done", None)
+    assert _wait_for(lambda: reconnects == [1])
+    cut = ended(_fake_run(tmp_path, "cut", {"state": "done", "done": {}, "cut_short": "N07-short"}, None, 1))
+    assert cut["state"] == "failed" and cut["reason"] == "the run reached its deadline before N07-short"
+    unrecorded = ended(_fake_run(tmp_path, "unrecorded", {"state": "done", "done": {}}, {"stops": {}}, 1))
+    assert unrecorded["state"] == "failed" and "without recording" in unrecorded["reason"]
+    died = ended(_fake_run(tmp_path, "died", None, None, 3, say="ImportError: no torch"))
+    assert (died["state"], died["reason"]) == ("failed", "ImportError: no torch")
+    assert reconnects == [1]
+
+
+def test_stop_ends_the_run_and_the_rig_steps_wait_for_it(client):
+    hand_run = client.app.state.visual.hand_run
+    hand_run.start("ser-0001", command=SLEEPER)
+    pid = hand_run.status()["pid"]
+    for path in ("/sessions", "/turntable/park", "/turntable/calibrate", "/live-fit/reset"):
+        r = client.post(VC + path, json={})
+        assert r.status_code == 409 and "hand run is measuring" in r.json()["detail"], path
+    run = client.post(f"{VC}/hand-run/stop").json()
+    assert (run["state"], run["stopped"]) == ("stopped", "stopped") and _wait_for(lambda: _gone(pid))
+    assert client.post(f"{VC}/sessions", json={}).status_code != 409
+
+
+def test_the_console_ends_its_run_when_it_shuts_down_and_kills_one_left_behind(monkeypatch, tmp_path):
+    """Shut down: the run dies with the console. Crashed: the next console kills the group it recorded."""
+    import json
+    import subprocess
+    from orca_ui.home import ui_home
+    monkeypatch.setenv("ORCA_RIG_AUTODETECT", "0")
+    with _console() as c:
+        c.app.state.visual.hand_run.start("ser-0001", command=SLEEPER)
+        pid = c.app.state.visual.hand_run.status()["pid"]
+        record = ui_home() / "visual_calibration" / "hand_runs" / "active.json"
+        assert json.loads(record.read_text())["pgid"] == pid
+    assert _wait_for(lambda: _gone(pid)) and not record.exists()
+
+    left = subprocess.Popen(SLEEPER, start_new_session=True)
+    record.write_text(json.dumps({"pgid": left.pid, "hand": "ser-0001"}))
+    with _console():
+        assert left.wait(timeout=5) == -9 and not record.exists()
+
+
+def test_results_name_their_run(client):
+    """The newest measured run of the connected hand, named, beside the newest run at all."""
+    import json
+    _experiment_on_path()
+    from hand_study import paths, run_hand
+    hand_id = _hand_on_file(client)
+    assert client.get(f"{VC}/hand-run/results").json() == {"hand": hand_id, "latest": None, "results": None}
+    measured = paths.new_run(run_hand.the_rig(), hand_id, protocol="night_quick")
+    (measured / "proposed").mkdir()
+    stops = {"index_mcp": {"old": [-20.0, 100.0], "new": [-15.0, 95.0], "n": 70, "dropped": 2, "t_span": [0.0, 1.0],
+                           "identifiable": True, "fit": [-15.0, 95.0], "rms": 1.2},
+             "wrist": {"old": [-30.0, 30.0], "new": [-30.0, 30.0], "n": 70, "dropped": 0, "t_span": [0.4, 0.5],
+                       "identifiable": False, "fit": [-28.0, 33.0], "rms": 0.9}}
+    (measured / "proposed" / "hardstops.json").write_text(json.dumps({
+        "run": "q1", "n": 70, "min_span": 0.4, "stops": stops,
+        "joint_ranges": {"path": "/h/joint_ranges.yaml", "recorded": ["index_mcp"], "rejected": {}, "gone": ["ring_mcp"]}}))
+    newer = paths.new_run(run_hand.the_rig(), hand_id, protocol="night_quick")
+    r = client.get(f"{VC}/hand-run/results").json()
+    assert r["latest"] == str(newer) and r["results"]["run"] == str(measured)
+    joints = r["results"]["joints"]
+    assert joints["index_mcp"]["measured"] and not joints["wrist"]["measured"] and r["results"]["gone"] == ["ring_mcp"]
+

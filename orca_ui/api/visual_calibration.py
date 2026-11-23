@@ -140,6 +140,15 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
     router = APIRouter(prefix="/api/visual-calibration", tags=["visual-calibration"])
     lock = threading.Lock()                        # one solve / photo write at a time
     table: dict = {}                               # "t": the open Turntable, "hold_until": the hold's lease
+    measure: dict = {"run": None}                  # the hand run (Measure joint ranges), once a hand service is attached
+
+    def idle_rig() -> None:
+        """The rig steps the hand run never takes wait while it runs (its photos, its plate)."""
+        if measure["run"] is not None and measure["run"].alive():
+            raise HTTPException(409, "the hand run is measuring on the rig: this waits until the run ends "
+                                     "or is stopped (Measure joint ranges)")
+
+    IDLE_RIG = [Depends(idle_rig)]
 
     def release_turntable(close: bool = False) -> bool:
         """Torque off (E-STOP, shutdown, a dropped hold); close: also let go of the board."""
@@ -530,7 +539,7 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
         lease(body.hold)
         return motor(lambda t: t.move(body.angle, settle, hold=body.hold))
 
-    @router.post("/turntable/calibrate")
+    @router.post("/turntable/calibrate", dependencies=IDLE_RIG)
     def turntable_calibrate() -> dict:
         """The motor calibration: hard stop, travel, every stop's motor position
         (turntable_calibration.yaml; not saved for the mock motor)."""
@@ -551,7 +560,7 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
             return table["t"].state().as_dict()        # a move is running: it ends with the torque off
         return motor(off, moves=False)
 
-    @router.post("/turntable/park")
+    @router.post("/turntable/park", dependencies=IDLE_RIG)
     def turntable_park() -> dict:
         """To the swap angle (object <-> hand), torque off after."""
         swap = float(rig_config().raw["turntable"].get("swap_angle", 180.0))
@@ -674,7 +683,7 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
         return [{"id": s.id, "step": s.meta["step"], "created": s.meta["created"], "photos": len(s.meta["photos"]),
                  "solved": s.result() is not None} for s in session.Session.list(sessions_dir())]
 
-    @router.post("/sessions")
+    @router.post("/sessions", dependencies=IDLE_RIG)
     def create(body: NewSession) -> dict:
         session, _ = vc()
         return session.Session.create(sessions_dir(), body.step, hand_turned=body.hand_turned).summary()
@@ -692,7 +701,7 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
             raise HTTPException(409, f"the plate is at {plate:.1f}°, not at the stop {stop:g}°")
         return plate
 
-    @router.post("/sessions/{sid}/photos")
+    @router.post("/sessions/{sid}/photos", dependencies=IDLE_RIG)
     async def add_photo(sid: str, request: Request, stop: float = Query(..., ge=-360, le=360),
                         plate: float | None = Query(None, ge=-360, le=360), camera: str = Query("a")) -> dict:
         """A photo taken elsewhere (an import; a sweep uses /capture). `plate`: the plate's angle when
@@ -716,7 +725,7 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
         return {"photo": entry, "size": s.meta["image_size"], "detections": _detections(dets),
                 "orientation": _orientation(s.object, dets)}
 
-    @router.post("/sessions/{sid}/capture")
+    @router.post("/sessions/{sid}/capture", dependencies=IDLE_RIG)
     def capture(sid: str, stop: float = Query(..., ge=-360, le=360),
                 plate: float | None = Query(None, ge=-360, le=360)) -> dict:
         """A photo from every camera at this stop: the backend's own full-resolution stills (PNG),
@@ -743,7 +752,7 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
             table["fit"] = LiveHandFit(rig_config())
         return table["fit"]
 
-    @router.post("/live-fit/frame")
+    @router.post("/live-fit/frame", dependencies=IDLE_RIG)
     async def live_fit_frame(request: Request, angle: float | None = Query(None, ge=-360, le=360),
                              joints: str | None = Query(None), source: str = Query("zeros"),
                              iters: int = Query(2, ge=1, le=20), solve_joints: bool = Query(False),
@@ -782,13 +791,13 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
         except ValueError as e:
             raise HTTPException(400, str(e)) from e
 
-    @router.post("/live-fit/reset")
+    @router.post("/live-fit/reset", dependencies=IDLE_RIG)
     def live_fit_reset() -> dict:
         if "fit" in table:
             table["fit"].reset()
         return {"ok": True}
 
-    @router.post("/live-fit/keep-view")
+    @router.post("/live-fit/keep-view", dependencies=IDLE_RIG)
     def live_fit_keep_view() -> dict:
         """Keep the last frame as an extra view of the same pose (another plate angle)."""
         f = table.get("fit")
@@ -800,14 +809,14 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
         except ValueError as e:
             raise HTTPException(409, str(e)) from e
 
-    @router.post("/live-fit/clear-views")
+    @router.post("/live-fit/clear-views", dependencies=IDLE_RIG)
     def live_fit_clear_views() -> dict:
         if "fit" in table:
             with fit_lock:
                 table["fit"].clear_views()
         return {"views": 0}
 
-    @router.post("/live-fit/freeze")
+    @router.post("/live-fit/freeze", dependencies=IDLE_RIG)
     def live_fit_freeze() -> dict:
         """Save the current fit and its frame for offline debugging."""
         import datetime
@@ -835,7 +844,7 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
         return {"size": [int(img.shape[1]), int(img.shape[0])], "detections": _detections(dets),
                 "orientation": _orientation(preview_detector().obj, dets)}
 
-    @router.post("/sessions/{sid}/solve")
+    @router.post("/sessions/{sid}/solve", dependencies=IDLE_RIG)
     def solve(sid: str) -> dict:
         s = open_session(sid)
         with lock:
@@ -918,7 +927,7 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
         return {"command": {j: round(v, 2) for j, v in cmd.items()},
                 "reached": {j: round(v, 2) for j, v in model.forward(cmd).items()}}
 
-    @router.post("/sessions/{sid}/apply")
+    @router.post("/sessions/{sid}/apply", dependencies=IDLE_RIG)
     def apply(sid: str) -> dict:
         s = open_session(sid)
         try:
@@ -981,15 +990,27 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
 
     # ---- Measure joint ranges (the assemblers' hand steps): hand_study.run_hand as the console's
     # child process (orca_ui.hand.hand_run), followed from its run folder (run_hand.progress, .results).
-    measure: dict = {"run": None}
-
     def attach_service(service, ui_url: str) -> None:
-        """The hand service (the hand to measure, its torque) and the URL the run drives the console at."""
+        """The hand service (the hand to measure, its torque) and the URL the run drives the console at.
+        A run an earlier console left running is killed now, and the hand's torque goes off once it is
+        connected again."""
         from orca_ui.hand.hand_run import HandRun
         from orca_ui.home import ui_home
         hand["service"] = service
         measure["run"] = router.hand_run = HandRun(EXPERIMENT, ui_url, lambda: ui_home() / "visual_calibration" / "hand_runs",
                                                    safe_off=run_safe_off, on_end=run_ended)
+        if measure["run"].reap_leftover() is not None:
+            threading.Thread(target=torque_off_when_connected, daemon=True, name="hand-run-leftover").start()
+
+    def torque_off_when_connected(wait_s: float = 120.0) -> None:
+        """After a run an earlier console left: hand and plate torque off as soon as they are there."""
+        t0 = time.monotonic()
+        while time.monotonic() - t0 < wait_s:
+            session = hand["service"].session
+            if session is not None and session.caps.motors:
+                break
+            time.sleep(1.0)
+        run_safe_off()
 
     def stop_hand_run(why: str = "stopped", release: bool = True) -> bool:
         return measure["run"] is not None and measure["run"].stop(why, release)
@@ -1017,14 +1038,24 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
         return run_hand
 
     def run_view(status: dict) -> dict:
-        """The process, the run's progress from its files and, once it ended, how: done (the night
-        finished), failed, stopped or ended (a dry run lists its steps only)."""
+        """The process, the run's progress from its files and, once it ended, how: done (its night
+        finished and its fit recorded the ranges: hardstops.json holds a joint_ranges record), failed
+        (anything else, `reason` saying why), stopped, or ended (a dry run lists its steps only)."""
         progress = run_hand_module().progress(Path(status["run"])) if status.get("run") else None
-        night = (progress or {}).get("state")
-        state = status["state"]
-        if state == "ended":
-            state = "done" if night == "done" else "failed" if status.get("returncode") or night == "aborted" else "ended"
-        return {**status, "state": state, "progress": progress}
+        p = progress or {}
+        state, reason = status["state"], None
+        if state == "ended" and not status.get("dry"):
+            if p.get("state") == "done" and p.get("recorded"):
+                state = "done"
+            else:
+                state = "failed"
+                last = next((x for x in reversed(status.get("log_tail") or []) if x.strip()), None)
+                reason = (p.get("error")
+                          or (p.get("cut_short") and f"the run reached its deadline before {p['cut_short']}")
+                          or (p.get("state") == "done" and "the run ended without recording joint ranges")
+                          or last or f"the run exited with {status.get('returncode')}")
+        dead = [w["log"] for w in p.get("workers") or [] if not w["alive"] and w.get("returncode") not in (None, -15)]
+        return {**status, "state": state, "reason": reason, "progress": progress, "dead_workers": dead}
 
     def run_ended(status: dict) -> None:
         """A finished run recorded the hand's ranges: the hand reconnects, so they are in force now."""
@@ -1052,16 +1083,19 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
         body = body or MeasureStart()
         run = runner()
         hand_id = hand_to_measure()
-        manager = hand["service"].operation_manager
-        if manager is not None and manager.active():
-            raise HTTPException(409, "an operation is running: wait for it or stop it")
         if run.alive():
             raise HTTPException(409, "a hand run is already running")
         if "t" not in table:
             raise HTTPException(409, "the rig's plate is not connected")
         camera_call(lambda c: c.preflight(None, write=True))
+
+        def no_operation() -> None:                # under the run's start lock: an operation starting
+            manager = hand["service"].operation_manager       # meanwhile already sees the run
+            if manager is not None and manager.active():
+                raise HTTPException(409, "an operation is running: wait for it or stop it")
         try:
-            return run_view(run.start(hand_id, dry=body.dry, limit=body.limit))
+            return run_view(run.start(hand_id, dry=body.dry, limit=body.limit, rig_id=table.get("rig_id"),
+                                      guard=no_operation))
         except (RuntimeError, OSError) as e:
             raise HTTPException(409, str(e)) from e
 
@@ -1084,16 +1118,19 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
 
     @router.get("/hand-run/results")
     def hand_run_results() -> dict:
-        """The connected hand's newest measured run on this rig: per joint the range in force before
-        and the measured one, which joints were measured, the accuracy before and after."""
+        """The connected hand's newest measured run on this rig (`results.run` names it): per joint
+        the range in force before and the measured one, which joints were measured, the accuracy
+        before and after. `latest`: the hand's newest run folder, measured or not."""
         from visual_calibration.rig_config import RigConfigError
         hand_id = hand_to_measure()
         rh = run_hand_module()
         try:
-            run = rh.latest_run(hand_id, with_results=True)
+            run = rh.latest_run(hand_id, with_results=True, rig_id=table.get("rig_id"))
+            latest = rh.latest_run(hand_id, rig_id=table.get("rig_id"))
         except RigConfigError as e:
             raise HTTPException(409, str(e)) from e
-        return {"hand": hand_id, "results": _plain(rh.results(run)) if run else None}
+        return {"hand": hand_id, "latest": str(latest) if latest else None,
+                "results": _plain(rh.results(run)) if run else None}
 
     @router.get("/board-write")
     def board_write_state() -> dict:

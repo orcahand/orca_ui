@@ -105,6 +105,12 @@ class OperationManager:
                 raise ServiceError(
                     f"operation {self._snapshot.kind!r} is already running",
                     status_code=409)
+            # Checked again under the lock right before the snapshot is made: a hand run starting
+            # meanwhile reads this manager's state under its own start lock (orca_ui.hand.hand_run).
+            hand_run = getattr(self._service, "hand_run_active", None)
+            if hand_run is not None and hand_run():
+                raise ServiceError("the rig's hand run is measuring the hand: wait for it or stop it",
+                                   status_code=409)
 
         # Conflict first: "already running" is the truthful error even when
         # the running op has the hand in maintenance (no session → param
@@ -117,10 +123,6 @@ class OperationManager:
         # maintenance lease, and arbiter-acquiring ops get a synchronous 409
         # instead of an async ERROR snapshot.
         self._service.require_manual_control()
-        hand_run = getattr(self._service, "hand_run_active", None)
-        if hand_run is not None and hand_run():
-            raise ServiceError("the rig's hand run is measuring the hand: wait for it or stop it",
-                               status_code=409)
         clean_params = op_cls.validate(self._service, dict(params or {}))
 
         with self._lock:
