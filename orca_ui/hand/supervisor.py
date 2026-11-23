@@ -361,6 +361,7 @@ class HandSupervisor(threading.Thread):
                     & set(self._missing_devices(caps)))),
                 rescanning=self._upgrade_probes_left > 0,
                 bare=self._settings.bare,
+                research=self._settings.research_ui,
                 state=self._state,
                 leaving_maintenance=self._leaving_maintenance,
                 capabilities=caps,

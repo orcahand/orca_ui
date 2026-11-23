@@ -11,10 +11,18 @@ if not (EXPERIMENT / "visual_calibration").is_dir():
     pytest.skip(f"no visual calibration experiment at {EXPERIMENT}", allow_module_level=True)
 
 
-def client_for(path, mock=False):
+def client_for(path, mock=False, cameras=None):
     app = FastAPI()
-    app.include_router(build_router(path, mock=mock))
+    app.include_router(build_router(path, mock=mock, cameras=cameras))
     return TestClient(app)
+
+
+class TileCameras:
+    """The rig's camera service, both cameras seeing the rendered tile."""
+
+    def stills(self):
+        img = cv2.imdecode(np.frombuffer(tile_png(), np.uint8), cv2.IMREAD_COLOR)
+        return {"a": img, "b": img}
 
 
 def tile_png(first_marker=0):
@@ -27,7 +35,7 @@ def tile_png(first_marker=0):
 
 
 def test_session_photo_detect_and_solve_errors(tmp_path):
-    c = client_for(tmp_path)
+    c = client_for(tmp_path, cameras=TileCameras())
     rig = c.get("/api/visual-calibration/rig").json()
     assert rig["stops"][0] == 0 and "tile_r0_s0" in rig["tiles"]
     assert rig["mountings"] == [0.0, 90.0, 180.0, 270.0] and rig["coverage_warnings"] == []
@@ -38,6 +46,12 @@ def test_session_photo_detect_and_solve_errors(tmp_path):
     assert r["photo"]["corners"] == 16 and r["detections"][0]["tile"] == "tile_r0_s0" and r["size"] == [1400, 1000]
     assert c.get(f"/api/visual-calibration/sessions/{sid}").json()["photos"][0]["stop_deg"] == 0
     assert c.get("/api/visual-calibration/sessions").json()[0]["photos"] == 1
+
+    # A sweep's stop: the backend's own stills, one photo per camera, tagged (the page posts none).
+    r = c.post(f"/api/visual-calibration/sessions/{sid}/capture?stop=30").json()
+    assert set(r["cameras"]) == {"a", "b"} and r["size"] == [1400, 1000]
+    assert r["cameras"]["b"]["photo"]["camera"] == "b" and r["cameras"]["b"]["detections"][0]["tile"] == "tile_r0_s0"
+    assert "camera" not in r["cameras"]["a"]["photo"] and len(c.get(f"/api/visual-calibration/sessions/{sid}").json()["photos"]) == 3
 
     live = c.post("/api/visual-calibration/detect", content=tile_png()).json()
     assert len(live["detections"]) == 1 and len(live["detections"][0]["uv"]) == 16
@@ -159,6 +173,9 @@ def test_the_turntable_torque_is_off_whenever_it_stops(tmp_path, monkeypatch):
 def test_lookup_table_command(tmp_path, monkeypatch):
     import json
     import sys
+
+    from orca_ui import research
+    monkeypatch.setattr(research, "_enabled", True)
     sys.path.insert(0, str(EXPERIMENT))
     from hand_study import lut as L
     from hand_study.configs import JOINTS, ROM

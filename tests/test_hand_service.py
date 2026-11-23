@@ -60,6 +60,35 @@ def test_torque_enable_then_targets_converge(service):
     assert service.status()["torque_enabled"] is False
 
 
+def test_neutral_and_zero_use_orca_cores_own_move_without_research_ui(service, tmp_path, monkeypatch):
+    """A study map selected in an earlier research run must not reshape neutral or zero."""
+    import json
+
+    from orca_ui import research
+    from orca_ui.hand import study_map
+
+    (tmp_path / "maps" / "ser-1").mkdir(parents=True)
+    joint = {"applied": True, "cmd_knots": [-10, 100], "cmd_true": [0, 80], "reach": [0, 80]}
+    (tmp_path / "maps" / "ser-1" / "curve.json").write_text(json.dumps({"joints": {"index_mcp": joint}}))
+    m = study_map.StudyMap(tmp_path / "joint_map.json", tmp_path / "maps")
+    m.hand_source = lambda: "ser-1"
+    monkeypatch.setattr(research, "_enabled", True)
+    m.set_mode("curve")
+    monkeypatch.setattr(research, "_enabled", False)
+    monkeypatch.setattr(study_map, "STUDY_MAP", m)
+
+    hand = service.session.hand
+    moves = []
+    monkeypatch.setattr(hand, "set_neutral_position", lambda **kw: moves.append("neutral"))
+    monkeypatch.setattr(hand, "set_zero_position", lambda **kw: moves.append("zero"))
+    monkeypatch.setattr(hand, "set_joint_positions", lambda *a, **kw: moves.append("mapped"))
+    service.enable_torque()
+    service.go_neutral()
+    assert _wait_for(lambda: moves == ["neutral"]), moves
+    service.go_zero()
+    assert _wait_for(lambda: moves == ["neutral", "zero"]), moves
+
+
 def test_unknown_joint_rejected(service):
     service.enable_torque()
     with pytest.raises(ServiceError):

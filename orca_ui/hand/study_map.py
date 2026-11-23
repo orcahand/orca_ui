@@ -27,6 +27,7 @@ from typing import Callable
 
 import numpy as np
 
+from orca_ui import research
 from orca_ui.home import ui_home
 
 LEGACY_HAND = "ser-4485"
@@ -88,13 +89,18 @@ class StudyMap:
 
     @property
     def mode(self) -> str:
-        """The connected hand's selected map; off for a hand never set or whose map is gone."""
+        """The connected hand's selected map; off for a hand never set or whose map is gone, and
+        always off without --research-ui (a stored selection is kept but not applied)."""
+        if not research.enabled():
+            return "off"
         hand = self.hand_source()
         m = self._selected().get(hand or "", "off")
         return m if m == "off" or m in self.files(hand) else "off"
 
     @mode.setter
     def mode(self, mode: str) -> None:
+        if mode != "off" and not research.enabled():
+            raise ValueError("study maps are a research extra: start the console with --research-ui")
         modes = self._selected()
         modes[self.hand_source() or ""] = mode
         try:
@@ -201,7 +207,10 @@ class StudyMap:
         return self.forward(estimate, mode) if mode != "off" else estimate
 
     def forward(self, estimate: dict[str, float], name: str | None = None) -> dict[str, float]:
-        """Where the joints really are, from orca_core's estimate (map `name`, else the selected, else the preferred)."""
+        """Where the joints really are, from orca_core's estimate (map `name`, else the selected, else the preferred);
+        the estimate unchanged without --research-ui."""
+        if not research.enabled():
+            return estimate
         d = self.data(name)
         if d is None:
             return dict(estimate)

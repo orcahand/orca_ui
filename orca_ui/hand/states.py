@@ -98,6 +98,9 @@ class StatusSnapshot:
     # no hand behind it. Views that pose a hand or map joints are meaningless
     # here and the browser hides them.
     bare: bool = False
+    # The study's research extras (--research-ui): the browser shows them
+    # only when this is set.
+    research: bool = False
 
     def as_dict(self) -> dict:
         caps = None
@@ -127,6 +130,7 @@ class StatusSnapshot:
             "refused": list(self.refused),
             "rescanning": self.rescanning,
             "bare": self.bare,
+            "research": self.research,
             "hardware_version": self.hardware_version,
             "hardware_version_override": self.hardware_version_override,
             "board_hardware_version": self.board_hardware_version,

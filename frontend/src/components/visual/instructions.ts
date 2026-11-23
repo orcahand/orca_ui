@@ -33,6 +33,7 @@ export interface StepDef {
   overlay?: boolean // the model overlay starts on (it can be switched on wherever the camera shows)
   sweep?: SessionKind // the motor turns the plate through the stops into a session of this kind
   solve?: boolean
+  research?: boolean // a research extra of the hand study: shown only with --research-ui
 }
 
 const side0 = (rig: RigInfo | null) => `${rig?.side0_stop ?? 180}°`
@@ -51,9 +52,9 @@ export const STEPS: StepDef[] = [
   {
     id: 'camera',
     phase: 'rig',
-    title: 'Set up the camera',
+    title: 'Set up the cameras',
     copy: () =>
-      'The BRIO on its side in its mount, 65° field of view (Logi Tune). Once the tiles are sharp, lock focus and exposure. From here on, don’t touch the camera.',
+      'Both BRIOs on their sides: camera A above at the back, camera B on the side rail 45° down. The console owns them: the view here is its preview, every photo is taken by both. With the tower on the plate, Check cameras locks focus and exposure to the rig config and proves which camera is which (it refuses swapped or missing cameras). From here on, don’t touch the cameras.',
     art: 'camera',
     live: true,
   },
@@ -107,6 +108,7 @@ export const STEPS: StepDef[] = [
     id: 'hand-pose',
     phase: 'hand',
     title: 'Estimate the hand pose (camera only)',
+    research: true,
     copy: () =>
       'The hand’s mount and joint angles from the camera image alone: nothing needs to be connected, and the motor does not move. Drawn over the camera: the CAD hand (URDF) at the estimate, following the plate; the View panel adds the CAD hand at zero to compare.',
     items: (rig) => [
@@ -137,7 +139,7 @@ export const STEPS: StepDef[] = [
     copy: () => 'One photo per stop, the same stops and the same approach (from the hard-stop side) as the rig calibration.',
     items: () => [
       'Put the hand at zero (every joint at 0°) and leave it there for the whole sweep.',
-      'Run sweep: the camera’s focus and exposure are set and checked first (the sweep stops if they can’t be), then the motor homes and turns through every stop.',
+      'Run sweep: the cameras are checked first (focus and exposure set, which camera is which; the sweep stops if they can’t be), then the motor homes and turns through every stop, a photo from each camera at each.',
       'The photos stay in a hand session.',
     ],
     live: true,
@@ -163,6 +165,7 @@ export const STEPS: StepDef[] = [
     id: 'hand-control',
     phase: 'hand',
     title: 'Accurate control (sandbox)',
+    research: true,
     copy: () => 'Move the hand to the joint angles you want, through the hand study’s lookup table or straight through orca_core’s linear map, and see on the camera whether it really gets there. The CAD hand is drawn at the angles you ask for.',
     items: () => [
       'Torque on. The hand ramps slowly to every new target; leaving this step turns the torque off.',
@@ -173,3 +176,6 @@ export const STEPS: StepDef[] = [
     overlay: true,
   },
 ]
+
+/** The steps without the research extras: what is on offer unless the console runs with --research-ui. */
+export const ASSEMBLER_STEPS: StepDef[] = STEPS.filter((s) => !s.research)

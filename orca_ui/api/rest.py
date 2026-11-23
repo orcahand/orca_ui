@@ -3,8 +3,9 @@ FastAPI's threadpool, never on the event loop."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from orca_ui import research
 from orca_ui.api import schemas
 from orca_ui import changelog as changelog_doc
 from orca_ui.hand.hand_store import NoHandFolder
@@ -380,7 +381,7 @@ def build_router(service: HandService) -> APIRouter:
         guard(service.set_max_current, body.ma)
         return {"ok": True, "control": service.control_state()}
 
-    @router.post("/control/motor_currents")
+    @router.post("/control/motor_currents", dependencies=[Depends(research.require)])
     def control_motor_currents(body: dict):
         """Per-motor goal-current limits for an experiment (hand_study collisions): {"ma": {motor_id: mA}};
         motors not named keep the console's max current. The config is not touched; /control/max_current

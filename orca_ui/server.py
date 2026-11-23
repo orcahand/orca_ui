@@ -29,6 +29,8 @@ def create_app(settings: UiSettings) -> FastAPI:
 
     from orca_ui.hand.operations import build_operation_manager
 
+    from orca_ui import research
+    research.configure(settings.research_ui)
     hub = StreamHub()
     service = HandService(
         settings,
@@ -64,6 +66,7 @@ def create_app(settings: UiSettings) -> FastAPI:
             service.stop()
             visual.stop_rig_watcher()
             visual.release_turntable(close=True)
+            visual.close_cameras()
 
     app = FastAPI(title="ORCA Hand Console", version="0.2.0", lifespan=lifespan)
     app.state.settings = settings
