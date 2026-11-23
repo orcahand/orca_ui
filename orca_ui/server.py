@@ -29,6 +29,8 @@ def create_app(settings: UiSettings) -> FastAPI:
 
     from orca_ui.hand.operations import build_operation_manager
 
+    from orca_ui import research
+    research.configure(settings.research_ui)
     hub = StreamHub()
     service = HandService(
         settings,

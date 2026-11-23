@@ -96,6 +96,11 @@ def parse_args(argv=None) -> argparse.Namespace:
                              "(overrides --teleop-dir).")
     parser.add_argument("--no-teleop", action="store_true",
                         help="Disable the teleoperation subsystem entirely.")
+    parser.add_argument("--research-ui", action="store_true",
+                        help="Show the visual calibration study's research extras "
+                             "(Study tab, study maps, ghost hands, control sandbox, "
+                             "live hand-pose estimate); they are off and hidden "
+                             "without this flag.")
     return parser.parse_args(argv)
 
 
@@ -219,6 +224,7 @@ def build_settings(argv=None) -> UiSettings:
         teleop_enabled=not args.no_teleop,
         teleop_cmd=args.teleop_cmd,
         teleop_dir=args.teleop_dir,
+        research_ui=args.research_ui,
     )
 
 
