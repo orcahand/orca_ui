@@ -121,15 +121,14 @@ def test_without_research_ui_no_map_is_ever_applied(tmp_path, monkeypatch):
     assert m.mode == "curve"                                     # kept for when it is switched back on
 
 
-def test_without_research_ui_the_research_endpoints_answer_404(monkeypatch):
+def test_without_research_ui_the_research_endpoints_answer_404(tmp_path, monkeypatch):
     from orca_ui.api.visual_calibration import build_router
-    from orca_ui.cli import parse_args
     from orca_ui.hand import study_map
 
     app = FastAPI()
-    app.include_router(build_router())
+    app.include_router(build_router(tmp_path, mock=True))
     c = TestClient(app)
-    research.configure(parse_args([]).research_ui)                # off unless asked for
+    monkeypatch.setattr(research, "_enabled", False)
     monkeypatch.setattr(study_map.STUDY_MAP, "set_mode", lambda mode: pytest.fail("selection reached the map"))
     api = "/api/visual-calibration"
     assert c.post(f"{api}/study-map", json={"mode": "curve"}).status_code == 404
@@ -137,3 +136,20 @@ def test_without_research_ui_the_research_endpoints_answer_404(monkeypatch):
     assert c.get(f"{api}/study-map").status_code == 404
     assert c.post(f"{api}/lut/command", json={"angles": {"index_mcp": 10}}).status_code == 404
     assert c.get(f"{api}/study/protocols").status_code == 404
+
+
+@pytest.mark.parametrize("flag", [False, True])
+def test_the_research_ui_flag_reaches_the_status_and_the_endpoints(flag, tmp_path, monkeypatch):
+    from orca_ui.cli import build_settings
+    from orca_ui.hand import study_map
+    from orca_ui.server import create_app
+
+    for attr, path in (("path", tmp_path / "joint_map.json"), ("root", tmp_path / "maps"),
+                       ("selection", tmp_path / "selected.json")):
+        monkeypatch.setattr(study_map.STUDY_MAP, attr, path)
+    settings = build_settings(["--mock", "--no-browser"] + (["--research-ui"] if flag else []))
+    assert settings.research_ui is flag
+    with TestClient(create_app(settings)) as c:
+        assert c.get("/api/status").json()["research"] is flag
+        assert c.get("/api/visual-calibration/study-map").status_code == (200 if flag else 404)
+        assert (c.post("/api/control/motor_currents", json={"ma": {}}).status_code == 404) is not flag
