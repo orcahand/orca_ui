@@ -1,0 +1,501 @@
+diff --git a/frontend/src/components/setup/GuidedTensionDialog.tsx b/frontend/src/components/setup/GuidedTensionDialog.tsx
+index 93e3ea1..f604b05 100644
+--- a/frontend/src/components/setup/GuidedTensionDialog.tsx
++++ b/frontend/src/components/setup/GuidedTensionDialog.tsx
+@@ -642,16 +642,24 @@ function MotorRow({
+ }
+ 
+ const CURRENT_FIELDS = [
+-  { key: 'hold_ap', label: 'Hold · APs', step: 'range', min: 20, max: 500, unit: 'mA', inc: 10 },
+-  { key: 'hold_mcp', label: 'Hold · MCPs', step: 'range', min: 20, max: 500, unit: 'mA', inc: 10 },
+-  { key: 'hold_pip', label: 'Hold · PIPs', step: 'range', min: 20, max: 500, unit: 'mA', inc: 10 },
+-  { key: 'tension_current', label: 'Tensioning', step: 'tension', min: 50, max: 1000, unit: 'mA', inc: 10 },
++  { key: 'hold_ap', label: 'Hold · APs', step: 'range', min: 20, max: 2000, unit: 'mA', inc: 10 },
++  { key: 'hold_mcp', label: 'Hold · MCPs', step: 'range', min: 20, max: 2000, unit: 'mA', inc: 10 },
++  { key: 'hold_pip', label: 'Hold · PIPs', step: 'range', min: 20, max: 2000, unit: 'mA', inc: 10 },
++  { key: 'tension_current', label: 'Tensioning', step: 'tension', min: 50, max: 2000, unit: 'mA', inc: 10 },
+   { key: 'tension_offset_deg', label: 'Turn CCW', step: null, min: 0, max: 45, unit: '°', inc: 5 },
+ ] as const
+ 
+-// Changes apply to the next step that uses the current, and at once when that
+-// step is the one running (the pull applies from the next tension step).
++// Edits are held until Save; saved values apply to the next step that uses them, and at
++// once when that step is the one running (the pull applies from the next tension step).
+ function CurrentsEditor({ extra, step }: { extra: GuidedTensionExtra; step: TensionStep | null }) {
++  const [drafts, setDrafts] = useState<Partial<Record<CurrentKey, string>>>({})
++  const changed = CURRENT_FIELDS.filter((f) => drafts[f.key] !== undefined && Number(drafts[f.key]) !== extra[f.key])
++  const valid = changed.every((f) => inRange(drafts[f.key]!, f.min, f.max))
++  const save = () => {
++    if (!valid) return
++    for (const f of changed) answer(`current:${f.key}=${Number(drafts[f.key])}`)
++    setDrafts({})
++  }
+   return (
+     <div className="gt-currents">
+       <div className="gt-todo-title">Currents</div>
+@@ -659,28 +667,42 @@ function CurrentsEditor({ extra, step }: { extra: GuidedTensionExtra; step: Tens
+         <CurrentField
+           key={f.key}
+           label={f.label}
+-          live={step === f.step}
++          live={step === f.step || (step === 'range' && f.key === 'tension_current')}
+           value={extra[f.key] ?? 0}
++          draft={drafts[f.key]}
+           min={f.min}
+           max={f.max}
+           unit={f.unit}
+           step={f.inc}
+-          onCommit={(v) => answer(`current:${f.key}=${v}`)}
++          onDraft={(v) => setDrafts((d) => ({ ...d, [f.key]: v }))}
++          onCommit={save}
+         />
+       ))}
++      <button className="btn btn-primary btn-sm gt-currents-save" disabled={!changed.length || !valid} onClick={save}>
++        Save
++      </button>
+     </div>
+   )
+ }
+ 
++type CurrentKey = (typeof CURRENT_FIELDS)[number]['key']
++
++function inRange(raw: string, min: number, max: number): boolean {
++  const parsed = Number(raw)
++  return raw !== '' && Number.isFinite(parsed) && parsed >= min && parsed <= max
++}
++
+ function CurrentField({
+   label,
+   hint,
+   unit = 'mA',
+   live,
+   value,
++  draft,
+   min,
+   max,
+   step = 10,
++  onDraft,
+   onCommit,
+ }: {
+   label: string
+@@ -688,18 +710,22 @@ function CurrentField({
+   unit?: string
+   live: boolean
+   value: number
++  draft?: string
+   min: number
+   max: number
+   step?: number
++  onDraft?: (value: string) => void
+   onCommit: (value: number) => void
+ }) {
+-  const [draft, setDraft] = useState(String(value))
+-  useEffect(() => setDraft(String(value)), [value])
+-  const parsed = Number(draft)
+-  const valid = draft !== '' && Number.isFinite(parsed) && parsed >= min && parsed <= max
++  const [local, setLocal] = useState(String(value))
++  useEffect(() => setLocal(String(value)), [value])
++  // With onDraft the parent holds the edit until it saves; otherwise blur and Enter commit.
++  const shown = onDraft ? (draft ?? String(value)) : local
++  const valid = inRange(shown, min, max)
+   const commit = () => {
++    const parsed = Number(shown)
+     if (valid && parsed !== value) onCommit(parsed)
+-    else setDraft(String(value))
++    else if (!onDraft) setLocal(String(value))
+   }
+   return (
+     <label className={`gt-current${live ? ' live' : ''}`} title={hint ?? `${min}–${max} ${unit}`}>
+@@ -713,10 +739,10 @@ function CurrentField({
+           min={min}
+           max={max}
+           step={step}
+-          value={draft}
++          value={shown}
+           className={valid ? undefined : 'invalid'}
+-          onChange={(e) => setDraft(e.target.value)}
+-          onBlur={commit}
++          onChange={(e) => (onDraft ? onDraft(e.target.value) : setLocal(e.target.value))}
++          onBlur={onDraft ? undefined : commit}
+           onKeyDown={(e) => {
+             if (e.key === 'Enter') {
+               e.preventDefault()
+diff --git a/frontend/src/components/setup/TensionStep.tsx b/frontend/src/components/setup/TensionStep.tsx
+index e9ebf8d..8d5b6ad 100644
+--- a/frontend/src/components/setup/TensionStep.tsx
++++ b/frontend/src/components/setup/TensionStep.tsx
+@@ -263,10 +263,10 @@ const CURRENT_FIELDS: {
+   min: number
+   max: number
+ }[] = [
+-  { key: 'hold_ap', label: 'hold AP', hint: 'range check · abductions + thumb cmc', min: 20, max: 500 },
+-  { key: 'hold_mcp', label: 'hold MCP', hint: 'range check · MCPs', min: 20, max: 500 },
+-  { key: 'hold_pip', label: 'hold PIP', hint: 'range check · PIPs + thumb dip', min: 20, max: 500 },
+-  { key: 'tension_current', label: 'tension', hint: 'held while you ratchet', min: 50, max: 1000 },
++  { key: 'hold_ap', label: 'hold AP', hint: 'range check · abductions + thumb cmc', min: 20, max: 2000 },
++  { key: 'hold_mcp', label: 'hold MCP', hint: 'range check · MCPs', min: 20, max: 2000 },
++  { key: 'hold_pip', label: 'hold PIP', hint: 'range check · PIPs + thumb dip', min: 20, max: 2000 },
++  { key: 'tension_current', label: 'tension', hint: 'held while you ratchet', min: 50, max: 2000 },
+ ]
+ 
+ function pickCurrents(defaults?: Partial<GuidedCurrents> | null): GuidedCurrents {
+diff --git a/frontend/src/theme/theme.css b/frontend/src/theme/theme.css
+index eb737c5..75a517e 100644
+--- a/frontend/src/theme/theme.css
++++ b/frontend/src/theme/theme.css
+@@ -2790,6 +2790,11 @@ header h1 {
+   width: 54px;
+ }
+ 
++.gt-currents-save {
++  align-self: flex-end;
++  margin-top: 4px;
++}
++
+ .gt-setting-input input.invalid,
+ .flow-field input.invalid {
+   border-color: rgb(var(--err-rgb) / 0.7);
+diff --git a/orca_ui/hand/operations/guided_tension.py b/orca_ui/hand/operations/guided_tension.py
+index a5bc6f7..bacc144 100644
+--- a/orca_ui/hand/operations/guided_tension.py
++++ b/orca_ui/hand/operations/guided_tension.py
+@@ -38,15 +38,13 @@ GOTO = "goto:"  # answer prefix that jumps to a range stage by key, or to score
+ GOTO_SCORE = f"{GOTO}score"
+ GOTO_TENSION = f"{GOTO}tension"
+ PUBLISH_PERIOD_S = 0.1
+-HOLD_BOUNDS_MA = (20.0, 500.0)
++HOLD_BOUNDS_MA = (20.0, 2000.0)
+ # Run settings: currents in mA, and how far the motors turn counterclockwise while tensioning in degrees.
+ CURRENT_BOUNDS_MA = {"hold_ap": HOLD_BOUNDS_MA, "hold_mcp": HOLD_BOUNDS_MA,
+-                     "hold_pip": HOLD_BOUNDS_MA, "tension_current": (50.0, 1000.0),
++                     "hold_pip": HOLD_BOUNDS_MA, "tension_current": (50.0, 2000.0),
+                      "tension_offset_deg": (0.0, 45.0)}
+ # Input values "current:<key>=<mA>" change a current mid-run instead of answering a prompt.
+ CURRENT_INPUT = "current:"
+-LIVE_STEP = {"hold_ap": "range", "hold_mcp": "range", "hold_pip": "range",
+-             "tension_current": "tension"}
+ # Input values "pass:<group>=<fraction>" change a group's pass threshold mid-run.
+ PASS_INPUT = "pass:"
+ PASS_GROUPS = ("ap", "mcp", "pip")
+@@ -153,6 +151,14 @@ class _Presenter:
+     def step(self) -> str:
+         return self._extra["step"]
+ 
++    @property
++    def stage_joints(self) -> list:
++        return list((self._extra.get("stage") or {}).get("joints") or [])
++
++    @property
++    def absent_joints(self) -> list:
++        return list(self._extra.get("absent_joints") or [])
++
+     def set_currents(self, currents: dict) -> None:
+         with self._lock:
+             self._extra.update(currents)
+@@ -301,14 +307,21 @@ class _LiveCurrents(Operation):
+         if presenter is not None:
+             presenter.set_currents({key: current})
+             presenter.log(f"{key.replace('_', ' ')} set to {current:.0f}{_unit(key)}")
+-            hand = self._hand
+-            if hand is not None and presenter.step == LIVE_STEP.get(key):
+-                if key == "tension_current":
+-                    hand_ops.set_max_current(hand, current)
+-                else:
+-                    hand_ops.set_joint_currents(hand, self.hold_for)
++            if self._hand is not None:
++                self._apply_live(presenter, key)
+         return True
+ 
++    def _apply_live(self, presenter: "_Presenter", key: str) -> None:
++        """Write a changed current to the motors when the running step uses it."""
++        step = presenter.step
++        if step == "tension" and key == "tension_current":
++            hand_ops.set_max_current(self._hand, self.currents[key])
++        elif step == "range" and key != "tension_offset_deg":
++            # The stage's joints yield at their hold current; the other fingers stay frozen at the tension current.
++            hand_ops.set_joint_currents(self._hand, self.hold_for, stage_joints=presenter.stage_joints,
++                                        freeze_ma=self.currents["tension_current"],
++                                        absent_joints=presenter.absent_joints)
++
+ 
+ class GuidedTensionOperation(_LiveCurrents):
+     def run(self, ctx: OpContext) -> dict:
+diff --git a/orca_ui/hand/operations/hand_ops.py b/orca_ui/hand/operations/hand_ops.py
+index d4b2e8b..12bfef6 100644
+--- a/orca_ui/hand/operations/hand_ops.py
++++ b/orca_ui/hand/operations/hand_ops.py
+@@ -226,11 +226,15 @@ def set_max_current(hand, current_ma: float) -> None:
+     hand.set_max_current(current_ma)
+ 
+ 
+-def set_joint_currents(hand, current_for_joint) -> None:
+-    """Per-motor current limits from a joint name -> mA function (wrist excluded)."""
++def set_joint_currents(hand, current_for_joint, stage_joints=None, freeze_ma=None, absent_joints=()) -> None:
++    """Per-motor current limits from a joint name -> mA function (wrist excluded); with
++    ``stage_joints``, every other joint is frozen at ``freeze_ma`` instead."""
+     from orca_core.maintenance.guided_tension import joint_currents, per_motor_currents
+ 
+-    hand.set_max_current(per_motor_currents(hand.config, joint_currents(hand.config, current_for_joint)))
++    by_joint = joint_currents(hand.config, current_for_joint, absent_joints)
++    if stage_joints is not None:
++        by_joint = {j: (ma if j in stage_joints else freeze_ma) for j, ma in by_joint.items()}
++    hand.set_max_current(per_motor_currents(hand.config, by_joint))
+ 
+ 
+ def tension_progress(config, hand_key: str | None) -> dict | None:
+diff --git a/pyproject.toml b/pyproject.toml
+index 207e53f..96acc16 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -52,3 +52,6 @@ artifacts = ["/orca_ui/webui/"]
+ 
+ [tool.hatch.build.targets.wheel]
+ packages = ["orca_ui"]
++
++[tool.uv.sources]
++orca-core = { path = "../orca_core", editable = true }
+diff --git a/tests/test_guided_tension_presenter.py b/tests/test_guided_tension_presenter.py
+index 14f3e64..7849eda 100644
+--- a/tests/test_guided_tension_presenter.py
++++ b/tests/test_guided_tension_presenter.py
+@@ -57,3 +57,54 @@ def test_rounds_count_on_from_the_saved_progress():
+     fresh = _Ctx()
+     _Presenter(fresh, {}).progress({"event": "step", "step": "pose", "round": 1})
+     assert fresh.extra["round"] == 1
++
++
++class _Hand:
++    def __init__(self, config):
++        self.config = config
++        self.writes = []
++
++    def set_max_current(self, current):
++        self.writes.append(current)
++
++
++def _live_op(step):
++    import glob
++    import os
++
++    import orca_core
++    from orca_core.hand_config import OrcaHandConfig
++
++    from orca_ui.hand.operations.guided_tension import GuidedTensionOperation
++
++    path = sorted(glob.glob(os.path.join(os.path.dirname(orca_core.__file__), "models", "v2", "*-right",
++                                         "config.yaml")))[0]
++    op = GuidedTensionOperation({"defaults": {"hold_ap": 200.0, "hold_mcp": 140.0, "hold_pip": 100.0,
++                                              "tension_current": 400.0, "tension_offset_deg": 10.0}})
++    op._hand = _Hand(OrcaHandConfig.from_config_path(config_path=path))
++    op._presenter = _Presenter(_Ctx(), op.settings())
++    op._presenter.progress({"event": "step", "step": step, "round": 1, "stage": hand_ops.range_stages()[1],
++                            "stage_index": 1, "stage_count": 4})
++    return op
++
++
++def test_a_saved_hold_current_reaches_the_stage_and_keeps_the_rest_frozen():
++    op = _live_op("range")
++    assert op.handle_input("current:hold_mcp=600")
++    config = op._hand.config
++    by_joint = dict(zip((config.motor_to_joint_dict.get(m) for m in config.motor_ids), op._hand.writes[-1]))
++    assert by_joint["middle_mcp"] == 600.0
++    assert by_joint["middle_pip"] == 100.0
++    assert by_joint["index_mcp"] == by_joint["ring_mcp"] == 400.0
++
++    assert op.handle_input("current:tension_current=500")
++    by_joint = dict(zip((config.motor_to_joint_dict.get(m) for m in config.motor_ids), op._hand.writes[-1]))
++    assert by_joint["index_mcp"] == 500.0 and by_joint["middle_mcp"] == 600.0
++
++
++def test_a_saved_current_waits_for_the_step_that_uses_it():
++    op = _live_op("tension")
++    op.handle_input("current:hold_mcp=300")
++    assert op._hand.writes == []
++    op.handle_input("current:tension_current=700")
++    assert op._hand.writes == [700.0]
+diff --git a/uv.lock b/uv.lock
+index 388b8b1..bc3a844 100644
+--- a/uv.lock
++++ b/uv.lock
+@@ -255,7 +255,7 @@ name = "exceptiongroup"
+ version = "1.3.1"
+ source = { registry = "https://pypi.org/simple" }
+ dependencies = [
+-    { name = "typing-extensions" },
++    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+ ]
+ sdist = { url = "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz", hash = "sha256:8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219", size = 30371, upload-time = "2025-11-21T23:01:54.787Z" }
+ wheels = [
+@@ -408,20 +408,20 @@ resolution-markers = [
+     "python_full_version >= '3.14' and sys_platform != 'win32'",
+ ]
+ dependencies = [
+-    { name = "anyio" },
+-    { name = "httpx" },
+-    { name = "httpx-sse" },
+-    { name = "jsonschema" },
+-    { name = "pydantic" },
+-    { name = "pydantic-settings" },
+-    { name = "pyjwt", extra = ["crypto"] },
+-    { name = "python-multipart" },
+-    { name = "pywin32", marker = "sys_platform == 'win32'" },
+-    { name = "sse-starlette" },
+-    { name = "starlette" },
+-    { name = "typing-extensions" },
+-    { name = "typing-inspection" },
+-    { name = "uvicorn", marker = "sys_platform != 'emscripten'" },
++    { name = "anyio", marker = "python_full_version >= '3.14'" },
++    { name = "httpx", marker = "python_full_version >= '3.14'" },
++    { name = "httpx-sse", marker = "python_full_version >= '3.14'" },
++    { name = "jsonschema", marker = "python_full_version >= '3.14'" },
++    { name = "pydantic", marker = "python_full_version >= '3.14'" },
++    { name = "pydantic-settings", marker = "python_full_version >= '3.14'" },
++    { name = "pyjwt", extra = ["crypto"], marker = "python_full_version >= '3.14'" },
++    { name = "python-multipart", marker = "python_full_version >= '3.14'" },
++    { name = "pywin32", marker = "python_full_version >= '3.14' and sys_platform == 'win32'" },
++    { name = "sse-starlette", marker = "python_full_version >= '3.14'" },
++    { name = "starlette", marker = "python_full_version >= '3.14'" },
++    { name = "typing-extensions", marker = "python_full_version >= '3.14'" },
++    { name = "typing-inspection", marker = "python_full_version >= '3.14'" },
++    { name = "uvicorn", marker = "python_full_version >= '3.14' and sys_platform != 'emscripten'" },
+ ]
+ sdist = { url = "https://files.pythonhosted.org/packages/27/3c/347cf965d313f5d41764e7d46bea6ffe7d9ef13b983cc429b0340962a082/mcp-1.27.2.tar.gz", hash = "sha256:8e02db104096d1c25b28e64bde29a5c32b31bc241710213e12fd4d84985bdfef", size = 621116, upload-time = "2026-05-29T17:16:04.039Z" }
+ wheels = [
+@@ -438,20 +438,20 @@ resolution-markers = [
+     "python_full_version < '3.11'",
+ ]
+ dependencies = [
+-    { name = "anyio" },
+-    { name = "httpx" },
+-    { name = "httpx-sse" },
+-    { name = "jsonschema" },
+-    { name = "pydantic" },
+-    { name = "pydantic-settings" },
+-    { name = "pyjwt", extra = ["crypto"] },
+-    { name = "python-multipart" },
+-    { name = "pywin32", marker = "sys_platform == 'win32'" },
+-    { name = "sse-starlette" },
+-    { name = "starlette" },
+-    { name = "typing-extensions" },
+-    { name = "typing-inspection" },
+-    { name = "uvicorn", marker = "sys_platform != 'emscripten'" },
++    { name = "anyio", marker = "python_full_version < '3.14'" },
++    { name = "httpx", marker = "python_full_version < '3.14'" },
++    { name = "httpx-sse", marker = "python_full_version < '3.14'" },
++    { name = "jsonschema", marker = "python_full_version < '3.14'" },
++    { name = "pydantic", marker = "python_full_version < '3.14'" },
++    { name = "pydantic-settings", marker = "python_full_version < '3.14'" },
++    { name = "pyjwt", extra = ["crypto"], marker = "python_full_version < '3.14'" },
++    { name = "python-multipart", marker = "python_full_version < '3.14'" },
++    { name = "pywin32", marker = "python_full_version < '3.14' and sys_platform == 'win32'" },
++    { name = "sse-starlette", marker = "python_full_version < '3.14'" },
++    { name = "starlette", marker = "python_full_version < '3.14'" },
++    { name = "typing-extensions", marker = "python_full_version < '3.14'" },
++    { name = "typing-inspection", marker = "python_full_version < '3.14'" },
++    { name = "uvicorn", marker = "python_full_version < '3.14' and sys_platform != 'emscripten'" },
+ ]
+ sdist = { url = "https://files.pythonhosted.org/packages/6e/77/9450b8f251a13affb6281997d0523c4615f8a8b35d0b21ff30db3a5aac9d/mcp-1.28.1.tar.gz", hash = "sha256:d51e36a5f5644faea4f85ea649bfffa6bc6c26770d42798ad6a3de3d2ba69683", size = 638501, upload-time = "2026-06-26T12:57:29.093Z" }
+ wheels = [
+@@ -611,7 +611,7 @@ wheels = [
+ [[package]]
+ name = "orca-core"
+ version = "0.7.0"
+-source = { registry = "https://pypi.org/simple" }
++source = { editable = "../orca_core" }
+ dependencies = [
+     { name = "dynamixel-sdk" },
+     { name = "fastapi" },
+@@ -621,9 +621,33 @@ dependencies = [
+     { name = "pyyaml" },
+     { name = "uvicorn" },
+ ]
+-sdist = { url = "https://files.pythonhosted.org/packages/e8/e0/c0a443ede09ab4cbda0b0cb935797f7114c288b6d6a7942f705689e27fe8/orca_core-0.7.0.tar.gz", hash = "sha256:6a08b9389d2ef40090a84fc6797b39f044b15a976e7a9ce0b06c79e3537ccb65", size = 638940, upload-time = "2026-10-14T12:47:09.901Z" }
+-wheels = [
+-    { url = "https://files.pythonhosted.org/packages/77/3d/af62e1f2a97cbc9fceb8060c31918de1dd4b1e4b11362c644ef57661869f/orca_core-0.7.0-py3-none-any.whl", hash = "sha256:9ad03b9b46004edd8508c12924974f95f03882adbe026104942ea515f37c0188", size = 307285, upload-time = "2026-10-14T12:47:08.531Z" },
++
++[package.metadata]
++requires-dist = [
++    { name = "dynamixel-sdk", specifier = ">=3.7.31,<4.0.0" },
++    { name = "fastapi", specifier = ">=0.115.12,<1.0.0" },
++    { name = "numpy", specifier = ">=2.2.6,<3.0.0" },
++    { name = "pyserial", specifier = ">=3.5,<4.0" },
++    { name = "pyyaml", specifier = ">=6.0.2,<7.0.0" },
++    { name = "uvicorn", specifier = ">=0.34.2,<0.35.0" },
++]
++
++[package.metadata.requires-dev]
++dev = [
++    { name = "httpx", specifier = ">=0.27,<1.0" },
++    { name = "pytest", specifier = ">=8.3.5,<9.0.0" },
++    { name = "pytest-xdist", specifier = ">=3.8.0" },
++]
++docs = [
++    { name = "mkdocs", specifier = "==1.6.1" },
++    { name = "mkdocs-autorefs", specifier = "==1.4.2" },
++    { name = "mkdocs-awesome-pages-plugin", specifier = "==2.10.1" },
++    { name = "mkdocs-get-deps", specifier = "==0.2.0" },
++    { name = "mkdocs-material", specifier = "==9.5.0" },
++    { name = "mkdocs-material-extensions", specifier = "==1.3.1" },
++    { name = "mkdocstrings", specifier = "==0.29.1" },
++    { name = "mkdocstrings-python", specifier = "==1.16.12" },
++    { name = "pymdown-extensions", specifier = "==10.8.1" },
+ ]
+ 
+ [[package]]
+@@ -661,7 +685,7 @@ requires-dist = [
+     { name = "httpx", specifier = ">=0.27" },
+     { name = "mcp", specifier = ">=1.12,<2" },
+     { name = "numpy", specifier = ">=1.24" },
+-    { name = "orca-core", specifier = ">=0.7.0,<0.8" },
++    { name = "orca-core", editable = "../orca_core" },
+     { name = "pyserial", specifier = ">=3.5,<4.0.0" },
+     { name = "pyyaml", specifier = ">=6,<7" },
+     { name = "uvicorn", specifier = ">=0.30" },
+diff --git a/frontend/public/assembly/parts/base-left-dynamixel/.assembly-model.json b/frontend/public/assembly/parts/base-left-dynamixel/.assembly-model.json
+new file mode 100644
+index 0000000..054cd06
+--- /dev/null
++++ b/frontend/public/assembly/parts/base-left-dynamixel/.assembly-model.json
+@@ -0,0 +1 @@
++{"crc": 3604661817, "size": 126106708, "mtime_ns": 1792393511767543521}
+\ No newline at end of file
+diff --git a/frontend/public/assembly/parts/base-left-dynamixel/assembly.glb b/frontend/public/assembly/parts/base-left-dynamixel/assembly.glb
+new file mode 100644
+index 0000000..fdd4626
+Binary files /dev/null and b/frontend/public/assembly/parts/base-left-dynamixel/assembly.glb differ
+diff --git a/frontend/public/assembly/parts/base-right-dynamixel/.assembly-model.json b/frontend/public/assembly/parts/base-right-dynamixel/.assembly-model.json
+new file mode 100644
+index 0000000..fad6698
+--- /dev/null
++++ b/frontend/public/assembly/parts/base-right-dynamixel/.assembly-model.json
+@@ -0,0 +1 @@
++{"crc": 2939809641, "size": 126266476, "mtime_ns": 1792393512073087018}
+\ No newline at end of file
+diff --git a/frontend/public/assembly/parts/base-right-dynamixel/assembly.glb b/frontend/public/assembly/parts/base-right-dynamixel/assembly.glb
+new file mode 100644
+index 0000000..78cb6e6
+Binary files /dev/null and b/frontend/public/assembly/parts/base-right-dynamixel/assembly.glb differ
+diff --git a/frontend/public/assembly/parts/touch-left-dynamixel/.assembly-model.json b/frontend/public/assembly/parts/touch-left-dynamixel/.assembly-model.json
+new file mode 100644
+index 0000000..f382760
+--- /dev/null
++++ b/frontend/public/assembly/parts/touch-left-dynamixel/.assembly-model.json
+@@ -0,0 +1 @@
++{"crc": 737287077, "size": 138690284, "mtime_ns": 1792393512416617780}
+\ No newline at end of file
+diff --git a/frontend/public/assembly/parts/touch-left-dynamixel/assembly.glb b/frontend/public/assembly/parts/touch-left-dynamixel/assembly.glb
+new file mode 100644
+index 0000000..ac01038
+Binary files /dev/null and b/frontend/public/assembly/parts/touch-left-dynamixel/assembly.glb differ
+diff --git a/frontend/public/assembly/parts/touch-right-dynamixel/.assembly-model.json b/frontend/public/assembly/parts/touch-right-dynamixel/.assembly-model.json
+new file mode 100644
+index 0000000..392ccc4
+--- /dev/null
++++ b/frontend/public/assembly/parts/touch-right-dynamixel/.assembly-model.json
+@@ -0,0 +1 @@
++{"crc": 818287942, "size": 136867768, "mtime_ns": 1792393512736004779}
+\ No newline at end of file
+diff --git a/frontend/public/assembly/parts/touch-right-dynamixel/assembly.glb b/frontend/public/assembly/parts/touch-right-dynamixel/assembly.glb
+new file mode 100644
+index 0000000..24923e6
+Binary files /dev/null and b/frontend/public/assembly/parts/touch-right-dynamixel/assembly.glb differ
