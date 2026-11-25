@@ -12,7 +12,8 @@ preview (``/cameras/{cam}/preview.jpg``), and the hand run takes its stills from
 ``/cameras/stills``. Nothing is captured before ``/cameras/preflight`` passed. The assemblers'
 "Measure joint ranges" starts that run for the connected hand as a child process
 (``/hand-run``, orca_ui.hand.hand_run); ``/board-write`` says whether this computer can then
-write the hand's board (the ``board_write`` operation).
+write the hand's board (the ``board_write`` operation). ``/doctor`` runs orca_core's rig doctor
+(visual_calibration.doctor: what this computer has for the rig).
 Sessions live in the rig's folder, ``<ORCA_HOME>/rigs/<rig id>/sessions/<id>/``,
 beside its calibrations (visual_calibration.session, visual_calibration.rig_home); the rig id
 comes from the board the watcher found, else from the USB serial turntable.yaml pins. The
@@ -1185,5 +1186,35 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
         """Whether this computer can write a hand's board (an orca_firmware checkout), and why not."""
         from orca_ui.hand.operations.board_write import board_writer
         return board_writer()
+
+    def doctor_module():
+        """visual_calibration.doctor, or None with an orca_core that has none."""
+        _experiment_on_path()
+        try:
+            return importlib.import_module("visual_calibration.doctor")
+        except ModuleNotFoundError as e:
+            if e.name != "visual_calibration.doctor":
+                raise
+            return None
+
+    @router.get("/doctor")
+    async def doctor(checks: list[str] | None = Query(None)) -> dict:
+        """What this computer has for the rig (visual_calibration.doctor.run): per check its name, status
+        (ok, warn, error), detail and fix. The doctor reads the system's listings only, never opening a
+        camera or a serial port, and runs off the event loop."""
+        module = doctor_module()
+        if module is None:
+            raise HTTPException(404, f"doctor not available in this orca_core (no visual_calibration/doctor.py "
+                                     f"in {EXPERIMENT})")
+        try:
+            rows = await asyncio.to_thread(module.run, checks)
+        except ImportError:
+            raise
+        except Exception as e:
+            raise HTTPException(500, f"the doctor failed: {type(e).__name__}: {e}") from e
+        out = [{"name": str(r.get("name") or "?"),
+                "status": r.get("status") if r.get("status") in ("ok", "warn", "error") else "warn",
+                "detail": str(r.get("detail") or ""), "fix": r.get("fix") or None} for r in rows]
+        return {"ok": all(r["status"] != "error" for r in out), "checks": out}
 
     return router

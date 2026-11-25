@@ -58,6 +58,7 @@ import {
   useHandRun,
 } from "./MeasureJointRanges";
 import { Results } from "./Results";
+import { RigDoctor } from "./RigDoctor";
 import { fitOf, solvedWell } from "./solve";
 import type { HandOverlay } from "./handOverlay";
 import { StepArt } from "./StepArt";
@@ -1851,6 +1852,7 @@ export function VisualCalibrationView() {
                 <p className="dim">Then restart orca-ui.</p>
               </div>
             )}
+            {index === 0 && <RigDoctor />}
             <div className="visual-cal-head">
               <span className="visual-cal-count">
                 {index + 1} / {shown.length} · {step.phase}

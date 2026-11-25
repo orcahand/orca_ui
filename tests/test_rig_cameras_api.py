@@ -92,3 +92,34 @@ def test_a_missing_rig_dependency_is_a_503_naming_it_and_the_fix(tmp_path, monke
     for r in (c.get("/api/visual-calibration/rig"), c.post("/api/visual-calibration/detect", content=b"\x89PNG")):
         assert r.status_code == 503 and r.headers["x-orca-missing"] == "cv2", r.text
         assert "OpenCV" in r.json()["detail"] and "rig extra" in r.json()["detail"]
+
+
+def test_the_doctor_reports_each_check_and_degrades_without_one(tmp_path, monkeypatch):
+    """GET /doctor (no --research-ui): the doctor's rows as the page reads them, run off the event
+    loop; with an orca_core that has no visual_calibration/doctor.py, a 404 saying so."""
+    import asyncio
+    import types
+    seen = {}
+
+    def run(checks=None):
+        try:
+            asyncio.get_running_loop()
+            seen["in_loop"] = True
+        except RuntimeError:
+            seen["in_loop"] = False
+        seen["checks"] = checks
+        return [{"name": "opencv", "status": "ok", "detail": "4.13"},
+                {"name": "cameras", "status": "error", "detail": "1 of 2 UVC cameras", "fix": "plug in camera B"},
+                {"name": "uvcc", "status": "odd", "detail": "npx missing"}]
+    monkeypatch.setitem(sys.modules, "visual_calibration.doctor", types.SimpleNamespace(run=run))
+    app = FastAPI()
+    app.include_router(build_router(tmp_path, cameras=FakeCameras()))
+    c = TestClient(app)
+    r = c.get("/api/visual-calibration/doctor?checks=cameras&checks=opencv").json()
+    assert seen == {"in_loop": False, "checks": ["cameras", "opencv"]} and r["ok"] is False
+    assert r["checks"][1] == {"name": "cameras", "status": "error", "detail": "1 of 2 UVC cameras",
+                              "fix": "plug in camera B"}
+    assert r["checks"][0]["fix"] is None and r["checks"][2]["status"] == "warn"
+    monkeypatch.setitem(sys.modules, "visual_calibration.doctor", None)
+    r = c.get("/api/visual-calibration/doctor")
+    assert r.status_code == 404 and "doctor not available" in r.json()["detail"]

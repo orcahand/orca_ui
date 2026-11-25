@@ -5274,6 +5274,122 @@ header h1 {
   color: var(--dim);
 }
 
+.visual-cal-doctor {
+  flex: none;
+  padding: 8px 10px;
+  font-size: 10px;
+  line-height: 1.5;
+  border: 1px solid var(--panel-border-strong);
+}
+
+.visual-cal-doctor.warn {
+  border-color: rgb(var(--warn-rgb) / 0.4);
+}
+
+.visual-cal-doctor.error {
+  border-color: rgb(var(--err-rgb) / 0.45);
+  background: rgb(var(--err-rgb) / 0.05);
+}
+
+.visual-cal-doctor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.visual-cal-doctor-head .err {
+  color: var(--err);
+}
+
+.visual-cal-doctor-head .warn {
+  color: var(--warn);
+}
+
+.visual-cal-doctor-head .dim {
+  color: var(--dim);
+}
+
+.visual-cal-doctor ul {
+  margin: 6px 0 4px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.visual-cal-doctor li {
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1fr);
+  gap: 3px 7px;
+  color: var(--dim);
+  overflow-wrap: anywhere;
+}
+
+.visual-cal-doctor li {
+  cursor: pointer;
+}
+
+.visual-cal-doctor .clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.visual-cal-fix.dim {
+  color: var(--dim);
+  font-style: italic;
+}
+
+.visual-cal-doctor li b {
+  color: var(--text);
+}
+
+.visual-cal-doctor li.error b {
+  color: var(--err);
+}
+
+.visual-cal-doctor li.warn b {
+  color: var(--warn);
+}
+
+.visual-cal-dot {
+  width: 6px;
+  height: 6px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.visual-cal-dot.warn {
+  background: var(--warn);
+}
+
+.visual-cal-dot.error {
+  background: var(--err);
+}
+
+.visual-cal-fix {
+  grid-column: 2;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.visual-cal-fix code {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 5px;
+  color: var(--text);
+  background: var(--panel-strong);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 .visual-cal-hint {
   margin: -8px 0 0;
   font-size: 10px;

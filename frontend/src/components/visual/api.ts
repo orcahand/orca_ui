@@ -434,6 +434,19 @@ export interface HandRunResults {
   } | null;
 }
 
+/** One check of orca_core's rig doctor (visual_calibration/doctor.py). */
+export interface DoctorCheck {
+  name: string;
+  status: "ok" | "warn" | "error";
+  detail: string;
+  fix: string | null;
+}
+
+export interface Doctor {
+  ok: boolean; // no check is an error
+  checks: DoctorCheck[];
+}
+
 export interface BoardWriter {
   available: boolean;
   tool: string | null;
@@ -535,6 +548,7 @@ export const visualApi = {
   handRunResults: () =>
     call<{ hand: string; latest: string | null; results: HandRunResults | null }>("/hand-run/results"),
   boardWriter: () => call<BoardWriter>("/board-write"),
+  doctor: () => call<Doctor>("/doctor"),
   twinState: (angle?: number) =>
     call<TwinState>(
       `/twin/state${angle === undefined ? "" : `?angle=${angle}`}`,
