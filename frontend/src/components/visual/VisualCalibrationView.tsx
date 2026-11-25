@@ -80,7 +80,7 @@ const SEARCH_EVERY = 5; // solves between the per-finger grid searches
 const ROTATIONS = [0, 90, 180, 270] as const;
 type Rotation = (typeof ROTATIONS)[number];
 const LIVE_MS = 700;
-const CONTROLS = /controls differ|uvcc|after the blink/; // a camera control would not hold: Logi Tune?
+const CONTROLS = /controls differ|uvcc|after the blink/; // a camera control would not hold: a camera app (Logi Tune)?
 const WEAK = 32;
 const KINDS: SessionKind[] = ["camera", "rotation", "hand"];
 
@@ -1264,7 +1264,7 @@ export function VisualCalibrationView() {
     try {
       setNote("checking the cameras…");
       await visualApi.cameraPreflight(step.phase === "rig").catch((e: Error) => {
-        throw new Error(`camera check: ${e.message}${CONTROLS.test(e.message) ? " (close Logi Tune)" : ""}`);
+        throw new Error(`camera check: ${e.message}${CONTROLS.test(e.message) ? " (close any camera app, such as Logi Tune)" : ""}`);
       });
       if (!tt?.connected) setTt(await visualApi.connect());
       let s = await visualApi.createSession(kind, false);
@@ -1318,7 +1318,7 @@ export function VisualCalibrationView() {
       say(
         controls
           ? CONTROLS.test(controls)
-            ? `camera controls differ: ${controls} — close Logi Tune; a sweep sets them`
+            ? `camera controls differ: ${controls} — close any camera app, such as Logi Tune; a sweep sets them`
             : `camera check: ${controls}`
           : shot.length
             ? `${stop}°: ${shot.map((p) => `camera ${p.camera ?? "a"} ${p.tiles} tiles, ${p.corners} corners`).join("; ")}`
@@ -1429,7 +1429,7 @@ export function VisualCalibrationView() {
       case "camera":
         return {
           state: seen || begun ? "done" : "todo",
-          note: seen ? "locked" : "on its side · 65°",
+          note: seen ? "locked" : "A back · B side, 45°",
         };
       case "light":
         return {

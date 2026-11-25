@@ -60,7 +60,7 @@ export const STEPS: StepDef[] = [
     phase: 'rig',
     title: 'Set up the cameras',
     copy: () =>
-      'Both BRIOs on their sides: camera A above at the back, camera B on the side rail 45° down. The console owns them: the view here is its preview, every photo is taken by both. With the tower on the plate, Check cameras locks focus and exposure to the rig config and proves which camera is which (it refuses swapped or missing cameras). From here on, don’t touch the cameras.',
+      'Two cameras, as the rig config names them: camera A above at the back, camera B on the side rail 45° down. The console owns them: the view here is its preview, every photo is taken by both. With the tower on the plate, Check cameras locks focus and exposure to the rig config and proves which camera is which (it refuses swapped or missing cameras). From here on, don’t touch the cameras.',
     art: 'camera',
     live: true,
   },
@@ -118,7 +118,7 @@ export const STEPS: StepDef[] = [
     title: 'Mount the hand',
     copy: () => 'The rig is calibrated; from here on the camera stays exactly where it is.',
     items: (rig) => [
-      'Close Logi Tune (it rewrites the camera’s focus and exposure). Don’t touch the camera.',
+      'Close any camera app that sets the cameras’ focus and exposure (Logi Tune for Logitech cameras). Don’t touch the cameras.',
       `Press “Park for the swap”: the plate turns to ${rig?.swap_angle ?? 180}° (the connector’s two rods side by side, facing you) and the torque is released. The plate then turns freely by hand; its angle is kept.`,
       'Take the tower off: undo the four radial M3, lift it straight up off the two rods.',
       `Put the hand on the same two rods, upright: at the parked ${rig?.swap_angle ?? 180}° the PALM FACES THE CAMERA (the way tile H faced), the back of the hand away. Right hand: seen from the camera the thumb is on the right; thumb on the left means it is the wrong way round (lift it off, turn it 180°). The overlay shows how it should sit. Then the four radial M3.`,

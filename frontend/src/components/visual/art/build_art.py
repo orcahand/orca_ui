@@ -319,7 +319,7 @@ def d_camera():
     for t in (-29, 29):                 # 58° vertical: the 65° diagonal mode, portrait
         r = math.radians(t)
         d.dash(lens, lens + (ax * math.cos(r) + up * math.sin(r)) * 250)
-    write('camera', d, 'The BRIO on its side in the mount, looking at the object')
+    write('camera', d, 'A camera in its mount, looking at the object')
 
 
 def d_light():
