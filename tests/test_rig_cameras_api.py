@@ -1,5 +1,8 @@
 """The rig's cameras behind the console (a fake camera service, no cv2): nothing full-resolution
-leaves the backend before the camera preflight passed; the preview needs none."""
+leaves the backend before the camera preflight passed; the preview needs none. A rig dependency
+this Python lacks is said, never a bare 500."""
+import sys
+
 import numpy as np
 import pytest
 from fastapi import FastAPI
@@ -77,3 +80,15 @@ def test_stills_only_after_the_camera_preflight(tmp_path, monkeypatch):
     assert both["format"] == "jpg" and set(both["cameras"]) == {"a", "b"}
     u = c.post("/api/visual-calibration/camera/uvc").json()                     # every camera's controls
     assert u["configured"] and set(u["cameras"]) == {"a", "b"} and u["set"] == {"gain": 0}
+
+
+def test_a_missing_rig_dependency_is_a_503_naming_it_and_the_fix(tmp_path, monkeypatch):
+    """Without OpenCV the page is told what is missing and how to get it (its module in the header
+    the page shows it from once), whichever endpoint runs into it."""
+    monkeypatch.setitem(sys.modules, "cv2", None)
+    app = FastAPI()
+    app.include_router(build_router(tmp_path, cameras=FakeCameras()))
+    c = TestClient(app, raise_server_exceptions=False)
+    for r in (c.get("/api/visual-calibration/rig"), c.post("/api/visual-calibration/detect", content=b"\x89PNG")):
+        assert r.status_code == 503 and r.headers["x-orca-missing"] == "cv2", r.text
+        assert "OpenCV" in r.json()["detail"] and "rig extra" in r.json()["detail"]

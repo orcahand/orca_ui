@@ -1,5 +1,7 @@
 // REST calls of the visual calibration page (orca_ui/api/visual_calibration.py).
 
+import { noteMissing } from "./missing";
+
 export interface Detection {
   tile: string;
   ids: number[];
@@ -449,6 +451,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       /* keep statusText */
     }
+    noteMissing(response, detail);
     throw new Error(detail);
   }
   return response.json() as Promise<T>;

@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { cameraPreviewUrl } from "./api";
+import { noteMissing } from "./missing";
 
 const PREVIEW_MS = 250; // at most ~4 previews a second
 const RETRY_MS = 1500;
@@ -39,7 +40,15 @@ export function useBackendCamera(
         const t0 = performance.now();
         try {
           const r = await fetch(cameraPreviewUrl(camera, maxSide), { cache: "no-store" });
-          if (!r.ok) throw new Error(await detail(r));
+          if (!r.ok) {
+            const why = await detail(r);
+            if (noteMissing(r, why)) {
+              // Said once at the top of the page; asking again cannot help until the console restarts.
+              setError(`camera ${camera}: no preview (see the message above)`);
+              break;
+            }
+            throw new Error(why);
+          }
           const frame = await createImageBitmap(await r.blob());
           if (!alive) {
             frame.close();

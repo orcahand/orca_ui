@@ -38,6 +38,7 @@ import {
 } from "./api";
 import { usePageVisible } from "../common/usePageVisible";
 import { useBackendCamera } from "./backendCamera";
+import { useRigMissing } from "./missing";
 import { drawTiles } from "./drawTiles";
 import {
   ASSEMBLER_STEPS,
@@ -777,6 +778,7 @@ export function VisualCalibrationView() {
   const [sandboxPose, setSandboxPose] = useState<Record<string, number> | null>(null);
   const [sandboxMount, setSandboxMount] = useState<number[][] | null>(null);
   const [handNote, setHandNote] = useState<string | null>(null);
+  const missing = useRigMissing((s) => s.missing);
   const handInfo = useAppStore((s) => s.handInfo);
   // Hand-phase ticks are the connected hand's own: another hand starts with none.
   const handId = handInfo?.hand?.id ?? null;
@@ -1702,7 +1704,11 @@ export function VisualCalibrationView() {
       <p className="visual-cal-empty warn">{error}</p>
     ) : !stream ? (
       <p className="visual-cal-empty">
-        {cameras.length ? "opening the camera…" : "looking for cameras…"}
+        {missing
+          ? "No camera view: see the message on the left."
+          : cameras.length
+            ? "opening the camera…"
+            : "looking for cameras…"}
       </p>
     ) : (
       <RotatedVideo
@@ -1838,6 +1844,13 @@ export function VisualCalibrationView() {
 
         <div className="visual-cal-content">
           <div className="visual-cal-side">
+            {missing && (
+              <div className="setup-alert error visual-cal-alert" role="alert">
+                <div className="setup-alert-title">Missing on this computer</div>
+                <p>{missing.message}</p>
+                <p className="dim">Then restart orca-ui.</p>
+              </div>
+            )}
             <div className="visual-cal-head">
               <span className="visual-cal-count">
                 {index + 1} / {shown.length} · {step.phase}
@@ -2040,7 +2053,7 @@ export function VisualCalibrationView() {
               >
                 {sweep
                   ? `sweep ${sweep.i + 1} / ${sweep.n} · ${note ?? ""}`
-                  : (busy ?? note)}
+                  : (busy ?? (note === missing?.message ? null : note))}
               </span>
               <button
                 className="btn btn-secondary"

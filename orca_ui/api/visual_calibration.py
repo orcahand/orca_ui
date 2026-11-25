@@ -18,11 +18,14 @@ beside its calibrations (visual_calibration.session, visual_calibration.rig_home
 comes from the board the watcher found, else from the USB serial turntable.yaml pins. The
 plate is turned by the rig's Dynamixel (visual_calibration.turntable; the mock one under
 --mock); the page drives the sweep: move, then ask for the photos.
-CPU-bound handlers are plain ``def`` so FastAPI runs them off the event loop.
+CPU-bound handlers are plain ``def`` so FastAPI runs them off the event loop. An endpoint that
+needs a rig dependency this Python lacks (OpenCV, torch, ...) answers 503 naming it and the fix,
+with the missing module in the ``X-Orca-Missing`` header (RigRoute).
 """
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import logging
 import os
 import sys
@@ -34,6 +37,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response
+from fastapi.routing import APIRoute
 from pydantic import BaseModel
 
 from orca_ui import research
@@ -95,6 +99,53 @@ def _experiment_on_path() -> None:
         sys.path.insert(0, str(EXPERIMENT))
 
 
+RIG_EXTRA_FIX = "install orca_core's rig extra: see experiments/visual_calibration/HANDOVER.md"
+MISSING_HEADER = "X-Orca-Missing"
+PACKAGES = {"cv2": "OpenCV (opencv-contrib-python)", "serial": "pyserial", "yaml": "PyYAML"}
+RUN_NEEDS = ("cv2", "torch", "transformers")       # the hand run's solves and its segmenter (BiRefNet)
+
+
+def missing_module(e: BaseException | None) -> str | None:
+    """The module an ImportError, or the ImportError it was raised from, could not import."""
+    while isinstance(e, ImportError):
+        if e.name:
+            return e.name
+        e = e.__cause__
+    return None
+
+
+def missing_dependency(e: ImportError) -> HTTPException:
+    """503 saying what this Python lacks for the rig and how to get it."""
+    name = missing_module(e) or ""
+    top = name.split(".")[0]
+    if name in ("visual_calibration", "hand_study"):
+        text = (f"no rig code at {EXPERIMENT}: set "
+                "ORCA_VISUAL_CALIBRATION=<orca_core checkout>/experiments/visual_calibration")
+    elif top in ("orca_core", "visual_calibration", "hand_study"):
+        text = (f"this orca_core lacks what the rig needs ({e}): run the console on orca_core "
+                f"internal/rig-calibration and {RIG_EXTRA_FIX}")
+    elif top:
+        text = f"this Python ({sys.executable}) has no {PACKAGES.get(top, top)}: {RIG_EXTRA_FIX}"
+    else:
+        text = f"{e}: {RIG_EXTRA_FIX}"
+    return HTTPException(503, text, headers={MISSING_HEADER: top or "unknown"})
+
+
+class RigRoute(APIRoute):
+    """An endpoint that runs into a missing rig dependency answers 503 saying so, never a bare 500."""
+
+    def get_route_handler(self):
+        handler = super().get_route_handler()
+
+        async def route(request: Request) -> Response:
+            try:
+                return await handler(request)
+            except ImportError as e:
+                logger.warning("visual calibration %s: %s", request.url.path, e)
+                raise missing_dependency(e) from e
+        return route
+
+
 _rig_yaml_cache: dict = {}
 
 
@@ -137,7 +188,7 @@ class StudyNote(BaseModel):
 def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> APIRouter:
     """`base`: the sessions folder (tests); by default the rig's own. `cameras`: the rig's
     camera service (default: a RigCameras of the rig config, made on first use)."""
-    router = APIRouter(prefix="/api/visual-calibration", tags=["visual-calibration"])
+    router = APIRouter(prefix="/api/visual-calibration", tags=["visual-calibration"], route_class=RigRoute)
     lock = threading.Lock()                        # one solve / photo write at a time
     table: dict = {}                               # "t": the open Turntable, "hold_until": the hold's lease
     measure: dict = {"run": None}                  # the hand run (Measure joint ranges), once a hand service is attached
@@ -357,11 +408,8 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
 
     def vc():
         _experiment_on_path()
-        try:
-            from visual_calibration import session
-            from visual_calibration.detect import read_image
-        except ImportError as e:
-            raise HTTPException(503, f"visual calibration experiment not found at {EXPERIMENT} ({e})") from e
+        from visual_calibration import session
+        from visual_calibration.detect import read_image
         return session, read_image
 
     @lru_cache(maxsize=1)
@@ -852,6 +900,8 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
                 s.solve()
             except (ValueError, NotImplementedError) as e:
                 raise HTTPException(400, str(e)) from e
+            except ImportError:
+                raise
             except Exception as e:                 # a bad photo set must not end in a bare 500
                 raise HTTPException(500, f"solve failed: {type(e).__name__}: {e}") from e
         return s.summary()
@@ -1079,6 +1129,11 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
             raise HTTPException(409, "a hand run is already running")
         if "t" not in table:
             raise HTTPException(409, "the rig's plate is not connected")
+        missing = [] if body.dry else [m for m in RUN_NEEDS if importlib.util.find_spec(m) is None]
+        if missing:                                # said before the cameras are opened for nothing
+            raise HTTPException(503, f"the run needs {', '.join(PACKAGES.get(m, m) for m in missing)}, missing "
+                                     f"from this Python ({sys.executable}): {RIG_EXTRA_FIX}",
+                                headers={MISSING_HEADER: missing[0]})
         stops = run.stops()                        # a Stop or E-STOP from here on cancels this start
         camera_call(lambda c: c.preflight(None, write=True))
 

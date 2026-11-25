@@ -307,6 +307,23 @@ def test_a_stop_during_the_camera_check_cancels_the_start(client, monkeypatch):
     assert client.get(f"{VC}/hand-run").json()["state"] == "idle"
 
 
+def test_a_run_this_python_cannot_run_is_refused_before_the_cameras_open(client, monkeypatch):
+    """A run whose segmenter or solves cannot load here: 503 naming what is missing and the fix,
+    and the cameras are never opened for it (a dry run needs none of it)."""
+    from orca_ui.api import visual_calibration
+    _experiment_on_path()
+    from visual_calibration.rig_cameras import RigCameras
+    _hand_on_file(client)
+    assert client.post(f"{VC}/turntable/connect", json={}).status_code == 200
+    opened = []
+    monkeypatch.setattr(RigCameras, "preflight", lambda *a, **k: opened.append(1))
+    monkeypatch.setattr(visual_calibration, "RUN_NEEDS", ("no_such_torch",))
+    r = client.post(f"{VC}/hand-run/start", json={})
+    assert r.status_code == 503 and r.headers["x-orca-missing"] == "no_such_torch"
+    assert "no_such_torch" in r.json()["detail"] and "rig extra" in r.json()["detail"]
+    assert opened == [] and client.get(f"{VC}/hand-run").json()["state"] == "idle"
+
+
 def test_results_name_their_run(client):
     """The newest measured run of the connected hand, named, beside the newest run at all."""
     import json
