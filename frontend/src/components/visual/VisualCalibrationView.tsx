@@ -1849,7 +1849,7 @@ export function VisualCalibrationView() {
               <div className="setup-alert error visual-cal-alert" role="alert">
                 <div className="setup-alert-title">Missing on this computer</div>
                 <p>{missing.message}</p>
-                <p className="dim">Then restart orca-ui.</p>
+                <p className="dim">Then restart orca-ui and reload this page.</p>
               </div>
             )}
             {index === 0 && <RigDoctor />}
