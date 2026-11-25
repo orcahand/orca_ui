@@ -103,37 +103,40 @@ def _experiment_on_path() -> None:
 RIG_EXTRA_FIX = "install orca_core's rig extra: see experiments/visual_calibration/HANDOVER.md"
 MISSING_HEADER = "X-Orca-Missing"
 PACKAGES = {"cv2": "OpenCV (opencv-contrib-python)", "serial": "pyserial", "yaml": "PyYAML"}
+# Every module the rig and a hand run import, when orca_core's doctor (its RUN_IMPORTS) is not there.
+RUN_IMPORTS = ("cv2", "torch", "torchvision", "transformers", "timm", "kornia", "einops", "huggingface_hub",
+               "numpy", "yaml", "serial", "dynamixel_sdk", "websockets.sync.client")
 RUN_NEEDS = ("cv2", "torch", "transformers")       # the hand run's solves and its segmenter (BiRefNet)
 
 
+def rig_dependencies() -> tuple[str, ...]:
+    """The top-level modules the rig and a hand run import (visual_calibration.doctor.RUN_IMPORTS)."""
+    _experiment_on_path()
+    try:
+        from visual_calibration.doctor import RUN_IMPORTS as imports
+    except ImportError:
+        imports = RUN_IMPORTS
+    return tuple(dict.fromkeys(m.split(".")[0] for m in imports))
+
+
 def missing_module(e: BaseException | None) -> str | None:
-    """The module an ImportError, or the ImportError it was raised from, could not import."""
+    """The module a ModuleNotFoundError, or the one an ImportError was raised from, could not find."""
     while isinstance(e, ImportError):
-        if e.name:
+        if isinstance(e, ModuleNotFoundError) and e.name:
             return e.name
         e = e.__cause__
     return None
 
 
-def missing_dependency(e: ImportError) -> HTTPException:
-    """503 saying what this Python lacks for the rig and how to get it."""
-    name = missing_module(e) or ""
-    top = name.split(".")[0]
-    if name in ("visual_calibration", "hand_study"):
-        text = (f"no rig code at {EXPERIMENT}: set "
-                "ORCA_VISUAL_CALIBRATION=<orca_core checkout>/experiments/visual_calibration")
-    elif top in ("orca_core", "visual_calibration", "hand_study"):
-        text = (f"this orca_core lacks what the rig needs ({e}): run the console on orca_core "
-                f"internal/rig-calibration and {RIG_EXTRA_FIX}")
-    elif top:
-        text = f"this Python ({sys.executable}) has no {PACKAGES.get(top, top)}: {RIG_EXTRA_FIX}"
-    else:
-        text = f"{e}: {RIG_EXTRA_FIX}"
-    return HTTPException(503, text, headers={MISSING_HEADER: top or "unknown"})
+def missing_dependency(module: str) -> HTTPException:
+    """503 saying which rig dependency this Python lacks and how to get it."""
+    return HTTPException(503, f"this Python ({sys.executable}) has no {PACKAGES.get(module, module)}: {RIG_EXTRA_FIX}",
+                         headers={MISSING_HEADER: module})
 
 
 class RigRoute(APIRoute):
-    """An endpoint that runs into a missing rig dependency answers 503 saying so, never a bare 500."""
+    """An endpoint that runs into a rig dependency this Python lacks answers 503 saying so; any
+    other import error (a name an orca_core lacks, our own modules) stays an error."""
 
     def get_route_handler(self):
         handler = super().get_route_handler()
@@ -142,8 +145,12 @@ class RigRoute(APIRoute):
             try:
                 return await handler(request)
             except ImportError as e:
-                logger.warning("visual calibration %s: %s", request.url.path, e)
-                raise missing_dependency(e) from e
+                top = (missing_module(e) or "").split(".")[0]
+                if not top or top not in rig_dependencies():
+                    logger.error("visual calibration %s: %s", request.url.path, e, exc_info=True)
+                    raise
+                logger.warning("visual calibration %s: %s", request.url.path, e, exc_info=True)
+                raise missing_dependency(top) from e
         return route
 
 
@@ -409,7 +416,13 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
 
     def vc():
         _experiment_on_path()
-        from visual_calibration import session
+        try:
+            from visual_calibration import session
+        except ModuleNotFoundError as e:
+            if e.name != "visual_calibration":
+                raise
+            raise HTTPException(503, f"visual calibration experiment not found at {EXPERIMENT}: set "
+                                     "ORCA_VISUAL_CALIBRATION=<orca_core checkout>/experiments/visual_calibration") from e
         from visual_calibration.detect import read_image
         return session, read_image
 

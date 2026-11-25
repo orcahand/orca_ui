@@ -94,6 +94,28 @@ def test_a_missing_rig_dependency_is_a_503_naming_it_and_the_fix(tmp_path, monke
         assert "OpenCV" in r.json()["detail"] and "rig extra" in r.json()["detail"]
 
 
+def test_only_a_missing_rig_dependency_is_a_503(tmp_path, monkeypatch):
+    """A rig dependency missing (torch): 503. Anything else an import runs into (a name this
+    orca_core lacks, a module that is not a rig dependency) stays a 500: never a wrong fix."""
+    import types
+    raised = {}
+
+    def run(checks=None):
+        raise raised["e"]
+    monkeypatch.setitem(sys.modules, "visual_calibration.doctor", types.SimpleNamespace(run=run))
+    app = FastAPI()
+    app.include_router(build_router(tmp_path, cameras=FakeCameras()))
+    c = TestClient(app, raise_server_exceptions=False)
+    raised["e"] = ModuleNotFoundError("No module named 'torch'", name="torch")
+    r = c.get("/api/visual-calibration/doctor")
+    assert r.status_code == 503 and r.headers["x-orca-missing"] == "torch" and "rig extra" in r.json()["detail"]
+    for e in (ImportError("cannot import name 'x' from 'orca_core.board_push'", name="orca_core.board_push"),
+              ModuleNotFoundError("No module named 'visual_calibration.gone'", name="visual_calibration.gone")):
+        raised["e"] = e
+        r = c.get("/api/visual-calibration/doctor")
+        assert r.status_code == 500 and "x-orca-missing" not in r.headers
+
+
 def test_the_doctor_reports_each_check_and_degrades_without_one(tmp_path, monkeypatch):
     """GET /doctor (no --research-ui): the doctor's rows as the page reads them, run off the event
     loop; with an orca_core that has no visual_calibration/doctor.py, a 404 saying so."""
