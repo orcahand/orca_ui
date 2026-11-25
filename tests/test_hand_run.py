@@ -317,7 +317,7 @@ def test_a_run_this_python_cannot_run_is_refused_before_the_cameras_open(client,
     assert client.post(f"{VC}/turntable/connect", json={}).status_code == 200
     opened = []
     monkeypatch.setattr(RigCameras, "preflight", lambda *a, **k: opened.append(1))
-    monkeypatch.setattr(visual_calibration, "RUN_NEEDS", ("no_such_torch",))
+    monkeypatch.setattr(visual_calibration, "rig_dependencies", lambda: ("numpy", "no_such_torch"))
     r = client.post(f"{VC}/hand-run/start", json={})
     assert r.status_code == 503 and r.headers["x-orca-missing"] == "no_such_torch"
     assert "no_such_torch" in r.json()["detail"] and "rig extra" in r.json()["detail"]

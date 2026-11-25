@@ -106,7 +106,6 @@ PACKAGES = {"cv2": "OpenCV (opencv-contrib-python)", "serial": "pyserial", "yaml
 # Every module the rig and a hand run import, when orca_core's doctor (its RUN_IMPORTS) is not there.
 RUN_IMPORTS = ("cv2", "torch", "torchvision", "transformers", "timm", "kornia", "einops", "huggingface_hub",
                "numpy", "yaml", "serial", "dynamixel_sdk", "websockets.sync.client")
-RUN_NEEDS = ("cv2", "torch", "transformers")       # the hand run's solves and its segmenter (BiRefNet)
 
 
 def rig_dependencies() -> tuple[str, ...]:
@@ -1143,7 +1142,7 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
             raise HTTPException(409, "a hand run is already running")
         if "t" not in table:
             raise HTTPException(409, "the rig's plate is not connected")
-        missing = [] if body.dry else [m for m in RUN_NEEDS if importlib.util.find_spec(m) is None]
+        missing = [] if body.dry else [m for m in rig_dependencies() if importlib.util.find_spec(m) is None]
         if missing:                                # said before the cameras are opened for nothing
             raise HTTPException(503, f"the run needs {', '.join(PACKAGES.get(m, m) for m in missing)}, missing "
                                      f"from this Python ({sys.executable}): {RIG_EXTRA_FIX}",
