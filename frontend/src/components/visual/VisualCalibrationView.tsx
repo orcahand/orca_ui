@@ -81,12 +81,13 @@ const SEARCH_EVERY = 5; // solves between the per-finger grid searches
 const ROTATIONS = [0, 90, 180, 270] as const;
 type Rotation = (typeof ROTATIONS)[number];
 const LIVE_MS = 700;
+const SWAPPED = /swapped/i; // the preflight found camera A where B should be, or the other way round
 const CONTROLS = /controls differ|uvcc|after the blink/; // a camera control would not hold: a camera app (Logi Tune)?
 const WEAK = 32;
 const KINDS: SessionKind[] = ["camera", "rotation", "hand"];
 
 type StepState = "done" | "warn" | "todo";
-type Issue = { text: string; fix: "camera-step" | "mount" | null };
+type Issue = { text: string; fix: "camera-step" | "mount" | "swap" | null };
 type Action = {
   label: string;
   title: string;
@@ -1066,6 +1067,13 @@ export function VisualCalibrationView() {
     setFailed(bad);
   };
 
+  // The camera preflight; cameras found swapped are said with the fix, beside the step.
+  const preflight = (tiles: boolean) =>
+    visualApi.cameraPreflight(tiles).catch((e: Error) => {
+      if (SWAPPED.test(e.message)) setIssue({ text: `camera check: ${e.message}`, fix: "swap" });
+      throw e;
+    });
+
   const run = async (label: string, job: () => Promise<void>) => {
     setBusy(label);
     say(null);
@@ -1225,7 +1233,7 @@ export function VisualCalibrationView() {
     } catch (e) {
       if (!/preflight/.test((e as Error).message)) throw e;
       setNote("checking the cameras…");
-      await visualApi.cameraPreflight(false);
+      await preflight(false);
       return visualApi.capture(id, stop);
     }
   };
@@ -1264,7 +1272,7 @@ export function VisualCalibrationView() {
     setSweep({ i: 0, n: rig.stops.length });
     try {
       setNote("checking the cameras…");
-      await visualApi.cameraPreflight(step.phase === "rig").catch((e: Error) => {
+      await preflight(step.phase === "rig").catch((e: Error) => {
         throw new Error(`camera check: ${e.message}${CONTROLS.test(e.message) ? " (close any camera app, such as Logi Tune)" : ""}`);
       });
       if (!tt?.connected) setTt(await visualApi.connect());
@@ -1369,7 +1377,8 @@ export function VisualCalibrationView() {
   // Every camera's controls locked and each one proven to be the camera it should be (the tower on the plate).
   const checkCameras = () =>
     run("checking the cameras…", async () => {
-      const r = await visualApi.cameraPreflight(true);
+      setIssue(null);
+      const r = await preflight(true);
       confirm("camera");
       const heights = Object.entries(r.tiles ?? {})
         .map(([c, t]) => `${c} ${t.height_mm.toFixed(0)} mm (mount ${t.expected_mm.toFixed(0)})`)
@@ -1979,6 +1988,13 @@ export function VisualCalibrationView() {
                   >
                     ← Calibrate the camera
                   </button>
+                )}
+                {issue.fix === "swap" && (
+                  <span>
+                    Cameras A and B swapped: trade them in the rig config with{" "}
+                    <code>python -m visual_calibration.sweep --assign-cameras --swap</code> (in orca_core’s
+                    experiments/visual_calibration), then Check cameras again.
+                  </span>
                 )}
                 {issue.fix === "mount" && (
                   <span>
