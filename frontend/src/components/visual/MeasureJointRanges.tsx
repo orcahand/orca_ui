@@ -20,6 +20,7 @@ import {
 } from "./api";
 
 const POLL_MS = 2000;
+const SWAPPED = /swapped/i; // the camera check found camera A where B should be, or the other way round
 
 /** Whether the connected hand's calibration in force was taken today. */
 export function calibratedToday(at: string | null | undefined): boolean {
@@ -148,6 +149,13 @@ export function MeasureRun({
         {blocked && !running && <span className="visual-cal-hint">{blocked}</span>}
       </div>
       {note && <p className={`visual-cal-note${note.bad ? " warn" : ""}`}>{note.text}</p>}
+      {note?.bad && SWAPPED.test(note.text) && (
+        <p className="visual-cal-note warn">
+          Cameras A and B swapped: trade them in the rig config with{" "}
+          <code>python -m visual_calibration.sweep --assign-cameras --swap</code> (in orca_core’s
+          experiments/visual_calibration), then Measure again.
+        </p>
+      )}
       {other && (
         <p className="visual-cal-note warn">
           The rig is measuring hand {other.hand}: stop that run before measuring this hand.

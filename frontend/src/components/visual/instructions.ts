@@ -60,7 +60,7 @@ export const STEPS: StepDef[] = [
     phase: 'rig',
     title: 'Set up the cameras',
     copy: () =>
-      'Two cameras, as the rig config names them: camera A above at the back, camera B on the side rail 45° down. The console owns them: the view here is its preview, every photo is taken by both. With the tower on the plate, Check cameras locks focus and exposure to the rig config and proves which camera is which. It refuses missing cameras, and swapped ones: then `python -m visual_calibration.sweep --assign-cameras --swap` (in orca_core’s experiments/visual_calibration) trades A and B in the rig config, and Check cameras again. From here on, don’t touch the cameras.',
+      'Two cameras, as the rig config names them: camera A above at the back, camera B on the side rail 45° down. The console owns them: the view here is its preview, every photo is taken by both. With the tower on the plate, Check cameras locks focus and exposure to the rig config and proves which camera is which. It refuses missing cameras, and swapped ones: then “python -m visual_calibration.sweep --assign-cameras --swap” (in orca_core’s experiments/visual_calibration) trades A and B in the rig config, and Check cameras again. From here on, don’t touch the cameras.',
     art: 'camera',
     live: true,
   },
