@@ -15,7 +15,7 @@ from orca_ui.hand.operations.base import OpContext, Operation
 def board_writer() -> dict:
     """Whether this computer can write a hand's board, and why not: the installed orca_core must
     pack the measured ranges (store section 16) and read a board back, and find an orca_firmware
-    checkout."""
+    checkout (`looked_in`: where it looked)."""
     import inspect
     try:
         from orca_core import board_push, board_store
@@ -29,9 +29,10 @@ def board_writer() -> dict:
                           "section 16): update orca_core"}
     tool = board_push.firmware_tool()
     if tool is None:
-        return {"available": False, "tool": None,
+        checkout = str(board_push.firmware_checkout())
+        return {"available": False, "tool": None, "looked_in": checkout,
                 "reason": f"no orca_firmware checkout with {board_push.TOOL_RELATIVE_PATH.as_posix()} at "
-                          f"{board_push.firmware_checkout()} (or set {board_push.FIRMWARE_REPO_ENV}): "
+                          f"{checkout} (or set {board_push.FIRMWARE_REPO_ENV}): "
                           "writing a hand's board is an internal tool"}
     return {"available": True, "tool": str(tool), "reason": None}
 

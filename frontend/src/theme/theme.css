@@ -2726,6 +2726,35 @@ header h1 {
   color: var(--warn);
 }
 
+/* A note in the step's main area: wrapped, not cut off. */
+.visual-cal-main .visual-cal-note {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.visual-cal-explain {
+  max-width: 72ch;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--dim);
+}
+
+.visual-cal-explain p {
+  margin: 0 0 6px;
+}
+
+.visual-cal-path {
+  display: block;
+  margin: 4px 0;
+  padding: 4px 6px;
+  font-size: 11px;
+  color: var(--text);
+  background: var(--panel-strong);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 .gt-row-pct {
   text-align: right;
   font-weight: 700;

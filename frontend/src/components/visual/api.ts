@@ -438,6 +438,7 @@ export interface BoardWriter {
   available: boolean;
   tool: string | null;
   reason: string | null;
+  looked_in?: string; // where the orca_firmware checkout was looked for, when none was found
 }
 
 const BASE = "/api/visual-calibration";

@@ -356,10 +356,12 @@ export function BoardWrite() {
   if (!writer) return <p className="visual-cal-note">{error ?? "loading…"}</p>;
   if (!writer.available)
     return (
-      <p className="visual-cal-note">
-        Not offered on this computer: {writer.reason}. The measured ranges stay in force here (the hand’s
-        joint_ranges.yaml).
-      </p>
+      <div className="visual-cal-explain">
+        <p>
+          Not offered on this computer: <WithPath text={writer.reason ?? ""} path={writer.looked_in} />.
+        </p>
+        <p>The measured ranges stay in force here (the hand’s joint_ranges.yaml).</p>
+      </div>
     );
   const write = () => {
     setError(null);
@@ -392,6 +394,19 @@ export function BoardWrite() {
       )}
       {handInfo?.hand && <HandDetails hand={handInfo.hand} />}
     </div>
+  );
+}
+
+/** `text` with `path` (where it occurs) on a line of its own. */
+function WithPath({ text, path }: { text: string; path?: string }) {
+  const at = path ? text.indexOf(path) : -1;
+  if (!path || at < 0) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, at).trimEnd()}
+      <code className="visual-cal-path">{path}</code>
+      {text.slice(at + path.length).trimStart()}
+    </>
   );
 }
 
