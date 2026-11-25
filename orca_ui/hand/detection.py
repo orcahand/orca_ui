@@ -144,6 +144,12 @@ def presence_from_detection(config, detection: HandDetection | None, *,
                 motor_port = auto_detect_port(config.motor_type)
             except Exception:
                 motor_port = None
+            from orca_ui.hand.boards import is_rig_board
+            reason = motor_port and is_rig_board(motor_port)
+            if reason:          # the scan takes any motor port; the rig's board is never a hand
+                logger.warning("motor port scan found the calibration rig's board on %s (%s), not a hand",
+                               motor_port, reason)
+                motor_port = None
 
     def _field(override: str, detected: str | None) -> str | None:
         if override == "auto":

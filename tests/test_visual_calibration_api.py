@@ -32,17 +32,25 @@ def test_session_photo_detect_and_solve_errors(tmp_path):
     assert rig["stops"][0] == 0 and "tile_r0_s0" in rig["tiles"]
     assert rig["mountings"] == [0.0, 90.0, 180.0, 270.0] and rig["coverage_warnings"] == []
     assert 0 < rig["swap_angle"] < rig["travel"] and rig["rig_board"]["usb_serial"]
+    assert {"a", "b"} <= set(rig["cameras"]) and rig["active_cameras"][0] == "a"
+    b = rig["cameras"]["b"]
+    assert {"enabled", "mount", "nominal", "serial", "rotation"} <= set(b) and abs(b["azimuth"] - 90) < 1e-6
 
     sid = c.post("/api/visual-calibration/sessions", json={"step": "camera"}).json()["id"]
     r = c.post(f"/api/visual-calibration/sessions/{sid}/photos?stop=0", content=tile_png()).json()
     assert r["photo"]["corners"] == 16 and r["detections"][0]["tile"] == "tile_r0_s0" and r["size"] == [1400, 1000]
     assert c.get(f"/api/visual-calibration/sessions/{sid}").json()["photos"][0]["stop_deg"] == 0
     assert c.get("/api/visual-calibration/sessions").json()[0]["photos"] == 1
+    r = c.post(f"/api/visual-calibration/sessions/{sid}/photos?stop=0&cam=b", content=tile_png()).json()
+    assert r["photo"]["name"] == "stop_0000.00_b" and r["photo"]["camera"] == "b"
+    photos = c.get(f"/api/visual-calibration/sessions/{sid}").json()["photos"]
+    assert [p.get("camera", "a") for p in photos] == ["a", "b"]                       # both kept at one stop
+    assert c.post(f"/api/visual-calibration/sessions/{sid}/photos?stop=0&cam=z", content=tile_png()).status_code == 404
 
     live = c.post("/api/visual-calibration/detect", content=tile_png()).json()
     assert len(live["detections"]) == 1 and len(live["detections"][0]["uv"]) == 16
 
-    assert c.post(f"/api/visual-calibration/sessions/{sid}/solve").status_code == 400     # one photo is not enough
+    assert c.post(f"/api/visual-calibration/sessions/{sid}/solve").status_code == 400     # one stop is not enough
     assert c.post(f"/api/visual-calibration/sessions/{sid}/apply").status_code == 400     # nothing solved
     assert c.post(f"/api/visual-calibration/sessions/{sid}/photos?stop=15", content=b"").status_code == 400
     assert c.get("/api/visual-calibration/sessions/nope").status_code == 404
@@ -71,11 +79,15 @@ def test_overlay_before_calibration(tmp_path, monkeypatch):
     o = c.get("/api/visual-calibration/overlay?angle=180&rotation=90").json()
     assert o["source"]["camera"] == "nominal" and len(o["camera_from_plate"]) == 4
     assert any(t["facing"] and t["tile"] == "tile_r1_s0" for t in o["tiles"])
+    b = c.get("/api/visual-calibration/overlay?angle=180&cam=b").json()                # cam B, its own turn (90°)
+    assert b["camera"] == "b" and b["camera_from_plate"] != o["camera_from_plate"] and b["tiles"]
+    assert c.get("/api/visual-calibration/overlay?angle=180&cam=z").status_code == 404
 
 
 def test_status_twin_and_orientation(tmp_path, monkeypatch):
     c = client_for(tmp_path, mock=True)
     assert c.post("/api/visual-calibration/camera/uvc").json()["ok"] is True       # no camera to set in mock mode
+    assert c.post("/api/visual-calibration/camera/uvc?cam=all").json()["ok"] is True
     s = c.get("/api/visual-calibration/status").json()
     assert [x["id"] for x in s["steps"]] == ["motor", "camera", "rotation", "hand"] and s["turntable"]["connected"] is False
 
@@ -84,7 +96,8 @@ def test_status_twin_and_orientation(tmp_path, monkeypatch):
     turned = cv2.imencode(".png", np.rot90(cv2.imdecode(np.frombuffer(tile_png(), np.uint8), 0)))[1].tobytes()
     assert c.post("/api/visual-calibration/detect", content=turned).json()["orientation"]["rotation"] == 90
 
-    assert c.get("/api/visual-calibration/twin/state").json()["angle_source"] == "none"
+    st = c.get("/api/visual-calibration/twin/state").json()
+    assert st["angle_source"] == "none" and len(st["cameras"]["b"]["cad"]["position"]) == 3   # the twin draws cam B
     c.post("/api/visual-calibration/turntable/connect", json={})
     c.post("/api/visual-calibration/turntable/home")
     c.post("/api/visual-calibration/turntable/move", json={"angle": 45})
@@ -118,14 +131,20 @@ def test_photos_take_the_turntables_read_back_angle(tmp_path):
     assert r["photo"]["plate_deg"] == 30.2
 
 
-def test_live_hand_fit_debug(tmp_path):
+def test_live_hand_fit_debug(tmp_path, monkeypatch):
     c = client_for(tmp_path, mock=True)
     assert c.post("/api/visual-calibration/live-fit/freeze").status_code == 409                # nothing yet
     frame = cv2.imencode(".jpg", np.full((540, 960), 90, np.uint8))[1].tobytes()
-    r = c.post("/api/visual-calibration/live-fit/frame?angle=180&source=zeros&iters=1", content=frame)
-    if r.status_code == 500 and "orcahand_description" in r.text:
+    c.get("/api/visual-calibration/rig")                                           # puts the experiment on sys.path
+    from visual_calibration.rig_config import RigConfig
+    with monkeypatch.context() as m:
+        m.setattr(RigConfig, "load_calibration", lambda self: {})
+        r = c.post("/api/visual-calibration/live-fit/frame?angle=180&iters=1&cam=b", content=frame)
+        assert r.status_code == 409 and "solved pose" in r.json()["detail"]        # an uncalibrated cam B misleads the fit
+    from visual_calibration.hand_model import description_root
+    if description_root() is None:
         pytest.skip("orcahand_description checkout not found")
-    r = r.json()
+    r = c.post("/api/visual-calibration/live-fit/frame?angle=180&source=zeros&iters=1", content=frame).json()
     assert set(r["delta"]) == {"rotation_deg", "translation_mm"} and r["outlines"]["cad"] and r["joints_source"] == "zeros"
     assert c.post("/api/visual-calibration/live-fit/freeze").json()["path"].startswith(str(tmp_path))
     # camera only: the joints too, a kept view, and what the fit sees
@@ -180,3 +199,28 @@ def test_lookup_table_command(tmp_path, monkeypatch):
     assert abs(r["reached"]["index_mcp"] - 20.0) < 0.3
     r = c.post("/api/visual-calibration/lut/command", json={"angles": {"index_mcp": 40.0}, "use_lut": False}).json()
     assert r["command"]["index_mcp"] == 40.0 and abs(r["reached"]["index_mcp"] - 38.0) < 0.3
+
+
+def test_camera_identity_comes_from_the_serial_not_the_browser(tmp_path, monkeypatch):
+    """Two BRIOs read alike in the browser: a frame is matched to a still of each camera taken by
+    its serial, and a verified photo from the wrong stream is refused."""
+    from orca_ui.api import visual_calibration as vc
+    views = {"a": cv2.imdecode(np.frombuffer(tile_png(), np.uint8), cv2.IMREAD_COLOR)}
+    views["b"] = cv2.flip(cv2.GaussianBlur(views["a"], (0, 0), 25), -1)
+    views["b"][:, :500] = 40                                                          # another view
+    monkeypatch.setattr(vc, "serial_still", lambda cam, cfg: views[cam])
+    c = client_for(tmp_path)
+    rig = c.get("/api/visual-calibration/rig").json()
+    if not rig["cameras"]["b"]["enabled"]:
+        pytest.skip("camera b is disabled in the rig config")
+    jpeg = lambda img: cv2.imencode(".jpg", cv2.resize(img, (700, 500)))[1].tobytes()
+    who = c.post("/api/visual-calibration/camera/identify?claim=a", content=jpeg(views["b"])).json()
+    assert who["camera"] == "b" and who["scores"]["b"] > who["scores"]["a"]
+    assert c.post("/api/visual-calibration/camera/identify", content=jpeg(views["a"])).json()["camera"] == "a"
+    assert c.get("/api/visual-calibration/camera/still?cam=b&max_side=200").headers["content-type"] == "image/jpeg"
+
+    sid = c.post("/api/visual-calibration/sessions", json={"step": "camera"}).json()["id"]
+    b_png = cv2.imencode(".png", views["b"])[1].tobytes()
+    assert c.post(f"/api/visual-calibration/sessions/{sid}/photos?stop=0&cam=a&verify=true", content=b_png).status_code == 409
+    assert c.post(f"/api/visual-calibration/sessions/{sid}/photos?stop=0&cam=b&verify=true", content=b_png).status_code == 200
+    assert c.get(f"/api/visual-calibration/sessions/{sid}").json()["photos"][0]["name"] == "stop_0000.00_b"

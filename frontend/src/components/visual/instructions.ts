@@ -2,12 +2,15 @@
 // in the order they are done. Phase rig: the calibration object instead of the
 // hand; the motor turns the plate through every stop twice, 1a for the camera
 // (lens, tile poses), 1b for the rotation (camera pose, axis, stop angles).
-// Phase hand: the hand on the same connector.
+// Phase hand: the hand on the same connector. Before both, phase setup: the one-time checks of
+// a newly built rig (RigSetup.tsx).
 
 import type { RigInfo, SessionKind } from './api'
 
-export type Phase = 'rig' | 'hand'
+export type Phase = 'setup' | 'rig' | 'hand'
+export const PHASE_LABEL: Record<Phase, string> = { setup: '0 · setup', rig: '1 · rig', hand: '2 · hand' }
 export type StepId =
+  | 'setup'
   | 'mount'
   | 'camera'
   | 'light'
@@ -39,6 +42,19 @@ const side0 = (rig: RigInfo | null) => `${rig?.side0_stop ?? 180}°`
 
 export const STEPS: StepDef[] = [
   {
+    id: 'setup',
+    phase: 'setup',
+    title: 'Set up the rig',
+    copy: () =>
+      'Once per newly built rig (or after a camera or the motor was swapped): USB, the turntable, which camera is A and which B, their placement, exposure and focus, and a tour of the tiles. Each card says what it found and what to do; any card can run again. What it finds goes to the rig’s local.yaml.',
+    items: () => [
+      'Plug both cameras straight into the computer with USB 3 cables.',
+      'Put the calibration tower on the plate.',
+      'Run the cards top to bottom; a green summary means ready for 1 · Rig.',
+    ],
+    live: true,
+  },
+  {
     id: 'mount',
     phase: 'rig',
     title: 'Mount the object',
@@ -51,9 +67,9 @@ export const STEPS: StepDef[] = [
   {
     id: 'camera',
     phase: 'rig',
-    title: 'Set up the camera',
-    copy: () =>
-      'The BRIO on its side in its mount, 65° field of view (Logi Tune). Once the tiles are sharp, lock focus and exposure. From here on, don’t touch the camera.',
+    title: 'Set up the cameras',
+    copy: (rig) =>
+      `The BRIO on its side in its mount, 65° field of view (Logi Tune)${rig?.cameras?.b?.enabled ? '; cam B on the side rail, 45° down' : ''}. Each stream is checked against its camera’s USB serial (both BRIOs look alike to the browser): a crossed pair swaps by itself. Once the tiles are sharp, lock focus and exposure. From here on, don’t touch the cameras.`,
     art: 'camera',
     live: true,
   },

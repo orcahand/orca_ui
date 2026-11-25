@@ -10,9 +10,13 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for running from source, the frontend
 build, and working against an unreleased `orca_core`.
 
 **Visual calibration** (branch `visual-calibration`): Setup › Visual calibration,
-`frontend/src/components/visual/`, two step tabs: 1 · Rig (calibration object,
-no hand), 2 · Hand. Plan and rig config live in orca_core
+`frontend/src/components/visual/`, three phases: 0 · Setup (once per rig,
+docs/rig-setup.md), 1 · Rig (calibration object, no hand), 2 · Hand. Plan and rig config live in orca_core
 (`experiments/visual_calibration/`, a self-contained experiment; the router puts it on sys.path).
+Two cameras (config.yaml `cameras: {a, b}`, b hidden when `enabled: false`): every camera
+endpoint takes `cam` (default `a`), and a browser stream is bound to a camera only by its
+USB serial, never by device order or label (`useRigCameras.tsx`, docs/rig-dashboard.md).
+The backend never opens a camera per request: `visual_calibration.capture.SharedCamera` only.
 
 **Before any merge, release or PR of a UI branch**, whoever proposes it: raise
 the changelog first. See [Versioning and the changelog](#versioning-and-the-changelog).

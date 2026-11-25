@@ -1,20 +1,23 @@
-// The rig camera on the dashboard (docs/rig-dashboard.md): the live stream turned like the
-// visual-calibration page (270° by default, its camera choice), and on request the model
-// overlay: the hand at its live pose (study-corrected when the study map is on) and the
-// tower's tiles at the plate angle. Off by default; click to enlarge, Esc to close.
+// The rig cameras on the dashboard (docs/rig-dashboard.md): every enabled camera's live stream,
+// each turned like on the visual-calibration page (its turn and device choice; cam A 270°, cam B
+// 90° by default), its identity checked against the camera's USB serial, and on request the
+// model overlay: the hand at its live pose (study-corrected when the study map is on) and the
+// tower's tiles at the plate angle, from that camera's pose. Off by default; click a view to
+// enlarge it, Esc to close.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '../../api/rest'
 import { useAppStore } from '../../state/appStore'
 import { useRig } from '../../state/rigStore'
-import { visualApi, type ModelOverlay } from '../visual/api'
+import { CAMS, visualApi, type CamId, type ModelOverlay } from '../visual/api'
 import { drawTiles } from '../visual/drawTiles'
-import { usePageVisible } from '../common/usePageVisible'
+import { CAM_LABEL, useRigCameras, type CamFeed } from '../visual/useRigCameras'
+import { UsbBanner } from '../visual/UsbBanner'
 import type { HandOverlay } from '../visual/handOverlay'
 
-const CAMERA_KEY = 'orca-ui.visual-calibration.camera'
 const ROTATION_KEY = 'orca-ui.visual-calibration.rotation'
+const DEFAULT_ROTATION: Record<CamId, number> = { a: 270, b: 90 }
 const ACCENT = '#22d3ee'
 const NO_LETTERS: Record<string, string> = {}
 
@@ -27,20 +30,24 @@ function stored<T>(key: string, fallback: T): T {
   }
 }
 
-export function RigCamera() {
-  const camera = useRig((s) => s.camera)
-  const overlay = useRig((s) => s.overlay)
+function CameraView({
+  feed,
+  rotation,
+  overlay,
+  hand,
+}: {
+  feed: CamFeed
+  rotation: number
+  overlay: boolean
+  hand: RefObject<HandOverlay | null>
+}) {
+  const cam = feed.cam
   const info = useRig((s) => s.info)
   const letters = info?.letters ?? NO_LETTERS
   const angle = useRig((s) => s.twinState?.angle ?? null)
-  const joints = useAppStore((s) => s.handInfo?.joints)
-  const video = useRef<HTMLVideoElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
-  const [error, setError] = useState<string | null>(null)
   const [zoomed, setZoomed] = useState(false)
   const [model, setModel] = useState<ModelOverlay | null>(null)
-  const hand = useRef<HandOverlay | null>(null)
-  const rotation = stored<number>(ROTATION_KEY, 270)
 
   useEffect(() => {
     if (!zoomed) return
@@ -49,67 +56,23 @@ export function RigCamera() {
     return () => window.removeEventListener('keydown', key)
   }, [zoomed])
 
-  const pageVisible = usePageVisible()
-  // The rig camera's own mode (4K): a smaller request switches the device for every client and
-  // starves the study's 4K capture; the element scales it down.
-  useEffect(() => {
-    if (!camera || !pageVisible) return
-    let alive = true
-    let stream: MediaStream | null = null
-    const id = stored<string>(CAMERA_KEY, '')
-    navigator.mediaDevices
-      .getUserMedia({ video: { ...(id ? { deviceId: { exact: id } } : {}), width: { ideal: 3840 }, height: { ideal: 2160 } } })
-      .then((s) => {
-        if (!alive) return s.getTracks().forEach((t) => t.stop())
-        stream = s
-        if (video.current) {
-          video.current.srcObject = s
-          void video.current.play()
-        }
-        setError(null)
-      })
-      .catch((e: Error) => alive && setError(`no camera: ${e.message}`))
-    return () => {
-      alive = false
-      stream?.getTracks().forEach((t) => t.stop())
-      if (video.current) video.current.srcObject = null
-    }
-  }, [camera, pageVisible])
-
-  // The overlay's model (lens, camera_from_plate, tiles) at the plate angle, refetched as it turns.
+  // This camera's model (lens, camera_from_plate, tiles) at the plate angle, refetched as it turns.
   const key = angle === null ? null : Math.round(angle * 2) / 2
   useEffect(() => {
-    if (!camera || !overlay) return
+    if (!overlay) return
     let alive = true
-    visualApi.overlay(key ?? 0, rotation).then((m) => alive && setModel(m)).catch(() => undefined)
+    visualApi.overlay(key ?? 0, rotation, cam).then((m) => alive && setModel(m)).catch(() => undefined)
     return () => {
       alive = false
     }
-  }, [camera, overlay, key, rotation])
-
-  useEffect(() => {
-    if (!camera || !overlay || !joints) return
-    let alive = true
-    Promise.all([api.modelMetadata(), import('../visual/handOverlay')])
-      .then(([meta, mod]) => mod.HandOverlay.create(meta.urdf_url, joints, ACCENT))
-      .then((h) => {
-        if (!alive) return h.dispose()
-        hand.current = h
-      })
-      .catch(() => undefined)
-    return () => {
-      alive = false
-      hand.current?.dispose()
-      hand.current = null
-    }
-  }, [camera, overlay, joints])
+  }, [overlay, key, rotation, cam])
 
   const modelRef = useRef(model)
   modelRef.current = model
   const lettersRef = useRef(letters)
   lettersRef.current = letters
+  const video = feed.video
   useEffect(() => {
-    if (!camera) return
     let raf = 0
     const draw = () => {
       const v = video.current
@@ -149,9 +112,9 @@ export function RigCamera() {
     }
     raf = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(raf)
-  }, [camera, overlay, rotation])
+  }, [overlay, rotation, video, hand])
 
-  if (!camera) return null
+  const unsure = feed.identity === 'mismatch' || feed.identity === 'unknown'
   const frame = (
     <div
       className={zoomed ? 'visual-cal-zoom' : 'visual-cal-frame rig-camera-frame'}
@@ -159,15 +122,63 @@ export function RigCamera() {
       title={zoomed ? 'Click or Esc to close' : 'Click to enlarge'}
     >
       <canvas ref={canvas} className="visual-cal-video" />
-      {error && <span className="visual-cal-seg-note">{error}</span>}
-      {zoomed && angle !== null && <span className="visual-cal-zoom-caption">plate {angle.toFixed(1)}°</span>}
+      <span className="visual-cal-cam-label" title={feed.identityNote ?? ''}>
+        <b>{CAM_LABEL[cam]}</b>
+        {unsure ? ` · ${feed.identityNote ?? 'identity unknown'}` : feed.identity === 'ok' ? ' · serial ✓' : ''}
+      </span>
+      {feed.error && <span className="visual-cal-seg-note">{feed.error}</span>}
+      {zoomed && angle !== null && (
+        <span className="visual-cal-zoom-caption">
+          {CAM_LABEL[cam]} · plate {angle.toFixed(1)}°
+        </span>
+      )}
     </div>
   )
   // Enlarged, it portals to <body>: the dashboard's sticky column would trap its z-index.
+  return zoomed ? createPortal(frame, document.body) : frame
+}
+
+export function RigCamera() {
+  const camera = useRig((s) => s.camera)
+  const overlay = useRig((s) => s.overlay)
+  const info = useRig((s) => s.info)
+  const joints = useAppStore((s) => s.handInfo?.joints)
+  const hand = useRef<HandOverlay | null>(null)
+  const cams = (info?.active_cameras ?? ['a']).filter((c): c is CamId => (CAMS as readonly string[]).includes(c))
+  // The rig cameras' own mode (4K, useRigCameras): a smaller request switches the device for every
+  // client and starves the study's 4K capture; the canvas scales it down.
+  const { feeds, access, sources } = useRigCameras(cams, camera)
+
+  useEffect(() => {
+    if (!camera || !overlay || !joints) return
+    let alive = true
+    Promise.all([api.modelMetadata(), import('../visual/handOverlay')])
+      .then(([meta, mod]) => mod.HandOverlay.create(meta.urdf_url, joints, ACCENT))
+      .then((h) => {
+        if (!alive) return h.dispose()
+        hand.current = h
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+      hand.current?.dispose()
+      hand.current = null
+    }
+  }, [camera, overlay, joints])
+
+  if (!camera) return null
+  const rotation = (c: CamId) =>
+    stored<number>(c === 'a' ? ROTATION_KEY : `${ROTATION_KEY}.${c}`, info?.cameras?.[c]?.rotation ?? DEFAULT_ROTATION[c])
   return (
     <>
-      <video ref={video} muted playsInline style={{ display: 'none' }} />
-      {zoomed ? createPortal(frame, document.body) : frame}
+      {sources}
+      {access && <span className="visual-cal-seg-note">{access}</span>}
+      <UsbBanner />
+      <div className="rig-cameras">
+        {cams.map((c) => (
+          <CameraView key={c} feed={feeds[c]} rotation={rotation(c)} overlay={overlay} hand={hand} />
+        ))}
+      </div>
     </>
   )
 }

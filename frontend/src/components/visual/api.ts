@@ -14,7 +14,12 @@ export interface Orientation {
   up_raw: [number, number]; // the tower's up in the raw frame
 }
 
+/** The rig's cameras (config.yaml cameras:): a level at +x, b on the side rail. */
+export const CAMS = ["a", "b"] as const;
+export type CamId = (typeof CAMS)[number];
+
 export interface Detected {
+  camera?: CamId;
   size: [number, number];
   detections: Detection[];
   orientation: Orientation | null;
@@ -136,6 +141,17 @@ export interface TwinState {
     } | null;
   };
   twin_available: boolean;
+  // Every camera's CAD pose and solved camera -> rig matrix (OpenCV frame), newer servers.
+  cameras?: Partial<
+    Record<
+      CamId,
+      {
+        enabled: boolean;
+        cad: { position: number[]; look_at: number[] } | null;
+        solved: Mat4 | null;
+      }
+    >
+  >;
   // Newer servers (docs/rig-dashboard.md): the hand on the plate, rig frame, mm.
   hand?: { plate_from_hand: Mat4; rig_from_hand: Mat4 };
   swap_angle?: number;
@@ -163,6 +179,17 @@ export interface CameraMount {
   tilt: number;
 }
 
+export interface RigCameraInfo {
+  enabled: boolean;
+  mount: (CameraMount & { azimuth?: number }) | null;
+  nominal: { position: number[]; look_at: number[] } | null; // CAD pose, rig frame mm
+  azimuth: number;
+  resolution: [number, number] | null;
+  serial: string | null; // its USB serial: the camera's identity
+  rotation: 0 | 90 | 180 | 270; // clockwise display turn that shows the rig's up as up
+  calibrated: { lens: boolean; pose: boolean };
+}
+
 export interface RigInfo {
   rig: string;
   version: string;
@@ -175,6 +202,9 @@ export interface RigInfo {
   tiles: string[];
   reference_tile: string | null;
   camera_mount: CameraMount | null;
+  // Newer servers: every camera, and the enabled ones in order (a first).
+  cameras?: Partial<Record<CamId, RigCameraInfo>>;
+  active_cameras?: CamId[];
   letters: Record<string, string>;
   swap_angle: number; // where the plate parks to swap the object for the hand
   rig_board: { usb_serial: string | null; devices: string[] }; // the turntable's board: never the hand's
@@ -199,6 +229,8 @@ export interface LiveFit {
   joint_table: JointEstimate[];
   suggest: { angle: number; joints: string[]; better: boolean } | null;
   views: number[];
+  camera?: CamId; // the camera of this frame (several calibrated cameras)
+  view_cameras?: CamId[];
   segmentation: { png: string; box: [number, number, number, number] } | null;
 }
 
@@ -215,6 +247,8 @@ export interface JointEstimate {
 
 export interface CameraControls {
   ok: boolean;
+  camera?: CamId;
+  cameras?: Partial<Record<CamId, CameraControls>>; // cam=all
   configured?: boolean;
   set?: Record<string, number | number[]>;
   controls?: Record<string, number | number[]>;
@@ -226,6 +260,7 @@ type Mat4 = number[][];
 /** What the rig model expects the camera to see at a plate angle; pixels in the raw camera image. */
 export interface ModelOverlay {
   angle: number;
+  camera?: CamId;
   source: { lens: string; camera: string; tiles: string; axis: string };
   lens: {
     fx: number;
@@ -273,6 +308,7 @@ export type SessionKind = "camera" | "rotation" | "hand";
 export interface PhotoEntry {
   name: string;
   stop_deg: number;
+  camera?: CamId; // missing: camera a
   tiles: number;
   corners: number;
   captured_at: string;
@@ -323,6 +359,16 @@ export interface SessionListItem {
   solved: boolean;
 }
 
+/** Which rig camera a browser frame shows, from stills taken by each camera's USB serial. */
+export interface CameraIdentity {
+  camera: CamId | null; // null: not sure
+  claim: CamId | null;
+  scores: Partial<Record<CamId, number>>;
+  errors: Partial<Record<CamId, string>>;
+  verified: boolean;
+  mock?: boolean; // --mock: no rig cameras to compare with
+}
+
 export interface LutState {
   available: boolean;
   summary: string | null;
@@ -336,6 +382,171 @@ export interface LutCommand {
   command: Record<string, number>;
   reached: Record<string, number> | null; // what the hand really reaches with it (the table)
 }
+
+// ---- 0 · Setup (orca_ui/api/rig_setup.py, docs/rig-setup.md)
+
+export type SetupStatus = "ok" | "warn" | "error" | "not run";
+
+/** A finding with its fix (visual_calibration.checks.warning). */
+export interface SetupWarning {
+  code: string;
+  severity: "error" | "warning" | "info";
+  message: string;
+  fix: string;
+  values: Record<string, unknown>;
+}
+
+export interface UsbCamera {
+  serial: string | null;
+  name: string | null;
+  bus: number;
+  ports: number[];
+  link_mbps: number | null;
+  usb3: boolean | null;
+  opencv_index: number | null;
+  camera: CamId | null; // the mount whose serial it has; null: not assigned yet
+}
+
+export interface UsbState {
+  status: SetupStatus;
+  cameras: UsbCamera[];
+  warnings: SetupWarning[];
+  banner: SetupWarning[]; // USB 2 links of enabled (or unassigned) cameras: every step shows these
+  active_cameras: CamId[];
+}
+
+export interface TurntableSetup {
+  status: SetupStatus;
+  calibrated: boolean;
+  board: { port: string; usb_serial: string | null; motor_id: number; model: string; baudrate: number } | null;
+  mine?: boolean;
+  mock?: boolean;
+  warnings: SetupWarning[];
+  state?: Turntable;
+}
+
+/** One camera's pose from a single view of the tower (setup.single_view_pose). */
+export interface ViewPose {
+  radius_mm: number;
+  height_mm: number;
+  tilt_down_deg: number;
+  aim_off_axis_deg: number;
+  aim_height_mm: number;
+  image_roll_deg: number;
+  rms_px: number;
+  corners: number;
+  tiles: string[];
+}
+
+export interface IdentifyResult {
+  status: SetupStatus;
+  cameras: {
+    serial: string;
+    configured_as: CamId | null;
+    usb3: boolean | null;
+    pose?: ViewPose | null;
+    tiles?: number;
+    image?: string; // base64 JPEG
+    size?: [number, number];
+    error?: string;
+  }[];
+  identify: {
+    assignment: Partial<Record<CamId, string>>;
+    confident: boolean;
+    margin: number | null;
+    unseen: string[];
+  };
+  before: Partial<Record<CamId, string | null>>;
+  disagree: boolean;
+  saved: boolean;
+  parked_at: number | null;
+  nominal: Partial<Record<CamId, { radius_mm: number; height_mm: number; tilt_down_deg: number }>>;
+}
+
+export interface Placement {
+  camera: CamId;
+  ok: boolean;
+  found: { distance: number; height: number; tilt: number };
+  want: { distance: number; height: number; tilt: number };
+  advice: string[];
+  lock: string | null;
+  holes: Partial<Record<"distance" | "height", number | null>>;
+}
+
+export interface AlignResult {
+  camera: CamId;
+  size: [number, number];
+  tiles: string[];
+  pose: ViewPose | null;
+  ok: boolean;
+  placement: Placement | null;
+  advice: string[];
+  status?: SetupStatus;
+  locked?: boolean;
+}
+
+export interface SetupJob {
+  id: string;
+  kind: "exposure" | "focus" | "tour";
+  camera: CamId | null;
+  state: "running" | "done" | "failed" | "cancelled";
+  progress: number;
+  note: string;
+  result: Record<string, unknown> | null;
+  error: string | null;
+  started: number;
+  ended: number | null;
+}
+
+export type SetupItem = { status: SetupStatus; at?: string; [key: string]: unknown };
+export type SetupPerCam = { status: SetupStatus; cameras: Partial<Record<CamId, SetupItem>> };
+
+export interface SetupSummary {
+  items: {
+    usb: SetupItem & { live: UsbState };
+    turntable: SetupItem;
+    identify: SetupItem;
+    align: SetupPerCam;
+    exposure: SetupPerCam;
+    focus: SetupPerCam;
+    tour: SetupItem;
+  };
+  ready: boolean;
+  blockers: string[];
+  cameras: CamId[];
+  jobs: SetupJob[];
+}
+
+export const setupApi = {
+  summary: () => call<SetupSummary>("/setup"),
+  usb: (fresh = false) =>
+    call<UsbState>("/setup/usb", fresh ? { method: "POST" } : undefined),
+  turntable: () => call<TurntableSetup>("/setup/turntable", { method: "POST" }),
+  identify: () => call<IdentifyResult>("/setup/identify", { method: "POST" }),
+  saveIdentity: (assignment: Partial<Record<CamId, string>>) =>
+    call<{ status: SetupStatus }>("/setup/identify/save", json({ assignment })),
+  align: (cam: CamId) => call<AlignResult>(`/setup/align?cam=${cam}`),
+  alignCheck: (cam: CamId, locked: boolean) =>
+    call<AlignResult>(`/setup/align/check?cam=${cam}&locked=${locked}`, {
+      method: "POST",
+    }),
+  keepHole: (cam: CamId, key: string, value: number) =>
+    call<{ ok: boolean }>("/setup/mount", json({ cam, key, value })),
+  exposure: (cam: CamId) =>
+    call<SetupJob>(`/setup/exposure?cam=${cam}`, { method: "POST" }),
+  focus: (cam: CamId) =>
+    call<SetupJob>(`/setup/focus?cam=${cam}`, { method: "POST" }),
+  tour: () => call<SetupJob>("/setup/tour", { method: "POST" }),
+  // Stream one camera for a while so its white LED lights: which BRIO is which, by eye.
+  light: (who: { cam: CamId } | { serial: string }, seconds = 10) =>
+    call<{ camera: CamId | null; serial: string; seconds: number; remaining_s: number }>(
+      `/setup/light?${"cam" in who ? `cam=${who.cam}` : `serial=${encodeURIComponent(who.serial)}`}&seconds=${seconds}`,
+      { method: "POST" },
+    ),
+  job: (id: string) => call<SetupJob>(`/setup/jobs/${id}`),
+  cancel: (id: string) =>
+    call<SetupJob>(`/setup/jobs/${id}/cancel`, { method: "POST" }),
+};
 
 const BASE = "/api/visual-calibration";
 
@@ -366,15 +577,21 @@ export const visualApi = {
   rig: () => call<RigInfo>("/rig"),
   sessions: () => call<SessionListItem[]>("/sessions"),
   session: (id: string) => call<Session>(`/sessions/${id}`),
-  createSession: (step: SessionKind, handTurned = false) =>
-    call<Session>("/sessions", json({ step, hand_turned: handTurned })),
-  addPhoto: (id: string, stop: number, image: Blob) =>
+  createSession: (step: SessionKind, handTurned = false, hold = false) =>
+    call<Session>("/sessions", json({ step, hand_turned: handTurned, hold })),
+  // verify: the server refuses the photo unless camera `cam` (by its serial) shows the same view.
+  addPhoto: (id: string, stop: number, image: Blob, cam: CamId = "a", verify = false) =>
     call<Detected & { photo: PhotoEntry }>(
-      `/sessions/${id}/photos?stop=${stop}`,
+      `/sessions/${id}/photos?stop=${stop}&cam=${cam}${verify ? "&verify=true" : ""}`,
       { method: "POST", body: image },
     ),
-  detect: (image: Blob) =>
-    call<Detected>("/detect", { method: "POST", body: image }),
+  detect: (image: Blob, cam: CamId = "a") =>
+    call<Detected>(`/detect?cam=${cam}`, { method: "POST", body: image }),
+  identify: (frame: Blob, claim: CamId) =>
+    call<CameraIdentity>(`/camera/identify?claim=${claim}`, {
+      method: "POST",
+      body: frame,
+    }),
   solve: (id: string) =>
     call<Session>(`/sessions/${id}/solve`, { method: "POST" }),
   apply: (id: string) =>
@@ -394,10 +611,15 @@ export const visualApi = {
       { method: "POST" },
     ),
   release: () => call<Turntable>("/turntable/release", { method: "POST" }),
-  overlay: (angle: number, rotation: number) =>
-    call<ModelOverlay>(`/overlay?angle=${angle}&rotation=${rotation}`),
+  // cad: the nominal mount pose, lens and tile seats even when calibrated (the setup's ghost).
+  overlay: (angle: number, rotation: number, cam: CamId = "a", cad = false) =>
+    call<ModelOverlay>(
+      `/overlay?angle=${angle}&rotation=${rotation}&cam=${cam}${cad ? "&source=cad" : ""}`,
+    ),
   status: () => call<CalStatus>("/status"),
-  cameraCheck: () => call<CameraControls>("/camera/uvc"),
+  // cam "all": every enabled camera (409 names each one that differs).
+  cameraCheck: (cam: CamId | "all" = "all") =>
+    call<CameraControls>(`/camera/uvc?cam=${cam}`),
   liveFit: (
     frame: Blob,
     angle: number,
@@ -405,9 +627,10 @@ export const visualApi = {
     source: string,
     solveJoints = false,
     search = false,
+    cam: CamId = "a",
   ) =>
     call<LiveFit>(
-      `/live-fit/frame?angle=${angle}&source=${encodeURIComponent(source)}&joints=${encodeURIComponent(JSON.stringify(joints))}&solve_joints=${solveJoints}&search=${search}`,
+      `/live-fit/frame?angle=${angle}&source=${encodeURIComponent(source)}&joints=${encodeURIComponent(JSON.stringify(joints))}&solve_joints=${solveJoints}&search=${search}&cam=${cam}`,
       { method: "POST", body: frame },
     ),
   liveFitKeepView: () =>
@@ -418,7 +641,8 @@ export const visualApi = {
     call<{ ok: boolean }>("/live-fit/reset", { method: "POST" }),
   liveFitFreeze: () =>
     call<{ path: string }>("/live-fit/freeze", { method: "POST" }),
-  cameraSet: () => call<CameraControls>("/camera/uvc", { method: "POST" }),
+  cameraSet: (cam: CamId | "all" = "all") =>
+    call<CameraControls>(`/camera/uvc?cam=${cam}`, { method: "POST" }),
   twin: () => call<TwinInfo>("/twin"),
   rigPresence: () => call<RigPresence>("/rig/presence"),
   rigScan: () => call<RigPresence>("/rig/scan", { method: "POST" }),
@@ -431,6 +655,10 @@ export const visualApi = {
 
 export const twinTileUrl = (name: string) =>
   `${BASE}/twin/tiles/${encodeURIComponent(name)}.png`;
+
+/** A still of the camera taken by its USB serial (raw, unturned JPEG). */
+export const cameraStillUrl = (cam: CamId, maxSide = 960) =>
+  `${BASE}/camera/still?cam=${cam}&max_side=${maxSide}`;
 
 export const twinFileUrl = (name: string) =>
   `${BASE}/twin/files/${encodeURIComponent(name)}`;

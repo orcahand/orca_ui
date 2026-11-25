@@ -46,6 +46,14 @@ def test_a_rig_board_is_never_a_hand(monkeypatch):
                                             ("/dev/rig",), False), info("ser-3526"))
     assert e.role == "rig" and e.as_dict()["role"] == "rig"
 
+    # Detection that refused the rig falls back to a motor port scan: that scan must refuse it too.
+    from orca_core.hand_config import _resolve_config_path
+    from orca_ui.hand import detection as det
+    from orca_ui.hand.supervisor import load_config
+    config = load_config(_resolve_config_path(None, model_name="orcahand-right"))       # motor port: auto
+    monkeypatch.setattr(det, "auto_detect_port", lambda motor_type: "/dev/rig")
+    assert det.presence_from_detection(config, None).motor_port is None
+
     svc = HandService(UiSettings(config_path=materialize_mock_model(), mock=True, open_browser=False),
                       publish_status=lambda s: None, publish_error=lambda e: None)
     with pytest.raises(ServiceError) as exc:

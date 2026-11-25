@@ -1,11 +1,13 @@
-// Visual calibration (orca_core VISUAL_CALIBRATION.md): one fixed camera, the
-// plate turning in front of it on the rig's motor. A subroutine of seven steps
+// Visual calibration (orca_core VISUAL_CALIBRATION.md): fixed cameras (cam A level,
+// cam B on the side rail when enabled), the plate turning in front of them on the rig's motor. A subroutine of seven steps
 // in two phases, freely switchable: rig (the calibration object instead of the
 // hand: set up, then 1a the camera and 1b the rotation, each a motor sweep
 // through every stop and a solve) and hand (the hand on the same connector, a
 // sweep with no solve yet). Each step shows what to do as a line drawing of the
 // rig, the plate's stops from above, and the live camera with the tiles it
-// finds, where those matter. A step's state comes from its session where the
+// finds, where those matter. Each camera has its own view, turn, overlay and tile count;
+// a capture stores every enabled camera's photo, and only from a stream whose view matched
+// that camera's USB serial (useRigCameras). A step's state comes from its session where the
 // session can tell (photos, solve), else from the operator having moved past it.
 // Without a motor, the plate can still be turned by hand to each stop. Over the
 // video, the model as the camera should see it (tiles on the rig steps, the
@@ -16,14 +18,17 @@ import {
   useEffect,
   useRef,
   useState,
+  type ReactNode,
   type RefObject,
 } from "react";
 import { SetupTabs } from "../setup/SetupTabs";
 import { api } from "../../api/rest";
 import { useAppStore } from "../../state/appStore";
 import {
+  CAMS,
   grabFrame,
   visualApi,
+  type CamId,
   type Detected,
   type LiveFit,
   type ModelOverlay,
@@ -31,11 +36,16 @@ import {
   type Session,
   type SessionKind,
   type SessionListItem,
+  type PhotoEntry,
+  type SetupSummary,
   type Turntable,
+  setupApi,
 } from "./api";
-import { usePageVisible } from "../common/usePageVisible";
+import { CAM_LABEL, trusted, useRigCameras, type CamFeed } from "./useRigCameras";
 import { drawTiles } from "./drawTiles";
-import { STEPS, type StepDef, type StepId } from "./instructions";
+import { PHASE_LABEL, STEPS, type StepDef, type StepId } from "./instructions";
+import { RigSetup } from "./RigSetup";
+import { UsbBanner } from "./UsbBanner";
 import { HandBoard } from "./HandBoard";
 import { Results } from "./Results";
 import { fitOf, solvedWell } from "./solve";
@@ -45,7 +55,7 @@ import { StopDial } from "./StopDial";
 import { ControlSandbox } from "./ControlSandbox";
 import { latest } from "../../state/streamStore";
 
-const CAMERA_KEY = "orca-ui.visual-calibration.camera";
+const CAM_VIEW_KEY = "orca-ui.visual-calibration.camera-view";
 const ROTATION_KEY = "orca-ui.visual-calibration.rotation";
 const ROTATION_MANUAL_KEY = "orca-ui.visual-calibration.rotation-manual";
 const STEP_KEY = "orca-ui.visual-calibration.wizard-step";
@@ -59,7 +69,9 @@ const SOLVE_JOINTS_KEY = "orca-ui.visual-calibration.solve-joints";
 const SEARCH_EVERY = 5; // solves between the per-finger grid searches
 const ROTATIONS = [0, 90, 180, 270] as const;
 type Rotation = (typeof ROTATIONS)[number];
-const PREFERRED = /brio/i;
+const DEFAULT_ROTATION: Record<CamId, Rotation> = { a: 270, b: 90 }; // the BRIOs' portrait mounts
+const rotationKey = (c: CamId, key = ROTATION_KEY) =>
+  c === "a" ? key : `${key}.${c}`;
 const LIVE_MS = 700;
 const WEAK = 32;
 const KINDS: SessionKind[] = ["camera", "rotation", "hand"];
@@ -107,7 +119,8 @@ type Layers = {
   tiles: boolean;
   hand: HandOverlay | null;
   letters: Record<string, string>;
-  fit?: LiveFit | null; // the camera-only pose estimate
+  fit?: LiveFit | null; // the camera-only pose estimate from this camera's frames (outlines, mask)
+  pose?: LiveFit | null; // the latest estimate of any camera: the hand drawn at it
   estimate?: HandOverlay | null; // the URDF at the estimate (pose + mount)
   zero?: HandOverlay | null; // the URDF at zero on the CAD mount, for comparison
   target?: { pose: Record<string, number>; mount: number[][] | null } | null; // the sandbox's wanted pose
@@ -332,6 +345,7 @@ function RotatedVideo({
   overlay,
   layers,
   caption,
+  label,
 }: {
   video: RefObject<HTMLVideoElement | null>;
   ready: boolean;
@@ -339,6 +353,7 @@ function RotatedVideo({
   overlay: Detected | null;
   layers: Layers;
   caption?: string; // shown over the enlarged view (the plate angle)
+  label?: ReactNode; // which camera, its tiles and identity
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   // Click: near full screen, click again or Esc to close. The same canvas, only its box
@@ -477,8 +492,9 @@ function RotatedVideo({
         }
         // Canvas pixels per screen pixel: lines and letters keep their on-screen size.
         const px = c.width / Math.max(1, c.clientWidth);
-        const { model, tiles, hand, letters, estimate, zero, fit: est, target } =
+        const { model, tiles, hand, letters, estimate, zero, target } =
           layersRef.current;
+        const est = layersRef.current.pose ?? layersRef.current.fit;
         const showOverlay = mode === "overlay";
         const urdfShown = showOverlay || mode === "seg-model";
         const k = Math.min(
@@ -491,7 +507,8 @@ function RotatedVideo({
           pose: Record<string, number> | null,
           mount: number[][] | null,
         ) => {
-          if (opacity <= 0) return;
+          if (opacity <= 0 || !model) return;
+          h.place(model); // one hand drawn into every camera's view: this camera's lens and pose
           h.setColor(color);
           h.setPose(pose);
           h.setMount(mount);
@@ -591,6 +608,7 @@ function RotatedVideo({
       title={zoomed ? "Click or Esc to close" : "Click to enlarge"}
     >
       <canvas ref={canvas} className="visual-cal-video" />
+      {label && <span className="visual-cal-cam-label">{label}</span>}
       <ViewPanel view={view} setView={setView} keys={keys} />
       {zoomed && caption && (
         <span className="visual-cal-zoom-caption">{caption}</span>
@@ -613,56 +631,34 @@ function sourceText(m: ModelOverlay): string {
   return "CAD (not calibrated)";
 }
 
-function pickDefault(cameras: MediaDeviceInfo[]): string {
-  const saved = stored<string>(CAMERA_KEY, "");
-  if (saved && cameras.some((c) => c.deviceId === saved)) return saved;
-  return (
-    (cameras.find((c) => PREFERRED.test(c.label)) ?? cameras[0])?.deviceId ?? ""
-  );
+const IDENTITY_TEXT: Record<CamFeed["identity"], string> = {
+  off: "off",
+  checking: "checking identity…",
+  ok: "serial ✓",
+  mismatch: "wrong camera",
+  unknown: "identity unknown",
+  mock: "not checked",
+};
+
+function identityTone(f: CamFeed): string {
+  return f.identity === "ok" ? "ok" : f.identity === "mismatch" || f.identity === "unknown" ? "warn" : "";
 }
 
-// Focus, exposure and white balance fixed at their current values, where the
-// browser and camera allow it (Chrome over UVC does for the BRIO).
-async function lockCamera(
-  stream: MediaStream,
-): Promise<{ locked: boolean; text: string }> {
-  const track = stream.getVideoTracks()[0];
-  const caps = (track.getCapabilities?.() ?? {}) as Record<string, unknown>;
-  const now = track.getSettings() as Record<string, unknown>;
-  const locks: Record<string, unknown> = {};
-  const can = (key: string) =>
-    Array.isArray(caps[key]) && (caps[key] as string[]).includes("manual");
-  if (can("focusMode"))
-    Object.assign(locks, {
-      focusMode: "manual",
-      ...(now.focusDistance !== undefined && {
-        focusDistance: now.focusDistance,
-      }),
-    });
-  if (can("exposureMode"))
-    Object.assign(locks, {
-      exposureMode: "manual",
-      ...(now.exposureTime !== undefined && { exposureTime: now.exposureTime }),
-    });
-  if (can("whiteBalanceMode"))
-    Object.assign(locks, {
-      whiteBalanceMode: "manual",
-      ...(now.colorTemperature !== undefined && {
-        colorTemperature: now.colorTemperature,
-      }),
-    });
-  const names = Object.keys(locks)
-    .filter((k) => k.endsWith("Mode"))
-    .map((k) => k.replace("Mode", ""));
-  if (!names.length)
-    return {
-      locked: false,
-      text: "this browser can’t lock this camera: lock it in Logi Tune",
-    };
-  await track.applyConstraints({
-    advanced: [locks as MediaTrackConstraintSet],
-  });
-  return { locked: true, text: `locked: ${names.join(", ")}` };
+// The photos of one stop count once every camera the session has photographed is there;
+// the weakest of them stands for the stop.
+function stopsTaken(photos: PhotoEntry[]): Map<number, PhotoEntry> {
+  const cams = new Set(photos.map((p) => p.camera ?? "a"));
+  const byStop = new Map<number, PhotoEntry[]>();
+  for (const p of photos)
+    byStop.set(p.stop_deg, [...(byStop.get(p.stop_deg) ?? []), p]);
+  const out = new Map<number, PhotoEntry>();
+  for (const [deg, ps] of byStop)
+    if ([...cams].every((c) => ps.some((p) => (p.camera ?? "a") === c)))
+      out.set(
+        deg,
+        ps.reduce((w, p) => (p.corners < w.corners ? p : w)),
+      );
+  return out;
 }
 
 function TurntableBar({
@@ -743,24 +739,27 @@ function TurntableBar({
 }
 
 export function VisualCalibrationView() {
-  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
-  const [cameraId, setCameraId] = useState("");
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [playing, setPlaying] = useState(false);
-  const [size, setSize] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [rotation, setRotation] = useState<Rotation>(() =>
-    stored<Rotation>(ROTATION_KEY, 270),
+  // Per camera: the display turn. Auto: the backend reads the tower's up from the tiles in each
+  // live frame; a click on a turn overrides it.
+  const [rotation, setRotation] = useState<Record<CamId, Rotation>>(() =>
+    Object.fromEntries(
+      CAMS.map((c) => [c, stored<Rotation>(rotationKey(c), DEFAULT_ROTATION[c])]),
+    ) as Record<CamId, Rotation>,
   );
-  // Auto: the backend reads the tower's up from the tiles in each live frame; a click on a turn overrides it.
-  const [manualRotation, setManualRotation] = useState<boolean>(() =>
-    stored<boolean>(ROTATION_MANUAL_KEY, false),
+  const [manualRotation, setManualRotation] = useState<Record<CamId, boolean>>(
+    () =>
+      Object.fromEntries(
+        CAMS.map((c) => [c, stored<boolean>(rotationKey(c, ROTATION_MANUAL_KEY), false)]),
+      ) as Record<CamId, boolean>,
   );
   const manualRef = useRef(manualRotation);
   manualRef.current = manualRotation;
+  const [camView, setCamView] = useState<CamId | "both">(() =>
+    stored<CamId | "both">(CAM_VIEW_KEY, "both"),
+  );
   const [stepId, setStepId] = useState<StepId>(() => {
-    const s = stored<StepId>(STEP_KEY, "mount");
-    return STEPS.some((d) => d.id === s) ? s : "mount";
+    const s = stored<StepId>(STEP_KEY, "setup");
+    return STEPS.some((d) => d.id === s) ? s : "setup";
   });
   const [confirmed, setConfirmed] = useState<StepId[]>(() =>
     stored<StepId[]>(CONFIRMED_KEY, []),
@@ -772,6 +771,7 @@ export function VisualCalibrationView() {
     stored<boolean>(BY_HAND_KEY, false),
   );
   const [rig, setRig] = useState<RigInfo | null>(null);
+  const [setupSummary, setSetupSummary] = useState<SetupSummary | null>(null);
   const [tt, setTt] = useState<Turntable | null>(null);
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
   const [byKind, setByKind] = useState<Record<SessionKind, Session | null>>({
@@ -781,7 +781,7 @@ export function VisualCalibrationView() {
   });
   const [stopIdx, setStopIdx] = useState(0);
   const [picked, setPicked] = useState(false); // a stop chosen on the dial: Capture retakes it
-  const [overlay, setOverlay] = useState<Detected | null>(null);
+  const [detected, setDetected] = useState<Partial<Record<CamId, Detected>>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [sweep, setSweep] = useState<{ i: number; n: number } | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -793,7 +793,7 @@ export function VisualCalibrationView() {
   const [mountHand, setMountHand] = useState(() =>
     stored<boolean>(MOUNT_HAND_KEY, false),
   );
-  const [model, setModel] = useState<ModelOverlay | null>(null);
+  const [models, setModels] = useState<Partial<Record<CamId, ModelOverlay>>>({});
   const [modelError, setModelError] = useState<string | null>(null);
   const [hand, setHand] = useState<HandOverlay | null>(null);
   const [handZero, setHandZero] = useState<HandOverlay | null>(null);
@@ -802,7 +802,8 @@ export function VisualCalibrationView() {
   const [handNote, setHandNote] = useState<string | null>(null);
   const handInfo = useAppStore((s) => s.handInfo);
   const handState = useAppStore((s) => s.status?.state ?? null);
-  const [fit, setFit] = useState<LiveFit | null>(null);
+  const [fit, setFit] = useState<LiveFit | null>(null); // the last estimate, of any camera
+  const [fits, setFits] = useState<Partial<Record<CamId, LiveFit>>>({});
   const [fitRate, setFitRate] = useState<number | null>(null);
   const [solving, setSolving] = useState(false);
   const [solveJoints, setSolveJoints] = useState(() =>
@@ -813,7 +814,6 @@ export function VisualCalibrationView() {
   const solvingRef = useRef(false);
   const handRef = useRef<HandOverlay | null>(null);
   const handZeroRef = useRef<HandOverlay | null>(null);
-  const video = useRef<HTMLVideoElement>(null);
   const abort = useRef(false);
   const busyRef = useRef(false);
   busyRef.current = busy !== null || sweep !== null;
@@ -825,91 +825,47 @@ export function VisualCalibrationView() {
   const stops = rig?.stops ?? [];
   const motorReady = !byHand && !!tt?.connected && tt.homed;
 
-  // The stream stops while the tab is hidden (no decoding for nobody).
-  const pageVisible = usePageVisible();
+  // Every enabled camera's stream (stopped while the tab is hidden), its identity by serial.
+  const activeCams = (rig?.active_cameras ?? ["a"]).filter((c): c is CamId =>
+    (CAMS as readonly string[]).includes(c),
+  );
+  const camsKey = activeCams.join(",");
+  const {
+    devices,
+    feeds,
+    access,
+    assign,
+    verify,
+    sources,
+  } = useRigCameras(activeCams, true);
+  const feedsRef = useRef(feeds);
+  feedsRef.current = feeds;
+  const shownCams = activeCams.filter((c) => camView === "both" || camView === c);
+  const viewCams = shownCams.length ? shownCams : activeCams;
+  const playing = activeCams.some((c) => feeds[c].playing);
+  const allPlaying = activeCams.every((c) => feeds[c].playing);
+  const anyStream = activeCams.some((c) => feeds[c].stream);
+  const cameraError =
+    access ?? activeCams.map((c) => feeds[c].error).find((e) => e) ?? null;
 
-  // Labels are only readable once camera access is granted.
+  // A camera's first turn, until the page has one for it: the one the server works out.
   useEffect(() => {
-    let alive = true;
-    const list = async () => {
-      const all = (await navigator.mediaDevices.enumerateDevices()).filter(
-        (d) => d.kind === "videoinput",
-      );
-      if (!alive) return;
-      setCameras(all);
-      setCameraId((id) =>
-        id && all.some((c) => c.deviceId === id) ? id : pickDefault(all),
-      );
-    };
-    // The access probe opens the camera at its default mode, which switches the device for
-    // every client (the study's 4K capture too): only probe while labels are still hidden.
-    navigator.mediaDevices
-      .enumerateDevices()
-      .then((all) =>
-        all.some((d) => d.kind === "videoinput" && d.label)
-          ? list()
-          : navigator.mediaDevices.getUserMedia({ video: true }).then((probe) => {
-              probe.getTracks().forEach((t) => t.stop());
-              return list();
-            }),
-      )
-      .catch((e: Error) => alive && setError(`No camera access: ${e.message}`));
-    navigator.mediaDevices.addEventListener("devicechange", list);
-    return () => {
-      alive = false;
-      navigator.mediaDevices.removeEventListener("devicechange", list);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!cameraId || !pageVisible) return;
-    let opened: MediaStream | null = null;
-    let alive = true;
-    setSize(null);
-    navigator.mediaDevices
-      .getUserMedia({
-        video: {
-          deviceId: { exact: cameraId },
-          width: { ideal: 3840 },
-          height: { ideal: 2160 },
-        },
-      })
-      .then((s) => {
-        if (!alive) {
-          s.getTracks().forEach((t) => t.stop());
-          return;
+    if (!rig?.cameras) return;
+    setRotation((cur) => {
+      const next = { ...cur };
+      for (const c of CAMS) {
+        const r = rig.cameras?.[c]?.rotation;
+        let saved: string | null = null;
+        try {
+          saved = localStorage.getItem(rotationKey(c));
+        } catch {
+          /* private mode */
         }
-        opened = s;
-        setStream(s);
-        setError(null);
-        const st = s.getVideoTracks()[0]?.getSettings();
-        if (st?.width)
-          setSize(
-            `${st.width}×${st.height}${st.frameRate ? ` · ${Math.round(st.frameRate)} fps` : ""}`,
-          );
-      })
-      .catch(
-        (e: Error) =>
-          alive && setError(`Could not open the camera: ${e.message}`),
-      );
-    return () => {
-      alive = false;
-      opened?.getTracks().forEach((t) => t.stop());
-      setStream(null);
-    };
-  }, [cameraId, pageVisible]);
-
-  // One <video> for the whole page: every step captures from it.
-  useEffect(() => {
-    const v = video.current;
-    setPlaying(false);
-    if (!v || !stream) return;
-    v.srcObject = stream;
-    const on = () => setPlaying(true);
-    v.addEventListener("loadeddata", on);
-    void v.play().catch(() => undefined);
-    return () => v.removeEventListener("loadeddata", on);
-  }, [stream]);
+        if (r !== undefined && saved === null) next[c] = r;
+      }
+      return next;
+    });
+  }, [rig]);
 
   const refreshSessions = useCallback(async () => {
     const all = await visualApi.sessions();
@@ -920,6 +876,13 @@ export function VisualCalibrationView() {
   useEffect(() => {
     visualApi.rig().then(setRig, (e: Error) => setNote(e.message));
   }, []);
+  const refreshSetup = useCallback(
+    () => setupApi.summary().then(setSetupSummary, () => undefined),
+    [],
+  );
+  useEffect(() => {
+    void refreshSetup();
+  }, [refreshSetup, stepId]);
   // The motor can be moved from elsewhere (another tab, the CLI): its state on every step change.
   useEffect(() => {
     visualApi.turntable().then(setTt, () => undefined);
@@ -946,7 +909,7 @@ export function VisualCalibrationView() {
   // The first stop without a photo, when a session is opened or the step changes (not after each capture).
   useEffect(() => {
     if (!rig) return;
-    const taken = new Set(session?.photos.map((p) => p.stop_deg));
+    const taken = stopsTaken(session?.photos ?? []);
     const next = rig.stops.findIndex((s) => !taken.has(s));
     setStopIdx(next < 0 ? 0 : next);
     setPicked(false);
@@ -957,23 +920,25 @@ export function VisualCalibrationView() {
   const live = !!step.live && playing && !showResults;
   useEffect(() => {
     if (!live) {
-      setOverlay(null);
+      setDetected({});
       return;
     }
     let alive = true;
     let timer = 0;
     const tick = async () => {
-      const v = video.current;
-      if (alive && v?.videoWidth && !busyRef.current) {
+      for (const c of camsKey.split(",") as CamId[]) {
+        const v = feedsRef.current[c].video.current;
+        if (!alive || !v?.videoWidth || busyRef.current) continue;
         try {
           const found = await visualApi.detect(
             await grabFrame(v, "image/jpeg", 1600),
+            c,
           );
-          if (alive) setOverlay(found);
+          if (alive) setDetected((d) => ({ ...d, [c]: found }));
           const o = found.orientation;
-          if (alive && o && o.agreement >= 0.9 && !manualRef.current) {
-            store(ROTATION_KEY, o.rotation);
-            setRotation(o.rotation);
+          if (alive && o && o.agreement >= 0.9 && !manualRef.current[c]) {
+            store(rotationKey(c), o.rotation);
+            setRotation((r) => (r[c] === o.rotation ? r : { ...r, [c]: o.rotation }));
           }
         } catch {
           /* next tick */
@@ -986,7 +951,7 @@ export function VisualCalibrationView() {
       alive = false;
       window.clearTimeout(timer);
     };
-  }, [live]);
+  }, [live, camsKey]);
 
   // The plate's read-back angle, ~5 Hz (also with the torque off): the overlay follows the plate.
   // On the hand steps the turntable is connected read-only (torque off) so the angle is known.
@@ -1053,21 +1018,26 @@ export function VisualCalibrationView() {
   const plateAngleRef = useRef(plateAngle);
   plateAngleRef.current = plateAngle;
 
+  const rotA = rotation.a;
+  const rotB = rotation.b;
   useEffect(() => {
     if (!overlayShown || !playing) return;
     let alive = true;
-    visualApi.overlay(plateAngle, rotation).then(
-      (m) => {
-        if (!alive) return;
-        setModel(m);
-        setModelError(null);
-      },
-      (e: Error) => alive && setModelError(e.message),
-    );
+    const turn: Record<CamId, Rotation> = { a: rotA, b: rotB };
+    for (const c of camsKey.split(",") as CamId[])
+      visualApi.overlay(plateAngle, turn[c], c).then(
+        (m) => {
+          if (!alive) return;
+          setModels((x) => ({ ...x, [c]: m }));
+          setModelError(null);
+        },
+        (e: Error) => alive && setModelError(`${CAM_LABEL[c]}: ${e.message}`),
+      );
     return () => {
       alive = false;
     };
-  }, [overlayShown, playing, plateAngle, rotation]);
+  }, [overlayShown, playing, plateAngle, rotA, rotB, camsKey]);
+  const model = models.a ?? models[activeCams[0]] ?? null;
 
   // The hand model loads once, the first time it is wanted, and stays for the page's life.
   const joints = handInfo?.joints;
@@ -1118,10 +1088,6 @@ export function VisualCalibrationView() {
     };
   }, [wantZero, joints]);
   useEffect(() => () => handZeroRef.current?.dispose(), []);
-  useEffect(() => {
-    if (hand && model) hand.place(model);
-    if (handZero && model) handZero.place(model);
-  }, [hand, handZero, model]);
 
   const toggleOverlay = (on: boolean) =>
     setOverlayOn((o) => {
@@ -1223,10 +1189,18 @@ export function VisualCalibrationView() {
     say(null);
     let n = 0;
     const t0 = performance.now();
+    // Every enabled camera with a solved pose takes turns (cam A always): their views add up.
+    const fitCams = activeCams.filter(
+      (c) => c === "a" || !!rig?.cameras?.[c]?.calibrated.pose,
+    );
     try {
       while (solvingRef.current) {
-        const v = video.current;
-        if (!v?.videoWidth) throw new Error("no camera image");
+        const c = fitCams[n % fitCams.length];
+        const f = feedsRef.current[c];
+        const v = f.video.current;
+        if (!v?.videoWidth) throw new Error(`${CAM_LABEL[c]}: no camera image`);
+        if (!trusted(f))
+          throw new Error(`${CAM_LABEL[c]}: ${f.identityNote ?? "not identified yet"}`);
         const { q, source } = jointPose();
         const r = await visualApi.liveFit(
           await grabFrame(v, "image/jpeg", 960),
@@ -1235,8 +1209,10 @@ export function VisualCalibrationView() {
           source,
           solveJointsRef.current,
           n % SEARCH_EVERY === 0,
+          c,
         );
         setFit(r);
+        setFits((x) => ({ ...x, [c]: r }));
         n += 1;
         setFitRate((n * 1000) / (performance.now() - t0));
       }
@@ -1257,12 +1233,13 @@ export function VisualCalibrationView() {
       await visualApi.liveFitReset();
       await visualApi.liveFitClearViews();
       setFit(null);
+      setFits({});
     });
   const keepView = () =>
     run("keeping…", async () => {
       const r = await visualApi.liveFitKeepView();
       say(
-        `view at ${plateAngle}° kept (${r.views} kept): turn the plate to another angle, keep the hand still`,
+        `${fit?.camera ? `${CAM_LABEL[fit.camera]} ` : ""}view at ${plateAngle}° kept (${r.views} kept): turn the plate to another angle, keep the hand still`,
       );
     });
   const clearViews = () =>
@@ -1279,25 +1256,56 @@ export function VisualCalibrationView() {
     setByHand(on);
   };
 
-  // One photo at the selected stop into the step's session (made if there is none).
+  // One photo per enabled camera at the selected stop into the step's session (made if there
+  // is none): all frames grabbed at once, each only from a stream that matched its camera's
+  // serial, and the server checks each against that camera again before storing it.
   const shoot = async (
     k: SessionKind,
     stop: number,
     s: Session | null,
   ): Promise<Session> => {
-    const v = video.current;
-    if (!v?.videoWidth) throw new Error("no camera image");
-    const target = s ?? (await visualApi.createSession(k, byHand));
-    const r = await visualApi.addPhoto(
-      target.id,
-      stop,
-      await grabFrame(v, "image/png"),
+    const cams = activeCams;
+    for (const c of cams) {
+      const f = feedsRef.current[c];
+      if (!f.video.current?.videoWidth)
+        throw new Error(`${CAM_LABEL[c]}: no camera image`);
+      if (!trusted(f))
+        throw new Error(
+          `${CAM_LABEL[c]}: ${f.identityNote ?? "not identified yet"}: nothing stored`,
+        );
+      const want = rig?.cameras?.[c]?.resolution;
+      const v = f.video.current;
+      if (want && (v.videoWidth !== want[0] || v.videoHeight !== want[1]))
+        throw new Error(
+          `${CAM_LABEL[c]} sends ${v.videoWidth}×${v.videoHeight}, the rig config needs ${want[0]}×${want[1]} (a USB 2 link? see the banner): nothing stored`,
+        );
+    }
+    const frames = await Promise.all(
+      cams.map((c) => grabFrame(feedsRef.current[c].video.current!, "image/png")),
     );
-    setOverlay(r);
-    const photos = [
-      ...target.photos.filter((p) => p.stop_deg !== stop),
-      r.photo,
-    ].sort((a, b) => a.stop_deg - b.stop_deg);
+    const target = s ?? (await visualApi.createSession(k, byHand));
+    let photos = target.photos;
+    for (const [i, c] of cams.entries()) {
+      const r = await visualApi.addPhoto(
+        target.id,
+        stop,
+        frames[i],
+        c,
+        feedsRef.current[c].identity === "ok",
+      );
+      setDetected((d) => ({ ...d, [c]: r }));
+      photos = [
+        ...photos.filter(
+          (p) => !(p.stop_deg === stop && (p.camera ?? "a") === c),
+        ),
+        r.photo,
+      ];
+    }
+    photos.sort(
+      (a, b) =>
+        a.stop_deg - b.stop_deg ||
+        (a.camera ?? "a").localeCompare(b.camera ?? "a"),
+    );
     const next = { ...target, photos };
     setSession(k, next);
     return next;
@@ -1313,7 +1321,7 @@ export function VisualCalibrationView() {
     setSweep({ i: 0, n: rig.stops.length });
     try {
       setNote("camera controls…");
-      await visualApi.cameraSet().catch((e: Error) => {
+      await visualApi.cameraSet("all").catch((e: Error) => {
         throw new Error(`camera check: ${e.message} (close Logi Tune)`);
       });
       if (!tt?.connected) setTt(await visualApi.connect());
@@ -1351,7 +1359,7 @@ export function VisualCalibrationView() {
     run("capturing…", async () => {
       if (!kind || !rig) return;
       const stop = rig.stops[stopIdx];
-      const controls = await visualApi.cameraCheck().then(
+      const controls = await visualApi.cameraCheck("all").then(
         () => null,
         (e: Error) => e.message,
       );
@@ -1360,16 +1368,16 @@ export function VisualCalibrationView() {
       const s = await shoot(kind, stop, session).finally(
         () => held && visualApi.torqueOff().then(setTt, () => undefined),
       );
-      const p = s.photos.find((x) => x.stop_deg === stop);
-      const taken = new Set(s.photos.map((x) => x.stop_deg));
+      const got = s.photos.filter((x) => x.stop_deg === stop);
+      const taken = new Set(stopsTaken(s.photos).keys());
       const next = rig.stops.findIndex((x, i) => i > stopIdx && !taken.has(x));
       if (byHand && next >= 0) setStopIdx(next);
       setPicked(false);
       say(
         controls
           ? `camera controls differ: ${controls} — close Logi Tune; a sweep sets them`
-          : p
-            ? `${stop}°: ${p.tiles} tiles, ${p.corners} corners`
+          : got.length
+            ? `${stop}°: ${got.map((p) => `${CAM_LABEL[p.camera ?? "a"]} ${p.tiles} tiles, ${p.corners} corners`).join(" · ")}`
             : null,
         !!controls,
       );
@@ -1413,12 +1421,13 @@ export function VisualCalibrationView() {
       say(`saved to ${r.path}`);
     });
 
+  // The cameras' UVC controls as config.yaml and local.yaml say (uvcc, by serial): the browser
+  // never sets focus or exposure itself, so it cannot undo what the setup tuned.
   const lock = () =>
     run("locking…", async () => {
-      if (!stream) return;
-      const r = await lockCamera(stream);
-      if (r.locked) confirm("camera");
-      say(r.text, !r.locked);
+      await visualApi.cameraSet("all");
+      confirm("camera");
+      say("focus, exposure and white balance locked as in the rig config");
     });
 
   const go = (i: number) => {
@@ -1438,24 +1447,23 @@ export function VisualCalibrationView() {
       if (kind) setSession(kind, id ? await visualApi.session(id) : null);
     });
 
-  const rotate = (r: Rotation | "auto") => {
+  const rotate = (c: CamId, r: Rotation | "auto") => {
     const manual = r !== "auto";
-    store(ROTATION_MANUAL_KEY, manual);
-    setManualRotation(manual);
+    store(rotationKey(c, ROTATION_MANUAL_KEY), manual);
+    setManualRotation((m) => ({ ...m, [c]: manual }));
     if (manual) {
-      store(ROTATION_KEY, r);
-      setRotation(r);
+      store(rotationKey(c), r);
+      setRotation((x) => ({ ...x, [c]: r }));
     }
   };
-  const choose = (id: string) => {
-    store(CAMERA_KEY, id);
-    setCameraId(id);
+  const chooseView = (v: CamId | "both") => {
+    store(CAM_VIEW_KEY, v);
+    setCamView(v);
   };
 
   // ---- step states, from the sessions where they can tell
   const photos = (k: SessionKind) => byKind[k]?.photos ?? [];
-  const count = (k: SessionKind) =>
-    new Set(photos(k).map((x) => x.stop_deg)).size;
+  const count = (k: SessionKind) => stopsTaken(photos(k)).size;
   const weak = (k: SessionKind) =>
     photos(k).filter((x) => x.corners < WEAK).length;
   const begun = count("camera") > 0 || count("rotation") > 0;
@@ -1463,6 +1471,19 @@ export function VisualCalibrationView() {
   const status = (s: StepDef): { state: StepState; note: string } => {
     const seen = confirmed.includes(s.id);
     switch (s.id) {
+      case "setup":
+        return {
+          state: setupSummary?.ready
+            ? "done"
+            : setupSummary?.blockers.some((b) => b.endsWith("error"))
+              ? "warn"
+              : "todo",
+          note: setupSummary
+            ? setupSummary.ready
+              ? "ready for 1 · rig"
+              : `${setupSummary.blockers.length} open`
+            : "once per rig",
+        };
       case "mount":
         return {
           state: seen || begun ? "done" : "todo",
@@ -1536,7 +1557,7 @@ export function VisualCalibrationView() {
   const states = STEPS.map(status);
 
   // ---- the step's controls: one primary at a time
-  const taken = new Map(session?.photos.map((p) => [p.stop_deg, p]));
+  const taken = stopsTaken(session?.photos ?? []);
   const n = taken.size;
   const complete = stops.length > 0 && n >= stops.length;
   const solved = !!session?.result;
@@ -1605,10 +1626,10 @@ export function VisualCalibrationView() {
   } else if (step.id === "camera") {
     actions.push({
       label: "Lock focus & exposure",
-      title: "Fix focus, exposure and white balance at their current values",
+      title: "Set focus, exposure and white balance to the rig config's values (uvcc) and read them back",
       onClick: lock,
       primary: !confirmed.includes("camera"),
-      disabled: !stream,
+      disabled: !anyStream,
     });
   } else if (kind) {
     if (byHand)
@@ -1617,7 +1638,7 @@ export function VisualCalibrationView() {
         title: "Turn the plate to this stop by hand, then save a photo (Space)",
         onClick: capture,
         primary: !complete,
-        disabled: !playing,
+        disabled: !allPlaying,
         key: "␣",
       });
     else {
@@ -1627,7 +1648,7 @@ export function VisualCalibrationView() {
           "Home the motor into the hard stop, then a photo at every stop (a new session)",
         onClick: () => void runSweep(),
         primary: !complete,
-        disabled: !playing || !rig,
+        disabled: !allPlaying || !rig,
       });
       if (picked && session)
         actions.push({
@@ -1635,7 +1656,7 @@ export function VisualCalibrationView() {
           title: "Replace the photo at this stop (Space)",
           onClick: capture,
           primary: false,
-          disabled: !playing || !motorReady,
+          disabled: !allPlaying || !motorReady,
           key: "␣",
         });
     }
@@ -1710,34 +1731,81 @@ export function VisualCalibrationView() {
       }
     />
   );
+  const camLabel = (c: CamId) => {
+    const f = feeds[c];
+    const d = detected[c];
+    const corners = d?.detections.reduce((n, x) => n + x.uv.length, 0) ?? 0;
+    return (
+      <>
+        <b>{CAM_LABEL[c]}</b>
+        {d && ` · ${d.detections.length} tiles · ${corners} corners`}
+        <span className={`visual-cal-chip ${identityTone(f)}`} title={f.identityNote ?? ""}>
+          <i />
+          {IDENTITY_TEXT[f.identity]}
+        </span>
+      </>
+    );
+  };
   const camera =
     step.live &&
     !showResults &&
-    (error ? (
-      <p className="visual-cal-empty warn">{error}</p>
-    ) : !stream ? (
+    (cameraError && !playing ? (
+      <p className="visual-cal-empty warn">{cameraError}</p>
+    ) : !anyStream ? (
       <p className="visual-cal-empty">
-        {cameras.length ? "opening the camera…" : "looking for cameras…"}
+        {devices.length ? "opening the cameras…" : "looking for cameras…"}
       </p>
     ) : (
-      <RotatedVideo
-        video={video}
-        ready={playing}
-        rotation={rotation}
-        overlay={overlay}
-        layers={{
-          model: overlayShown ? model : null,
-          tiles: tilesShown,
-          hand: handShown && step.id !== "hand-pose" ? hand : null,
-          letters: rig?.letters ?? {},
-          fit: step.id === "hand-pose" ? fit : null,
-          estimate: handShown && (step.id === "hand-pose" || step.id === "hand-control") ? hand : null,
-          target: step.id === "hand-control" && sandboxPose ? { pose: sandboxPose, mount: sandboxMount } : null,
-          zero: handShown && step.id === "hand-pose" ? handZero : null,
-        }}
-        caption={`plate ${plateAngle}°${motorAngle === null ? " (assumed)" : tt?.torque ? "" : " (read-back, torque off)"}${overlayShown ? "" : " · overlay off"}`}
-      />
+      <div className="visual-cal-cams">
+        {viewCams.map((c) =>
+          feeds[c].stream ? (
+            <div key={c} className="visual-cal-cam">
+              <RotatedVideo
+                video={feeds[c].video}
+                ready={feeds[c].playing}
+                rotation={rotation[c]}
+                overlay={detected[c] ?? null}
+                label={camLabel(c)}
+                layers={{
+                  model: overlayShown ? (models[c] ?? null) : null,
+                  tiles: tilesShown,
+                  hand: handShown && step.id !== "hand-pose" ? hand : null,
+                  letters: rig?.letters ?? {},
+                  fit: step.id === "hand-pose" ? (fits[c] ?? null) : null,
+                  pose: step.id === "hand-pose" ? fit : null,
+                  estimate: handShown && (step.id === "hand-pose" || step.id === "hand-control") ? hand : null,
+                  target: step.id === "hand-control" && sandboxPose ? { pose: sandboxPose, mount: sandboxMount } : null,
+                  zero: handShown && step.id === "hand-pose" ? handZero : null,
+                }}
+                caption={`${CAM_LABEL[c]} · plate ${plateAngle}°${motorAngle === null ? " (assumed)" : tt?.torque ? "" : " (read-back, torque off)"}${overlayShown ? "" : " · overlay off"}`}
+              />
+            </div>
+          ) : (
+            <p key={c} className="visual-cal-empty warn visual-cal-cam">
+              {feeds[c].error ?? `${CAM_LABEL[c]}: opening…`}
+            </p>
+          ),
+        )}
+      </div>
     ));
+  // The setup's align view: the live stream, the CAD ghost of the tower (the nominal mount pose and
+  // lens, whatever is calibrated) and the tiles found.
+  const setupView = (c: CamId, ghost: ModelOverlay | null) =>
+    feeds[c].stream ? (
+      <RotatedVideo
+        video={feeds[c].video}
+        ready={feeds[c].playing}
+        rotation={rotation[c]}
+        overlay={detected[c] ?? null}
+        label={camLabel(c)}
+        layers={{ model: ghost, tiles: true, hand: null, letters: rig?.letters ?? {} }}
+        caption={`${CAM_LABEL[c]} · plate ${plateAngle}° · CAD ghost`}
+      />
+    ) : (
+      <p className="visual-cal-empty warn">
+        {feeds[c].error ?? `${CAM_LABEL[c]}: opening…`}
+      </p>
+    );
   const calibrated =
     model?.source.lens === "calibrated" && model.source.camera === "calibrated";
   const hint =
@@ -1745,7 +1813,7 @@ export function VisualCalibrationView() {
       ? "Lines sit on the tiles when the rig is right. A whole side off before calibrating: the object sits another way round (the calibration finds it). All off by the same amount: the camera mount setting."
       : "Tower and forearm sit on the hand when the rig is right; the fingers follow the joint angles. All off by the same amount: the camera mount setting.") +
     (model && !calibrated ? " Before 1a and 1b, a few mm is normal." : "");
-  const overlayBar = step.live && !showResults && stream && (
+  const overlayBar = step.live && step.id !== "setup" && !showResults && anyStream && (
     <div className="visual-cal-overlay">
       <div className="toolbar">
         <label
@@ -1773,6 +1841,19 @@ export function VisualCalibrationView() {
             hand
           </label>
         )}
+        {activeCams.length > 1 && (
+          <div className="view-tabs" title="Which cameras to show">
+            {(["both", ...activeCams] as const).map((v) => (
+              <button
+                key={v}
+                className={`view-tab ${camView === v || (v === "both" && !shownCams.length) ? "active" : ""}`}
+                onClick={() => chooseView(v)}
+              >
+                {v === "both" ? "both" : CAM_LABEL[v]}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       {overlayShown && (
         <span
@@ -1793,18 +1874,12 @@ export function VisualCalibrationView() {
     <>
       <SetupTabs />
       <section className="panel visual-cal">
-        <video
-          ref={video}
-          className="visual-cal-source"
-          autoPlay
-          playsInline
-          muted
-        />
+        {sources}
         <nav className="gt-steps visual-cal-nav">
           {STEPS.map((s, i) => (
             <div key={s.id} className="visual-cal-nav-item">
               {(i === 0 || STEPS[i - 1].phase !== s.phase) && (
-                <div className="visual-cal-phase">{s.phase}</div>
+                <div className="visual-cal-phase">{PHASE_LABEL[s.phase]}</div>
               )}
               <button
                 type="button"
@@ -1853,6 +1928,7 @@ export function VisualCalibrationView() {
 
         <div className="visual-cal-content">
           <div className="visual-cal-side">
+            <UsbBanner />
             <div className="visual-cal-head">
               <span className="visual-cal-count">
                 {index + 1} / {STEPS.length} · {step.phase}
@@ -1957,7 +2033,7 @@ export function VisualCalibrationView() {
                 {overlayBar}
               </div>
             )}
-            {overlayShown && stream && (
+            {overlayShown && anyStream && step.id !== "setup" && (
               <p className="visual-cal-hint">{hint}</p>
             )}
 
@@ -1993,40 +2069,70 @@ export function VisualCalibrationView() {
             )}
 
             {step.id === "camera" && (
-              <div className="visual-cal-toolbar">
-                <select
-                  value={cameraId}
-                  onChange={(e) => choose(e.target.value)}
-                  disabled={!cameras.length}
-                  title="Camera"
+              <div className="visual-cal-cam-setup">
+                {activeCams.map((c) => {
+                  const f = feeds[c];
+                  return (
+                    <div key={c} className="visual-cal-toolbar">
+                      <b>{CAM_LABEL[c]}</b>
+                      <select
+                        value={f.deviceId}
+                        onChange={(e) => assign(c, e.target.value)}
+                        disabled={!devices.length}
+                        title={`The browser device for ${CAM_LABEL[c]} (serial ${rig?.cameras?.[c]?.serial ?? "?"}): checked against the serial, a crossed pair swaps by itself`}
+                      >
+                        {devices.map((d, i) => (
+                          <option key={d.deviceId} value={d.deviceId}>
+                            {d.label || `camera ${i + 1}`}
+                          </option>
+                        ))}
+                      </select>
+                      <div
+                        className="view-tabs"
+                        title="Turn the image: auto reads the tower's up from the tiles; a turn overrides it"
+                      >
+                        <button
+                          className={`view-tab ${manualRotation[c] ? "" : "active"}`}
+                          onClick={() => rotate(c, "auto")}
+                        >
+                          auto
+                        </button>
+                        {ROTATIONS.map((r) => (
+                          <button
+                            key={r}
+                            className={`view-tab ${manualRotation[c] && rotation[c] === r ? "active" : ""}`}
+                            onClick={() => rotate(c, r)}
+                          >
+                            {r}°
+                          </button>
+                        ))}
+                      </div>
+                      {f.size && <span className="setup-card-hint">{f.size}</span>}
+                      <span
+                        className={`visual-cal-chip ${identityTone(f)}`}
+                        title={f.identityNote ?? ""}
+                      >
+                        <i />
+                        {IDENTITY_TEXT[f.identity]}
+                      </span>
+                      {f.identityNote && f.identity !== "ok" && (
+                        <span className="setup-card-hint">{f.identityNote}</span>
+                      )}
+                    </div>
+                  );
+                })}
+                {rig?.cameras?.b && !rig.cameras.b.enabled && (
+                  <span className="setup-card-hint">
+                    cam B is disabled in the rig config (cameras › b › enabled: false)
+                  </span>
+                )}
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={verify}
+                  title="Compare each stream with a still taken by the camera's USB serial"
                 >
-                  {cameras.map((c, i) => (
-                    <option key={c.deviceId} value={c.deviceId}>
-                      {c.label || `camera ${i + 1}`}
-                    </option>
-                  ))}
-                </select>
-                <div
-                  className="view-tabs"
-                  title="Turn the image: auto reads the tower's up from the tiles; a turn overrides it"
-                >
-                  <button
-                    className={`view-tab ${manualRotation ? "" : "active"}`}
-                    onClick={() => rotate("auto")}
-                  >
-                    auto
-                  </button>
-                  {ROTATIONS.map((r) => (
-                    <button
-                      key={r}
-                      className={`view-tab ${manualRotation && rotation === r ? "active" : ""}`}
-                      onClick={() => rotate(r)}
-                    >
-                      {r}°
-                    </button>
-                  ))}
-                </div>
-                {size && <span className="setup-card-hint">{size}</span>}
+                  Check identity
+                </button>
               </div>
             )}
 
@@ -2086,7 +2192,25 @@ export function VisualCalibrationView() {
             </div>
           </div>
           <div className="visual-cal-main">
-            {camera && <div className="visual-cal-live">{camera}</div>}
+            {step.id === "setup" ? (
+              <RigSetup
+                rig={rig}
+                cams={activeCams}
+                summary={setupSummary}
+                refresh={refreshSetup}
+                tt={tt}
+                plateAngle={plateAngle}
+                rotation={rotation}
+                renderView={setupView}
+                onSerials={() => {
+                  visualApi.rig().then(setRig, () => undefined);
+                  verify();
+                }}
+                onTurntable={setTt}
+              />
+            ) : (
+              camera && <div className="visual-cal-live">{camera}</div>
+            )}
             {showResults && session && (
               <Results session={session} cad={rig?.camera_mount ?? null} />
             )}

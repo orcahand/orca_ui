@@ -1,8 +1,9 @@
 // The calibration rig's digital twin in the dashboard's 3D view (docs/rig-dashboard.md):
 // Shea's meshes (orca_files calibration_rig/twin/, rig frame mm, z up) in four groups —
 // static, rotor Rz(plate), object (the tower) Rz(plate)·Rz(mounting), camera — and the
-// tower's ChArUco tiles as textured quads at their seats. The live plate angle comes
-// with /twin/state; HandScene mounts the hand with rigMountMatrix().
+// tower's ChArUco tiles as textured quads at their seats. Every enabled rig camera (A, B)
+// is marked by its view frustum at its solved pose, or its CAD pose until 1b has solved it.
+// The live plate angle comes with /twin/state; HandScene mounts the hand with rigMountMatrix().
 
 import { useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useState } from 'react'
@@ -15,6 +16,9 @@ type Group = 'static' | 'rotor' | 'object' | 'camera'
 interface Part { name: string; file: string; group: Group; color?: string; transform: Mat4 }
 
 const TILE_MM = 78
+const FRUSTUM_MM = { depth: 70, half: [39, 22] } // a 16:9 view, OpenCV camera frame (z forward)
+const SOLVED = '#22c55e'
+const CAD = '#f59e0b'
 
 /** Rig frame (mm, z up) to the scene (m, y up). */
 export const RIG_TO_SCENE = new THREE.Matrix4()
@@ -36,6 +40,50 @@ function seatMatrix(seat: { corner: number[]; rpy: number[] }): THREE.Matrix4 {
   // The tile frame has x right, y down (image top at y = 0): the plane's +y is the image top.
   return m.multiply(new THREE.Matrix4().makeTranslation(TILE_MM / 2, TILE_MM / 2, 0))
     .multiply(new THREE.Matrix4().makeScale(1, -1, 1))
+}
+
+/** camera -> rig (OpenCV frame: x right, y down, z forward) looking from `eye` at `at`, rig z up. */
+function lookAt(eye: number[], at: number[]): THREE.Matrix4 {
+  const p = new THREE.Vector3(...eye)
+  const z = new THREE.Vector3(...at).sub(p).normalize()
+  const x = new THREE.Vector3().crossVectors(z, new THREE.Vector3(0, 0, 1)).normalize()
+  const y = new THREE.Vector3().crossVectors(z, x)
+  return new THREE.Matrix4().makeBasis(x, y, z).setPosition(p)
+}
+
+function frustum(color: string, label: string): THREE.Group {
+  const { depth: d, half: [w, h] } = FRUSTUM_MM
+  const c = [[-w, -h], [w, -h], [w, h], [-w, h]].map(([x, y]) => [x, y, d])
+  const pts = c.flatMap((p, i) => [0, 0, 0, ...p, ...p, ...c[(i + 1) % 4]])
+  pts.push(0, -h, d, 0, -h - 12, d) // a tick at the image top
+  const geo = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
+  const g = new THREE.Group()
+  g.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color })))
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = 64
+  const ctx = canvas.getContext('2d')
+  if (ctx) {
+    ctx.fillStyle = color
+    ctx.font = 'bold 48px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(label, 32, 34)
+  }
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), depthTest: false }))
+  sprite.scale.setScalar(30)
+  sprite.position.set(0, -h - 30, 0)
+  g.add(sprite)
+  return g
+}
+
+function disposeTree(o: THREE.Object3D) {
+  o.traverse((x) => {
+    const m = x as THREE.Mesh
+    m.geometry?.dispose()
+    const mat = m.material as THREE.Material & { map?: THREE.Texture }
+    mat?.map?.dispose()
+    mat?.dispose?.()
+  })
 }
 
 function fixed(o: THREE.Object3D, m?: THREE.Matrix4) {
@@ -60,6 +108,12 @@ export function RigTwin({ twin, state, showTower }: { twin: TwinInfo; state: Twi
     return { root, ...g }
   }, [])
   const [loaded, setLoaded] = useState(false)
+  const cams = useMemo(() => {
+    const g = new THREE.Group()
+    fixed(g)
+    groups.root.add(g)
+    return g
+  }, [groups])
 
   useEffect(() => {
     let alive = true
@@ -111,6 +165,25 @@ export function RigTwin({ twin, state, showTower }: { twin: TwinInfo; state: Twi
     groups.rotor.matrixWorldNeedsUpdate = groups.object.matrixWorldNeedsUpdate = true
     invalidate()
   }, [state, groups, invalidate])
+
+  // The cameras' frustums, rebuilt only when a pose changes (the state comes at 5 Hz).
+  const camKey = JSON.stringify(state?.cameras ?? null)
+  useEffect(() => {
+    const all = JSON.parse(camKey) as TwinState['cameras'] | null
+    for (const [name, c] of Object.entries(all ?? {})) {
+      if (!c?.enabled) continue
+      const m = c.solved ? mat4(c.solved) : c.cad ? lookAt(c.cad.position, c.cad.look_at) : null
+      if (!m) continue
+      const f = frustum(c.solved ? SOLVED : CAD, name.toUpperCase())
+      fixed(f, m)
+      cams.add(f)
+    }
+    invalidate()
+    return () => {
+      cams.children.forEach(disposeTree)
+      cams.clear()
+    }
+  }, [camKey, cams, invalidate])
 
   useEffect(() => {
     groups.object.visible = showTower

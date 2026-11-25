@@ -5682,6 +5682,54 @@ header h1 {
   flex-wrap: wrap;
 }
 
+.visual-cal-cam-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+/* One view per rig camera, side by side (each its own turn, overlay and tile count). */
+.visual-cal-cams {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.visual-cal-cam {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.visual-cal-cam-label {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 3px 8px;
+  font: 11px var(--font);
+  color: #fff;
+  background: rgb(0 0 0 / 0.6);
+  pointer-events: none;
+}
+
+.visual-cal-cam-label .visual-cal-chip {
+  color: #fff;
+}
+
+.visual-cal-zoom .visual-cal-cam-label {
+  top: 8vh;
+  left: 3vw;
+}
+
 .visual-cal-actions {
   align-items: center;
 }
@@ -5855,3 +5903,41 @@ header h1 {
 }
 .rig-camera-frame { height: auto; max-height: 48vh; }
 .rig-camera-frame .visual-cal-video { max-height: 48vh; }
+.rig-cameras { display: flex; gap: 8px; }
+.rig-cameras > .visual-cal-frame { flex: 1 1 0; min-width: 0; }
+
+/* Visual calibration 0 · Setup (RigSetup.tsx) */
+.visual-cal-chip.error i { background: var(--danger-bright); }
+.visual-cal-usb-banner { display: grid; gap: 4px; margin-bottom: 8px; }
+.rig-setup { display: flex; flex-direction: column; gap: 10px; width: 100%; overflow: auto; padding-right: 4px; }
+.rig-setup-summary { padding: 8px 10px; font-size: 12px; border: 1px solid rgb(var(--warn-rgb) / 0.4); }
+.rig-setup-summary.ok { border-color: rgb(var(--ok-rgb) / 0.6); color: var(--ok); }
+.rig-setup-card { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; font-size: 11px;
+  border: 1px solid var(--panel-border); border-left: 3px solid var(--panel-border-strong); }
+.rig-setup-card.ok { border-left-color: var(--ok); }
+.rig-setup-card.warn { border-left-color: var(--warn); }
+.rig-setup-card.error { border-left-color: var(--danger-bright); }
+.rig-setup-card header { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.rig-setup-num { min-width: 16px; font-weight: 700; color: var(--dim); }
+.rig-setup-actions { margin-left: auto; display: flex; gap: 6px; }
+.rig-setup-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.rig-setup-findings { margin: 0; padding-left: 16px; display: grid; gap: 2px; }
+.rig-setup-findings li.error, .rig-setup-card .warn { color: var(--warn); }
+.rig-setup-findings li.error b { color: var(--danger-bright); }
+.rig-setup-card .ok { color: var(--ok); }
+.rig-setup-table { border-collapse: collapse; font-size: 11px; }
+.rig-setup-table th, .rig-setup-table td { padding: 2px 8px 2px 0; text-align: left; }
+.rig-setup-ident { display: flex; gap: 12px; flex-wrap: wrap; }
+.rig-setup-ident figure { margin: 0; max-width: 300px; display: grid; gap: 4px; }
+.rig-setup-ident img { width: 180px; height: 180px; object-fit: contain; background: var(--letterbox); }
+.rig-setup-align { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.rig-setup-align-live { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 320px); gap: 10px; }
+.rig-setup-view { height: 52vh; min-height: 260px; display: flex; }
+.rig-setup-advice { display: grid; gap: 6px; align-content: start; }
+.rig-setup-advice ul { margin: 0; padding-left: 16px; font-size: 12px; }
+.rig-setup-lock { padding: 8px; font-size: 12px; border: 1px solid rgb(var(--ok-rgb) / 0.6); background: rgb(var(--ok-rgb) / 0.08); }
+.rig-setup-job { display: flex; gap: 8px; align-items: center; }
+.rig-setup-job .setup-progress { flex: 1; align-self: center; }
+.rig-setup-curve, .rig-setup-diagram { flex: none; }
+.rig-setup-light { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.rig-setup-lit { font-weight: 700; color: var(--accent); }
