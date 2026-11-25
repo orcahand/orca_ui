@@ -124,6 +124,8 @@ def test_the_doctor_reports_each_check_and_degrades_without_one(tmp_path, monkey
     seen = {}
 
     def run(checks=None):
+        if checks and "nope" in checks:
+            raise ValueError("no check nope; the checks: opencv, cameras, uvcc")
         try:
             asyncio.get_running_loop()
             seen["in_loop"] = True
@@ -142,6 +144,8 @@ def test_the_doctor_reports_each_check_and_degrades_without_one(tmp_path, monkey
     assert r["checks"][1] == {"name": "cameras", "status": "error", "detail": "1 of 2 UVC cameras",
                               "fix": "plug in camera B"}
     assert r["checks"][0]["fix"] is None and r["checks"][2]["status"] == "warn"
+    r = c.get("/api/visual-calibration/doctor?checks=nope")
+    assert r.status_code == 400 and "no check nope" in r.json()["detail"]
     monkeypatch.setitem(sys.modules, "visual_calibration.doctor", None)
     r = c.get("/api/visual-calibration/doctor")
     assert r.status_code == 404 and "doctor not available" in r.json()["detail"]

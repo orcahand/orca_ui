@@ -1222,6 +1222,8 @@ def build_router(base: Path | None = None, mock: bool = False, cameras=None) -> 
             rows = await asyncio.to_thread(module.run, checks)
         except ImportError:
             raise
+        except ValueError as e:                    # a check it does not have
+            raise HTTPException(400, str(e)) from e
         except Exception as e:
             raise HTTPException(500, f"the doctor failed: {type(e).__name__}: {e}") from e
         out = [{"name": str(r.get("name") or "?"),
